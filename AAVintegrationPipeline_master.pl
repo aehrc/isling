@@ -76,9 +76,8 @@ while (my $vl = <VIRAL>) {
 	elsif ($cig =~ /(\d+)[SH]$/) 	  { if ($1 > $cutoff) { @viralInt = analyzeRead($parts[3], $cig, "+"); } } # integration site is after the viral sequence
 
 	# ID = readName_seq (in forward direction)
-###### ADD HERE CHECK FOR XA FIELD.  IF PRESENT, ADD TO END OF VALUE IN HASH ARRAY, OTHERIWISE ADD "noXA"	
-#   my @XA = grep /^XA/, @parts;
-	
+
+	#Add get secondary alignment information from XA field
 	my $vSec;
 	if ($vl =~ /XA\:.+\:.+/) 	{ 
 		($vSec) = ($vl =~ /XA\:.+\:(.+)\s/); 
@@ -127,7 +126,7 @@ while (my $hl = <HUMAN>) {
 
 	if (exists $viralIntegrations{join("xxx",($parts[0],$seq))}) { # only consider reads that were tagged from the viral alignment, no need to consider excess reads
 	
-		
+		#get secondary alignments from XA field
 		my $hSec;
 		if ($hl =~ /XA\:.+\:.+/) 	{ ($hSec) = ($hl =~ /XA\:.+\:(.+)\s/); }
 		else 						{ $hSec = "NA"; }
