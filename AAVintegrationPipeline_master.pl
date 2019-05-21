@@ -40,10 +40,11 @@ my %humanIntegrations;
 ### Junctions are defined by the CIGAR string: SM or MS
 ### Save the resulting information in a hash:
 ###	key: 	{ReadID}xxx{ReadSequence}
-###	value:	{TargetID}xxx{ViralIntegrationData}xxx{Sequence}xxx{SeqOrientation}xxx{CIGAR}
+###	value:	{TargetID}xxx{ViralIntegrationData}xxx{Sequence}xxx{SeqOrientation}xxx{CIGAR}xxx{XA}
 ###		SeqOrientation: f = aligned in fwd orientation
 ###				r = aligned in rev orientation
 ###		Sequence is always given in fwd orientation
+### XA is the secondary alignments in the XA field (from BWA); not present use "noXA"
 
 open (VIRAL, $viral) || die "Could not open viral alignment file: $viral\n";
 if ($verbose) { print "Processing viral alignment...\n"; }
@@ -51,6 +52,7 @@ while (my $vl = <VIRAL>) {
 	if ($vl =~ /^@/) { next; } # skip header lines
 
 	my @parts = split("\t", $vl);
+	
 
 	if ($parts[1] & 0x800) { next(); } # skip supplementary alignments
 
@@ -74,8 +76,17 @@ while (my $vl = <VIRAL>) {
 	elsif ($cig =~ /(\d+)[SH]$/) 	  { if ($1 > $cutoff) { @viralInt = analyzeRead($parts[3], $cig, "+"); } } # integration site is after the viral sequence
 
 	# ID = readName_seq (in forward direction)
-	if   (@viralInt and ($parts[1] & 0x10)) { $viralIntegrations{join("xxx", ($parts[0],(reverseComp($parts[9]))[0]))} = join("\t",($parts[2], @viralInt, (reverseComp($parts[9]))[0], 'r', $cig)); }
-	elsif (@viralInt) 			{ $viralIntegrations{join("xxx", ($parts[0],$parts[9]))}	           = join("\t",($parts[2], @viralInt, $parts[9],                   'f', $cig)); } 
+###### ADD HERE CHECK FOR XA FIELD.  IF PRESENT, ADD TO END OF VALUE IN HASH ARRAY, OTHERIWISE ADD "noXA"	
+#   my @XA = grep /^XA/, @parts;
+	
+	my $vSec;
+	if ($vl =~ /XA\:.+\:.+/) 	{ 
+		($vSec) = ($vl =~ /XA\:.+\:(.+)\s/); 
+	}
+	else 						{ $vSec = "NA"; }
+	
+	if   (@viralInt and ($parts[1] & 0x10)) { $viralIntegrations{join("xxx", ($parts[0],(reverseComp($parts[9]))[0]))} = join("\t",($parts[2], @viralInt, (reverseComp($parts[9]))[0], 'r', $cig, $vSec)); }
+	elsif (@viralInt) 			{ $viralIntegrations{join("xxx", ($parts[0],$parts[9]))}	           = join("\t",($parts[2], @viralInt, $parts[9],                   'f', $cig, $vSec)); } 
 	#$viralIntegrations{join("xxx", ($parts[0],$parts[9]))} = join("\t",($parts[2], @viralInt, $parts[9]));
 }
 close VIRAL;
@@ -87,7 +98,7 @@ if ($verbose) { print "Processing human alignment...\n"; }
 while (my $hl = <HUMAN>) {
 	if ($hl =~ /^@/) { next; } # skip header lines
 
-	my @parts = split("\t", $hl);
+	my @parts = split("\t", $hl); #get fields from each alignment
 	
 	if ($parts[1] & 0x800) { next(); } # skip supplementary alignments
 
@@ -115,13 +126,18 @@ while (my $hl = <HUMAN>) {
 	#$seq = $parts[9];
 
 	if (exists $viralIntegrations{join("xxx",($parts[0],$seq))}) { # only consider reads that were tagged from the viral alignment, no need to consider excess reads
+	
+		
+		my $hSec;
+		if ($hl =~ /XA\:.+\:.+/) 	{ ($hSec) = ($hl =~ /XA\:.+\:(.+)\s/); }
+		else 						{ $hSec = "NA"; }
 		
 		my @humanInt;
 		if    ($cig =~ /^\d+[SH].+\d+[SH]$/) { @humanInt = undef; }
 		elsif ($cig =~ /(^\d+)[SH]/)         { if ($1 > $cutoff) { @humanInt = analyzeRead($parts[3], $cig, "-"); } }
 		elsif ($cig =~ /(\d+)[SH]$/)         { if ($1 > $cutoff) { @humanInt = analyzeRead($parts[3], $cig, "+"); } }
 
-		if (@humanInt) { $humanIntegrations{join("xxx",($parts[0],$seq))} = join("\t",($parts[2], @humanInt, $seq, $ori, $cig)); }
+		if (@humanInt) { $humanIntegrations{join("xxx",($parts[0],$seq))} = join("\t",($parts[2], @humanInt, $seq, $ori, $cig, $hSec)); }
 	}
 }
 close HUMAN;
@@ -408,6 +424,9 @@ sub extractOutput {
 	my @viral = split("\t",$viralData);
 	my @human = split("\t",$humanData);
 
+	my $vSec = pop(@viral);
+	my $hSec = pop(@human);
+
 	my $overlap = $intData[6];
 
 	### Extract junction coordinates relative to the target sequence
@@ -434,7 +453,7 @@ sub extractOutput {
 
 	my $outline = join("\t", ($human[0], $humanStart, $humanStop, $viral[0], 
 				  $viralStart, $viralStop, $overlap, $human[5], 
-				  $humanSeq, $viralSeq, $overlapSeq));
+				  $humanSeq, $viralSeq, $overlapSeq, $hSec, $vSec));
 
 	return($outline);
 }
@@ -460,7 +479,7 @@ sub printOutput {
 ### Print output file
 	my ($outFile, @outLines) = @_;	
 	open (OUTFILE, ">$outFile") || die "Could not open output file: $outFile\n";
-	print OUTFILE "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNo. Ambiguous Bases\tOrientation\tHuman Seq\tViral Seq\tAmbiguous Seq\tRead ID\n";
+	print OUTFILE "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNo. Ambiguous Bases\tOrientation\tHuman Seq\tViral Seq\tAmbiguous Seq\tHuman Secondary Alignments\tViral Secondary Alignments\tRead ID\n";
 	foreach my $line (@outLines) { print OUTFILE "$line\n"; }
 	close OUTFILE;
 }
