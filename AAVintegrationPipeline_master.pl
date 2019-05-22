@@ -162,7 +162,7 @@ foreach my $key (keys %viralIntegrations) {
 		# Once the positions are collected, put together the output	
 		my $outLine;
 		if (@intData) { $outLine = extractOutput($viralIntegrations{$key}, $humanIntegrations{$key}, @intData); }
-		if ($outLine) { push(@outLines, join("\t", ($outLine, (split("xxx",$key))[0]))) };
+		if ($outLine) { push(@outLines, join("\t", ($outLine, (split("xxx",$key))[0],(split("xxx",$key))[1]))) };
 	}
 }
 
@@ -478,7 +478,7 @@ sub printOutput {
 ### Print output file
 	my ($outFile, @outLines) = @_;	
 	open (OUTFILE, ">$outFile") || die "Could not open output file: $outFile\n";
-	print OUTFILE "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNo. Ambiguous Bases\tOrientation\tHuman Seq\tViral Seq\tAmbiguous Seq\tHuman Secondary Alignments\tViral Secondary Alignments\tRead ID\n";
+	print OUTFILE "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNo. Ambiguous Bases\tOrientation\tHuman Seq\tViral Seq\tAmbiguous Seq\tHuman Secondary Alignments\tViral Secondary Alignments\tRead ID\t(merged)\n";
 	foreach my $line (@outLines) { print OUTFILE "$line\n"; }
 	close OUTFILE;
 }
