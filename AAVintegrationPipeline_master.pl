@@ -492,7 +492,7 @@ sub printBed {
 	open (BEDFILE, ">$bedFile") || die "Could not open bedfile: $bedFile\n";
 	foreach my $line (@outLines) {
 		my @parts = split("\t",$line);
-		print BEDFILE "$parts[0]\t$parts[1]\t$parts[2]\t$parts[11]\t.\t$parts[7]\n";
+		print BEDFILE "$parts[0]\t$parts[1]\t$parts[2]\t$parts[13]\t.\t$parts[7]\n";
 	}
 	close BEDFILE;
 }
