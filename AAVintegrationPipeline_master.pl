@@ -158,7 +158,6 @@ foreach my $key (keys %viralIntegrations) {
 		#	Viral Stop	
 		#	Overlap
 		my @intData = collectIntersect($viralIntegrations{$key}, $humanIntegrations{$key});
-
 		# Once the positions are collected, put together the output	
 		my $outLine;
 		if (@intData) { $outLine = extractOutput($viralIntegrations{$key}, $humanIntegrations{$key}, @intData); }
@@ -192,7 +191,7 @@ sub printHelp {
 	print "\t--bed:     Print integrations sites to indicated bed file (default = NA)\n";
 	print "\t--merged:  Merge bedfile into overlapping integration sites (default = NA)\n";
 	print "\t--verbose: Print progress messages\n";
-	print "\t--help:    Print this help message and quite\n";
+	print "\t--help:    Print this help message and quit\n";
 
 	exit;
 }
@@ -317,30 +316,30 @@ sub collectIntersect {
 	my ($vClip) = ($vCig =~ /(\d+)S/);
 	my ($vAlig) = ($vCig =~ /(\d+)M/);
 	
-
-	################################
-	############ TO DO #############
-	################################
-	#if (abs($hClip - $vClip) > 0) { 
-	# if the clipped regions do not line up, then there is a region in the read that cannot be mapped to host or virus
-	# we make the assumption that these come from the virus, as the viral genome is not 100% characterized
-	# therefore, set the viral Start/Stop as right next to the host start/stop
-
-
-	#}
-
 	### Overlap should be the same regardless of how it's calculated so double check
-	my $overlap1 = abs($hClip - $vAlig);
-	my $overlap2 = abs($vClip - $hAlig);
+	my $overlap1 = abs($hAlig - $vClip);
+	my $overlap2 = abs($vAlig - $hClip);
 
-	unless ($overlap1 == $overlap2) { 
+	#here check that absolute values of overlap are the same
+	unless (abs($overlap1) == abs($overlap2)) { 
 		print "Impossible overlap found\n";
 		return;
 	}
+	
+	
+	#ambigous bases may result from either an overlap of aligned regions, or a gap
+	#if the total number of aligned bases (from human and viral alignments) are greater than the read length, then it's an overlap
+	#otherwise it's a gap
+	my $overlaptype;
+	if 		(($hAlig + $vAlig) > ($hClip + $hAlig))	 {	$overlaptype = "overlap";	} #overlap
+	elsif 	(($hAlig + $vAlig) == ($hClip + $hAlig)) {	$overlaptype = "none";		} #no gap or overlap
+	else 											 {	$overlaptype = "gap";		} #gap
+	
+
 
 	### Calculate the start and stop positions of the viral and human sequences relative to the read
-	my ($hRStart,$hRStop) = extractSeqCoords($hOri, $hDir, $hAlig, $overlap1, length($seq));
-	my ($vRStart,$vRStop) = extractSeqCoords($vOri, $vDir, $vAlig, $overlap1, length($seq));
+	my ($hRStart,$hRStop) = extractSeqCoords($hOri, $hDir, $hAlig, abs($overlap1), length($seq));
+	my ($vRStart,$vRStop) = extractSeqCoords($vOri, $vDir, $vAlig, abs($overlap1), length($seq));
 
 	#my ($hRStart, $hRStop);
 	#if ($hOri eq "+") { # human integration site is after the aligned sequence: Human -> Viral
@@ -390,7 +389,7 @@ sub collectIntersect {
 	#	return; # If you end up here something's gone weird. Need to double check to make sure nothing would end up here
 	#}
 
-	return($intRStart, $intRStop, $hRStart, $hRStop, $vRStart, $vRStop, $overlap1, $order);
+	return($intRStart, $intRStop, $hRStart, $hRStop, $vRStart, $vRStop, $overlap1, $order, $overlaptype);
 
 	#if 	  ($vOri eq "+" and $hOri eq "-" and $vStop - 1 > $hStart) { return($hStart, $vStop); } # overalp with order virus -> human
 	#elsif ($vOri eq "-" and $hOri eq "+" and $hStop - 1 > $vStart)    { return($vStart, $hStop); } # overlap with order human -> virus
@@ -415,7 +414,7 @@ sub extractSeqCoords {
 sub extractOutput {
 ### Construct the output line
 ### Output line is a tab seperated string with the following information
-### humanChr humanStart humanStop viralChr viralStar viralStop AmbiguousBases Orientation(human) humanSeq viralSeq AmbiguousSeq
+### humanChr humanStart humanStop viralChr viralStar viralStop AmbiguousBases OverlapType Orientation(human) humanSeq viralSeq AmbiguousSeq HumanSecAlign ViralSecAlign
 	my ($viralData) = shift @_;
 	my ($humanData) = shift @_;
 	my @intData     = @_;
@@ -427,6 +426,8 @@ sub extractOutput {
 	my $hSec = pop(@human);
 
 	my $overlap = $intData[6];
+	
+	my $overlaptype = $intData[8];
 
 	### Extract junction coordinates relative to the target sequence
 	my ($viralStart, $viralStop) = extractCoords($viral[1], $viral[2], $viral[5], $overlap);
@@ -451,7 +452,7 @@ sub extractOutput {
 	#else		  	{ $overlapSeq = substr($human[6], ($human[3]-$overlap), $overlap); }
 
 	my $outline = join("\t", ($human[0], $humanStart, $humanStop, $viral[0], 
-				  $viralStart, $viralStop, $overlap, $human[5], 
+				  $viralStart, $viralStop, $overlap, $overlaptype, $human[5], 
 				  $humanSeq, $viralSeq, $overlapSeq, $hSec, $vSec));
 
 	return($outline);
@@ -478,7 +479,7 @@ sub printOutput {
 ### Print output file
 	my ($outFile, @outLines) = @_;	
 	open (OUTFILE, ">$outFile") || die "Could not open output file: $outFile\n";
-	print OUTFILE "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNo. Ambiguous Bases\tOrientation\tHuman Seq\tViral Seq\tAmbiguous Seq\tHuman Secondary Alignments\tViral Secondary Alignments\tRead ID\t(merged)\n";
+	print OUTFILE "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNo. Ambiguous Bases\tOverlap Type\tOrientation\tHuman Seq\tViral Seq\tAmbiguous Seq\tHuman Secondary Alignments\tViral Secondary Alignments\tRead ID\t(merged)\n";
 	foreach my $line (@outLines) { print OUTFILE "$line\n"; }
 	close OUTFILE;
 }
@@ -492,7 +493,7 @@ sub printBed {
 	open (BEDFILE, ">$bedFile") || die "Could not open bedfile: $bedFile\n";
 	foreach my $line (@outLines) {
 		my @parts = split("\t",$line);
-		print BEDFILE "$parts[0]\t$parts[1]\t$parts[2]\t$parts[13]\t.\t$parts[7]\n";
+		print BEDFILE "$parts[0]\t$parts[1]\t$parts[2]\t$parts[14]\t.\t$parts[8]\n";
 	}
 	close BEDFILE;
 }
