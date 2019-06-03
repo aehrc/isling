@@ -44,7 +44,7 @@ my %humanIntegrations;
 ###		SeqOrientation: f = aligned in fwd orientation
 ###				r = aligned in rev orientation
 ###		Sequence is always given in fwd orientation
-### XA is the secondary alignments in the XA field (from BWA); not present use "noXA"
+### XA is the secondary alignments in the XA field (from BWA)
 
 open (VIRAL, $viral) || die "Could not open viral alignment file: $viral\n";
 if ($verbose) { print "Processing viral alignment...\n"; }
@@ -84,8 +84,16 @@ while (my $vl = <VIRAL>) {
 	}
 	else 						{ $vSec = "NA"; }
 	
-	if   (@viralInt and ($parts[1] & 0x10)) { $viralIntegrations{join("xxx", ($parts[0],(reverseComp($parts[9]))[0]))} = join("\t",($parts[2], @viralInt, (reverseComp($parts[9]))[0], 'r', $cig, $vSec)); }
-	elsif (@viralInt) 			{ $viralIntegrations{join("xxx", ($parts[0],$parts[9]))}	           = join("\t",($parts[2], @viralInt, $parts[9],                   'f', $cig, $vSec)); } 
+	#get supplementary alignments from SA field in order to check for possible vector rearrangements
+	my $vSup;
+	if ($vl =~ /SA\:.+\:.+/) 	{ 
+		($vSup) = ($vl =~ /SA\:.+\:(.+)\s/); 
+	}
+	else 						{ $vSup = "NA"; }	
+	
+	
+	if   (@viralInt and ($parts[1] & 0x10)) { $viralIntegrations{join("xxx", ($parts[0],(reverseComp($parts[9]))[0]))} = join("\t",($parts[2], @viralInt, (reverseComp($parts[9]))[0], 'r', $cig, $vSec, $vSup)); }
+	elsif (@viralInt) 			{ $viralIntegrations{join("xxx", ($parts[0],$parts[9]))}	           = join("\t",($parts[2], @viralInt, $parts[9],                   'f', $cig, $vSec, $vSup)); } 
 	#$viralIntegrations{join("xxx", ($parts[0],$parts[9]))} = join("\t",($parts[2], @viralInt, $parts[9]));
 }
 close VIRAL;
@@ -131,12 +139,17 @@ while (my $hl = <HUMAN>) {
 		if ($hl =~ /XA\:.+\:.+/) 	{ ($hSec) = ($hl =~ /XA\:.+\:(.+)\s/); }
 		else 						{ $hSec = "NA"; }
 		
+		#get supplementary alignments from SA field
+		my $hSup;
+		if ($hl =~ /SA\:.+\:.+/) 	{ ($hSup) = ($hl =~ /SA\:.+\:(.+)\s/); }
+		else 						{ $hSup = "NA"; }
+		
 		my @humanInt;
 		if    ($cig =~ /^\d+[SH].+\d+[SH]$/) { @humanInt = undef; }
 		elsif ($cig =~ /(^\d+)[SH]/)         { if ($1 > $cutoff) { @humanInt = analyzeRead($parts[3], $cig, "-"); } }
 		elsif ($cig =~ /(\d+)[SH]$/)         { if ($1 > $cutoff) { @humanInt = analyzeRead($parts[3], $cig, "+"); } }
 
-		if (@humanInt) { $humanIntegrations{join("xxx",($parts[0],$seq))} = join("\t",($parts[2], @humanInt, $seq, $ori, $cig, $hSec)); }
+		if (@humanInt) { $humanIntegrations{join("xxx",($parts[0],$seq))} = join("\t",($parts[2], @humanInt, $seq, $ori, $cig, $hSec, $hSup)); }
 	}
 }
 close HUMAN;
@@ -272,7 +285,7 @@ sub collectIntersect {
 ### BWA Alignments are 1-based
 	my ($viralData, $humanData) = @_;
 
-	my ($vStart, $vStop, $vOri, $seq, $vDir, $vCig) = (split("\t",$viralData))[3,4,5,6,7,8];
+	my ($vStart, $vStop, $vOri, $seq, $vDir, $vCig, $vSup) = (split("\t",$viralData))[3,4,5,6,7,8,-1];
 	my ($hStart, $hStop, $hOri, $hDir, $hCig)       = (split("\t",$humanData))[3,4,5,7,8];
 
 	if	((($vOri eq $hOri) and ($vDir eq $hDir)) or( ($vOri ne $hOri) and ($vDir ne $hDir))) { return; } # in some cases the same part of the read may be clippeed 
@@ -330,10 +343,59 @@ sub collectIntersect {
 	#ambigous bases may result from either an overlap of aligned regions, or a gap
 	#if the total number of aligned bases (from human and viral alignments) are greater than the read length, then it's an overlap
 	#otherwise it's a gap
-	my $overlaptype;
-	if 		(($hAlig + $vAlig) > ($hClip + $hAlig))	 {	$overlaptype = "overlap";	} #overlap
-	elsif 	(($hAlig + $vAlig) == ($hClip + $hAlig)) {	$overlaptype = "none";		} #no gap or overlap
+	my ($overlaptype, $readlen);
+	$readlen = $hClip + $hAlig;
+	if 		(($hAlig + $vAlig) > ($readlen))	 {	$overlaptype = "overlap";	} #overlap
+	elsif 	(($hAlig + $vAlig) == ($readlen)) {	$overlaptype = "none";		} #no gap or overlap
 	else 											 {	$overlaptype = "gap";		} #gap
+	
+	
+	
+	### check for possible vector rearrangements
+	## this is only really relevant for clinical vectors where there is some homology between the vector and the human genome
+	## check that there aren't any supplementary alignments to the viral genome that when considered with the primary viral alignment, span the whole read
+	my $isRearrange = "";
+	#if there's secondary alignments
+	if ($vSup ne "NA") {
+		#get reference for primary alignment
+		# my $pViralRef = ;
+	
+		#get if soft clip is at start or end of read
+		my $vPrimEnd;
+		if (($vDir eq 'f') and ($vCig =~ /^(\d+)[SH]/)) { $vPrimEnd = 'start'; }
+		elsif (($vDir eq 'f') and ($vCig =~ /(\d+)[SH]$/)) { $vPrimEnd = 'end';   }
+		elsif (($vDir eq 'r') and ($vCig =~ /^(\d+)[SH]/)) { $vPrimEnd = 'end';   }
+		elsif (($vDir eq 'r') and ($vCig =~ /(\d+)[SH]$/)) { $vPrimEnd = 'start'; }
+		else 	{print "Can't figure out which end of the read is clipped in the viral alignment"; } #this shouldn't happen
+	
+	
+	# check each secondary alignment to see if it can account for rest of read
+	my (@viralSups, $supCigar, $supSense, $supViralRef, $supEnd, $vSupAlig, $supAlignment);
+		@viralSups = split(";", $vSup);
+		foreach $supAlignment (@viralSups) {
+		
+			($supViralRef, $supSense, $supCigar) = (split(",",$supAlignment))[0,2,3];
+		
+			#check here if reference for supplementary alignment is the same as the primary alignment
+			#if ($sViralRef ne $pViralRef) { next; } # don't need to check if references are different
+		
+			#check for if mapped is at start AND end (below assumes just one end mapped)
+			#get if mapped part of supplementary alignment is at beginning or end of read
+			if	  (($supSense eq '+') and ($supCigar =~ /^(\d+)[M]/)) { $supEnd = 'start';  ($vSupAlig) = ($supCigar =~ /^(\d+)M/);}
+			elsif (($supSense eq '+') and ($supCigar =~ /(\d+)[M]$/)) { $supEnd = 'end'	 ;  ($vSupAlig) = ($supCigar =~ /(\d+)M$/);}
+			elsif (($supSense eq '-') and ($supCigar =~ /^(\d+)[M]/)) { $supEnd = 'end'	 ;  ($vSupAlig) = ($supCigar =~ /^(\d+)M/);}
+			elsif (($supSense eq '-') and ($supCigar =~ /(\d+)[M]$/)) { $supEnd = 'start';  ($vSupAlig) = ($supCigar =~ /(\d+)M$/);}
+			else { next; } #if mapped part not at start or end
+		
+			if (($vPrimEnd eq $supEnd) and (($vSupAlig + $vAlig) >= $readlen)){ $isRearrange = "yes"; }
+		
+	
+		}
+	
+	}
+	
+	#if didn't find any possible vector rearrangements to account for this read, probably not vector rearrangment
+	if ($isRearrange eq "") { $isRearrange = "no"; }
 	
 
 
@@ -389,7 +451,7 @@ sub collectIntersect {
 	#	return; # If you end up here something's gone weird. Need to double check to make sure nothing would end up here
 	#}
 
-	return($intRStart, $intRStop, $hRStart, $hRStop, $vRStart, $vRStop, $overlap1, $order, $overlaptype);
+	return($intRStart, $intRStop, $hRStart, $hRStop, $vRStart, $vRStop, $overlap1, $order, $overlaptype, $isRearrange);
 
 	#if 	  ($vOri eq "+" and $hOri eq "-" and $vStop - 1 > $hStart) { return($hStart, $vStop); } # overalp with order virus -> human
 	#elsif ($vOri eq "-" and $hOri eq "+" and $hStop - 1 > $vStart)    { return($vStart, $hStop); } # overlap with order human -> virus
@@ -422,12 +484,17 @@ sub extractOutput {
 	my @viral = split("\t",$viralData);
 	my @human = split("\t",$humanData);
 
-	my $vSec = pop(@viral);
-	my $hSec = pop(@human);
+	my $vSec = $viral[-2];
+	my $hSec = $human[-2];
+	
+	my $vSup = $viral[-1];
+	my $hSup = $human[-1];
 
 	my $overlap = $intData[6];
 	
 	my $overlaptype = $intData[8];
+	
+	my $rearrange = $intData[9];
 
 	### Extract junction coordinates relative to the target sequence
 	my ($viralStart, $viralStop) = extractCoords($viral[1], $viral[2], $viral[5], $overlap);
@@ -453,7 +520,7 @@ sub extractOutput {
 
 	my $outline = join("\t", ($human[0], $humanStart, $humanStop, $viral[0], 
 				  $viralStart, $viralStop, $overlap, $overlaptype, $human[5], 
-				  $humanSeq, $viralSeq, $overlapSeq, $hSec, $vSec));
+				  $humanSeq, $viralSeq, $overlapSeq, $hSec, $vSec, $rearrange));
 
 	return($outline);
 }
@@ -479,7 +546,7 @@ sub printOutput {
 ### Print output file
 	my ($outFile, @outLines) = @_;	
 	open (OUTFILE, ">$outFile") || die "Could not open output file: $outFile\n";
-	print OUTFILE "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNo. Ambiguous Bases\tOverlap Type\tOrientation\tHuman Seq\tViral Seq\tAmbiguous Seq\tHuman Secondary Alignments\tViral Secondary Alignments\tRead ID\t(merged)\n";
+	print OUTFILE "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNo. Ambiguous Bases\tOverlap Type\tOrientation\tHuman Seq\tViral Seq\tAmbiguous Seq\tHuman Secondary Alignments\tViral Secondary Alignments\tPossible Vector Rearrangement?\tRead ID\t(merged)\n";
 	foreach my $line (@outLines) { print OUTFILE "$line\n"; }
 	close OUTFILE;
 }
@@ -493,7 +560,7 @@ sub printBed {
 	open (BEDFILE, ">$bedFile") || die "Could not open bedfile: $bedFile\n";
 	foreach my $line (@outLines) {
 		my @parts = split("\t",$line);
-		print BEDFILE "$parts[0]\t$parts[1]\t$parts[2]\t$parts[14]\t.\t$parts[8]\n";
+		print BEDFILE "$parts[0]\t$parts[1]\t$parts[2]\t$parts[-2]\t.\t$parts[8]\n";
 	}
 	close BEDFILE;
 }
