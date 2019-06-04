@@ -3,54 +3,60 @@
 ## process and merge overlapping reads with SeqPrep
 ## Compress to a single fasta file
 
-#SBATCH --job-name=merge-for-LWpipeline		#name of job
-#SBATCH --time=12:00:00  			#time allowed
-#SBATCH --mem=40GB				#memory
-#SBATCH --nodes=1				#number of nodes
-#SBATCH --ntasks-per-node=1			#number of tasks per node
-#SBATCH -a 1-12					#sbatch array - number of tasks
+#SBATCH --job-name=merge			#name of job
+#SBATCH --time=2:00:00  				#time allowed
+#SBATCH --mem-per-cpu=5GB			#memory
+#SBATCH --nodes=3
+#SBATCH --ntasks-per-node=4
+#SBATCH --cpus-per-task=5
 #SBATCH --mail-type=END,FAIL			#Mail events (NONE, BEGIN, END, FAIL, ALL)
 #SBATCH --mail-user=suzanne.scott@csiro.au
 #SBATCH --output=../slogs/%x_%j.log 		#Standard error and output log
 
 pwd; hostname; date
 
-#need seqprep via conda
-source ~/.bashrc
-conda activate bioinfo2
+#modules
+module load parallel
 
 #input and output directories
-PROJ=/datastore/sco305/integration/expt2_testing-secondary-alignments
-DATA=/datastore/sco305/integration/expt1_comparing-pipelines/data/tool_comparison/rawdata
-OUTPATH=${PROJ}/preproc/merged
+PROJ=/datastore/sco305/integration/expt2_pipeline-tweaks
+DATA=${PROJ}/data
 
-mkdir -p $OUTPATH
-cp ${DATA}/sample2index.txt ${PROJ}/preproc
-SUFFIX=$(head /dev/urandom | tr -dc a-z | head -c3)
-sed 's/human/hg38/g; s/hg19/hg38/g; s/references/expt2_testing-secondary-alignments\/references/g' ${PROJ}/preproc/sample2index.txt > ${PROJ}/preproc/sample2index.txt.${SUFFIX}
+#get directories with read data
+echo "getting directories to merge..."
+data2analyse=()
+while IFS= read -r -d $'\0'; do
+	data2analyse+=("${REPLY:0:-6}")
+done < <(find ${DATA}/*/reads -maxdepth 0 -type d -print0)
 
-#get sample names
-SAMPLE=$(sed "${SLURM_ARRAY_TASK_ID}q;d" ${PROJ}/preproc/sample2index.txt.${SUFFIX} | cut -d',' -f1)
+echo ${data2analyse[@]}
 
+#number of directories
+NDIR=(${#data2analyse[@]})
+echo "Analysing ${NDIR} directories"
 
-echo $SAMPLE
+# This specifies the options used to run srun. The "-N1 -n${SLURM_NTASKS_PER_NODE} -c1" options are
+# used to allocate ${SLURM_NTASKS_PER_NODE} tasks and 1 cpu per task to each node.
+srun="srun --exclusive -N1 -n${SLURM_NTASKS_PER_NODE} -c1"
 
-#get paths to reads
-READ1=${DATA}/${SAMPLE}_R1.fastq.gz
-READ2=${DATA}/${SAMPLE}_R2.fastq.gz
+# This specifies the options used to run GNU parallel:
+#
+#   --delay of 0.2 prevents overloading the controlling node.
+#
+#   -j is the number of tasks run simultaneously.
+#
+#   The combination of --joblog and --resume create a task log that
+#   can be used to monitor progress.
+#
+parallel="parallel --delay 0.2 -j ${SLURM_NTASKS_PER_NODE} --joblog ../slogs/runtask_${SLURM_JOB_ID}.log --resume"
 
-#generate paths for output
-OUT1=${OUTPATH}/${SAMPLE}.seqPrep_processed.R1.fastq.gz
-OUT2=${OUTPATH}/${SAMPLE}.seqPrep_processed.R2.fastq.gz
-OUT3=${OUTPATH}/${SAMPLE}.seqPrep_processed.merged.fastq.gz
+# Run a script, do_merging.sh, using GNU parallel and srun. Parallel
+# will run the runtask script for the numbers 1 through ${NAACS}. To
+# illustrate, the first job will run like this:
+#
+#   srun --exclusive -N1 -n1 ./do_merging.sh ${DATA}/firstdataset   > ${DATA}/firstdataset/merge.log
+#
+$parallel "$srun ./do_merging.sh {} $SLURM_CPUS_PER_TASK 2>&1 {}/merge.log" ::: ${data2analyse[@]}
 
-OUT=${OUTPATH}/${SAMPLE}.seqPrep_processed.fastq
-
-#run seqprep
-SeqPrep -f $READ1 -r $READ2 -1 $OUT1 -2 $OUT2 -s $OUT3
-
-gzip -cdk ${OUTPATH}/${SAMPLE}* > $OUT
-
-mv ${PROJ}/preproc/sample2index.txt.${SUFFIX} ${PROJ}/preproc/sample2index.txt
 
 date

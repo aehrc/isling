@@ -1,68 +1,67 @@
 #!/bin/bash
 
 ## Runs the AAV integration pipeline on alignment files
+##Looks for multiple folders with data.  Runs alignments from each folder on one node, with ntasks-per-node alignment jobs on each node running in parallel
 
-#SBATCH --job-name=run-LWpipeline		#name of job
-#SBATCH --time=0:30:00  			#time allowed
-#SBATCH --mem=10GB				#memory
-#SBATCH --nodes=1				#number of nodes
-#SBATCH --ntasks-per-node=1			#number of tasks per node
-#SBATCH -a 1-12					#sbatch array - number of tasks
+#SBATCH --job-name=pipeline			#name of job
+#SBATCH --time=3:00:00  			#time allowed
+#SBATCH --mem-per-cpu=5GB			#memory per cpu
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=20
+#SBATCH --cpus-per-task=1
 #SBATCH --mail-type=END,FAIL			#Mail events (NONE, BEGIN, END, FAIL, ALL)
 #SBATCH --mail-user=suzanne.scott@csiro.au
 #SBATCH --output=../slogs/%x_%j.log 		#Standard error and output log
 
 pwd; hostname; date
 
-module load bedtools
-module load samtools
+#modules
+module load parallel
 
-PROJ=/datastore/sco305/integration/expt2_testing-secondary-alignments
-DATA=${PROJ}/preproc
+#input and output directories
+PROJ=/datastore/sco305/integration/expt2_pipeline-tweaks
+DATA=${PROJ}/data
 
-SAMPLE=$(sed "${SLURM_ARRAY_TASK_ID}q;d" ${DATA}/sample2index.txt | cut -d',' -f1)
-HOST=$(sed "${SLURM_ARRAY_TASK_ID}q;d" ${DATA}/sample2index.txt | cut -d',' -f3)
+#get directories with read data
+#CSV with data directory in first position, sample name in second, host genome in third and virus genome in fourth
+echo -n "" > ${DATA}/data2analyse.txt
+dirs=($(find ${DATA}/* -maxdepth 0 -type d))
+for dir in "${dirs[@]}"; do
+  mkdir -p ${dir}/out
+  while IFS= read -r line; do
+	echo "${dir},${line}" >> ${DATA}/data2analyse.txt
+  done < "${dir}/samples.txt"
+done
 
-echo $SAMPLE
+#total tasks allocated in slurm
+TOTALTASKS=$((${SLURM_NTASKS_PER_NODE} * ${SLURM_NNODES}))
+echo total tasks: $TOTALTASKS
 
-HOSTSAM=${DATA}/hostAligned/${SAMPLE}.${HOST}.bwa.sorted.supFilt.sam
-VIRALSAM=${DATA}/viralAligned/${SAMPLE}.virus.bwa.sorted.supFilt.sam
-AHOSTSAM=${DATA}/hostAligned/${SAMPLE}.${HOST}.bwa.a.sorted.supFilt.sam
-AVIRALSAM=${DATA}/viralAligned/${SAMPLE}.virus.bwa.a.sorted.supFilt.sam
-HHOSTSAM=${DATA}/hostAligned/${SAMPLE}.${HOST}.bwa.h.sorted.supFilt.sam
-HVIRALSAM=${DATA}/viralAligned/${SAMPLE}.virus.bwa.h.sorted.supFilt.sam
+TOTALTASKS=5
 
-OUTPATH=${PROJ}/out
+# This specifies the options used to run srun. The "-N1 -n${SLURM_NTASKS_PER_NODE} -c1" options are
+# used to allocate ${SLURM_NTASKS_PER_NODE} tasks and 1 cpu per task to each node.
+srun="srun --exclusive -N1 -n1"
 
-mkdir -p $OUTPATH
+# This specifies the options used to run GNU parallel:
+#
+#   --delay of 0.2 prevents overloading the controlling node.
+#
+#   -j is the number of tasks run simultaneously.
+#
+#   The combination of --joblog and --resume create a task log that
+#   can be used to monitor progress.
+#
+parallel="parallel --delay 0.2 -j $TOTALTASKS --joblog ../slogs/runtask_${SLURM_JOB_ID}.log --resume"
 
-#run pipeline
-echo ""
-echo running normal alignment
-perl ${PROJ}/tools/AAVintegrationPipeline_master.pl --viral ${VIRALSAM} --human ${HOSTSAM} --output ${OUTPATH}/${SAMPLE}.integrations.txt --bed ${OUTPATH}/${SAMPLE}.integrations.bed --merged ${OUTPATH}/${SAMPLE}.integrations.merged.bed --cutoff 10
-echo ""
-echo running with a flag
-perl ${PROJ}/tools/AAVintegrationPipeline_master.pl --viral ${AVIRALSAM} --human ${AHOSTSAM} --output ${OUTPATH}/${SAMPLE}.integrations.a.txt --bed ${OUTPATH}/${SAMPLE}.integrations.a.bed --merged ${OUTPATH}/${SAMPLE}.integrations.a.merged.bed --cutoff 10
-echo ""
-echo running with h flag
-perl ${PROJ}/tools/AAVintegrationPipeline_master.pl --viral ${HVIRALSAM} --human ${HHOSTSAM} --output ${OUTPATH}/${SAMPLE}.integrations.h.txt --bed ${OUTPATH}/${SAMPLE}.integrations.h.bed --merged ${OUTPATH}/${SAMPLE}.integrations.merged.h.bed --cutoff 10
+# Run a script, do_merging.sh, using GNU parallel and srun. Parallel
+# will run the runtask script for the numbers 1 through ${NAACS}. To
+# illustrate, the first job will run like this:
+#
+#   srun --exclusive -N1 -n1 ./do_merging.sh ${DATA}/firstdataset  > ${DATA}/firstdataset/merge.log
+#
+$parallel "$srun ./do_pipeline.sh {} ${PROJ} 2>&1 {}/align.log" :::: ${DATA}/data2analyse.txt
 
-#sort output
-sort -k1,1 -k2,2 ${OUTPATH}/${SAMPLE}.integrations.txt > ${OUTPATH}/${SAMPLE}.integrations.txt
-sort -k1,1 -k2,2 ${OUTPATH}/${SAMPLE}.integrations.a.txt > ${OUTPATH}/${SAMPLE}.integrations.a.txt
-sort -k1,1 -k2,2 ${OUTPATH}/${SAMPLE}.integrations.h.txt > ${OUTPATH}/${SAMPLE}.integrations.h.txt
-
-#get read IDs
-cat ${OUTPATH}/${SAMPLE}.integrations.txt | cut -f12 | tail -n+1 > ${OUTPATH}/${SAMPLE}.readIDs.txt
-
-echo extracting reads...
-
-#get fastq of reads
-samtools view -H ${HOSTSAM} > ${OUTPATH}/${SAMPLE}.reads.sam
-samtools view ${HOSTSAM} | fgrep -w -f ${OUTPATH}/${SAMPLE}.readIDs.txt >> ${OUTPATH}/${SAMPLE}.reads.sam
-
-samtools fastq ${OUTPATH}/${SAMPLE}.reads.sam > ${OUTPATH}/${SAMPLE}.readsofInterest.fastq
-
-#rm ${OUTPATH}/${SAMPLE}.reads.sam ${OUTPATH}/${SAMPLE}.readIDs.txt
+wait 
 
 date
