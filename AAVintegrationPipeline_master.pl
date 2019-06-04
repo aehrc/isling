@@ -253,7 +253,7 @@ sub processCIGAR {
 
 	if ($oriCig =~ /^\d+[SH].+\d+[SH]$/) { return; } # skip if a double clipped read got through
 	elsif ($oriCig =~ /^(\d+)[SH](.+)$/) { ($clipped, $other, $order) = ($1,$2,1); }
-	elsif ($oriCig =~ /^(.+)(\d+)[SH]$/) { ($other, $clipped, $order) = ($1,$2,2); }
+	elsif ($oriCig =~ /^(.+[MIDP])(\d+)[SH]$/) { ($other, $clipped, $order) = ($1,$2,2); }
 	# Note I don't save if it's hard/soft clipped, only the number of bases
 
 	# The CIGAR String can have multiple combinations of the following features:
