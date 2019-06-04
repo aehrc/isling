@@ -77,20 +77,23 @@ while (my $vl = <VIRAL>) {
 
 	# ID = readName_seq (in forward direction)
 
-	#Add get secondary alignment information from XA field
-	my $vSec;
-	if ($vl =~ /XA\:.+\:.+/) 	{ 
-		($vSec) = ($vl =~ /XA\:.+\:(.+)\s/); 
-	}
-	else 						{ $vSec = "NA"; }
+	#something weird is happening with $vSec and $vSup if both are present - only XA is being matched???
+
 	
 	#get supplementary alignments from SA field in order to check for possible vector rearrangements
 	my $vSup;
 	if ($vl =~ /SA\:.+\:.+/) 	{ 
-		($vSup) = ($vl =~ /SA\:.+\:(.+)\s/); 
+		($vSup) = ($vl =~ /SA:.:(.*?);/); 
+
 	}
 	else 						{ $vSup = "NA"; }	
 	
+	#Add get secondary alignment information from XA field
+	my $vSec;
+	if ($vl =~ /XA\:.+\:.+/) 	{ 
+		($vSec) = ($vl =~ /XA:.:(.*?);/); 
+	}
+	else 						{ $vSec = "NA"; }
 	
 	if   (@viralInt and ($parts[1] & 0x10)) { $viralIntegrations{join("xxx", ($parts[0],(reverseComp($parts[9]))[0]))} = join("\t",($parts[2], @viralInt, (reverseComp($parts[9]))[0], 'r', $cig, $vSec, $vSup)); }
 	elsif (@viralInt) 			{ $viralIntegrations{join("xxx", ($parts[0],$parts[9]))}	           = join("\t",($parts[2], @viralInt, $parts[9],                   'f', $cig, $vSec, $vSup)); } 
@@ -393,7 +396,7 @@ sub collectIntersect {
 			else { next; } #if mapped part not at start or end
 		
 			if (($vPrimEnd eq $supEnd) and (($vSupAlig + $vAlig) >= $readlen)) { $isRearrange = "yes"; }
-		
+			
 	
 		}
 	
