@@ -345,9 +345,9 @@ sub collectIntersect {
 	#otherwise it's a gap
 	my ($overlaptype, $readlen);
 	$readlen = $hClip + $hAlig;
-	if 		(($hAlig + $vAlig) > ($readlen))	 {	$overlaptype = "overlap";	} #overlap
+	if 		(($hAlig + $vAlig) > ($readlen))  {	$overlaptype = "overlap";	} #overlap
 	elsif 	(($hAlig + $vAlig) == ($readlen)) {	$overlaptype = "none";		} #no gap or overlap
-	else 											 {	$overlaptype = "gap";		} #gap
+	else 									  {	$overlaptype = "gap";		} #gap
 	
 	
 	
@@ -362,7 +362,7 @@ sub collectIntersect {
 	
 		#get if soft clip is at start or end of read
 		my $vPrimEnd;
-		if (($vDir eq 'f') and ($vCig =~ /^(\d+)[SH]/)) { $vPrimEnd = 'start'; }
+		if    (($vDir eq 'f') and ($vCig =~ /^(\d+)[SH]/)) { $vPrimEnd = 'start'; }
 		elsif (($vDir eq 'f') and ($vCig =~ /(\d+)[SH]$/)) { $vPrimEnd = 'end';   }
 		elsif (($vDir eq 'r') and ($vCig =~ /^(\d+)[SH]/)) { $vPrimEnd = 'end';   }
 		elsif (($vDir eq 'r') and ($vCig =~ /(\d+)[SH]$/)) { $vPrimEnd = 'start'; }
@@ -375,19 +375,24 @@ sub collectIntersect {
 		foreach $supAlignment (@viralSups) {
 		
 			($supViralRef, $supSense, $supCigar) = (split(",",$supAlignment))[0,2,3];
+			
+			if ($supCigar =~ /(^\d+[SH].*\d+[SH]$)/) { next; } #skip alignments where both ends are clipped
+	
+			unless ($supCigar =~ /^\d+[M]|\d+[M]$/) { next; } #make sure one end is matched
+			#$supCigar = processCIGAR($supCigar, $seq);
 		
 			#check here if reference for supplementary alignment is the same as the primary alignment
 			#if ($sViralRef ne $pViralRef) { next; } # don't need to check if references are different
 		
 			#check for if mapped is at start AND end (below assumes just one end mapped)
 			#get if mapped part of supplementary alignment is at beginning or end of read
-			if	  (($supSense eq '+') and ($supCigar =~ /^(\d+)[M]/)) { $supEnd = 'start';  ($vSupAlig) = ($supCigar =~ /^(\d+)M/);}
-			elsif (($supSense eq '+') and ($supCigar =~ /(\d+)[M]$/)) { $supEnd = 'end'	 ;  ($vSupAlig) = ($supCigar =~ /(\d+)M$/);}
-			elsif (($supSense eq '-') and ($supCigar =~ /^(\d+)[M]/)) { $supEnd = 'end'	 ;  ($vSupAlig) = ($supCigar =~ /^(\d+)M/);}
-			elsif (($supSense eq '-') and ($supCigar =~ /(\d+)[M]$/)) { $supEnd = 'start';  ($vSupAlig) = ($supCigar =~ /(\d+)M$/);}
+			if	  (($supSense eq '+') and ($supCigar =~ /^(\d+)M/)) { $supEnd = 'start';  ($vSupAlig) = ($supCigar =~ /^(\d+)M/);}
+			elsif (($supSense eq '+') and ($supCigar =~ /(\d+)M$/)) { $supEnd = 'end'	 ;  ($vSupAlig) = ($supCigar =~ /(\d+)M$/);}
+			elsif (($supSense eq '-') and ($supCigar =~ /^(\d+)M/)) { $supEnd = 'end'	 ;  ($vSupAlig) = ($supCigar =~ /^(\d+)M/);}
+			elsif (($supSense eq '-') and ($supCigar =~ /(\d+)M$/)) { $supEnd = 'start';  ($vSupAlig) = ($supCigar =~ /(\d+)M$/);}
 			else { next; } #if mapped part not at start or end
 		
-			if (($vPrimEnd eq $supEnd) and (($vSupAlig + $vAlig) >= $readlen)){ $isRearrange = "yes"; }
+			if (($vPrimEnd eq $supEnd) and (($vSupAlig + $vAlig) >= $readlen)) { $isRearrange = "yes"; }
 		
 	
 		}
