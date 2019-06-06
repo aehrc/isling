@@ -476,7 +476,7 @@ sub extractOutput {
 
 	my $outline = join("\t", ($human[0], $humanStart, $humanStop, $viral[0], 
 				  $viralStart, $viralStop, $overlap, $overlaptype, $human[5], 
-				  $humanSeq, $viralSeq, $overlapSeq, $hSec, $vSec, $rearrange, $hAmbig));
+				  $humanSeq, $viralSeq, $overlapSeq, $hSec, $vSec, $rearrange, $hAmbig, $vAmbig));
 
 	return($outline);
 }
