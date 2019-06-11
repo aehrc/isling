@@ -31,7 +31,7 @@ unless ($viral and $human) { printHelp(); }
 
 my %viralIntegrations;
 my %humanIntegrations;
-### These hashe's contain the information about the integration sites within the resepctive genomes
+### These hashes contain the information about the integration sites within the resepctive genomes
 ### Data is saved as a tab seperated string
 ### Read name => Chr intStart intStop relStart relStop orientation readSeqeunce
 
@@ -40,11 +40,12 @@ my %humanIntegrations;
 ### Junctions are defined by the CIGAR string: SM or MS
 ### Save the resulting information in a hash:
 ###	key: 	{ReadID}xxx{ReadSequence}
-###	value:	{TargetID}xxx{ViralIntegrationData}xxx{Sequence}xxx{SeqOrientation}xxx{CIGAR}xxx{XA}
+###	value:	{TargetID}xxx{ViralIntegrationData}xxx{Sequence}xxx{SeqOrientation}xxx{CIGAR}xxx{XA}xxx{SA}
 ###		SeqOrientation: f = aligned in fwd orientation
 ###				r = aligned in rev orientation
 ###		Sequence is always given in fwd orientation
 ### XA is the secondary alignments in the XA field (from BWA)
+### SA is the supplementary alignments in the SA field (from BWA)
 
 open (VIRAL, $viral) || die "Could not open viral alignment file: $viral\n";
 if ($verbose) { print "Processing viral alignment...\n"; }
@@ -338,8 +339,12 @@ sub collectIntersect {
 	
 	my $isVecRearrange;
 	if ($vSup eq "NA") { $isVecRearrange = "no"; }
-	else { $isVecRearrange = isWholeReadVecRearrange($vDir, $vCig, $vAlig, $vSup, $readlen); }
+	else { $isVecRearrange = isWholeReadVecRearrange($vDir, $vCig, $vAlig, join(";", $vSup, $vSec), $readlen); }
 	 
+	 
+	my $isHumRearrange;
+	if ($hSup eq "NA") { $isHumRearrange = "no"; }
+	else { $isHumRearrange = isWholeReadVecRearrange($hDir, $hCig, $hAlig, join(";", $hSup, $hSec), $readlen); }
 	
 	#check to see if location of human alignment is ambiguous: multiple equivalent alignments accounting for human part of read
 	my $isHumAmbig;
@@ -403,7 +408,7 @@ sub collectIntersect {
 	#	return; # If you end up here something's gone weird. Need to double check to make sure nothing would end up here
 	#}
 
-	return($intRStart, $intRStop, $hRStart, $hRStop, $vRStart, $vRStop, $overlap1, $order, $overlaptype, $isVecRearrange, $isHumAmbig, $isVirAmbig);
+	return($intRStart, $intRStop, $hRStart, $hRStop, $vRStart, $vRStop, $overlap1, $order, $overlaptype, $isVecRearrange, $isHumRearrange, $isHumAmbig, $isVirAmbig);
 
 	#if 	  ($vOri eq "+" and $hOri eq "-" and $vStop - 1 > $hStart) { return($hStart, $vStop); } # overalp with order virus -> human
 	#elsif ($vOri eq "-" and $hOri eq "+" and $hStop - 1 > $vStart)    { return($vStart, $hStop); } # overlap with order human -> virus
@@ -446,11 +451,12 @@ sub extractOutput {
 	
 	my $overlaptype = $intData[8];
 	
-	my $rearrange = $intData[9];
+	my $vRearrange = $intData[9];
+	my $hRearrange = $intData[10];
 	
-	my $hAmbig = $intData[10];
 	
-	my $vAmbig = $intData[11];
+	my $hAmbig = $intData[11];
+	my $vAmbig = $intData[12];
 
 	### Extract junction coordinates relative to the target sequence
 	my ($viralStart, $viralStop) = extractCoords($viral[1], $viral[2], $viral[5], $overlap);
@@ -476,7 +482,7 @@ sub extractOutput {
 
 	my $outline = join("\t", ($human[0], $humanStart, $humanStop, $viral[0], 
 				  $viralStart, $viralStop, $overlap, $overlaptype, $human[5], 
-				  $humanSeq, $viralSeq, $overlapSeq, $hSec, $vSec, $rearrange, $hAmbig, $vAmbig));
+				  $humanSeq, $viralSeq, $overlapSeq, $hSec, $vSec, $hRearrange, $vRearrange, $hAmbig, $vAmbig));
 
 	return($outline);
 }
@@ -605,8 +611,6 @@ sub isWholeReadVecRearrange {
 	## this is only really relevant for clinical vectors where there is some homology between the vector and the human genome
 	## check that there aren't any supplementary alignments to the viral genome that when considered with the primary viral alignment, span the whole read
 	my $isRearrange = "";
-	#if there's secondary alignments
-	if ($vSup ne "NA") {
 		#get reference for primary alignment
 		# my $pViralRef = ;
 	
@@ -623,7 +627,9 @@ sub isWholeReadVecRearrange {
 	my (@viralSups, $supCigar, $supSense, $supViralRef, $supEnd, $vSupAlig, $supAlignment);
 		@viralSups = split(";", $vSup);
 		foreach $supAlignment (@viralSups) {
-		
+			
+			if ($supAlignment eq "NA") { next; }
+			
 			($supViralRef, $supSense, $supCigar) = (split(",",$supAlignment))[0,2,3];
 			
 			if ($supCigar =~ /(^\d+[SH].*\d+[SH]$)/) { next; } #skip alignments where both ends are clipped
@@ -644,9 +650,6 @@ sub isWholeReadVecRearrange {
 			
 			#if end is the same, and number of mapped bases in supplementary and primary alignments is greater than read length
 			if (($vPrimEnd eq $supEnd) and (($vSupAlig + $vAlig) >= $readlen)) { $isRearrange = "yes"; }	
-	
-		}
-	
 	}
 	
 	#if didn't find any possible vector rearrangements to account for this read, probably not vector rearrangment
@@ -660,7 +663,7 @@ sub printOutput {
 ### Print output file
 	my ($outFile, @outLines) = @_;	
 	open (OUTFILE, ">$outFile") || die "Could not open output file: $outFile\n";
-	print OUTFILE "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNo. Ambiguous Bases\tOverlap Type\tOrientation\tHost Seq\tViral Seq\tAmbiguous Seq\tHost Secondary Alignments\tViral Secondary Alignments\tPossible Vector Rearrangement?\tHost Pos. Ambiguous?\tViral Pos. Ambiguous?\tRead ID\t(merged)\n";
+	print OUTFILE "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNoAmbiguousBases\tOverlapType\tOrientation\tHostSeq\tViralSeq\tAmbiguousSeq\tHostSecondaryAlignments\tViralSecondaryAlignments\tPossibleHostTranslocation?\tPossibleVectorRearrangement?\tHostPossibleAmbiguous?\tViralPossibleAmbiguous?\tReadID\tMergedRead\n";
 	foreach my $line (@outLines) { print OUTFILE "$line\n"; }
 	close OUTFILE;
 }
