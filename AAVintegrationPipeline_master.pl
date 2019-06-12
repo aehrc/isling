@@ -507,13 +507,15 @@ sub extractSequence {
 sub getSecSup {
 #get secondary (XA) and supplementary (SA) alignments from line
 
-#note that secondary alignemnts have the form (ref,pos,strand,cigar,)
+#note that secondary alignemnts have the form /XA:Z:(chr,pos,CIGAR,NM;)*/
+#supplementary alignments have the form /SA:Z:(chr,pos,strand,CIGAR,PHRED,NM;)*/
 
 	my ($line) = @_;
 	
+	#get supplementary alignments from SA field
 	my ($sup, $sec);
 	if ($line =~ /SA:.:.*;/) 	{ 
-		($sup) = ($line =~ /SA:.:(.*?);/); 
+		($sup) = ($line =~ /SA:.:(.*?);/); #will this get only one supp alignment?
 	
 	}
 	else 						{ $sup = "NA"; }	
@@ -537,13 +539,11 @@ sub getSecSup {
 			my $newSec = join(",", $chr, $newPos, $strand, $cig, "0", $nm);
 			
 			$newSecs = join(";", $newSec, $newSecs)
-			}
+		}
 		$sec = $newSecs;
 
 	}
 	else 	{ $sec = "NA"; }
-	
-	
 	
 	return ($sec, $sup);
 
@@ -560,11 +560,15 @@ sub isAmbigLoc {
 	my ($dir, $cig, $sec, $aligL) = @_;
 	
 	#get if match is at start or end of read
+	
+	
+	#if alignment is in reverse orientation, convert to forward by reversing the cigar
+	if ($dir eq 'r') { $cig = reverseCigar($cig); }
+	
+	#get if matched region is at start or end
 	my $primEnd;
-	if    (($dir eq 'f') and ($cig =~ /^(\d+)[M]/)) { $primEnd = 'start'; }
-	elsif (($dir eq 'f') and ($cig =~ /(\d+)[M]$/)) { $primEnd = 'end';   }
-	elsif (($dir eq 'r') and ($cig =~ /^(\d+)[M]/)) { $primEnd = 'end';   }
-	elsif (($dir eq 'r') and ($cig =~ /(\d+)[M]$/)) { $primEnd = 'start'; }
+	if    (($cig =~ /^(\d+)[M]/)) { $primEnd = 'start'; }
+	elsif (($cig =~ /(\d+)[M]$/)) { $primEnd = 'end';   }
 	else 	{print "Can't figure out which end of the read is clipped in the primary alignment"; } #this shouldn't happen
 	
 	my ($secCigar, $secSense, $secEnd, $secAligL, $secAlignment);
@@ -573,7 +577,7 @@ sub isAmbigLoc {
 	foreach $secAlignment (@secs) {
 	
 		if ($secAlignment eq "NA") { next; } #check for no secondary alignments
-		my ($secSense, $secCigar) = (split(",",$secAlignment))[2,3];
+		my ($secSense, $secCigar) = (split(",",$secAlignment))[2,3]; #get sense and cigar from 
 		
 		if ($secCigar =~ /(^\d+[SH].*\d+[SH]$)/) { next; } #skip alignments where both ends are clipped
 		if ($secCigar =~ /(^\d+[M].*\d+[M]$)/) { next; } #skip alignments where both ends are matched
@@ -582,10 +586,10 @@ sub isAmbigLoc {
 	
 		#check for if mapped is at start AND end (below assumes just one end mapped)
 		#get if mapped part of supplementary alignment is at beginning or end of read
-		if	  (($secSense eq '+') and ($secCigar =~ /^(\d+)M/)) { $secEnd = 'start';  ($secAligL) = ($secCigar =~ /^(\d+)M/);}
-		elsif (($secSense eq '+') and ($secCigar =~ /(\d+)M$/)) { $secEnd = 'end'	 ;  ($secAligL) = ($secCigar =~ /[A-Z](\d+)M$/);}
-		elsif (($secSense eq '-') and ($secCigar =~ /^(\d+)M/)) { $secEnd = 'end'	 ;  ($secAligL) = ($secCigar =~ /^(\d+)M/);}
-		elsif (($secSense eq '-') and ($secCigar =~ /(\d+)M$/)) { $secEnd = 'start';  ($secAligL) = ($secCigar =~ /[A-Z](\d+)M$/);}
+		if ($secSense eq '-') { $secCigar = reverseCigar($secCigar); } #reverse read if necessary
+		
+		if	  (($secCigar =~ /^(\d+)M/)) { $secEnd = 'start';  ($secAligL) = ($secCigar =~ /^(\d+)M/);}
+		elsif (($secCigar =~ /(\d+)M$/)) { $secEnd = 'end'	 ;  ($secAligL) = ($secCigar =~ /[A-Z](\d+)M$/);}
 		else { next; } #if mapped part not at start or end
 		
 		#if end of the read is the same and number of bases matched is the same, there is ambiguity
@@ -595,6 +599,34 @@ sub isAmbigLoc {
 	if ($isAmbiguous eq "") { $isAmbiguous = "no"; }
 	
 	return $isAmbiguous;
+
+}
+
+sub isRearrange {
+
+	my ($pCigar, $pDir, $sup) = @_;
+	
+	#after processing, cigars have one matched region per alignment
+	#get location in read of matched region and it's length
+	#make array of start of matched regions and their lengths in format startxxxlength
+	#need to take into account direction of read - convert everything to forward orientation
+	#need to zeropad start and length so that each have three digits, for sorting later
+	
+	my @aligns;
+	
+	#first do primary alignment
+	if ($pDir eq "r") { $pCigar = reverseCigar($pCigar); }
+	
+	
+	
+	
+	
+	my ($start, $length, $dir);
+	
+	
+	
+	
+	
 
 }
 
@@ -616,10 +648,9 @@ sub isWholeReadVecRearrange {
 	
 		#get if soft clip is at start or end of read
 		my $vPrimEnd;
-		if    (($vDir eq 'f') and ($vCig =~ /^(\d+)[SH]/)) { $vPrimEnd = 'start'; }
-		elsif (($vDir eq 'f') and ($vCig =~ /(\d+)[SH]$/)) { $vPrimEnd = 'end';   }
-		elsif (($vDir eq 'r') and ($vCig =~ /^(\d+)[SH]/)) { $vPrimEnd = 'end';   }
-		elsif (($vDir eq 'r') and ($vCig =~ /(\d+)[SH]$/)) { $vPrimEnd = 'start'; }
+		if ($vDir eq 'r') { $vCig = reverseCigar($vCig); } #reverse cigar if necessary
+		if    ($vCig =~ /^(\d+)[SH]/) { $vPrimEnd = 'start'; }
+		elsif ($vCig =~ /(\d+)[SH]$/) { $vPrimEnd = 'end';   }
 		else 	{print "Can't figure out which end of the read is clipped in the viral alignment"; } #this shouldn't happen
 	
 	
@@ -642,10 +673,9 @@ sub isWholeReadVecRearrange {
 		
 			#check for if mapped is at start AND end (below assumes just one end mapped)
 			#get if mapped part of supplementary alignment is at beginning or end of read
-			if	  (($supSense eq '+') and ($supCigar =~ /^(\d+)M/)) { $supEnd = 'start';  ($vSupAlig) = ($supCigar =~ /^(\d+)M/);}
-			elsif (($supSense eq '+') and ($supCigar =~ /(\d+)M$/)) { $supEnd = 'end'	 ;  ($vSupAlig) = ($supCigar =~ /(\d+)M$/);}
-			elsif (($supSense eq '-') and ($supCigar =~ /^(\d+)M/)) { $supEnd = 'end'	 ;  ($vSupAlig) = ($supCigar =~ /^(\d+)M/);}
-			elsif (($supSense eq '-') and ($supCigar =~ /(\d+)M$/)) { $supEnd = 'start';  ($vSupAlig) = ($supCigar =~ /(\d+)M$/);}
+			if ($supSense eq '-') { $supCigar = reverseCigar($supCigar); } #reverse cigar if necessary
+			if	  ($supCigar =~ /^(\d+)M/) { $supEnd = 'start';  ($vSupAlig) = ($supCigar =~ /^(\d+)M/);}
+			elsif ($supCigar =~ /(\d+)M$/) { $supEnd = 'end'  ;  ($vSupAlig) = ($supCigar =~ /(\d+)M$/);}
 			else { next; } #if mapped part not at start or end
 			
 			#if end is the same, and number of mapped bases in supplementary and primary alignments is greater than read length
@@ -709,3 +739,31 @@ sub reverseComp {
 	$rev =~ tr/ATGCatgc/TACGtacg/;
 	return($rev);
 }
+
+sub reverseCigar {
+
+	my ($oriCig) = @_;
+
+	#invert cigar string so that corresponds to opposite strand
+
+	my (@letters, @numbers, $newCig, $letter, $number);
+
+	#get and reverse letters and numbers from cigar
+	@letters = reverse(split(/\d+/, $oriCig));
+	@numbers = reverse(split(/[A-Z]/, $oriCig));
+	
+	#since numbers precede letters, always get one extra empty element in letter array (which is at end)
+	pop @letters;
+	
+	#check that letters and numbers have same number of elements
+	unless ((scalar @letters) == (scalar @numbers)) { print "could not reverse cigar ${oriCig}!\n"; return;}
+	
+	#reconstruct reversed cigar
+	foreach $number (@numbers) {
+		$newCig .= ($number.shift(@letters));	
+	}
+	
+	return $newCig;
+
+}
+
