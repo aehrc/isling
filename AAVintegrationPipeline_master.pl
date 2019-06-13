@@ -338,13 +338,13 @@ sub collectIntersect {
 	#check to see is whole read can be accounted for by vector rearrangements
 	
 	my $isVecRearrange;
-	if ($vSup eq "NA") { $isVecRearrange = "no"; }
-	else { $isVecRearrange = isWholeReadVecRearrange($vDir, $vCig, $vAlig, join(";", $vSup, $vSec), $readlen); }
-	 
+	if ((join(";", $vSup, $vSec)) eq "NA;NA") { $isVecRearrange = "no"; }
+	else { $isVecRearrange = isRearrange($vCig, $vDir, (join(";", $vSup, $vSec)), $readlen);}
 	 
 	my $isHumRearrange;
-	if ($hSup eq "NA") { $isHumRearrange = "no"; }
-	else { $isHumRearrange = isWholeReadVecRearrange($hDir, $hCig, $hAlig, join(";", $hSup, $hSec), $readlen); }
+	if ((join(";", $hSup, $hSec)) eq "NA;NA") { $isHumRearrange = "no"; }
+	else { $isHumRearrange = isRearrange($hCig, $hDir, (join(";", $hSup, $hSec)), $readlen);}
+	
 	
 	#check to see if location of human alignment is ambiguous: multiple equivalent alignments accounting for human part of read
 	my $isHumAmbig;
@@ -604,89 +604,116 @@ sub isAmbigLoc {
 
 sub isRearrange {
 
-	my ($pCigar, $pDir, $sup) = @_;
+	my ($pCig, $pDir, $sup, $readlen) = @_;
 	
 	#after processing, cigars have one matched region per alignment
-	#get location in read of matched region and it's length
-	#make array of start of matched regions and their lengths in format startxxxlength
+	#get location in read of matched region and its length
+	#make array of start of matched regions and their lengths in format startxxxend
 	#need to take into account direction of read - convert everything to forward orientation
 	#need to zeropad start and length so that each have three digits, for sorting later
+	#NOTE - THIS ASSUMES READ LENGTHS LESS THAN 1000!!!
+	if ($readlen >= 1000) { print "warning: vector rearangement check doesn't work for read lengths >= 1000\n" ;}
 	
-	my @aligns;
+	
+	#note - currently considering all alignments together regardless of their reference: consider changing to check only that alignments to a sigle reference account for the whole read
+	#for vector/virus we would want to do this because probably don't have different viruses recombining?
+	#for human/host we would not want to do this could have translocations
+	#could do this by making one @aligns per reference, and store all 
+	#note - using 1-based indexing of read alignments
+		
+	my @aligns; #to store start and end of each alignment
 	
 	#first do primary alignment
-	if ($pDir eq "r") { $pCigar = reverseCigar($pCigar); }
+	if ($pDir eq "r") { $pCig = reverseCigar($pCig); } #reverse cigar if necessary
+	#primary alignment cigar has been processed so we can assume it only has one mapped region and one soft-clipped region
+	if 	   ($pCig =~ /^(\d+)[M]/) { push(@aligns, "1xxx${1}"); }  #simplest case is that matched region is start
+	elsif  ($pCig =~ /^(\d+)[SH](\d+)[M]$/) { push(@aligns, (${1}+1)."xxx".(${1}+${2})); }
 	
+	#now do rest of the alignments
+	my @supAligns = split(";", $sup);
+	foreach my $supAlign (@supAligns) {
 	
+		if ($supAlign eq "NA") { next; } #check for no secondary alignments
+		my ($supSense, $supCig) = (split(",",$supAlign))[2,3]; #get sense and cigar from alignment
 	
-	
-	
-	my ($start, $length, $dir);
-	
-	
-	
-	
-	
-
-}
-
-sub isWholeReadVecRearrange {
-
-	#$vDir is direction of primary alignment ('f' or 'r')
-	#$vCig is cigar of primary alignment
-	#$vSup is supplementary alignments in the form /(chr,pos,CIGAR,NM;)*/
-	#$vAlig is number of bases mapped in primary alignment
-	my ($vDir, $vCig, $vAlig, $vSup, $readlen) = @_;
-	
-	
-	### check for possible vector rearrangements
-	## this is only really relevant for clinical vectors where there is some homology between the vector and the human genome
-	## check that there aren't any supplementary alignments to the viral genome that when considered with the primary viral alignment, span the whole read
-	my $isRearrange = "";
-		#get reference for primary alignment
-		# my $pViralRef = ;
-	
-		#get if soft clip is at start or end of read
-		my $vPrimEnd;
-		if ($vDir eq 'r') { $vCig = reverseCigar($vCig); } #reverse cigar if necessary
-		if    ($vCig =~ /^(\d+)[SH]/) { $vPrimEnd = 'start'; }
-		elsif ($vCig =~ /(\d+)[SH]$/) { $vPrimEnd = 'end';   }
-		else 	{print "Can't figure out which end of the read is clipped in the viral alignment"; } #this shouldn't happen
-	
-	
-	# check each viral secondary alignment to see if it can account for rest of read
-	my (@viralSups, $supCigar, $supSense, $supViralRef, $supEnd, $vSupAlig, $supAlignment);
-		@viralSups = split(";", $vSup);
-		foreach $supAlignment (@viralSups) {
-			
-			if ($supAlignment eq "NA") { next; }
-			
-			($supViralRef, $supSense, $supCigar) = (split(",",$supAlignment))[0,2,3];
-			
-			if ($supCigar =~ /(^\d+[SH].*\d+[SH]$)/) { next; } #skip alignments where both ends are clipped
-	
-			unless ($supCigar =~ /^\d+[M]|\d+[M]$/) { next; } #make sure one end is matched
-			#$supCigar = processCIGAR($supCigar, $seq);
+		if ($supSense eq '-') { $supCig = reverseCigar($supCig); }
 		
-			#check here if reference for supplementary alignment is the same as the primary alignment
-			#if ($sViralRef ne $pViralRef) { next; } # don't need to check if references are different
+		#get matched region(s) from alignment
+		#get and reverse letters and numbers from cigar
+		my @letters = split(/\d+/, $supCig);
+		my @numbers = split(/[A-Z]/, $supCig);
+		#since numbers precede letters, always get one extra empty element in letter array (which is at start)
+		shift @letters;
+
+
+		#for each match in @letters, get position in read where alignment starts and length of alignment
+		my ($start, $matchedLen, $end);
+		for my $i (0..$#letters) { 
+			if ($letters[$i] eq "M") { 
+				#get matched length
+				$matchedLen = $numbers[$i];
 		
-			#check for if mapped is at start AND end (below assumes just one end mapped)
-			#get if mapped part of supplementary alignment is at beginning or end of read
-			if ($supSense eq '-') { $supCigar = reverseCigar($supCigar); } #reverse cigar if necessary
-			if	  ($supCigar =~ /^(\d+)M/) { $supEnd = 'start';  ($vSupAlig) = ($supCigar =~ /^(\d+)M/);}
-			elsif ($supCigar =~ /(\d+)M$/) { $supEnd = 'end'  ;  ($vSupAlig) = ($supCigar =~ /(\d+)M$/);}
-			else { next; } #if mapped part not at start or end
-			
-			#if end is the same, and number of mapped bases in supplementary and primary alignments is greater than read length
-			if (($vPrimEnd eq $supEnd) and (($vSupAlig + $vAlig) >= $readlen)) { $isRearrange = "yes"; }	
+				#get start
+				$start = 1;
+				for my $j (0..($i-1)) { $start += $numbers[$j]; } #sum up numbers up to where match starts
+				
+				#get end
+				$end = ($start + $matchedLen - 1);
+				
+				#append to @aligns
+				push(@aligns, "${start}xxx${end}");
+		
+			}
+		}
 	}
 	
-	#if didn't find any possible vector rearrangements to account for this read, probably not vector rearrangment
-	if ($isRearrange eq "") { $isRearrange = "no"; }
+	#add padding and sort alignments
+	#zeropadding is needed so that sorting works correctly
+	my @padded;
+	foreach my $element (@aligns) {
+		
+		#get start and end
+		my ($start, $end) = (split('xxx', $element));
+		
+		#add padding to start if not three digits
+		if ($start =~ /^(\d)$/) { $start = "00${1}"; }
+		elsif ($start =~ /^(\d\d)$/) {$start = "0${1}"; }
+		
+		#add padding to end if not three digits
+		if ($end =~ /^(\d)$/) { $end = "00${1}"; }
+		elsif ($end =~ /^(\d\d)$/) {$end = "0${1}"; }
+		
+		push(@padded, join('xxx', $start, $end));
+	}
 	
+	#sort array
+	my @sorted = sort(@padded);
+	
+	#check if alignments can account for whole read
+	my $isRearrange; #to store result, "yes" or "no"
+	#check that first base is accounted for
+	#since list is sorted, if first base is accounted for then first alignment will account for it
+	if ($sorted[0] !~ "001") { return "no"; } 
+
+	#check rest of the read
+	my $currentPos = 0;
+	my $lastUsed = -1;
+	my $i = (scalar @sorted) - 1; #start at end of list and go backwards
+	
+	while (($currentPos < $readlen) and ($i != $lastUsed )) {
+		if ((split('xxx', $sorted[$i]))[0] <= ($currentPos +1))  { 
+			$currentPos = (split('xxx', $sorted[$i]))[1]; #update current position
+			$lastUsed = $i; #update last used alignment
+			$i = ((scalar @sorted) - 1); #start again at end of list	
+		}
+		else { $i -= 1; }
+	}
+	
+	#check if we reached the end of the read
+	$isRearrange = ($currentPos == $readlen) ? "yes" : "no";
+
 	return $isRearrange;
-	
+
 }
 
 sub printOutput {
@@ -700,7 +727,7 @@ sub printOutput {
 
 sub printBed {
 ### Print Bed output
-### Bed starts are 0-based and there ends are 1-based
+### Bed starts are 0-based and their ends are 1-based
 ### 1	0	1 <- referes to the first base on chromosome 1
 
 	my ($bedFile, @outLines) = @_;
@@ -751,7 +778,6 @@ sub reverseCigar {
 	#get and reverse letters and numbers from cigar
 	@letters = reverse(split(/\d+/, $oriCig));
 	@numbers = reverse(split(/[A-Z]/, $oriCig));
-	
 	#since numbers precede letters, always get one extra empty element in letter array (which is at end)
 	pop @letters;
 	
