@@ -720,7 +720,7 @@ sub printOutput {
 ### Print output file
 	my ($outFile, @outLines) = @_;	
 	open (OUTFILE, ">$outFile") || die "Could not open output file: $outFile\n";
-	print OUTFILE "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNoAmbiguousBases\tOverlapType\tOrientation\tHostSeq\tViralSeq\tAmbiguousSeq\tHostSecondaryAlignments\tViralSecondaryAlignments\tPossibleHostTranslocation?\tPossibleVectorRearrangement?\tHostPossibleAmbiguous?\tViralPossibleAmbiguous?\tReadID\tMergedRead\n";
+	print OUTFILE "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNoAmbiguousBases\tOverlapType\tOrientation\tHostSeq\tViralSeq\tAmbiguousSeq\tHostSecondaryAlignments\tViralSecondaryAlignments\tPossibleHostTranslocation\tPossibleVectorRearrangement\tHostPossibleAmbiguous\tViralPossibleAmbiguous\tReadID\tMergedRead\n";
 	foreach my $line (@outLines) { print OUTFILE "$line\n"; }
 	close OUTFILE;
 }
