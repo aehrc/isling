@@ -4,7 +4,7 @@
 
 
 #SBATCH --job-name=align			#name of job
-#SBATCH --time=3:00:00  				#time allowed
+#SBATCH --time=4:00:00  				#time allowed
 #SBATCH --mem-per-cpu=5GB			#memory per cpu
 #SBATCH --nodes=4
 #SBATCH --ntasks-per-node=6
@@ -21,6 +21,7 @@ module load parallel
 #input and output directories
 PROJ=/datastore/sco305/integration/expt2_pipeline-tweaks
 DATA=${PROJ}/data
+BWAPATH=${PROJ}/tools/bwa-0.7.17/bwa
 
 #get directories with read data
 #CSV with data directory in first position, sample name in second, host genome in third and virus genome in fourth
@@ -57,7 +58,7 @@ parallel="parallel --delay 0.2 -j $TOTALTASKS --joblog ../slogs/runtask_${SLURM_
 #
 #   srun --exclusive -N1 -n1 ./do_merging.sh ${DATA}/firstdataset  > ${DATA}/firstdataset/merge.log
 #
-$parallel "$srun ./do_aligning.sh {} ${PROJ}  2>&1 {}/align.log" :::: ${DATA}/data2analyse.txt
+$parallel "$srun ./do_aligning.sh {} ${PROJ} ${BWAPATH}  2>&1 {}/align.log" :::: ${DATA}/data2analyse.txt
 
 wait 
 

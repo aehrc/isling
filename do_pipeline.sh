@@ -13,8 +13,8 @@ HOST=$(echo $1 | cut -f3 -d,)
 VIRUS=$(echo $1 | cut -f4 -d,)
 PROJ=$2
 
-HOSTSAM=${DATA}/${SAMPLE}.${HOST}.bwa.sorted.supFilt.sam
-VIRALSAM=${DATA}/${SAMPLE}.${VIRUS}.bwa.sorted.supFilt.sam
+HOSTSAM=${DATA}/${SAMPLE}.${HOST}.bwa.sam
+VIRALSAM=${DATA}/${SAMPLE}.${VIRUS}.bwa.sam
 
 echo analysing sample $SAMPLE after alignment to ${HOST} and ${VIRUS} genomes
 

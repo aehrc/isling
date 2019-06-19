@@ -13,20 +13,15 @@ SAMPLE=$(echo $1 | cut -f2 -d,)
 HOST=$(echo $1 | cut -f3 -d,)
 VIRUS=$(echo $1 | cut -f4 -d,)
 PROJ=$2
+BWAPATH=$3
 
-#load modules
-module load samtools
-module load bwa
-
-#need conda for pysam
-source ~/.bashrc
-conda activate bioinfo2
 
 #input paths
 
-
-#location of reads - here only using merged reads
+#location of reads 
 READS=${DATA}/${SAMPLE}.seqPrep_processed.fastq
+READ1=${DATA}/${SAMPLE}.seqPrep_processed.R1.fastq.gz
+READ2=${DATA}/${SAMPLE}.seqPrep_processed.R2.fastq.gz
 
 #output paths
 HOSTPATH=${DATADIR}/aligned
@@ -38,42 +33,22 @@ HOSTINDEX=${PROJ}/references/${HOST}
 VIRALINDEX=${PROJ}/references/${VIRUS}
 
 
-#output files for host alignment (regular alignment)
+#output files for host alignment
 HOSTSAM=${HOSTPATH}/${SAMPLE}.${HOST}.bwa.sam
-HOSTBAM=${HOSTPATH}/${SAMPLE}.${HOST}.bwa.bam
-HOSTSOR=${HOSTPATH}/${SAMPLE}.${HOST}.bwa.sorted.bam
-HOSTSUP=${HOSTPATH}/${SAMPLE}.${HOST}.bwa.sorted.supFilt.bam
-HOSTSUPSAM=${HOSTPATH}/${SAMPLE}.${HOST}.bwa.sorted.supFilt.sam
+HOSTSAMPE=${HOSTPATH}/${SAMPLE}.${HOST}.bwaPaired.sam
 
 
 #output files for pAAV2 alignment
 VIRALSAM=${VIRALPATH}/${SAMPLE}.${VIRUS}.bwa.sam
-VIRALBAM=${VIRALPATH}/${SAMPLE}.${VIRUS}.bwa.bam
-VIRALSOR=${VIRALPATH}/${SAMPLE}.${VIRUS}.bwa.sorted.bam
-VIRALSUP=${VIRALPATH}/${SAMPLE}.${VIRUS}.bwa.sorted.supFilt.bam
-VIRALSUPSAM=${VIRALPATH}/${SAMPLE}.${VIRUS}.bwa.sorted.supFilt.sam
+VIRALSAMPE=${VIRALPATH}/${SAMPLE}.${VIRUS}.bwaPaired.sam
 
 
 #align single reads with BWA
-python ./alignSingleReadsWithBWA.py --index $HOSTINDEX --reads $READS --output $HOSTSAM --threshold 10 --hflag 20 
-python ./alignSingleReadsWithBWA.py --index $VIRALINDEX --reads $READS --output $VIRALSAM --threshold 10 --hflag 20
+python ./alignSingleReadsWithBWA.py --index $HOSTINDEX --reads $READS --output $HOSTSAM --threshold 10 --hflag 200 --bwa $BWAPATH
+python ./alignSingleReadsWithBWA.py --index $VIRALINDEX --reads $READS --output $VIRALSAM --threshold 10 --hflag 200 --bwa $BWAPATH
 
 
-#convert to bam and sort
-python ./convertAndSort.py --sam $HOSTSAM --bam $HOSTBAM --sort $HOSTSOR
-python ./convertAndSort.py --sam $VIRALSAM --bam $VIRALBAM --sort $VIRALSOR
+#aligned paired reads with BWA
+python ./alignPEReadsWithBWA.py --index $HOSTINDEX --read1 $READ1 --read2 $READ2 --output $HOSTSAMPE --threshold 10 --hflag 200 --bwa $BWAPATH
+python ./alignPEReadsWithBWA.py --index $VIRALINDEX --read1 $READ1 --read2 $READ2 --output $VIRALSAMPE --threshold 10 --hflag 200 --bwa $BWAPATH
 
-
-#remove supplementary alignments
-samtools view -bh -G 0x800 $HOSTSOR > $HOSTSUP
-samtools view -bh -G 0x800 $VIRALSOR > $VIRALSUP
-
-
-#index 
-samtools index $HOSTSUP
-samtools index $VIRALSUP
-
-
-#convert to sam
-samtools view -h -o $HOSTSUPSAM $HOSTSUP
-samtools view -h -o $VIRALSUPSAM $VIRALSUP
