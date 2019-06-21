@@ -3,7 +3,7 @@
 package ViralIntegration;
 use Exporter;
 @ISA = ('Exporter');
-@EXPORT = qw(analyseRead processCIGAR collectIntersect extractSeqCoords extractOutput extractCoords extractSequence getSecSup isAmbigLoc isRearrange printOutput printBed printMerged reverseComp reverseCigar);
+@EXPORT = qw(analyzeRead processCIGAR extractSeqCoords extractOutput extractCoords extractSequence getSecSup isAmbigLoc isRearrange printOutput printBed printMerged reverseComp reverseCigar);
 
 
 ##### subroutines #####
@@ -74,159 +74,6 @@ sub processCIGAR {
 	# Construct simplified CIGAR string (only contains matched and clipped)
 	if ($order == 1) { return(join('',($clipped,"S",$matched,"M"))); }
 	else		 { return(join('',($matched,"M",$clipped,"S"))); }
-}
-
-sub collectIntersect {
-### Check if there is overlap between the integration sites
-### in human and viral integration sites
-### returns integration start/stop relative to read sequence
-
-### BWA Alignments are 1-based
-	my ($viralData, $humanData) = @_;
-
-	my ($vStart, $vStop, $vOri, $seq, $vDir, $vCig, $vSec, $vSup) = (split("\t",$viralData))[3,4,5,6,7,8,-2,-1];
-	my ($hStart, $hStop, $hOri, $hDir, $hCig, $hSec, $hSup)       = (split("\t",$humanData))[3,4,5,7,8,-2,-1];
-
-	if	((($vOri eq $hOri) and ($vDir eq $hDir)) or( ($vOri ne $hOri) and ($vDir ne $hDir))) { return; } # in some cases the same part of the read may be clippeed 
-	### CIGAR strings are always reported relative to the strand
-	### 100M50S on a fwd read = 50S100M on a rev read
-	### Therefore if integration position and read orientation match (e.g. ++ and ff) same part of the read is clipped
-	### If they all don't match (e.g. +- and fr which is equivalent to ++ and ff) then the same part of the read is clipped
-	### ++ and fr is ok because this is the same as +- and ff
-
-	unless 	($vOri and $hOri) { return; } # Catch a weird case where an orientation isn't found. Appears to happen when both ends are clipped
-	#if 	($vOri eq $hOri)  { 
-	#	return; 
-	#} # skip reads where same side is clipped in virus and human (not a true junction)
-
-	#if ($vDir eq 'r' and $hDir eq 'f' and $vOri eq "+") { 
-	#	$vOri   = "-";
-	#	$vStart = length($seq) - $vStart - 1;
-	#	$vStop  = length($seq) - $vStop  - 1;
-	#}
-	#elsif ($vDir eq 'r' and $hDir eq 'f' and $vOri eq "-") { 
-	#	$vOri   = "+";
-	#	$vStart = length($seq) - $vStart - 1;
-	#	$vStop  = length($seq) - $vStop  - 1;
-	#}
-	#elsif ($vDir eq 'f' and $hDir eq 'r' and $hOri eq "+") { 
-	#	$hOri   = "-"; 
-	#	$hStart = length($seq) - $hStart - 1;
-	#	$hStop  = length($seq) - $hStop  - 1; 
-	#}
-	#elsif ($vDir eq 'f' and $hDir eq 'r' and $hOri eq "-") { 
-	#	$hOri   = "+"; 
-	#	$vStart = length($seq) - $vStart - 1;
-	#	$vStop  = length($seq) - $vStop  - 1; 
-	#}
-
-	### First find if there is any overlap between the human and viral junctions
-	### Do so by comparing the CIGAR strings
-	### Can calculate by subtracting aligned of one from clipped of other	
-	my ($hClip) = ($hCig =~ /(\d+)S/);
-	my ($hAlig) = ($hCig =~ /(\d+)M/);
-	my ($vClip) = ($vCig =~ /(\d+)S/);
-	my ($vAlig) = ($vCig =~ /(\d+)M/);
-	
-	### Overlap should be the same regardless of how it's calculated so double check
-	my $overlap1 = abs($hAlig - $vClip);
-	my $overlap2 = abs($vAlig - $hClip);
-
-	#here check that absolute values of overlap are the same
-	unless (abs($overlap1) == abs($overlap2)) { 
-		print "Impossible overlap found\n";
-		return;
-	}
-	
-	
-	#ambigous bases may result from either an overlap of aligned regions, or a gap
-	#if the total number of aligned bases (from human and viral alignments) are greater than the read length, then it's an overlap
-	#otherwise it's a gap
-	my ($overlaptype, $readlen);
-	$readlen = length($seq);
-	if 		(($hAlig + $vAlig) > ($readlen))  {	$overlaptype = "overlap";	} #overlap
-	elsif 	(($hAlig + $vAlig) == ($readlen)) {	$overlaptype = "none";		} #no gap or overlap
-	else 									  {	$overlaptype = "gap";		} #gap
-	
-	
-	#check to see is whole read can be accounted for by vector rearrangements
-	
-	my $isVecRearrange;
-	if ((join(";", $vSup, $vSec)) eq "NA;NA") { $isVecRearrange = "no"; }
-	else { $isVecRearrange = isRearrange($vCig, $vDir, (join(";", $vSup, $vSec)), $readlen);}
-	 
-	my $isHumRearrange;
-	if ((join(";", $hSup, $hSec)) eq "NA;NA") { $isHumRearrange = "no"; }
-	else { $isHumRearrange = isRearrange($hCig, $hDir, (join(";", $hSup, $hSec)), $readlen);}
-	
-	
-	#check to see if location of human alignment is ambiguous: multiple equivalent alignments accounting for human part of read
-	my $isHumAmbig;
-	if ($hSec eq "NA") { $isHumAmbig = "no";}
-	else { $isHumAmbig = isAmbigLoc($hDir, $hCig, $hSec, $hAlig);}
-	
-	#check to see if location of viral alignment is ambiguous: multiple equivalent alignments accounting for viral part of read
-	my $isVirAmbig;
-	if ($vSec eq "NA") { $isVirAmbig = "no";}
-	else { $isVirAmbig = isAmbigLoc($vDir, $vCig, $vSec, $vAlig);}
-
-	### Calculate the start and stop positions of the viral and human sequences relative to the read
-	my ($hRStart,$hRStop) = extractSeqCoords($hOri, $hDir, $hAlig, abs($overlap1), $readlen);
-	my ($vRStart,$vRStop) = extractSeqCoords($vOri, $vDir, $vAlig, abs($overlap1), $readlen);
-
-	#my ($hRStart, $hRStop);
-	#if ($hOri eq "+") { # human integration site is after the aligned sequence: Human -> Viral
-	#	$hRStart = 1; # because the first half of the read is human
-	#	$hRStop  = $hAlig - $overlap1; # it extends to the start of the overlap
-	#}
-	#else { # integration is before the aligned seqeunce: Viral -> Human
-	#	$hRStop  = length($seq); # because the second half of the read is human
-	#	$hRStart = $hRStop - $hAlig + $overlap1 + 1; #extends to the start of the overlap
-	#}
-		
-	#repeat for the viral junction
-	#my ($vRStart, $vRStop);
-	#if ($vOri eq "+") {
-	#	$vRStart = 1;
-	#	$vRStop  = $vAlig - $overlap1;
-	#}
-	#else {
-	#	$vRStop  = length($seq);
-	#	$vRStart = $vRStop - $vAlig + $overlap1 + 1; 
-	#}
-
-	### Collect integration start/stop positions relative to read
-	### These are the bases that flank the bond that is broken by insertion of the virus
-	### Takes any overlap into account	
-	my ($intRStart, $intRStop, $order);
-
-	if    ($hRStop < $vRStart) { ($intRStart,$intRStop,$order) = ($hRStop,$vRStart,"hv"); } # Orientation is Human -> Virus
-	elsif ($vRStop < $hRStart) { ($intRStart,$intRStop,$order) = ($vRStop,$hRStart,"vh"); } # Orientation is Virus -> Human
-	else 			   { 
-		print "Something weird has happened";
-		return;
-	}
-
-	#if ($vOri eq "-" and $hOri eq "+") { # Orientation is Human -> Virus
-	#	$intRStart = $hRStop;
-	#	$intRStop  = $vRStart;
-	#	$order     = "hv";
-	#}
-	#elsif ($hOri eq "-" and $vOri eq "+") { # Orientation is Virus -> Human
-	#	$intRStart = $vRStop;
-	#	$intRStop  = $vRStart;
-	#	$order     = "vh";
-	#}
-
-	#else {
-	#	return; # If you end up here something's gone weird. Need to double check to make sure nothing would end up here
-	#}
-
-	return($intRStart, $intRStop, $hRStart, $hRStop, $vRStart, $vRStop, $overlap1, $order, $overlaptype, $isVecRearrange, $isHumRearrange, $isHumAmbig, $isVirAmbig);
-
-	#if 	  ($vOri eq "+" and $hOri eq "-" and $vStop - 1 > $hStart) { return($hStart, $vStop); } # overalp with order virus -> human
-	#elsif ($vOri eq "-" and $hOri eq "+" and $hStop - 1 > $vStart)    { return($vStart, $hStop); } # overlap with order human -> virus
-	#else 							   	   { return($hStart, $hStop); } # if no overlap, use human positions
 }
 
 sub extractSeqCoords {
@@ -315,6 +162,22 @@ sub extractSequence {
 
 	if ($ori eq "-") { return($seq = substr($seq, ($stop + $overlap))); }
 	else			 { return($seq = substr($seq, 0, ($start - $overlap + 1))); }
+
+}
+
+sub getMatchedRegion {
+	#get the matched region from a cigar string, assuming it's at an end of the read
+	
+	my ($cigar, $dir) = @_;
+
+	if ($dir eq '-') { $cigar = reverseCigar($cigar); }
+	
+	my ($end, $align);
+	
+	if	  (($cigar =~ /^(\d+)M/)) { $end = 'start';  ($align) = ($cigar =~ /^(\d+)M/);}
+	elsif (($cigar =~ /(\d+)M$/)) { $end = 'end'  ;  ($align) = ($cigar =~ /[A-Z](\d+)M$/);}
+	
+	return ($end, $align);
 
 }
 
@@ -418,7 +281,19 @@ sub isAmbigLoc {
 
 sub isRearrange {
 
-	my ($pCig, $pDir, $sup, $readlen) = @_;
+	#check for two possible types of rearrangements of a reference genome
+	# 1. Check if the alignments to one reference genome can account for the whole read
+	#			This would indicate a possible rearrangment made of known fragments from one genome
+	# 2. Check if there is a secondary alignment from one reference equivalent to the primary alignment in the second
+	#			This could indicate a possible rearrangement with a possible gap
+
+	my ($pCig, $pDir, $sup, $readlen, $otherpCig, $otherpDir) = @_;
+	# $pCig is primary alignment of the first reference
+	# $pDir is the direction of the primary alignment of the first reference
+	# $sup are the secondary and supplementary alignments of the first reference
+	# $otherpCig is the primary alignment for the second reference
+	# $otherpDir is the direction of the primary alignment for the second reference
+
 	
 	#after processing, cigars have one matched region per alignment
 	#get location in read of matched region and its length
@@ -434,7 +309,10 @@ sub isRearrange {
 	#for human/host we would not want to do this could have translocations
 	#could do this by making one @aligns per reference, and store all 
 	#note - using 1-based indexing of read alignments
-		
+	
+	#get length and end of matched region in second reference primary alignment
+	my ($otherpEnd, $otherpAlign) = getMatchedRegion($otherpCig, $otherpDir);
+	
 	my @aligns; #to store start and end of each alignment
 	
 	#first do primary alignment
@@ -450,6 +328,17 @@ sub isRearrange {
 		if ($supAlign eq "NA") { next; } #check for no secondary alignments
 		my ($supSense, $supCig) = (split(",",$supAlign))[2,3]; #get sense and cigar from alignment
 	
+		
+		#first check for second type of rearrangement: 
+		#is this secondary alignment equivalent to the primary alignment against the other reference?
+		
+		#get length and end of matched region in secondary alignment
+		my ($supEnd, $supAlign) = getMatchedRegion($supCig, $supSense); 
+		
+		if ($supEnd) { #mapped region might not be at start or end, in which case $supEnd won't be assigned
+			if (($otherpEnd eq $supEnd) and ($supAlign == $otherpAlign)) { return "yes"; } 	
+		}
+		
 		if ($supSense eq '-') { $supCig = reverseCigar($supCig); }
 		
 		#get matched region(s) from alignment
@@ -458,7 +347,6 @@ sub isRearrange {
 		my @numbers = split(/[A-Z]/, $supCig);
 		#since numbers precede letters, always get one extra empty element in letter array (which is at start)
 		shift @letters;
-
 
 		#for each match in @letters, get position in read where alignment starts and length of alignment
 		my ($start, $matchedLen, $end);
@@ -525,6 +413,8 @@ sub isRearrange {
 	
 	#check if we reached the end of the read
 	$isRearrange = ($currentPos == $readlen) ? "yes" : "no";
+
+
 
 	return $isRearrange;
 

@@ -144,11 +144,11 @@ while (my $hl = <HUMAN>) {
 }
 close HUMAN;
 
-### Look for valid integration sites
+### Look for evidence of integration sites by identifying chimeric reads
 ### Need to compare the junction sites in the viral and human genomes to see if there is any overlap (ambiguous bases)
 ### Adjust integration coordinates appropriately
 my @outLines;
-if ($verbose) { print "Detecting integrations...\n"; }
+if ($verbose) { print "Detecting chimeric reads...\n"; }
 foreach my $key (keys %viralIntegrations) {
 	if (exists $humanIntegrations{$key}) { # only consider reads that are flagged in both human and viral alignments
 		# Collect positions relative to read
@@ -199,3 +199,94 @@ sub printHelp {
 	exit;
 }
 
+sub collectIntersect {
+### Check if there is overlap between the integration sites
+### in human and viral integration sites
+### returns integration start/stop relative to read sequence
+
+### BWA Alignments are 1-based
+	my ($viralData, $humanData) = @_;
+
+	my ($vStart, $vStop, $vOri, $seq, $vDir, $vCig, $vSec, $vSup) = (split("\t",$viralData))[3,4,5,6,7,8,-2,-1];
+	my ($hStart, $hStop, $hOri, $hDir, $hCig, $hSec, $hSup)       = (split("\t",$humanData))[3,4,5,7,8,-2,-1];
+
+	if	((($vOri eq $hOri) and ($vDir eq $hDir)) or( ($vOri ne $hOri) and ($vDir ne $hDir))) { return; } # in some cases the same part of the read may be clippeed 
+	### CIGAR strings are always reported relative to the strand
+	### 100M50S on a fwd read = 50S100M on a rev read
+	### Therefore if integration position and read orientation match (e.g. ++ and ff) same part of the read is clipped
+	### If they all don't match (e.g. +- and fr which is equivalent to ++ and ff) then the same part of the read is clipped
+	### ++ and fr is ok because this is the same as +- and ff
+
+	unless 	($vOri and $hOri) { return; } # Catch a weird case where an orientation isn't found. Appears to happen when both ends are clipped
+
+	### First find if there is any overlap between the human and viral junctions
+	### Do so by comparing the CIGAR strings
+	### Can calculate by subtracting aligned of one from clipped of other	
+	my ($hClip) = ($hCig =~ /(\d+)S/);
+	my ($hAlig) = ($hCig =~ /(\d+)M/);
+	my ($vClip) = ($vCig =~ /(\d+)S/);
+	my ($vAlig) = ($vCig =~ /(\d+)M/);
+	
+	### Overlap should be the same regardless of how it's calculated so double check
+	my $overlap1 = abs($hAlig - $vClip);
+	my $overlap2 = abs($vAlig - $hClip);
+
+	#here check that absolute values of overlap are the same
+	unless (abs($overlap1) == abs($overlap2)) { 
+		print "Impossible overlap found\n";
+		return;
+	}
+	
+	#ambigous bases may result from either an overlap of aligned regions, or a gap
+	#if the total number of aligned bases (from human and viral alignments) are greater than the read length, then it's an overlap
+	#otherwise it's a gap
+	my ($overlaptype, $readlen);
+	$readlen = length($seq);
+	if 		(($hAlig + $vAlig) > ($readlen))  {	$overlaptype = "overlap";	} #overlap
+	elsif 	(($hAlig + $vAlig) == ($readlen)) {	$overlaptype = "none";		} #no gap or overlap
+	else 									  {	$overlaptype = "gap";		} #gap
+	
+	
+	#check to see is whole read can be accounted for by vector rearrangements
+	
+	my $isVecRearrange;
+	if ((join(";", $vSup, $vSec)) eq "NA;NA") { $isVecRearrange = "no"; }
+	else { $isVecRearrange = isRearrange($vCig, $vDir, (join(";", $vSup, $vSec)), $readlen, $hCig, $hDir);}
+	 
+	my $isHumRearrange;
+	if ((join(";", $hSup, $hSec)) eq "NA;NA") { $isHumRearrange = "no"; }
+	else { $isHumRearrange = isRearrange($hCig, $hDir, (join(";", $hSup, $hSec)), $readlen, $vCig, $vDir);}
+	
+	
+	#check to see if location of human alignment is ambiguous: multiple equivalent alignments accounting for human part of read
+	my $isHumAmbig;
+	if ($hSec eq "NA") { $isHumAmbig = "no";}
+	else { $isHumAmbig = isAmbigLoc($hDir, $hCig, $hSec, $hAlig);}
+	
+	#check to see if location of viral alignment is ambiguous: multiple equivalent alignments accounting for viral part of read
+	my $isVirAmbig;
+	if ($vSec eq "NA") { $isVirAmbig = "no";}
+	else { $isVirAmbig = isAmbigLoc($vDir, $vCig, $vSec, $vAlig);}
+
+	### Calculate the start and stop positions of the viral and human sequences relative to the read
+	my ($hRStart,$hRStop) = extractSeqCoords($hOri, $hDir, $hAlig, abs($overlap1), $readlen);
+	my ($vRStart,$vRStop) = extractSeqCoords($vOri, $vDir, $vAlig, abs($overlap1), $readlen);
+
+	### Collect integration start/stop positions relative to read
+	### These are the bases that flank the bond that is broken by insertion of the virus
+	### Takes any overlap into account	
+	my ($intRStart, $intRStop, $order);
+
+	if    ($hRStop < $vRStart) { ($intRStart,$intRStop,$order) = ($hRStop,$vRStart,"hv"); } # Orientation is Human -> Virus
+	elsif ($vRStop < $hRStart) { ($intRStart,$intRStop,$order) = ($vRStop,$hRStart,"vh"); } # Orientation is Virus -> Human
+	else 			   { 
+		print "Something weird has happened";
+		return;
+	}
+
+	return($intRStart, $intRStop, $hRStart, $hRStop, $vRStart, $vRStop, $overlap1, $order, $overlaptype, $isVecRearrange, $isHumRearrange, $isHumAmbig, $isVirAmbig);
+
+	#if 	  ($vOri eq "+" and $hOri eq "-" and $vStop - 1 > $hStart) { return($hStart, $vStop); } # overalp with order virus -> human
+	#elsif ($vOri eq "-" and $hOri eq "+" and $hStop - 1 > $vStart)    { return($vStart, $hStop); } # overlap with order human -> virus
+	#else 							   	   { return($hStart, $hStop); } # if no overlap, use human positions
+}
