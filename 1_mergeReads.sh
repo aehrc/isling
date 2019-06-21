@@ -23,21 +23,22 @@ PROJ=/datastore/sco305/integration/expt2_pipeline-tweaks
 DATA=${PROJ}/data
 
 #get directories with read data
-echo "getting directories to merge..."
-data2analyse=()
-while IFS= read -r -d $'\0'; do
-	data2analyse+=("${REPLY:0:-6}")
-done < <(find ${DATA}/*/reads -maxdepth 0 -type d -print0)
+#CSV with data directory in first position, sample name in second, host genome in third and virus genome in fourth
+echo -n "" > ${DATA}/data2analyse.txt
+dirs=($(find ${DATA}/* -maxdepth 0 -type d))
+for dir in "${dirs[@]}"; do
+  mkdir -p ${dir}/merged_reads
+  while IFS= read -r line; do
+	echo "${dir},${line}" >> ${DATA}/data2analyse.txt
+  done < "${dir}/samples.txt"
+done
 
-echo ${data2analyse[@]}
-
-#number of directories
-NDIR=(${#data2analyse[@]})
-echo "Analysing ${NDIR} directories"
+TOTALTASKS=$((${SLURM_NTASKS_PER_NODE} * ${SLURM_NNODES}))
+echo total tasks: $TOTALTASKS
 
 # This specifies the options used to run srun. The "-N1 -n${SLURM_NTASKS_PER_NODE} -c1" options are
 # used to allocate ${SLURM_NTASKS_PER_NODE} tasks and 1 cpu per task to each node.
-srun="srun --exclusive -N1 -n${SLURM_NTASKS_PER_NODE} -c1"
+srun="srun --exclusive -N1 -n1"
 
 # This specifies the options used to run GNU parallel:
 #
@@ -48,15 +49,18 @@ srun="srun --exclusive -N1 -n${SLURM_NTASKS_PER_NODE} -c1"
 #   The combination of --joblog and --resume create a task log that
 #   can be used to monitor progress.
 #
-parallel="parallel --delay 0.2 -j ${SLURM_NTASKS_PER_NODE} --joblog ../slogs/runtask_${SLURM_JOB_ID}.log --resume"
+parallel="parallel --delay 0.2 -j $TOTALTASKS --joblog ../slogs/runtask_${SLURM_JOB_ID}.log --resume"
 
 # Run a script, do_merging.sh, using GNU parallel and srun. Parallel
 # will run the runtask script for the numbers 1 through ${NAACS}. To
 # illustrate, the first job will run like this:
 #
-#   srun --exclusive -N1 -n1 ./do_merging.sh ${DATA}/firstdataset   > ${DATA}/firstdataset/merge.log
+#   srun --exclusive -N1 -n1 ./do_merging.sh ${DATA}/firstdataset  > ${DATA}/firstdataset/merge.log
 #
-$parallel "$srun ./do_merging.sh {} $SLURM_CPUS_PER_TASK 2>&1 {}/merge.log" ::: ${data2analyse[@]}
+$parallel "$srun ./do_merging.sh {} ${PROJ}  2>&1 {}/align.log" :::: ${DATA}/data2analyse.txt
+
+
+
 
 
 date
