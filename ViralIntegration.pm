@@ -166,7 +166,7 @@ sub extractSequence {
 }
 
 sub getMatchedRegion {
-	#get the matched region from a cigar string, assuming it's at an end of the read
+	#get the matched region from a cigar string, assuming it's at the start or end of the read
 	
 	my ($cigar, $dir) = @_;
 
@@ -336,7 +336,7 @@ sub isRearrange {
 		my ($supEnd, $supAlign) = getMatchedRegion($supCig, $supSense); 
 		
 		if ($supEnd) { #mapped region might not be at start or end, in which case $supEnd won't be assigned
-			if (($otherpEnd eq $supEnd) and ($supAlign == $otherpAlign)) { return "yes"; } 	
+			if (($otherpEnd eq $supEnd) and ($supAlign >= $otherpAlign)) { return "yes"; } 	
 		}
 		
 		if ($supSense eq '-') { $supCig = reverseCigar($supCig); }

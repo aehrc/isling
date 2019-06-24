@@ -4,9 +4,7 @@
 use strict;
 use warnings;
 
-use File::Basename qw(dirname);
-use Cwd  qw(abs_path);
-use lib dirname(dirname abs_path $0) . '/lib';
+use lib '.';
 
 use ViralIntegration;
 use Getopt::Long;
@@ -185,7 +183,7 @@ exit;
 sub printHelp {
 	print "Pipeline for detection of viral integration sites within a genome\n\n";
 	print "Usage:\n";
-	print "\tperl detectionPipeline.pl --viral <sam> --human <sam> --cutoff <n> --output <out> --bed <bed> --help\n\n";
+	print "\tperl softClip.pl --viral <sam> --human <sam> --cutoff <n> --output <out> --bed <bed> --help\n\n";
 	print "Arguments:\n";
 	print "\t--viral:   Alignment of reads to viral genomes (sam)\n";
 	print "\t--human:   Alignment of reads to human genome (sam)\n";
