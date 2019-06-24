@@ -22,7 +22,7 @@ echo analysing sample $SAMPLE after alignment to ${HOST} and ${VIRUS} genomes
 #run pipeline
 echo ""
 echo running integration site anaylsis script on ${SAMPLE}
-perl ${PROJ}/tools/AAVintegrationPipeline_master.pl --viral ${VIRALSAM} --human ${HOSTSAM} --output ${OUTPATH}/${SAMPLE}.${HOST}_${VIRUS}.integrations.txt --bed ${OUTPATH}/${SAMPLE}.${HOST}_${VIRUS}.integrations.bed --merged ${OUTPATH}/${SAMPLE}.${HOST}_${VIRUS}.integrations.merged.bed --cutoff 10
+perl ${PROJ}/tools/softClip.pl --viral ${VIRALSAM} --human ${HOSTSAM} --output ${OUTPATH}/${SAMPLE}.${HOST}_${VIRUS}.integrations.txt --bed ${OUTPATH}/${SAMPLE}.${HOST}_${VIRUS}.integrations.bed --merged ${OUTPATH}/${SAMPLE}.${HOST}_${VIRUS}.integrations.merged.bed --cutoff 10
 
 sed -i 's\chr\\g' ${OUTPATH}/${SAMPLE}.${HOST}_${VIRUS}.integrations.txt
 
