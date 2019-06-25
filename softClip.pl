@@ -80,11 +80,8 @@ while (my $vl = <VIRAL>) {
 	elsif ($cig =~ /(\d+)[SH]$/) 	  { if ($1 > $cutoff) { @viralInt = analyzeRead($parts[3], $cig, "+"); } } # integration site is after the viral sequence
 
 	# ID = readName_seq (in forward direction)
-
-
 	
 	#get supplementary (SA) and secondary (XA) alignments in order to check for possible vector rearrangements
-	
 	my ($vSec, $vSup) = getSecSup($vl);
 	
 	
@@ -255,16 +252,15 @@ sub collectIntersect {
 	if ((join(";", $hSup, $hSec)) eq "NA;NA") { $isHumRearrange = "no"; }
 	else { $isHumRearrange = isRearrange($hCig, $hDir, (join(";", $hSup, $hSec)), $readlen, $vCig, $vDir);}
 	
-	
 	#check to see if location of human alignment is ambiguous: multiple equivalent alignments accounting for human part of read
 	my $isHumAmbig;
 	if ($hSec eq "NA") { $isHumAmbig = "no";}
-	else { $isHumAmbig = isAmbigLoc($hDir, $hCig, $hSec, $hAlig);}
+	else { $isHumAmbig = isAmbigLoc($hDir, $hCig, $hSec);}
 	
 	#check to see if location of viral alignment is ambiguous: multiple equivalent alignments accounting for viral part of read
 	my $isVirAmbig;
 	if ($vSec eq "NA") { $isVirAmbig = "no";}
-	else { $isVirAmbig = isAmbigLoc($vDir, $vCig, $vSec, $vAlig);}
+	else { $isVirAmbig = isAmbigLoc($vDir, $vCig, $vSec);}
 
 	### Calculate the start and stop positions of the viral and human sequences relative to the read
 	my ($hRStart,$hRStop) = extractSeqCoords($hOri, $hDir, $hAlig, abs($overlap1), $readlen);
