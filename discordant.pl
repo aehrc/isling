@@ -4,9 +4,7 @@
 use strict;
 use warnings;
 
-use File::Basename qw(dirname);
-use Cwd  qw(abs_path);
-use lib dirname(dirname abs_path $0) . '/lib';
+use lib ".";
 
 use ViralIntegration;
 use Getopt::Long;
@@ -34,21 +32,22 @@ if ($help) { printHelp(); }
 
 unless ($viral and $human) { printHelp(); }
 
-my %viralIntegrations;
-my %humanIntegrations;
-### These hashes contain the information about the integration sites within the resepctive genomes
-### Data is saved as a tab seperated string
-### Read name => Chr intStart intStop relStart relStop orientation readSeqeunce
+### hash arrays will store putative discordant pairs from both alignments
+### make one array for R1 and R2, and one for viral and human (four total)
+my %viralR1;
+my %viralR2;
+my %humanR1;
+my %humanR2;
 
 
 ### Collect junction reads from viral genome
 ### Junctions are defined by the CIGAR string: SM or MS
 ### Save the resulting information in a hash:
-###	key: 	{ReadID}xxx{ReadSequence}
-###	value:	{TargetID}xxx{ViralIntegrationData}xxx{Sequence}xxx{SeqOrientation}xxx{CIGAR}xxx{XA}xxx{SA}
+###	key: 	{ReadID}
+###	value:	{sequence}xxx{TargetID}xxx{alignStart}xxx{SeqOrientation}xxx{CIGAR}
 ###		SeqOrientation: f = aligned in fwd orientation
 ###				r = aligned in rev orientation
-###		Sequence is always given in fwd orientation
+###		Sequence is always given in fwd orientation if flag 0x10 is set, otherwise is reverse
 ### XA is the secondary alignments in the XA field (from BWA)
 ### SA is the supplementary alignments in the SA field (from BWA)
 
@@ -57,88 +56,81 @@ if ($verbose) { print "Processing viral alignment...\n"; }
 while (my $vl = <VIRAL>) {
 	if ($vl =~ /^@/) { next; } # skip header lines
 
-	my @parts = split("\t", $vl);
+	my @parts = split(' ', $vl);
 	
+	# flags to consider
+	#0x2 = read mapped in proper pair
+	#0x4 = not mapped
+	#0x8 = mate unmapped
+	#0x10 = mapped in reverse orientation
+	#0x40 = first in pair
+	#0x80 = second in pair
+	#0x800 = supplementary alignment
 
 	if ($parts[1] & 0x800) { next(); } # skip supplementary alignments
-
-	if ($parts[2] eq "*") { next; } # skip unaligned reads
-	if ($parts[5] =~ /(^\d+[SH].*\d+[SH]$)/) { next; } # skip alignments where both ends are clipped
-
-	unless ($parts[5] =~ /^\d+[SH]|\d+[SH]$/) { next; } # at least one end of the read must be clipped in order to be considered
-
-	my $cig = processCIGAR($parts[5], $parts[9]); # Process the CIGAR string to account for complex alignments
-	unless ($cig) { next; } # keep checking to make sure double clipped reads don't sneak through
-
-	### Store informaton about the integration site:
-	###	Integration Start Target = last clipped base position relative to target sequence
-	###	Integration Stop Target  = first aligned base position relative to target sequence
-	###	Integration Start Read 	 = last clipped base position relative to read length
-	###	Integration Stop Read    = first aligned base position relative to read length
-	###	Integration Orientation	 = orientation of integration site: + = after aligned sequence, - = before aligned sequence
-	my @viralInt;
-	if    ($cig =~ /^\d+[SH].+\d+[SH]$/) { @viralInt = undef; } # double check, sometimes double clipped sneak through
-	elsif ($cig =~ /(^\d+)[SH]/)   	  { if ($1 > $cutoff) { @viralInt = analyzeRead($parts[3], $cig, "-"); } } # integration site is before the viral sequence
-	elsif ($cig =~ /(\d+)[SH]$/) 	  { if ($1 > $cutoff) { @viralInt = analyzeRead($parts[3], $cig, "+"); } } # integration site is after the viral sequence
-
-	# ID = readName_seq (in forward direction)
-
-	#get supplementary (SA) and secondary (XA) alignments in order to check for possible vector rearrangements
+	if ($parts[1] & 0x2) { next(); } # skip mapped in proper pair
 	
+	#want reads where if not mapped, mate is mapped, or vice versa
+	
+	unless ((($parts[1] & 0x8) and !($parts[1] & 0x4)) or (!($parts[1] & 0x8) and ($parts[1] & 0x4))) { next; }
+
+	#get cigar
+	my $cig = $parts[5]; # Don't process cigar for now; could be a cigar or * if unmapped
+	
+	#get sequence and orientation
+	my ($seq, $seqOri);	
+	if ($parts[1] & 0x10) { $seq = reverseComp($parts[9]); $seqOri = 'r'; }
+	else { $seq = $parts[9]; $seqOri = 'f'; }
+	
+	#get read ID, aligned viral reference, alignment start
+	my ($ID, $ref, $start) = ($parts[0], $parts[2], $parts[3]);
+	
+	#get supplementary (SA) and secondary (XA) alignments in order to check for possible vector rearrangements
 	my ($vSec, $vSup) = getSecSup($vl);
 	
-	
-	if   (@viralInt and ($parts[1] & 0x10)) { $viralIntegrations{join("xxx", ($parts[0],(reverseComp($parts[9]))[0]))} = join("\t",($parts[2], @viralInt, (reverseComp($parts[9]))[0], 'r', $cig, $vSec, $vSup)); }
-	elsif (@viralInt) 			{ $viralIntegrations{join("xxx", ($parts[0],$parts[9]))}	           = join("\t",($parts[2], @viralInt, $parts[9],                   'f', $cig, $vSec, $vSup)); } 
-	#$viralIntegrations{join("xxx", ($parts[0],$parts[9]))} = join("\t",($parts[2], @viralInt, $parts[9]));
+	#get if first or second in pair
+	my $inPair;
+	if ($parts[1] & 0x40) 		{ $viralR1{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $vSec, $vSup); }
+	elsif ($parts[1] & 0x80) 	{ $viralR2{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $vSec, $vSup); }
+
 }
 close VIRAL;
 
-### Collect junction reads from human genome
+### Collect discordant reads from human genome
 ### This is the same process as for viral junctions
 open (HUMAN, $human) || die "Could not open human alignment file: $human\n";
 if ($verbose) { print "Processing human alignment...\n"; }
 while (my $hl = <HUMAN>) {
 	if ($hl =~ /^@/) { next; } # skip header lines
 
-	my @parts = split("\t", $hl); #get fields from each alignment
+	my @parts = split(' ', $hl); #get fields from each alignment
+	
+	#want reads where if not mapped, mate is mapped, or vice versa
+	unless ((($parts[1] & 0x8) and !($parts[1] & 0x4)) or (!($parts[1] & 0x8) and ($parts[1] & 0x4))) { next; }
+	
+	unless ((exists $viralR1{$parts[0]}) and (exists $viralR2{$parts[0]})) { next; } #only consider reads from viral alignment
 	
 	if ($parts[1] & 0x800) { next(); } # skip supplementary alignments
-
-	if ($parts[2] eq "*") { next; } # skip unaligned reads
-	unless ($parts[5]) { 
-		next; 
-	}
-	if ($parts[5] =~ /(^\d+[SH].*\d+[SH]$)/) { next; } #skip alignments where both ends are clipped
+	if ($parts[1] & 0x2) { next(); } # skip mapped in proper pair
 	
-	unless ($parts[5] =~ /^\d+[SH]|\d+[SH]$/) { next; }
-	my $cig = processCIGAR($parts[5], $parts[9]); # Process the CIGAR string to account for complex alignments
-	unless ($cig) { next; }
-
-	my $seq;
-	my $ori;
-	if ($parts[1] & 0x10) { 
-		($seq) = reverseComp($parts[9]); 
-		$ori   = 'r';
-	}
-	else				  { 
-		$seq = $parts[9]; 
-		$ori = 'f';
-	}
-
-	#$seq = $parts[9];
-
-	if (exists $viralIntegrations{join("xxx",($parts[0],$seq))}) { # only consider reads that were tagged from the viral alignment, no need to consider excess reads
+	#get cigar
+	my $cig = $parts[5]; # Don't process cigar for now; could be a cigar or * if unmapped
 	
-		my ($hSec, $hSup) = getSecSup($hl);
-		
-		my @humanInt;
-		if    ($cig =~ /^\d+[SH].+\d+[SH]$/) { @humanInt = undef; }
-		elsif ($cig =~ /(^\d+)[SH]/)         { if ($1 > $cutoff) { @humanInt = analyzeRead($parts[3], $cig, "-"); } }
-		elsif ($cig =~ /(\d+)[SH]$/)         { if ($1 > $cutoff) { @humanInt = analyzeRead($parts[3], $cig, "+"); } }
+	#get sequence and orientation
+	my ($seq, $seqOri);	
+	if ($parts[1] & 0x10) { $seq = reverseComp($parts[9]); $seqOri = 'r'; }
+	else { $seq = $parts[9]; $seqOri = 'f'; }
+	
+	#get read ID, aligned viral reference, alignment start
+	my ($ID, $ref, $start) = ($parts[0], $parts[2], $parts[3]);
+	
+	#get supplementary (SA) and secondary (XA) alignments in order to check for possible vector rearrangements
+	my ($hSec, $hSup) = getSecSup($hl);
+	
+	#get if first or second in pair and add to appropriate array
+	if ($parts[1] & 0x40) 		{ $humanR1{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $hSec, $hSup);}
+	elsif ($parts[1] & 0x80)  	{ $humanR2{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $hSec, $hSup); }
 
-		if (@humanInt) { $humanIntegrations{join("xxx",($parts[0],$seq))} = join("\t",($parts[2], @humanInt, $seq, $ori, $cig, $hSec, $hSup)); }
-	}
 }
 close HUMAN;
 
@@ -147,33 +139,30 @@ close HUMAN;
 ### Need to compare the junction sites in the viral and human genomes to see if there is any overlap (ambiguous bases)
 ### Integration coordinates are not exact, but assigned to the middle part of the human read
 my @outLines;
-if ($verbose) { print "Detecting integrations...\n"; }
-foreach my $key (keys %viralIntegrations) {
-	if (exists $humanIntegrations{$key}) { # only consider reads that are flagged in both human and viral alignments
-		# Collect positions relative to read
-		# Returns an array with the following:
-		#	Integration Start
-		#	Integration Stop
-		#	Human Start
-		#	Human Stop
-		#	Viral Start
-		#	Viral Stop	
-		#	Overlap
-		my @intData = findDiscordant($viralIntegrations{$key}, $humanIntegrations{$key});
-		# Once the positions are collected, put together the output	
-		my $outLine;
-		if (@intData) { $outLine = extractOutput($viralIntegrations{$key}, $humanIntegrations{$key}, @intData); }
-		if ($outLine) { push(@outLines, join("\t", ($outLine, (split("xxx",$key))[0],(split("xxx",$key))[1]))) };
-	}
+if ($verbose) { print "Finding discordant read-pairs...\n"; }
+foreach my $key (keys %viralR1) {
+
+	#check that read ID is found for all hashes
+	unless ( exists $viralR2{$key} ) { next; } 
+	unless ( exists $humanR1{$key} ) { next; }
+	unless ( exists $humanR2{$key} ) { next; }
+
+	# Find discordant read pairs
+	my @intData = findDiscordant($key, $viralR1{$key}, $viralR2{$key}, $humanR1{$key}, $humanR2{$key});
+	
+	# Once the positions are collected, put together the output	
+	my $outLine;
+	if ((scalar @intData) > 1) { $outLine = join("\t", @intData); }
+	if (defined $outLine) { push(@outLines, join("\t", ($outLine, $key))) };
 }
 
-unless (@outLines) { die "No integration sites were detected\n"; } # if no integration events detected, finish
+unless (@outLines) { die "No discordant read-pairs were detected\n"; } # if no integration events detected, finish
 
 if ($verbose) { print "Writing output...\n"; }
 printOutput($output, @outLines);
-if ($bed)    { printBed($bed, @outLines); }
+#if ($bed)    { printBed($bed, @outLines); }
 
-if ($merged) { printMerged($bed, $merged); }
+#if ($merged) { printMerged($bed, $merged); }
 
 exit;
 
@@ -182,104 +171,113 @@ exit;
 ### Subroutines ###
 #----------------------------------------------------------------------------------------------------------------------------------------
 
-
 sub findDiscordant {
 ### Check if there is overlap between the integration sites
 ### in human and viral integration sites
 ### returns integration start/stop relative to read sequence
 
 ### BWA Alignments are 1-based
-	my ($viralData, $humanData) = @_;
-
-	my ($vStart, $vStop, $vOri, $seq, $vDir, $vCig, $vSec, $vSup) = (split("\t",$viralData))[3,4,5,6,7,8,-2,-1];
-	my ($hStart, $hStop, $hOri, $hDir, $hCig, $hSec, $hSup)       = (split("\t",$humanData))[3,4,5,7,8,-2,-1];
-
-	if	((($vOri eq $hOri) and ($vDir eq $hDir)) or( ($vOri ne $hOri) and ($vDir ne $hDir))) { return; } # in some cases the same part of the read may be clippeed 
-	### CIGAR strings are always reported relative to the strand
-	### 100M50S on a fwd read = 50S100M on a rev read
-	### Therefore if integration position and read orientation match (e.g. ++ and ff) same part of the read is clipped
-	### If they all don't match (e.g. +- and fr which is equivalent to ++ and ff) then the same part of the read is clipped
-	### ++ and fr is ok because this is the same as +- and ff
-
-	unless 	($vOri and $hOri) { return; } # Catch a weird case where an orientation isn't found. Appears to happen when both ends are clipped
-
-	### First find if there is any overlap between the human and viral junctions
-	### Do so by comparing the CIGAR strings
-	### Can calculate by subtracting aligned of one from clipped of other	
-	my ($hClip) = ($hCig =~ /(\d+)S/);
-	my ($hAlig) = ($hCig =~ /(\d+)M/);
-	my ($vClip) = ($vCig =~ /(\d+)S/);
-	my ($vAlig) = ($vCig =~ /(\d+)M/);
+	my ($key, $vR1, $vR2, $hR1, $hR2) = @_;
 	
-	### Overlap should be the same regardless of how it's calculated so double check
-	my $overlap1 = abs($hAlig - $vClip);
-	my $overlap2 = abs($vAlig - $hClip);
+	my ($seq1, $vR1ori, $vR1ref, $vR1start, $vR1cig, $vR1inPair, $vR1sec, $vR1sup) = (split('xxx', $vR1))[0, 1, 2, 3, 4, 5, 6, 7];
+	my ($seq2, $vR2ori, $vR2ref, $vR2start, $vR2cig, $vR2inPair, $vR2sec, $vR2sup) = (split('xxx', $vR2))[0, 1, 2, 3, 4, 5, 6, 7];
+	my ($hR1ori, $hR1ref, $hR1start, $hR1cig, $hR1inPair, $hR1sec, $hR1sup) = (split('xxx', $hR1))[1, 2, 3, 4, 5, 6, 7];
+	my ($hR2ori, $hR2ref, $hR2start, $hR2cig, $hR2inPair, $hR2sec, $hR2sup) = (split('xxx', $hR2))[1, 2, 3, 4, 5, 6, 7];
 
-	#here check that absolute values of overlap are the same
-	unless (abs($overlap1) == abs($overlap2)) { 
-		print "Impossible overlap found\n";
-		return;
+	#check that we do have complementary discordant read-pairs in human and viral alignments
+	unless ((( $vR1cig eq "*") and ($vR2cig =~ /^\d+M$/)) or (( $vR2cig eq "*") and ($vR1cig =~ /^\d+M$/))) { return; }
+	unless ((( $hR1cig eq "*") and ($hR2cig =~ /^\d+M$/)) or (( $hR2cig eq "*") and ($hR1cig =~ /^\d+M$/))) { return; }
+	if ((($vR1cig eq "*") and ($hR1cig eq "*")) or (($vR1cig =~ /^\d+M$/) and ($hR1cig =~ /^\d+M$/))) { return; }
+	
+	#get reference for virus and human based on which is mapped
+	my ($hRef, $vRef, $hSeq, $vSeq);
+	if ($hR1cig ne "*") { #if human matched R1
+		$hRef = $hR1ref; 
+		$hSeq = $seq1; 
+		$vRef = $vR2ref;
+		$vSeq = $seq2;
 	}
+	else { #if human matched R2
+		$hRef = $hR2ref; 
+		$hSeq = $seq2;
+		$vRef = $vR1ref;
+		$vSeq = $seq1; 
+	}	
 	
-	#ambigous bases may result from either an overlap of aligned regions, or a gap
-	#if the total number of aligned bases (from human and viral alignments) are greater than the read length, then it's an overlap
-	#otherwise it's a gap
-	my ($overlaptype, $readlen);
-	$readlen = length($seq);
-	if 		(($hAlig + $vAlig) > ($readlen))  {	$overlaptype = "overlap";	} #overlap
-	elsif 	(($hAlig + $vAlig) == ($readlen)) {	$overlaptype = "none";		} #no gap or overlap
-	else 									  {	$overlaptype = "gap";		} #gap
+	my $readlen1 = length($seq1);
+	my $readlen2 = length($seq2);
 	
+	#find if junction is human/virus or virus/human
+	#find approximate location of junction on both human and virus side (assign to end of read closest to junction)
+	#position indicated in SAM file is left-most mapping base: for forward reads this is 5' end, for reverse it's 3'
+	my ($junct, $hIntStart, $hIntStop, $vIntStart, $vIntStop, $isVecRearrange, $isHumRearrange, $isHumAmbig, $isVirAmbig);
+	if ($hR1cig ne "*") { #if R1 is matched in human
 	
-	#check to see is whole read can be accounted for by vector rearrangements
-	
-	my $isVecRearrange;
-	if ((join(";", $vSup, $vSec)) eq "NA;NA") { $isVecRearrange = "no"; }
-	else { $isVecRearrange = isRearrange($vCig, $vDir, (join(";", $vSup, $vSec)), $readlen);}
+		#left-most mapped base is at position $hR1start, so need to add length of sequence to get position
+		$hIntStart = $hR1start + $readlen1 - 1;
+		$hIntStop = $hR1start + $readlen1;
+		
+		#opposite for viral read
+		$vIntStart = $vR2start -1;
+		$vIntStop = $vR2start;
+		
+		#get type of junction
+		if ($hR1ori eq 'f') 	{ $junct = 'hv'; } #if human R1 is forward, orientation is hv
+		elsif ($hR1ori eq 'r') 	{ $junct = 'vh'; } #otherwise orientation is vh
+		
+		#check for ambiguities
+		#if ((join(";", $vR2sup, $vR2sec)) eq "NA;NA") { $isVecRearrange = "no"; }
+		#else { $isVecRearrange = isRearrange($vR2cig, $vR2ori, (join(";", $vR2sup, $vR2sec)), $readlen2, $hR1cig, $hR1ori);}
 	 
-	my $isHumRearrange;
-	if ((join(";", $hSup, $hSec)) eq "NA;NA") { $isHumRearrange = "no"; }
-	else { $isHumRearrange = isRearrange($hCig, $hDir, (join(";", $hSup, $hSec)), $readlen);}
+		#if ((join(";", $hR1sup, $hR1sec)) eq "NA;NA") { $isHumRearrange = "no"; }
+		#else { $isHumRearrange = isRearrange($hR1cig, $hR1ori, (join(";", $hR1sup, $hR1sec)), $readlen1, $vR1cig, $vR1ori);}
 	
+		#check to see if location of human alignment is ambiguous: multiple equivalent alignments accounting for human part of read
+		if ($hR1sec eq "NA") { $isHumAmbig = "no";}
+		else { $isHumAmbig = isAmbigLoc($hR1ori, $hR1cig, $hR1sec);}
 	
-	#check to see if location of human alignment is ambiguous: multiple equivalent alignments accounting for human part of read
-	my $isHumAmbig;
-	if ($hSec eq "NA") { $isHumAmbig = "no";}
-	else { $isHumAmbig = isAmbigLoc($hDir, $hCig, $hSec, $hAlig);}
-	
-	#check to see if location of viral alignment is ambiguous: multiple equivalent alignments accounting for viral part of read
-	my $isVirAmbig;
-	if ($vSec eq "NA") { $isVirAmbig = "no";}
-	else { $isVirAmbig = isAmbigLoc($vDir, $vCig, $vSec, $vAlig);}
-
-	### Calculate the start and stop positions of the viral and human sequences relative to the read
-	my ($hRStart,$hRStop) = extractSeqCoords($hOri, $hDir, $hAlig, abs($overlap1), $readlen);
-	my ($vRStart,$vRStop) = extractSeqCoords($vOri, $vDir, $vAlig, abs($overlap1), $readlen);
-
-	### Collect integration start/stop positions relative to read
-	### These are the bases that flank the bond that is broken by insertion of the virus
-	### Takes any overlap into account	
-	my ($intRStart, $intRStop, $order);
-
-	if    ($hRStop < $vRStart) { ($intRStart,$intRStop,$order) = ($hRStop,$vRStart,"hv"); } # Orientation is Human -> Virus
-	elsif ($vRStop < $hRStart) { ($intRStart,$intRStop,$order) = ($vRStop,$hRStart,"vh"); } # Orientation is Virus -> Human
-	else 			   { 
-		print "Something weird has happened";
-		return;
+		#check to see if location of viral alignment is ambiguous: multiple equivalent alignments accounting for viral part of read
+		if ($vR2sec eq "NA") { $isVirAmbig = "no";}
+		else { $isVirAmbig = isAmbigLoc($vR2ori, $vR2cig, $vR2sec);}
 	}
+	elsif ($hR2cig ne '*') { #if R2 is matched in human
 	
+		#left-most mapped base is at postion $hR2start
+		$hIntStart = $hR2start - 1;
+		$hIntStop = $hR2start;
+		
+		#left-most mapped base is at position $vR1start, so need to add length of sequence to get position
+		$vIntStart = $vR1start + $readlen1 -1;
+		$vIntStop = $vR1start + $readlen1;
+		
+		#get type of junction
+		if ($hR2ori eq 'r')		{ $junct = 'hv'; } #if human R2 is reverse, orientation is hv
+		elsif ($hR2ori eq 'f') { $junct = 'vh'; } #if human R2 is forward, orientation is vh
+	
+		#check for ambiguities
+		#if ((join(";", $vR1sup, $vR1sec)) eq "NA;NA") { $isVecRearrange = "no"; }
+		#else { $isVecRearrange = isRearrange($vR1cig, $vR1ori, (join(";", $vR1sup, $vR1sec)), $readlen1, $hR2cig, $hR2ori);}
+	 
+		#if ((join(";", $hR2sup, $hR2sec)) eq "NA;NA") { $isHumRearrange = "no"; }
+		#else { $isHumRearrange = isRearrange($hR2cig, $hR2ori, (join(";", $hR2sup, $hR2sec)), $readlen2, $vR2cig, $vR2ori);}
+	
+		#check to see if location of human alignment is ambiguous: multiple equivalent alignments accounting for human part of read
+		if ($hR2sec eq "NA") { $isHumAmbig = "no";}
+		else { $isHumAmbig = isAmbigLoc($hR2ori, $hR2cig, $hR2sec);}
+	
+		#check to see if location of viral alignment is ambiguous: multiple equivalent alignments accounting for viral part of read
+		if ($vR1sec eq "NA") { $isVirAmbig = "no";}
+		else { $isVirAmbig = isAmbigLoc($vR1ori, $vR1cig, $vR1sec);}
+	}
 
-	return($intRStart, $intRStop, $hRStart, $hRStop, $vRStart, $vRStop, $overlap1, $order, $overlaptype, $isVecRearrange, $isHumRearrange, $isHumAmbig, $isVirAmbig);
+	return($hRef, $hIntStart, $hIntStop, $vRef, $vIntStart, $vIntStop, '?', 'discordant', $junct, $hSeq, $vSeq, '-', join(';', $hR1sec, $hR2sec), join(';', $vR1sec, $vR2sec), 'NA', 'NA', $isVirAmbig, $isHumAmbig);
 
-	#if 	  ($vOri eq "+" and $hOri eq "-" and $vStop - 1 > $hStart) { return($hStart, $vStop); } # overalp with order virus -> human
-	#elsif ($vOri eq "-" and $hOri eq "+" and $hStop - 1 > $vStart)    { return($vStart, $hStop); } # overlap with order human -> virus
-	#else 							   	   { return($hStart, $hStop); } # if no overlap, use human positions
 }
 
 sub printHelp {
 	print "Pipeline for detection of viral integration sites within a genome\n\n";
 	print "Usage:\n";
-	print "\tperl detectionPipeline.pl --viral <sam> --human <sam> --cutoff <n> --output <out> --bed <bed> --help\n\n";
+	print "\tperl discordant.pl --viral <sam> --human <sam> --cutoff <n> --output <out> --bed <bed> --help\n\n";
 	print "Arguments:\n";
 	print "\t--viral:   Alignment of reads to viral genomes (sam)\n";
 	print "\t--human:   Alignment of reads to human genome (sam)\n";
@@ -292,3 +290,4 @@ sub printHelp {
 
 	exit;
 }
+
