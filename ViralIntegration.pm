@@ -115,7 +115,6 @@ sub extractOutput {
 	my $vRearrange = $intData[9];
 	my $hRearrange = $intData[10];
 	
-	
 	my $hAmbig = $intData[11];
 	my $vAmbig = $intData[12];
 
@@ -234,7 +233,7 @@ sub isAmbigLoc {
 	#$cig is cigar of primary alignment
 	#$sec is secondary alignments in the form /(chr,pos,CIGAR,NM;)*/
 	#$aligL is number of bases mapped in primary alignment
-	my ($dir, $cig, $sec, $aligL) = @_;
+	my ($dir, $cig, $sec) = @_;
 	
 	#get if match is at start or end of read
 	
@@ -243,9 +242,9 @@ sub isAmbigLoc {
 	if ($dir eq 'r') { $cig = reverseCigar($cig); }
 	
 	#get if matched region is at start or end
-	my $primEnd;
-	if    (($cig =~ /^(\d+)[M]/)) { $primEnd = 'start'; }
-	elsif (($cig =~ /(\d+)[M]$/)) { $primEnd = 'end';   }
+	my ($primEnd, $aligL);
+	if    (($cig =~ /^(\d+)[M]/)) { $aligL = $1; $primEnd = 'start'; }
+	elsif (($cig =~ /(\d+)[M]$/)) { $aligL = $1; $primEnd = 'end';   }
 	else 	{print "Can't figure out which end of the read is clipped in the primary alignment"; } #this shouldn't happen
 	
 	my ($secCigar, $secSense, $secEnd, $secAligL, $secAlignment);
@@ -424,7 +423,7 @@ sub printOutput {
 ### Print output file
 	my ($outFile, @outLines) = @_;	
 	open (OUTFILE, ">$outFile") || die "Could not open output file: $outFile\n";
-	print OUTFILE "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNoAmbiguousBases\tOverlapType\tOrientation\tHostSeq\tViralSeq\tAmbiguousSeq\tHostSecondaryAlignments\tViralSecondaryAlignments\tPossibleHostTranslocation\tPossibleVectorRearrangement\tHostPossibleAmbiguous\tViralPossibleAmbiguous\tReadID\tMergedRead\n";
+	print OUTFILE "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNoAmbiguousBases\tOverlapType\tOrientation\tHostSeq\tViralSeq\tAmbiguousSeq\tHostSecondaryAlignments\tViralSecondaryAlignments\tPossibleHostTranslocation\tPossibleVectorRearrangement\tHostPossibleAmbiguous\tViralPossibleAmbiguous\tReadID\n";
 	foreach my $line (@outLines) { print OUTFILE "$line\n"; }
 	close OUTFILE;
 }
