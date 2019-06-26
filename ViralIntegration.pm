@@ -169,7 +169,7 @@ sub getMatchedRegion {
 	
 	my ($cigar, $dir) = @_;
 
-	if ($dir eq '-') { $cigar = reverseCigar($cigar); }
+	if (($dir eq '-') or ($dir eq 'r')) { $cigar = reverseCigar($cigar); }
 	
 	my ($end, $align);
 	
@@ -191,7 +191,7 @@ sub getSecSup {
 	#get supplementary alignments from SA field
 	my ($sup, $sec);
 	if ($line =~ /SA:.:.*;/) 	{ 
-		($sup) = ($line =~ /SA:.:(.*?);/); #will this get only one supp alignment?
+		($sup) = ($line =~ /SA:.:(.*?);\s/);
 	
 	}
 	else 						{ $sup = "NA"; }	
