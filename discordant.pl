@@ -270,7 +270,7 @@ sub findDiscordant {
 		else { $isVirAmbig = isAmbigLoc($vR1ori, $vR1cig, $vR1sec);}
 	}
 
-	return($hRef, $hIntStart, $hIntStop, $vRef, $vIntStart, $vIntStop, '?', 'discordant', $junct, $hSeq, $vSeq, '-', join(';', $hR1sec, $hR2sec), join(';', $vR1sec, $vR2sec), 'NA', 'NA', $isVirAmbig, $isHumAmbig);
+	return($hRef, $hIntStart, $hIntStop, $vRef, $vIntStart, $vIntStop, '?', 'discordant', $junct, $hSeq, $vSeq, '-', join(';', $hR1sec, $hR2sec), join(';', $vR1sec, $vR2sec), 'NA', 'NA', $isVirAmbig, $isHumAmbig, 'NA');
 
 }
 
