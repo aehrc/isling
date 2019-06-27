@@ -109,6 +109,7 @@ while (my $hl = <HUMAN>) {
 	if ($parts[5] =~ /(^\d+[SH].*\d+[SH]$)/) { next; } #skip alignments where both ends are clipped
 	
 	unless ($parts[5] =~ /^\d+[SH]|\d+[SH]$/) { next; }
+
 	my $cig = processCIGAR($parts[5], $parts[9]); # Process the CIGAR string to account for complex alignments
 	unless ($cig) { next; }
 
@@ -155,7 +156,7 @@ foreach my $key (keys %viralIntegrations) {
 		#	Viral Start
 		#	Viral Stop	
 		#	Overlap
-		my @intData = collectIntersect($viralIntegrations{$key}, $humanIntegrations{$key});
+		my @intData = collectIntersect($viralIntegrations{$key}, $humanIntegrations{$key}, $key);
 		# Once the positions are collected, put together the output	
 		my $outLine;
 		if (@intData) { $outLine = extractOutput($viralIntegrations{$key}, $humanIntegrations{$key}, @intData); }
@@ -200,7 +201,7 @@ sub collectIntersect {
 ### returns integration start/stop relative to read sequence
 
 ### BWA Alignments are 1-based
-	my ($viralData, $humanData) = @_;
+	my ($viralData, $humanData, $key) = @_;
 
 	my ($vStart, $vStop, $vOri, $seq, $vDir, $vCig, $vSec, $vSup) = (split("\t",$viralData))[3,4,5,6,7,8,-2,-1];
 	my ($hStart, $hStop, $hOri, $hDir, $hCig, $hSec, $hSup)       = (split("\t",$humanData))[3,4,5,7,8,-2,-1];
@@ -246,11 +247,11 @@ sub collectIntersect {
 	
 	my $isVecRearrange;
 	if ((join(";", $vSup, $vSec)) eq "NA;NA") { $isVecRearrange = "no"; }
-	else { $isVecRearrange = isRearrange($vCig, $vDir, (join(";", $vSup, $vSec)), $readlen, $hCig, $hDir);}
+	else { $isVecRearrange = isRearrange($vCig, $vDir, (join(";", $vSup, $vSec)), $readlen, $hCig, $hDir, (split("xxx", $key))[1]);}
 	 
 	my $isHumRearrange;
 	if ((join(";", $hSup, $hSec)) eq "NA;NA") { $isHumRearrange = "no"; }
-	else { $isHumRearrange = isRearrange($hCig, $hDir, (join(";", $hSup, $hSec)), $readlen, $vCig, $vDir);}
+	else { $isHumRearrange = isRearrange($hCig, $hDir, (join(";", $hSup, $hSec)), $readlen, $vCig, $vDir, (split("xxx", $key))[1]);}
 	
 	#check to see if location of human alignment is ambiguous: multiple equivalent alignments accounting for human part of read
 	my $isHumAmbig;

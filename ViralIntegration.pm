@@ -286,7 +286,7 @@ sub isRearrange {
 	# 2. Check if there is a secondary alignment from one reference equivalent to the primary alignment in the second
 	#			This could indicate a possible rearrangement with a possible gap
 
-	my ($pCig, $pDir, $sup, $readlen, $otherpCig, $otherpDir) = @_;
+	my ($pCig, $pDir, $sup, $readlen, $otherpCig, $otherpDir, $seq) = @_;
 	# $pCig is primary alignment of the first reference
 	# $pDir is the direction of the primary alignment of the first reference
 	# $sup are the secondary and supplementary alignments of the first reference
@@ -309,8 +309,10 @@ sub isRearrange {
 	#could do this by making one @aligns per reference, and store all 
 	#note - using 1-based indexing of read alignments
 	
-	#get length and end of matched region in second reference primary alignment
-	my ($otherpEnd, $otherpAlign) = getMatchedRegion($otherpCig, $otherpDir);
+	#reverse second reference primary alignment if necessary
+	if (($otherpDir eq 'r') or ($otherpDir eq '-')) { 
+		$otherpCig = reverseCigar($otherpCig); 
+	}
 	
 	my @aligns; #to store start and end of each alignment
 	
@@ -326,19 +328,13 @@ sub isRearrange {
 	
 		if ($supAlign eq "NA") { next; } #check for no secondary alignments
 		my ($supSense, $supCig) = (split(",",$supAlign))[2,3]; #get sense and cigar from alignment
-	
+		
+		if ($supSense eq '-') { $supCig = reverseCigar($supCig); }
 		
 		#first check for second type of rearrangement: 
 		#is this secondary alignment equivalent to the primary alignment against the other reference?
 		
-		#get length and end of matched region in secondary alignment
-		my ($supEnd, $supAlign) = getMatchedRegion($supCig, $supSense); 
-		
-		if ($supEnd) { #mapped region might not be at start or end, in which case $supEnd won't be assigned
-			if (($otherpEnd eq $supEnd) and ($supAlign >= $otherpAlign)) { return "yes"; } 	
-		}
-		
-		if ($supSense eq '-') { $supCig = reverseCigar($supCig); }
+		if (($otherpCig eq $supCig) or ($otherpCig eq processCIGAR($supCig, $seq))) { return "yes"; } 	
 		
 		#get matched region(s) from alignment
 		#get and reverse letters and numbers from cigar
@@ -423,7 +419,7 @@ sub printOutput {
 ### Print output file
 	my ($outFile, @outLines) = @_;	
 	open (OUTFILE, ">$outFile") || die "Could not open output file: $outFile\n";
-	print OUTFILE "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNoAmbiguousBases\tOverlapType\tOrientation\tHostSeq\tViralSeq\tAmbiguousSeq\tHostSecondaryAlignments\tViralSecondaryAlignments\tPossibleHostTranslocation\tPossibleVectorRearrangement\tHostPossibleAmbiguous\tViralPossibleAmbiguous\tReadID\n";
+	print OUTFILE "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNoAmbiguousBases\tOverlapType\tOrientation\tHostSeq\tViralSeq\tAmbiguousSeq\tHostSecondaryAlignments\tViralSecondaryAlignments\tPossibleHostTranslocation\tPossibleVectorRearrangement\tHostPossibleAmbiguous\tViralPossibleAmbiguous\tReadID\tmerged\n";
 	foreach my $line (@outLines) { print OUTFILE "$line\n"; }
 	close OUTFILE;
 }
