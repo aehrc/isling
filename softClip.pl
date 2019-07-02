@@ -124,8 +124,6 @@ while (my $hl = <HUMAN>) {
 		$ori = 'f';
 	}
 
-	#$seq = $parts[9];
-
 	if (exists $viralIntegrations{join("xxx",($parts[0],$seq))}) { # only consider reads that were tagged from the viral alignment, no need to consider excess reads
 	
 		my ($hSec, $hSup) = getSecSup($hl);
