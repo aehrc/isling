@@ -153,7 +153,8 @@ foreach my $key (keys %viralR1) {
 	# Once the positions are collected, put together the output	
 	my $outLine;
 	if ((scalar @intData) > 1) { $outLine = join("\t", @intData); }
-	if (defined $outLine) { push(@outLines, join("\t", ($outLine, $key))) };
+	my $combReads = join("", (split("xxx", $viralR1{$key}))[0], (split("xxx", $viralR2{$key}))[0]);
+	if (defined $outLine) { push(@outLines, join("\t", ($outLine, $key, $combReads))); }
 }
 
 unless (@outLines) { die "No discordant read-pairs were detected\n"; } # if no integration events detected, finish
@@ -270,7 +271,7 @@ sub findDiscordant {
 		else { $isVirAmbig = isAmbigLoc($vR1ori, $vR1cig, $vR1sec);}
 	}
 
-	return($hRef, $hIntStart, $hIntStop, $vRef, $vIntStart, $vIntStop, '?', 'discordant', $junct, $hSeq, $vSeq, '-', join(';', $hR1sec, $hR2sec), join(';', $vR1sec, $vR2sec), 'NA', 'NA', $isVirAmbig, $isHumAmbig, 'NA');
+	return($hRef, $hIntStart, $hIntStop, $vRef, $vIntStart, $vIntStop, '?', 'discordant', $junct, $hSeq, $vSeq, '-', join(';', $hR1sec, $hR2sec), join(';', $vR1sec, $vR2sec), 'NA', 'NA', $isVirAmbig, $isHumAmbig);
 
 }
 
