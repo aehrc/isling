@@ -1,4 +1,4 @@
-#### get reads from folder
+mo#### get reads from folder
 
 library(tidyverse)
 
