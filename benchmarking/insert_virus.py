@@ -83,20 +83,11 @@ def insertViralPortion(host, host_int, viruses):
 	#make integration object to store properties of integration
 	currentInt = Integration(host)
 	
-	print(currentInt)
-	
 	#get one viral chunk
 	currentInt.addFragment(viruses)
 	
 	#do integration
-	print("making insertion of chunk of virus:")
-	print(currentInt.chr)
-	print(currentInt.hStart)
-	print(currentInt.hStop)
-	print(currentInt.viruses)
-	print(currentInt.vParts)
-	print(currentInt.oris)
-	print(currentInt.bases)
+
 	
 	print(currentInt)
 
@@ -166,8 +157,11 @@ class Integration:
 		self.bases = [] #to store bases inserted
 		
 	def addFragment(self, viruses, part = "rand"):
+		#add a simple fragment
 		#get viral chunk
 		chunk = ViralChunk(viruses, part)
+		
+		#check that chunk doesn't overlap with any current fragments
 		
 		#add viral chunk
 		self.fragments += 1 #increment number of fragments
@@ -175,6 +169,12 @@ class Integration:
 		self.vParts.append([chunk.start, chunk.stop])
 		self.oris.append(chunk.ori)
 		self.bases.append(chunk.bases)
+		
+	def addRearrange(self, viruses, part = "rand"):
+		#add a rearranged fragment
+		
+		chunk = ViralChunk(viruses, part)
+		
 		
 	def __str__(self):
 		if self.fragments == 0:
@@ -208,6 +208,27 @@ class ViralChunk:
 		else:
 			self.ori = "r"
 			self.bases = viruses[self.virus].seq[self.start+1:self.stop+2].reverse_complement()
+			
+		#store information about rearrangements
+		self.rearranged = False #has chunk been rearranged?
+		self.breakpoints = [] #store breakpoints
+		self.oris = [self.ori] #store orientations of rearranged parts of chunk
+		
+		def subChunk(self, breakpoint, )
+			
+			
+			
+	def rearrange(self):
+		#rearrange a chunk by splitting into two and randomly recombining
+		self.rearranged = True
+		self.breakpoints.append(random.randint(self.start, self,stop))
+		
+		
+		if random.random() > 0.5:
+			self.oris.append("f")
+			self.
+		
+		
 			
 
 		
