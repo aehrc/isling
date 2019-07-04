@@ -4,9 +4,6 @@ library(tidyverse)
 #import data
 data <- read_tsv(file = "test_data/m366T.rearrange.txt") 
 
-data %>% 
-  mutate(length = map_int(seq, length))
-
 #make summary table of number of vector rearrangements
 data %>% 
   group_by(possibleVecRearrange) %>% 
@@ -29,6 +26,20 @@ for (i in colns) {
 } #end of loop over columns
   
   
+#compare to FRG vec rearranges
+
+soft <- read_tsv(file = "test_data/FRG206.soft.txt") 
+count(soft, PossibleVectorRearrangement) %>% 
+  mutate( freq = n/sum(n) ) %>% 
+  ggplot(aes(x="", y=freq, fill=PossibleVectorRearrangement)) +
+  geom_bar(stat = "identity", width=1)+
+  geom_label(aes(label = paste0(n, "\n", round(freq*100), "%")), 
+             position = position_fill(vjust = 0.5),
+             show.legend = FALSE) +
+  coord_polar("y", start=0) +
+  theme_void() +
+  theme(legend.position = "bottom")
+
 
 #make pie chart of number of gaps
 
