@@ -111,7 +111,7 @@ close OUTFILE;
 sub printHelp {
 	print "Pipeline for detection of viral integration sites within a genome\n\n";
 	print "Usage:\n";
-	print "\tperl softClip.pl --viral <sam> --human <sam> --cutoff <n> --output <out> --bed <bed> --help\n\n";
+	print "\tperl softClip.pl --viral <sam> --thresh <f> --output <out> --help\n\n";
 	print "Arguments:\n";
 	print "\t--viral:   Alignment of reads to viral genomes (sam)\n";
 	print "\t--thresh:  Threshold for fraction of read that must be aligned to not be vector rearrangement (0 < thresh < 1, default = 0.95)\n";
