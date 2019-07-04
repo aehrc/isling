@@ -3,7 +3,7 @@
 package ViralIntegration;
 use Exporter;
 @ISA = ('Exporter');
-@EXPORT = qw(analyzeRead processCIGAR extractSeqCoords extractOutput extractCoords extractSequence getSecSup isAmbigLoc isRearrange printOutput printBed printMerged reverseComp reverseCigar);
+@EXPORT = qw(analyzeRead processCIGAR extractSeqCoords extractOutput extractCoords extractSequence getMatchedRegion getMatchedRegions getSecSup isAmbigLoc isRearrange printOutput printBed printMerged reverseComp reverseCigar);
 
 
 ##### subroutines #####
@@ -148,7 +148,7 @@ sub extractOutput {
 }
 
 sub extractCoords {
-### Extract coordinates
+### Extract genomic coordinates for matched region based on start and stop relative to read
 	my ($start, $stop, $ori, $overlap) = @_;
 
 	if ($ori eq "-") { return(($start), ($stop + $overlap)); }
@@ -161,6 +161,29 @@ sub extractSequence {
 
 	if ($ori eq "-") { return($seq = substr($seq, ($stop + $overlap))); }
 	else			 { return($seq = substr($seq, 0, ($start - $overlap + 1))); }
+
+}
+
+sub getGenomicCoords {
+	#get genomic coordinates of matched region (specified by cigar string, $cigar, and mapping orientation, $ori)
+	#use left-most mapped position from sam file
+	
+	my ($pos, $cigar, $ori) = @_;
+	
+	#get matched regions from cigar
+	my @aligns = getMatchedRegions($cigar, $ori);
+	
+	
+	#need to know what the coordinate of the start of the read is, given the left-most mapping position
+	
+	
+	my @coords;
+	foreach my $align (@aligns) {
+		my ($start, $stop) = split("xxx", $align);
+	
+	}
+	
+
 
 }
 
@@ -341,11 +364,9 @@ sub isRearrange {
 	#get location in read of matched regions and their lengths
 	#make array of start of matched regions and their lengths in format startxxxend
 	#need to take into account direction of read - convert everything to forward orientation
-	#need to zeropad start and length so that each have three digits, for sorting later
-	#NOTE - THIS ASSUMES READ LENGTHS LESS THAN 1000!!!
+	#need to zeropad start and length so that each have the same number of digits, for sorting later
 	my $readlen = length($seq);
-	if ($readlen >= 1000) { print "warning: vector rearangement check doesn't work for read lengths >= 1000\n" ;}
-	
+
 	
 	#note - currently considering all alignments together regardless of their reference: consider changing to check only that alignments to a sigle reference account for the whole read
 	#for vector/virus we would want to do this because probably don't have different viruses recombining?
@@ -368,37 +389,54 @@ sub isRearrange {
 		push(@aligns, getMatchedRegions($supCig, $supSense))
 	}
 	
-	#add padding and sort alignments
-	#zeropadding is needed so that sorting works correctly
-	my @padded;
-	foreach my $element (@aligns) {
-		
-		#get start and end
-		my ($start, $end) = (split('xxx', $element));
-		
-		#add padding to start if not three digits
-		if ($start =~ /^(\d)$/) { $start = "00${1}"; }
-		elsif ($start =~ /^(\d\d)$/) {$start = "0${1}"; }
-		
-		#add padding to end if not three digits
-		if ($end =~ /^(\d)$/) { $end = "00${1}"; }
-		elsif ($end =~ /^(\d\d)$/) {$end = "0${1}"; }
-		
-		push(@padded, join('xxx', $start, $end));
-	}
-	
 	#sort array
-	my @sorted = sort(@padded);
+	my @sorted = sort(zeroPad(@aligns));
 	
-	#remove alignments with identical start positions
-	#start at end of list and remove any alignments with start positions equal to the last kept alignment
-	#this should keep the longest alignment for each start position
-	#my $lastKept = $#sorted;
-	#for my $i reverse((0..$#sorted-1)) {
-	#	#if match between ith element and the last element not removed
-	#	if ((split('xxx', $sorted[$lastKept]))[0] == (split('xxx', $sorted[$i]))[0]) { splice(@sorted, i, 1); }
-	#	else { $lastKept = $i; }
-	#}
+	
+	#remove any nested alignments
+	#these are alignments that are completely encompassed by another alignment 
+	#ie 001xxx100 and 010xxx020 are nested and 010xxx020 should be removed
+	#also 001xxx009 and 001xxx010 are nested and 001xxx009 should be removed
+	#keep any equivalent alignments - these are pairs with identical start and stop postions
+	
+	#strategy: start at end of array and check if the current alignment and the previous alignment are nested
+	#if so, remove the nested one (which will always be the current alignment, since the list is sorted)
+	my $lastKept = $#sorted;
+	my @equivalent;
+	for my $i (reverse((1..$#sorted))) {
+		#get current and previous start and end
+		my ($cS, $cE) = split('xxx', $sorted[$i]);
+		my ($pS, $pE) = split('xxx', $sorted[$i-1]);
+		#if two (or more) alignments are equivalent, we don't yet know if they should both/all be removed or not
+		#just keep track of them
+		if (($cS == $pS) and ($cE == $pE)) {
+			push(@equivalent, $i);
+			next;
+		}
+		#if current alignment and previous alignment are nested
+		if ((($cS > $pS) and ($cE < $pE)) or (($cS > $pS) and ($cE == $pE))) { 
+			#if no equivalent alignments
+			if ($#equivalent == 0) {
+				#just remove the one alignment (the current alignment)
+				splice(@sorted, $i, 1); 
+				}
+			#if there are equivalent alignments
+			else {
+				#remove them all
+				splice(@sorted, $i, ($#equivalent+1));
+			}
+		}
+		#if current alignment and previous alignment are nested, and the previous alignment is the nested alignment
+		#eg current = 001xxx120, previous = 001xxx100
+		if (($cS == $pS) and ($cE > $pE)) {
+			#first move current alignment to the position of the previous alignment, then delete
+			@sorted[$i-1] = @sorted[$i];
+			splice(@sorted, $i, 1);
+		}
+		#reset equivalent 
+		@equivalent = ();
+		
+	}
 	
 	#check if alignments can account for whole read
 	#check all alignments for gaps
@@ -429,12 +467,15 @@ sub isRearrange {
 	
 	my $isRearrange; #to store result, "yes" or "no"
 	
-	if ($gaps == 0) { return ("no", $gapBP, $gaps); }
-	
 	if ($gapBP < ($readlen - ($thresh * $readlen))) { $isRearrange = "yes"; }
 	else { $isRearrange = "no"; }
 	
+	
+	#get start and stop 
+	
 	return ($isRearrange, $gapBP, $gaps);
+	
+	
 }
 
 sub printOutput {
@@ -511,6 +552,45 @@ sub reverseCigar {
 	}
 	
 	return $newCig;
+
+}
+
+sub zeroPad {
+	#if we have a 1D array of start and stop locations of alignments, zero-pad these in order to correctly sort by start position
+	#assume that 
+	
+	my @aligns = @_;
+	
+	#get number of digits in the longest start or stop coordinate
+	#this is the number of total digits in all coordinates after zeropadding
+	my $longest = 0;
+	foreach my $element (@aligns) {
+		
+		#get start and end
+		my ($start, $end) = (split('xxx', $element));
+		
+		#check if number of digits in $start and $end is more than $longest
+		if (length($start) > $longest) { $longest = length($start); }
+		elsif (length($end) > $longest) { $longest = length($end); }
+		
+	}
+	
+	#add padding
+	my @padded;
+	foreach my $element (@aligns) {
+		
+		#get start and end
+		my ($start, $end) = (split('xxx', $element));
+		
+		$start = "0" x ($longest - length($start)) . $start;
+		
+		$end = "0" x ($longest - length($end)) . $end;
+		
+		push(@padded, join('xxx', $start, $end));
+	}
+	
+	return @padded;
+
 
 }
 

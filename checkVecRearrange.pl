@@ -10,16 +10,16 @@ use ViralIntegration;
 use Getopt::Long;
 
 my $viral;
-my $human;
 my $output = "rearrange.txt";
+my $bed = "rearrange.bed";
 my $verbose;
 my $thresh = 0.95;
 my $help;
 
 GetOptions('thesh=f'  => \$thresh,
 		   'viral=s'  => \$viral,
-		   'human=s'  => \$human,
 		   'output=s' => \$output,
+		   'bed=s'	  => \$bed,
 		   'verbose'  => \$verbose,
 		   'help',    => \$help);
 
@@ -61,12 +61,9 @@ while (my $vl = <VIRAL>) {
 	my $cig = $parts[5]; 
 	unless ($cig) { next; } # keep checking to make sure double clipped reads don't sneak through
 
-	### Store informaton about the integration site:
-	###	Integration Start Target = last clipped base position relative to target sequence
-	###	Integration Stop Target  = first aligned base position relative to target sequence
-	###	Integration Start Read 	 = last clipped base position relative to read length
-	###	Integration Stop Read    = first aligned base position relative to read length
-	###	Integration Orientation	 = orientation of integration site: + = after aligned sequence, - = before aligned sequence
+	#get information about location of alignment
+	my $ref = $parts[2];
+	my $pos = $parts[3];
 	
 	
 	#get supplementary (SA) and secondary (XA) alignments in order to check for possible vector rearrangements
@@ -83,27 +80,46 @@ while (my $vl = <VIRAL>) {
 		$ori = 'f';
 	}
 	
-	$viralReads{join("xxx", ($parts[0],$seq))} = join("xxx",($parts[2], $seq, $ori, $cig, $vSec, $vSup)); 
+	$viralReads{join("xxx", ($parts[0],$seq))} = join("xxx",($parts[2], $seq, $ori, $cig, $vSec, $vSup, $pos)); 
 
 }
 close VIRAL;
 
-my ($rearrange, $line);
+my ($rearrange, $line, $bedLine);
 open (OUTFILE, ">$output") || die "Could not open output file: $output\n";
+if ($bed) { open (BEDFILE, ">$bed") || die "Could not open output file: $output\n"; }
 print OUTFILE "ReadID\tpossibleVecRearrange\tTotalGapBP\tGaps\tsups+secs\tseq\n";
 
 
 foreach my $key (keys %viralReads) {
 		#get info from alignments
 		my $seq = (split("xxx",$key))[1];
-		my ($pCig, $pDir, $pSec, $pSup) = (split("xxx",$viralReads{$key}))[3,2,4,5];
+		my ($pCig, $pDir, $pSec, $pSup, $pos, $ref) = (split("xxx",$viralReads{$key}))[3,2,4,5,6,0];
 		my $sup = join(";", $pSec, $pSup);
 		
 		#get if possible vector rearrangement
-		$line = join("\t", (split("xxx",$key))[0], isRearrange($pCig, $pDir, $sup, $seq, $thresh), $sup, $seq);
+		my ($isRearrange, $gapBP, $gaps) = isRearrange($pCig, $pDir, $sup, $seq, $thresh);
+		$line = join("\t", (split("xxx",$key))[0], $isRearrange, $gapBP, $gaps, $sup, $seq);
+		
+		print OUTFILE "$line\n";
 		
 		# print to file
-		print OUTFILE "$line\n";
+		if ($bed) {
+			#first get info about primary alignment
+			my @aligns = getMatchedRegions($pCig, $pDir);
+			
+			foreach my $align (@aligns) {
+				
+			
+			}
+		
+			#print BEDFILE "$bedLine\n";
+		}
+		
+		
+		
+		#print to bed file
+		
 }
 
 close OUTFILE;
@@ -111,11 +127,12 @@ close OUTFILE;
 sub printHelp {
 	print "Pipeline for detection of viral integration sites within a genome\n\n";
 	print "Usage:\n";
-	print "\tperl softClip.pl --viral <sam> --thresh <f> --output <out> --help\n\n";
+	print "\tperl softClip.pl --viral <sam> --thresh <f> --output <out>  --bed <bed> --help\n\n";
 	print "Arguments:\n";
 	print "\t--viral:   Alignment of reads to viral genomes (sam)\n";
 	print "\t--thresh:  Threshold for fraction of read that must be aligned to not be vector rearrangement (0 < thresh < 1, default = 0.95)\n";
 	print "\t--output:  Output file for results (default = rearrange.txt\n";
+	print "\t--bed:		Output bed file (optional)\n";
 	print "\t--verbose: Print progress messages\n";
 	print "\t--help:    Print this help message and quit\n";
 
