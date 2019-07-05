@@ -349,7 +349,7 @@ sub isRearrange {
 	#sort alignments and check for gaps between start of read, each alignment, and end of read
 	#check if number of bases in gaps is less than $thresh * readlength
 	
-	my ($pCig, $pDir, $sup, $seq, $thresh) = @_;
+	my ($pCig, $pDir, $pRef, $pPos, $sup, $seq, $thresh) = @_;
 	# $pCig is primary alignment of the first reference
 	# $pDir is the direction of the primary alignment 
 	# $sup are the secondary and supplementary alignments
@@ -377,16 +377,17 @@ sub isRearrange {
 	my @aligns; #to store start and end of each alignment
 	
 	#first do primary alignment
-	push(@aligns, getMatchedRegions($pCig, $pDir));
+	push(@aligns, join("xxx", getMatchedRegions($pCig, $pDir), $pRef, $pPos, $pDir, $pCig));
 	
 	#then do rest of the alignments
 	my @supAligns = split(";", $sup);
 	foreach my $supAlign (@supAligns) {
 	
-		if ($supAlign eq "NA") { next; } #check for no secondary alignments
-		my ($supSense, $supCig) = (split(",",$supAlign))[2,3]; #get sense and cigar from alignment
+		if (($supAlign eq "NA") or ($supAlign eq "")) { next; } #check for no secondary alignments
+		my ($supRef, $supPos, $supSense, $supCig) = (split(",",$supAlign))[0,1,2,3]; #get info about this alignment
 		
-		push(@aligns, getMatchedRegions($supCig, $supSense))
+		#need to keep the other alignment info for later output
+		push(@aligns, join("xxx", getMatchedRegions($supCig, $supSense), $supRef, $supPos, $supSense, $supCig))
 	}
 	
 	#sort array
@@ -402,11 +403,11 @@ sub isRearrange {
 	#strategy: start at end of array and check if the current alignment and the previous alignment are nested
 	#if so, remove the nested one (which will always be the current alignment, since the list is sorted)
 	my $lastKept = $#sorted;
-	my @equivalent;
+	my @equivalent = ();
 	for my $i (reverse((1..$#sorted))) {
 		#get current and previous start and end
-		my ($cS, $cE) = split('xxx', $sorted[$i]);
-		my ($pS, $pE) = split('xxx', $sorted[$i-1]);
+		my ($cS, $cE) = (split('xxx', $sorted[$i]))[0,1];
+		my ($pS, $pE) = (split('xxx', $sorted[$i-1]))[0,1];
 		#if two (or more) alignments are equivalent, we don't yet know if they should both/all be removed or not
 		#just keep track of them
 		if (($cS == $pS) and ($cE == $pE)) {
@@ -416,7 +417,7 @@ sub isRearrange {
 		#if current alignment and previous alignment are nested
 		if ((($cS > $pS) and ($cE < $pE)) or (($cS > $pS) and ($cE == $pE))) { 
 			#if no equivalent alignments
-			if ($#equivalent == 0) {
+			if ($#equivalent <= 0) {
 				#just remove the one alignment (the current alignment)
 				splice(@sorted, $i, 1); 
 				}
@@ -567,7 +568,7 @@ sub zeroPad {
 	foreach my $element (@aligns) {
 		
 		#get start and end
-		my ($start, $end) = (split('xxx', $element));
+		my ($start, $end, @other) = (split('xxx', $element));
 		
 		#check if number of digits in $start and $end is more than $longest
 		if (length($start) > $longest) { $longest = length($start); }
@@ -580,13 +581,13 @@ sub zeroPad {
 	foreach my $element (@aligns) {
 		
 		#get start and end
-		my ($start, $end) = (split('xxx', $element));
+		my ($start, $end, @other) = (split('xxx', $element));
 		
 		$start = "0" x ($longest - length($start)) . $start;
 		
 		$end = "0" x ($longest - length($end)) . $end;
 		
-		push(@padded, join('xxx', $start, $end));
+		push(@padded, join('xxx', $start, $end, @other));
 	}
 	
 	return @padded;

@@ -98,7 +98,7 @@ foreach my $key (keys %viralReads) {
 		my $sup = join(";", $pSec, $pSup);
 		
 		#get if possible vector rearrangement
-		my ($isRearrange, $gapBP, $gaps) = isRearrange($pCig, $pDir, $sup, $seq, $thresh);
+		my ($isRearrange, $gapBP, $gaps) = isRearrange($pCig, $pDir, $ref, $pos, $sup, $seq, $thresh);
 		$line = join("\t", (split("xxx",$key))[0], $isRearrange, $gapBP, $gaps, $sup, $seq);
 		
 		print OUTFILE "$line\n";
