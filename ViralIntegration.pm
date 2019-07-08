@@ -196,74 +196,58 @@ sub getGenomicCoords {
 	my (@letters, @numbers);
 	getCigarParts($cig, \@letters, \@numbers);
 	
+	#need two new versions of the @numbers array:
+	#version @rNumbers retains numbers for all @letters that consume query [MIS]
+	#version @gNumbers retains numbers of all @letters that consume reference [MDN]
+	#need these to make calculation of read- and genome-relative positions for each CIGAR operation
+	my @rNumbers = @numbers;
+	my @gNumbers = @numbers;
+	
+	for my $i (0..$#numbers) {
+		#if doesn't consume reference
+		if (@letters[$i] !~ /[MIS]/) {
+			@rNumbers[$i] = 0;
+		}
+		#if doesn't consume query
+		if (@letters[$i] !~ /[MDN]/) {
+			@gNumbers[$i] = 0;
+		}
+	}
+	
 	
 	#make arrays with info about start and stop position relative to read of each CIGAR operation
 	#also genomic position (start and stop) for each CIGAR operation
-	my (@rStart, @rStop, @gStart, @gStop);
+	my ($rStart, $rStop, $gStart, $gStop);
 	
-	for 
-	
-	
-	#then find rStart and rStop that correspond to alingment of interest
-	#pull out gStart and gStop for this alignment and return
-	
-	#walk along the cigar operations and calculate the genomic coordinates
-	#when get to desired matched region, return coordinates
-	
-	my $foundFirst; #to keep track of if we've reached the CIGAR operation accounting for pos
-	my $gPos; #to keep track of genomic position corresponding to current CIGAR operation
-	my $readPos; # to keep track of positon in read
-	#start and numbers are relative to read
-	#if read is forward, first base in read is numbered 1
-	#if read is reverse, first base in read is numbered $readlen
-	#so for reverse read with cigar 50M10S30S, start and stop would be 31 and 41
-	if (($sense eq "f") or ($sense eq "+")) { $readPos = 1; }
-	else {
-		#get length of read as number of MIS operations
-		for my $i (0..$#letters) {
-			if (@letters[$i] =~ /[MIS]/) { $readPos += @numbers[$i]; }	
+	#loop over elements of CIGAR to calculate start and stop positions relative to read
+	for my $i (0..$#numbers) {
+		#add to rStart and rStop 
+		#if forward, need to sum from start of array to $i
+		if (($sense eq 'f') or ($sense eq '+')) {
+			#rStart for this position is 1 + (sum of @numbers up to but not including this position)
+			$rStart = 1 + eval join("+", @rNumbers[0..($i-1)]);
+			#rStop for this position is (sum of @numbers up to and including this position)
+			$rStop = eval join("+", @rNumbers[0..$i]);
 		}
-		#move back to start of first cigar opeartion from end that consumes read [MIS]
-		for my $i (reverse(0..$#letters)) {
-			if (@letters[$i] =~ /[MIS]/) { $readPos = $readPos - @numbers[$i] + 1; last; }
+		#read is reverse, need to sum from $i to end of array
+		else {
+			#rStart is 1+ sum from next element to end of array
+			$rStart = 1 + eval join("+", @rNumbers[$i+1..$#rNumbers]);
+			#rStop is sum from this element to end of array
+			$rStop = eval join("+", @rNumbers[$i..$#rNumbers]);
+			#gStart is 
 		}
+		#if we've found the right operation
+		if (($start == $rStart) and ($stop == $rStop)) {
+			#calculate gStart and gStop
+			$gStart = $pos + eval join("+", @gNumbers[0..($i-1)]);
+			$gStop = $pos - 1 + eval join("+", @gNumbers[0..$i]);
+			
+			return  ($gStart < $gStop) ? ($gStart, $gStop) : ($gStop, $gStart);
+			
+		}
+		
 	}
-	
-	my ($gStart, $gStop); 
-	
-	for my $i (0..$#letters) {
-		#is this the first [MDN] CIGAR operation?
-		unless ($foundFirst) { 
-		
-			#is this the first [MDN] in @letters?
-			if (@letters[$i] =~ /[MDN]/) {
-				$foundFirst = 1;
-				$gPos = $pos;
-			}
-		}
-		#if we still haven't found first [MDN] operation, keep looking
-		unless ($foundFirst) { 
-		#always need to update read position
-		$readPos = updateRPos($readPos, @letters[$i], @numbers[$i]);
-		next; 
-		}
-		
-		#if we've reached the matched region of interest
-		if ($readPos == $start) { 
-			($gStart, $gStop) = ($gPos, updateGPos($gPos, @letters[$i], @numbers[$i], $sense)); 
-			last;
-		}
-		
-		#otherwise increment $readPos and $gPos
-		$gPos = updateGPos($gPos, @letters[$i], @numbers[$i], $sense);
-		$readPos = updateRPos($readPos, @letters[$i], @numbers[$i], $sense);
-	}
-	
-	my @gCoords =  ($gStart < $gStop) ? ($gStart, $gStop) : ($gStop, $gStart);
-	
-	return(@gCoords);
-
-
 }
 
 sub getMatchedRegion {
@@ -306,8 +290,8 @@ sub getMatchedRegions {
 	#need to remove any cigar operations that don't consume query (D, N, H, P)
 	for my $i (0..$#letters) {
 		if (@letters[$i] =~ /[DNHP]/) {
-			@letters = splice(@letters, $i, 1);
-			@numbers = splice(@numbers, $i, 1);
+			splice(@letters, $i, 1);
+			splice(@numbers, $i, 1);
 		}
 	
 	}
@@ -480,7 +464,9 @@ sub isRearrange {
 		my ($supRef, $supPos, $supSense, $supCig) = (split(",",$supAlign))[0,1,2,3]; #get info about this alignment
 		
 		#need to keep the other alignment info for later output
-		push(@aligns, join("xxx", getMatchedRegions($supCig, $supSense), $supRef, $supPos, $supSense, $supCig))
+		my @curAligns = getMatchedRegions($supCig, $supSense);
+		foreach $align (@curAligns) { push(@aligns, join("xxx", $align, $supRef, $supPos, $supSense, $supCig)); }
+		
 	}
 	
 	#sort array
