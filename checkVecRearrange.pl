@@ -11,7 +11,7 @@ use Getopt::Long;
 
 my $viral;
 my $output = "rearrange.txt";
-my $bed = "rearrange.bed";
+my $bed;
 my $verbose;
 my $thresh = 0.95;
 my $help;
@@ -85,7 +85,7 @@ while (my $vl = <VIRAL>) {
 }
 close VIRAL;
 
-my ($rearrange, $line, $bedLine);
+my ($rearrange, $line, $bedline);
 open (OUTFILE, ">$output") || die "Could not open output file: $output\n";
 if ($bed) { open (BEDFILE, ">$bed") || die "Could not open output file: $output\n"; }
 print OUTFILE "ReadID\tpossibleVecRearrange\tTotalGapBP\tGaps\tsups+secs\tseq\n";
@@ -98,22 +98,31 @@ foreach my $key (keys %viralReads) {
 		my $sup = join(";", $pSec, $pSup);
 		
 		#get if possible vector rearrangement
-		my ($isRearrange, $gapBP, $gaps) = isRearrange($pCig, $pDir, $ref, $pos, $sup, $seq, $thresh);
+		my @reData = isRearrange($pCig, $pDir, $ref, $pos, $sup, $seq, $thresh);
+		my $isRearrange = shift @reData;
+		my $gapBP = shift @reData;
+		my $gaps = shift @reData;
+		my @aligns = @reData;
 		$line = join("\t", (split("xxx",$key))[0], $isRearrange, $gapBP, $gaps, $sup, $seq);
 		
+		#print to txt file
 		print OUTFILE "$line\n";
 		
-		# print to file
-		if ($bed) {
-			#first get info about primary alignment
-			my @aligns = getMatchedRegions($pCig, $pDir);
-			
+		# print to bed file
+		if ($bed) {			
 			foreach my $align (@aligns) {
+				#get info from this alignment
+				my ($start, $stop, $ref, $pos, $sense, $cig) = split("xxx", $align);
 				
-			
+				#get genomic coordinates
+				my ($gStart, $gStop) = getGenomicCoords($start, $stop, $pos, $sense, $cig);
+				
+				#make line and print to file
+				$bedline = join("/t", $ref, $gStart, $gStop, $isRearrange, (split("xxx",$key))[0]);
+				print BEDFILE "$bedline\n";
 			}
 		
-			#print BEDFILE "$bedLine\n";
+			
 		}
 		
 		
