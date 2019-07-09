@@ -118,7 +118,7 @@ foreach my $key (keys %viralReads) {
 				my ($gStart, $gStop) = getGenomicCoords($start, $stop, $pos, $sense, $cig);
 				
 				#make line and print to file
-				$bedline = join("/t", $ref, $gStart, $gStop, $isRearrange, (split("xxx",$key))[0], (split("xxx",$key))[1]);
+				$bedline = join("\t", $ref, $gStart, $gStop, $isRearrange, (split("xxx",$key))[0], (split("xxx",$key))[1]);
 				print BEDFILE "$bedline\n";
 			}
 		
