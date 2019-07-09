@@ -19,7 +19,7 @@ pwd; hostname; date
 module load parallel
 
 #input and output directories
-PROJ=/datastore/sco305/integration/expt2_pipeline-tweaks
+PROJ="`pwd`/.."  #NOTE NEED TO RUN FROM scripts DIRECTORY IN THE CORRECT PROJECT!
 DATA=${PROJ}/data
 
 #get directories with read data

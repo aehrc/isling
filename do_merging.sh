@@ -4,7 +4,7 @@ pwd; hostname; date
 
 #need seqprep via conda
 source ~/.bashrc
-conda activate bioinfo2
+conda activate integration
 
 #get info from inputs
 DATADIR=$(echo $1 | cut -f1 -d,)
@@ -16,8 +16,8 @@ PROJ=$2
 OUTPATH="${DATADIR}/merged_reads"
 
 #get paths to reads
-READ1=${DATA}/${SAMPLE}_1.fastq.gz
-READ2=${DATA}/${SAMPLE}_2.fastq.gz
+READ1=${DATA}/${SAMPLE}_R1.fastq.gz
+READ2=${DATA}/${SAMPLE}_R2.fastq.gz
 
 #generate paths for output
 OUT1=${OUTPATH}/${SAMPLE}.seqPrep_processed.R1.fastq.gz

@@ -17,11 +17,13 @@ pwd; hostname; date
 
 #modules
 module load parallel
+source ~/.bashrc
+conda activate integration
 
 #input and output directories
-PROJ=/datastore/sco305/integration/expt2_pipeline-tweaks
+PROJ="`pwd`/.."  #NOTE NEED TO RUN FROM scripts DIRECTORY IN THE CORRECT PROJECT!
 DATA=${PROJ}/data
-BWAPATH=${PROJ}/tools/bwa-0.7.17/bwa
+BWAPATH=bwa
 
 #get directories with read data
 #CSV with data directory in first position, sample name in second, host genome in third and virus genome in fourth
@@ -29,8 +31,10 @@ echo -n "" > ${DATA}/data2analyse.txt
 dirs=($(find ${DATA}/* -maxdepth 0 -type d))
 for dir in "${dirs[@]}"; do
   mkdir -p ${dir}/aligned
+  mkdir -p ${dir}/summary
   while IFS= read -r line; do
 	echo "${dir},${line}" >> ${DATA}/data2analyse.txt
+	echo "${dir},${line}"
   done < "${dir}/samples.txt"
 done
 
@@ -61,6 +65,9 @@ parallel="parallel --delay 0.2 -j $TOTALTASKS --joblog ../slogs/runtask_${SLURM_
 $parallel "$srun ./do_aligning.sh {} ${PROJ} ${BWAPATH}  2>&1 {}/align.log" :::: ${DATA}/data2analyse.txt
 
 wait 
+
+#run R script to graph mapped and unmapped reads
+Rscript count_reads.R
 
 
 date

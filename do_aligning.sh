@@ -10,11 +10,13 @@ pwd ; hostname ; date
 DATADIR=$(echo $1 | cut -f1 -d,)
 DATA="${DATADIR}/merged_reads"
 SAMPLE=$(echo $1 | cut -f2 -d,)
-HOST=$(echo $1 | cut -f3 -d,)
+HOSTORG=$(echo $1 | cut -f3 -d,)
 VIRUS=$(echo $1 | cut -f4 -d,)
 PROJ=$2
 BWAPATH=$3
 
+source ~/.bashrc
+conda activate integration
 
 #input paths
 
@@ -29,18 +31,21 @@ VIRALPATH=${DATADIR}/aligned
 
 
 #index locations
-HOSTINDEX=${PROJ}/references/${HOST}
+HOSTINDEX=${PROJ}/references/${HOSTORG}
 VIRALINDEX=${PROJ}/references/${VIRUS}
 
 
 #output files for host alignment
-HOSTSAM=${HOSTPATH}/${SAMPLE}.${HOST}.bwa.sam
-HOSTSAMPE=${HOSTPATH}/${SAMPLE}.${HOST}.bwaPaired.sam
+HOSTSAM=${HOSTPATH}/${SAMPLE}.${HOSTORG}.bwa.sam
+HOSTSAMPE=${HOSTPATH}/${SAMPLE}.${HOSTORG}.bwaPaired.sam
 
 
 #output files for pAAV2 alignment
 VIRALSAM=${VIRALPATH}/${SAMPLE}.${VIRUS}.bwa.sam
 VIRALSAMPE=${VIRALPATH}/${SAMPLE}.${VIRUS}.bwaPaired.sam
+
+echo "host index: ${HOSTINDEX}"
+echo "viral index: ${VIRALINDEX}"
 
 
 #align single reads with BWA

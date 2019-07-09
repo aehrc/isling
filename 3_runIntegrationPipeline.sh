@@ -4,7 +4,7 @@
 ##Looks for multiple folders with data.  Runs alignments from each folder on one node, with ntasks-per-node alignment jobs on each node running in parallel
 
 #SBATCH --job-name=pipeline			#name of job
-#SBATCH --time=3:00:00  			#time allowed
+#SBATCH --time=1:00:00  			#time allowed
 #SBATCH --mem-per-cpu=5GB			#memory per cpu
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=20
@@ -17,10 +17,13 @@ pwd; hostname; date
 
 #modules
 module load parallel
+source ~/.bashrc
+conda activate integration
 
 #input and output directories
-PROJ=/datastore/sco305/integration/expt2_pipeline-tweaks
+PROJ="`pwd`/.."  #NOTE NEED TO RUN FROM scripts DIRECTORY IN THE CORRECT PROJECT!
 DATA=${PROJ}/data
+mkdir -P ${PROJ}/out
 
 #get directories with read data
 #CSV with data directory in first position, sample name in second, host genome in third and virus genome in fourth
@@ -28,6 +31,7 @@ echo -n "" > ${DATA}/data2analyse.txt
 dirs=($(find ${DATA}/* -maxdepth 0 -type d))
 for dir in "${dirs[@]}"; do
   mkdir -p ${dir}/out
+  rm ${dir}/out/*
   while IFS= read -r line; do
 	echo "${dir},${line}" >> ${DATA}/data2analyse.txt
   done < "${dir}/samples.txt"
@@ -36,8 +40,6 @@ done
 #total tasks allocated in slurm
 TOTALTASKS=$((${SLURM_NTASKS_PER_NODE} * ${SLURM_NNODES}))
 echo total tasks: $TOTALTASKS
-
-TOTALTASKS=5
 
 # This specifies the options used to run srun. The "-N1 -n${SLURM_NTASKS_PER_NODE} -c1" options are
 # used to allocate ${SLURM_NTASKS_PER_NODE} tasks and 1 cpu per task to each node.
@@ -63,5 +65,9 @@ parallel="parallel --delay 0.2 -j $TOTALTASKS --joblog ../slogs/runtask_${SLURM_
 $parallel "$srun ./do_pipeline.sh {} ${PROJ} 2>&1 {}/align.log" :::: ${DATA}/data2analyse.txt
 
 wait 
+
+#run R script to make graphs
+
+Rscript circlize_integrations.R
 
 date
