@@ -157,7 +157,7 @@ foreach my $key (keys %viralR1) {
 	if (defined $outLine) { push(@outLines, join("\t", ($outLine, $key, $combReads))); }
 }
 
-unless (@outLines) { die "No discordant read-pairs were detected\n"; } # if no integration events detected, finish
+unless (@outLines) { print "No discordant read-pairs were detected\n"; } # if no integration events detected, finish
 
 if ($verbose) { print "Writing output...\n"; }
 printOutput($output, @outLines);
