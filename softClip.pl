@@ -164,7 +164,7 @@ foreach my $key (keys %viralIntegrations) {
 	}
 }
 
-unless (@outLines) { die "No integration sites were detected\n"; } # if no integration events detected, finish
+unless (@outLines) { print "No integration sites were detected\n"; } # if no integration events detected, finish
 
 if ($verbose) { print "Writing output...\n"; }
 printOutput($output, @outLines);

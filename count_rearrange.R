@@ -5,23 +5,28 @@ library(tidyverse)
 
 data_path = "../data/"
 out_path = "../out/"
-files <- list.files(path = data_path, recursive = TRUE, pattern = "rearrange.txt")
+refiles <- list.files(path = data_path, recursive = TRUE, pattern = "rearrange.txt")
 
 #remove empty files
-isnotempty <- map(files, ~file.info(paste(data_path, ., sep=''))$size != 0) %>% unlist()
-files <- files[isnotempty]
+isnotempty <- map(refiles, ~file.info(paste(data_path, ., sep=''))$size != 0) %>% unlist()
+refiles <- refiles[isnotempty]
 
+colns <- c("ReadID", "possibleVecRearrange", "totalGapBP", "no_gaps", "sups", "seq")
 
 #import all datasets
-data <- data_frame(filename = files) %>% # create a data frame holding the file names
-  mutate(integrations = map(filename, ~ read_tsv(file.path(data_path, .), 
+rearrange <- data_frame(filename = refiles) 
+
+rearrange <- rearrange %>% # create a data frame holding the file names
+  mutate(rearrange = map(filename, ~ read_tsv(file.path(data_path, .), 
                                                  na = c("", "NA", "?"), 
-                                                 col_types = cols(Chr = col_character(), .default =col_guess())))) %>% 
+                                                 col_names = colns,
+                                              skip = 1))) %>% 
   unnest()
 
 
+
 #add extra columns with sample name, dataset, host
-data <- data %>% 
+rearrange <- rearrange %>% 
   mutate(dataset = dirname(dirname(filename))) %>% 
   mutate(sample = str_extract(basename(filename), "^[\\w]+(?=\\.)")) %>% 
   mutate( host = ifelse(str_detect(basename(filename), "mouse|mm10"), "mm10", "hg38"))
@@ -30,14 +35,18 @@ data <- data %>%
 
 
 #make summary table of number of vector rearrangements
-data %>% 
-  group_by(possibleVecRearrange) %>% 
+rearrange %>% 
+  group_by(possibleVecRearrange, dataset) %>% 
   count()
 
 #make pie chart of possible vector rearrange
-colns <- c("possibleVecRearrange", "Gaps")
+colns <- c("no_gaps","possibleVecRearrange")
 for (i in colns) {
-  count(data, !!ensym(i)) %>% 
+  rearrange %>% 
+  mutate(dataset = as.factor(dataset)) %>%
+  count(!!ensym(i), dataset) %>% 
+  complete(!!ensym(i), dataset, fill = list(n = 0))%>% 
+    group_by(dataset) %>% 
     mutate( freq = n/sum(n) ) %>% 
     ggplot(aes(x="", y=freq, fill=!!ensym(i))) +
     geom_bar(stat = "identity", width=1)+
@@ -46,7 +55,8 @@ for (i in colns) {
                show.legend = FALSE) +
     coord_polar("y", start=0) +
     theme_void() +
-    theme(legend.position = "bottom")
+    theme(legend.position = "bottom") + 
+    facet_wrap(vars(dataset))
   ggsave(paste0(out_path, "rearrange_",gsub(" ", "", i), ".pdf", sep = ""))
 
 } #end of loop over columns
@@ -62,12 +72,39 @@ isnotempty <- map(bedfiles, ~file.info(paste(data_path, ., sep=''))$size != 0) %
 bedfiles <- bedfiles[isnotempty]
 
 
+
 #import all datasets
-data <- data_frame(filename = bedfiles) %>% # create a data frame holding the file names
+colns <- c("virus", "start", "stop", "rearrange", "ID", "seq")
+bed <- data_frame(filename = bedfiles) %>% # create a data frame holding the file names
   mutate(integrations = map(filename, ~ read_tsv(file.path(data_path, .), 
-                                                 na = c("", "NA", "?"), 
+                                                 na = c("", "NA", "?"),
+                                                 col_names = colns,
                                                  col_types = cols(Chr = col_character(), .default =col_guess())))) %>% 
   unnest()
 
+#calculate midpoint of bed
 
+bed <- bed %>% 
+  mutate(dataset = dirname(dirname(filename))) %>% 
+  mutate(sample = str_extract(basename(filename), "^[\\w]+(?=\\.)")) %>% 
+  mutate( host = ifelse(str_detect(basename(filename), "mouse|mm10"), "mm10", "hg38"))
+
+
+bed <-bed %>% 
+  mutate(mid = (start + stop)/2)
+
+
+summary <- bed %>% 
+  filter(!str_detect(filename, "AGRF")) %>% 
+  filter(str_detect(sample, "m")) %>% 
+  group_by(sample, rearrange) %>% 
+  count()
+
+bed %>% 
+  filter(rearrange == "yes") %>% 
+  filter(str_detect(filename, "pAAV")) %>% 
+  ggplot(aes(x = mid, color = sample))+ 
+  geom_density() +
+  facet_grid(rows = vars(dataset))
+ggsave(file.path(out_path, "rearrange_density.pdf"), width = 10, height = 5)
   

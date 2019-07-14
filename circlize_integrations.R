@@ -92,7 +92,6 @@ for (i in unique(data$dataset)) {
       filter(str_detect(sample, j))
   }
   write_xlsx(toWrite, path = paste(out_path, i, ".xlsx", sep = ""))
-  
 }
 
 #get summary of number of sites per 
