@@ -1,0 +1,146 @@
+#### python modules ####
+
+import glob
+import os
+
+#### CONFIG FILE ####
+#which datasets are to be aligned to which hosts and viruses are specified in dsets.yaml
+configfile: "dsets.yaml"
+
+#this is of the form { dset1: {host: host1, virus: host2}, dset2: {host: host2, virus: virus2} }
+
+#make four lists, with each entry in each list corresponding to one desired output file
+
+DATASETS = []
+SAMPLES = []
+HOSTS = []
+VIRUSES = []
+
+for dataset in config:
+	#get files in directory and strip off "_R1.fastq.gz"
+	samples = [os.path.basename(f)[:-12] for f in glob.glob("../data/{}/reads/*_R1.fastq.gz".format(dataset))]
+	for sample in samples:
+		DATASETS.append(dataset)
+		SAMPLES.append(sample)
+		HOSTS.append(config[dataset]["host"])
+		VIRUSES.append(config[dataset]["virus"])
+
+#### target files ####
+
+
+rule all:
+	input: 
+		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES),
+		expand("../out/{dset}/host_aligned/{samp}.{host}.bwa.bam", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS),
+		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES),
+		expand("../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.bam", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS),
+		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES)
+
+#### merging ###
+
+
+rule merge_reads:
+	input:
+		r1 = "../data/{dset}/reads/{samp}_R1.fastq.gz",
+		r2 = "../data/{dset}/reads/{samp}_R2.fastq.gz"	
+	output:
+		merged = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.merged.fastq.gz",
+		proc_r1 = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.R1.fastq.gz",
+		proc_r2 = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.R2.fastq.gz",
+		all = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.fastq.gz"
+	run:
+		shell("SeqPrep -f {input.r1} -r {input.r2} -1 {output.proc_r1} -2 {output.proc_r2} -s {output.merged}")
+		shell("cat {output.proc_r1} {output.proc_r2} {output.merged} > {output.all}")
+
+#### alignments ####
+
+rule index:
+	input:
+		"../references/{genome}.fa"
+	output:
+		"../references/{genome}.ann",
+		"../references/{genome}.amb",
+		"../references/{genome}.bwt",
+		"../references/{genome}.pac",
+		"../references/{genome}.sa"
+	run:
+		prefix = os.path.basename(input)[:-3]
+		print("bwa index -p {prefix} {input}")
+		shell("bwa index -p {prefix} {input}")
+
+rule align_bwa_host:
+	input:
+		proc_r1 = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.R1.fastq.gz",
+		proc_r2 = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.R2.fastq.gz",
+		all = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.fastq.gz",
+		ann = "../references/{host}.ann",
+		amb = "../references/{host}.amb",
+		bwt = "../references/{host}.bwt",
+		pac = "../references/{host}.pac",
+		sa = "../references/{host}.sa"
+	output:
+		hPaired = temp("../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.sam"),
+		hSing = temp("../out/{dset}/host_aligned/{samp}.{host}.bwa.sam"),
+	threads: 5
+	run:		
+		shell("python ./alignReadsWithBWA.py --threads {threads} --index ../references/{wildcards.host} --read1 {input.proc_r1} --read2 {input.proc_r2} --output {output.hPaired} --threshold 10 --hflag 200"),
+		shell("python ./alignReadsWithBWA.py --threads {threads} --index ../references/{wildcards.host} --read1 {input.all} --output {output.hSing} --threshold 10 --hflag 200")
+
+
+rule align_bwa_virus:
+	input:
+		proc_r1 = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.R1.fastq.gz",
+		proc_r2 = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.R2.fastq.gz",
+		all = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.fastq.gz",
+		ann = "../references/{virus}.ann",
+		amb = "../references/{virus}.amb",
+		bwt = "../references/{virus}.bwt",
+		pac = "../references/{virus}.pac",
+		sa = "../references/{virus}.sa"
+	output:
+		vPaired = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam"),
+		vSing = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam")
+	threads: 5
+	run:	
+		shell("python ./alignReadsWithBWA.py --threads {threads} --index ../references/{wildcards.virus} --read1 {input.proc_r1} --read2 {input.proc_r2} --output {output.vPaired} --threshold 10 --hflag 200"),
+		shell("python ./alignReadsWithBWA.py --threads {threads} --index ../references/{wildcards.virus} --read1 {input.all} --output {output.vSing} --threshold 10 --hflag 200")
+
+rule convert:
+	input:
+		"../out/{dset}/{host_virus}/{samp}.{host_virus_name}.{alignType}.sam"
+	output:
+		bam = "../out/{dset}/{host_virus}/{samp}.{host_virus_name}.{alignType}.bam",
+		bai = "../out/{dset}/{host_virus}/{samp}.{host_virus_name}.{alignType}.bam.bai",
+		
+	run:
+		shell("samtools view -bS {input} | samtools sort - -o {output.bam}")
+		shell("samtools index {output.bam}")
+
+
+#### perl scripts ####
+
+rule run_int_scripts:
+	input:
+		hPaired = "../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.sam",
+		hSing = "../out/{dset}/host_aligned/{samp}.{host}.bwa.sam",
+		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam",
+		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam"
+	output:
+		allInt = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
+		soft = temp("../out/{dset}/ints/{samp}.{host}.{virus}.soft.txt"),
+		discord = temp("../out/{dset}/ints/{samp}.{host}.{virus}.discordant.txt")
+	run:
+		shell("perl -I ../tools ../tools/softClip.pl --viral {input.vSing} --human {input.hSing} --output {output.soft} --cutoff 10")
+		shell("perl -I ../tools ../tools/discordant.pl --viral {input.vPaired} --human {input.hPaired} --output {output.discord} --cutoff 10")
+		shell("awk 'FNR==1 && NR!=1 {{ getline; }} {{ print $0; }}' {output.soft} {output.discord} > {output.allInt}")
+
+
+rule run_rearrange_scripts:
+	input:
+		"../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam"
+	output:
+		txt = "../out/{dset}/rearrange/{samp}.{virus}.rearrange.txt",
+		bed = "../out/{dset}/rearrange/{samp}.{virus}.rearrange.bed"
+	run:
+		shell("perl -I ../tools ../tools/checkVecRearrange.pl --viral {input} --output {output.txt} --bed {output.bed}")
+	
