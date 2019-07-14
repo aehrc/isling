@@ -128,8 +128,8 @@ rule run_int_scripts:
 		soft = temp("../out/{dset}/ints/{samp}.{host}.{virus}.soft.txt"),
 		discord = temp("../out/{dset}/ints/{samp}.{host}.{virus}.discordant.txt")
 	run:
-		shell("perl -I ../tools ../tools/softClip.pl --viral {input.vSing} --human {input.hSing} --output {output.soft} --cutoff 10")
-		shell("perl -I ../tools ../tools/discordant.pl --viral {input.vPaired} --human {input.hPaired} --output {output.discord} --cutoff 10")
+		shell("perl -I . ./softClip.pl --viral {input.vSing} --human {input.hSing} --output {output.soft} --cutoff 10")
+		shell("perl -I . ./discordant.pl --viral {input.vPaired} --human {input.hPaired} --output {output.discord} --cutoff 10")
 		shell("awk 'FNR==1 && NR!=1 {{ getline; }} {{ print $0; }}' {output.soft} {output.discord} > {output.allInt}")
 
 
@@ -140,5 +140,5 @@ rule run_rearrange_scripts:
 		txt = "../out/{dset}/rearrange/{samp}.{virus}.rearrange.txt",
 		bed = "../out/{dset}/rearrange/{samp}.{virus}.rearrange.bed"
 	run:
-		shell("perl -I ../tools ../tools/checkVecRearrange.pl --viral {input} --output {output.txt} --bed {output.bed}")
+		shell("perl -I . ./checkVecRearrange.pl --viral {input} --output {output.txt} --bed {output.bed}")
 	
