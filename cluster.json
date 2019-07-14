@@ -12,7 +12,7 @@
 	"align_bwa_host":
 	{	
 		"cpus-per-task" : "5",
-		"time" : "2:00:00"
+		"time" : "3:00:00"
 	},
 	"align_bwa_virus":
 	{	
