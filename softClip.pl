@@ -10,6 +10,7 @@ use ViralIntegration;
 use Getopt::Long;
 
 my $cutoff = 20; # default clipping cutoff
+my $thresh = 0.95; #default amount of read that must be covered by alignments for rearrangement
 my $viral;
 my $human;
 my $output = "integrationSites.txt";
@@ -20,6 +21,7 @@ my $verbose;
 my $help;
 
 GetOptions('cutoff=i' => \$cutoff,
+		   'thresh=f' => \$thresh,
 		   'viral=s'  => \$viral,
 		   'human=s'  => \$human,
 		   'output=s' => \$output,
@@ -154,7 +156,7 @@ foreach my $key (keys %viralIntegrations) {
 		#	Viral Start
 		#	Viral Stop	
 		#	Overlap
-		my @intData = collectIntersect($viralIntegrations{$key}, $humanIntegrations{$key}, $key);
+		my @intData = collectIntersect($viralIntegrations{$key}, $humanIntegrations{$key}, $key, $thresh);
 		# Once the positions are collected, put together the output	
 		my $outLine;
 		if (@intData) { $outLine = extractOutput($viralIntegrations{$key}, $humanIntegrations{$key}, @intData); }
@@ -179,11 +181,12 @@ exit;
 sub printHelp {
 	print "Pipeline for detection of viral integration sites within a genome\n\n";
 	print "Usage:\n";
-	print "\tperl softClip.pl --viral <sam> --human <sam> --cutoff <n> --output <out> --bed <bed> --help\n\n";
+	print "\tperl softClip.pl --viral <sam> --human <sam> --cutoff <n> --thresh <n> --output <out> --bed <bed> --help\n\n";
 	print "Arguments:\n";
 	print "\t--viral:   Alignment of reads to viral genomes (sam)\n";
 	print "\t--human:   Alignment of reads to human genome (sam)\n";
 	print "\t--cutoff:  Minimum number of clipped reads to be considered (default = 20)\n";
+	print "\t--thresh:	Amount of read that must be covered by one alignment to be considered rearrangement";
 	print "\t--output:  Output file for results (default = integrationSite.txt\n";
 	print "\t--bed:     Print integrations sites to indicated bed file (default = NA)\n";
 	print "\t--merged:  Merge bedfile into overlapping integration sites (default = NA)\n";
@@ -199,7 +202,7 @@ sub collectIntersect {
 ### returns integration start/stop relative to read sequence
 
 ### BWA Alignments are 1-based
-	my ($viralData, $humanData, $key) = @_;
+	my ($viralData, $humanData, $key, $thresh) = @_;
 
 	my ($vStart, $vStop, $vOri, $seq, $vDir, $vCig, $vSec, $vSup) = (split("\t",$viralData))[3,4,5,6,7,8,-2,-1];
 	my ($hStart, $hStop, $hOri, $hDir, $hCig, $hSec, $hSup)       = (split("\t",$humanData))[3,4,5,7,8,-2,-1];
@@ -245,11 +248,11 @@ sub collectIntersect {
 	
 	my $isVecRearrange;
 	if ((join(";", $vSup, $vSec)) eq "NA;NA") { $isVecRearrange = "no"; }
-	else { $isVecRearrange = isRearrange($vCig, $vDir, (join(";", $vSup, $vSec)), $readlen, $hCig, $hDir, (split("xxx", $key))[1]);}
+	else { $isVecRearrange = (isRearrange($vCig, $vDir, (join(";", $vSup, $vSec)), $seq, $thresh))[0];}
 	 
 	my $isHumRearrange;
 	if ((join(";", $hSup, $hSec)) eq "NA;NA") { $isHumRearrange = "no"; }
-	else { $isHumRearrange = isRearrange($hCig, $hDir, (join(";", $hSup, $hSec)), $readlen, $vCig, $vDir, (split("xxx", $key))[1]);}
+	else { $isHumRearrange = (isRearrange($hCig, $hDir, (join(";", $hSup, $hSec)), $seq, $thresh))[0];}
 	
 	#check to see if location of human alignment is ambiguous: multiple equivalent alignments accounting for human part of read
 	my $isHumAmbig;

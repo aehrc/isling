@@ -3,7 +3,7 @@
 package ViralIntegration;
 use Exporter;
 @ISA = ('Exporter');
-@EXPORT = qw(analyzeRead processCIGAR extractSeqCoords extractOutput extractCoords extractSequence getSecSup isAmbigLoc isRearrange printOutput printBed printMerged reverseComp reverseCigar);
+@EXPORT = qw(analyzeRead processCIGAR extractSeqCoords extractOutput extractCoords extractSequence getCigarParts getGenomicCoords getMatchedRegion getMatchedRegions getSecSup isAmbigLoc isRearrange printOutput printBed printMerged reverseComp reverseCigar);
 
 
 ##### subroutines #####
@@ -66,7 +66,7 @@ sub processCIGAR {
 	# D needs to be removed in the final "matched" count  - because it adds space where base was missing
 
 	# The full "matched" sequence, can be calculated as length(read) - length(clipped).
-	# This will give the toal amount of the read that was aligned (matched) and the part of the read that wasn't (clipped)
+	# This will give the total amount of the read that was aligned (matched) and the part of the read that wasn't (clipped)
 	# The assumption is that everything else is either matched or inserted (and therefore should still be counted)
 
 	my $matched = length($seq) - $clipped;		
@@ -148,7 +148,7 @@ sub extractOutput {
 }
 
 sub extractCoords {
-### Extract coordinates
+### Extract genomic coordinates for matched region based on start and stop relative to read
 	my ($start, $stop, $ori, $overlap) = @_;
 
 	if ($ori eq "-") { return(($start), ($stop + $overlap)); }
@@ -162,6 +162,92 @@ sub extractSequence {
 	if ($ori eq "-") { return($seq = substr($seq, ($stop + $overlap))); }
 	else			 { return($seq = substr($seq, 0, ($start - $overlap + 1))); }
 
+}
+
+sub getCigarParts {
+	#split up a cigar string into two different arrays containing the letters and the numbers
+	#return references to the two arrays
+	
+	my ($cigar, $let, $num) = @_;
+	
+	#get and reverse letters and numbers from cigar
+	@$let = split(/\d+/, $cigar);
+	@$num = split(/[A-Z]/, $cigar);
+
+	#since numbers precede letters, always get one extra empty element in letter array (which is at start)
+	shift @$let;
+	
+}
+
+sub getGenomicCoords {
+	#get genomic coordinates of matched region (specified by start and stop relative to the read)
+	#using cigar, direction and POS (1-based leftmost mapping position of first CIGAR operation that consumes a reference base [M, D, N])
+	#need to consider CIGAR operations that consume read [MIS=X] or not [DNHP], 
+	#and those that consume reference [MDN] or not [ISHP]
+	
+	#without processing the cigar, might have more than one matched region per alignment so want to get coordinates for one that is specified
+	
+	my ($start, $stop, $pos, $sense, $cig, $readlen) = @_;
+	
+	#need to know what the coordinate of the start of the read is, given the left-most mapping position of M, D or N cigar operation
+	#first simplify cigar to remove 
+	
+	#get all regions from cigar
+	my (@letters, @numbers);
+	getCigarParts($cig, \@letters, \@numbers);
+	
+	#need two new versions of the @numbers array:
+	#version @rNumbers retains numbers for all @letters that consume query [MIS]
+	#version @gNumbers retains numbers of all @letters that consume reference [MDN]
+	#need these to make calculation of read- and genome-relative positions for each CIGAR operation
+	my @rNumbers = @numbers;
+	my @gNumbers = @numbers;
+	
+	for my $i (0..$#numbers) {
+		#if doesn't consume reference
+		if (@letters[$i] !~ /[MIS]/) {
+			@rNumbers[$i] = 0;
+		}
+		#if doesn't consume query
+		if (@letters[$i] !~ /[MDN]/) {
+			@gNumbers[$i] = 0;
+		}
+	}
+	
+	
+	#make arrays with info about start and stop position relative to read of each CIGAR operation
+	#also genomic position (start and stop) for each CIGAR operation
+	my ($rStart, $rStop, $gStart, $gStop);
+	
+	#loop over elements of CIGAR to calculate start and stop positions relative to read
+	for my $i (0..$#numbers) {
+		#add to rStart and rStop 
+		#if forward, need to sum from start of array to $i
+		if (($sense eq 'f') or ($sense eq '+')) {
+			#rStart for this position is 1 + (sum of @numbers up to but not including this position)
+			$rStart = 1 + eval join("+", @rNumbers[0..($i-1)]);
+			#rStop for this position is (sum of @numbers up to and including this position)
+			$rStop = eval join("+", @rNumbers[0..$i]);
+		}
+		#read is reverse, need to sum from $i to end of array
+		else {
+			#rStart is 1+ sum from next element to end of array
+			$rStart = 1 + eval join("+", @rNumbers[$i+1..$#rNumbers]);
+			#rStop is sum from this element to end of array
+			$rStop = eval join("+", @rNumbers[$i..$#rNumbers]);
+			#gStart is 
+		}
+		#if we've found the right operation
+		if (($start == $rStart) and ($stop == $rStop)) {
+			#calculate gStart and gStop
+			$gStart = $pos + eval join("+", @gNumbers[0..($i-1)]);
+			$gStop = $pos - 1 + eval join("+", @gNumbers[0..$i]);
+			
+			return  ($gStart < $gStop) ? ($gStart, $gStop) : ($gStop, $gStart);
+			
+		}
+		
+	}
 }
 
 sub getMatchedRegion {
@@ -178,6 +264,58 @@ sub getMatchedRegion {
 	
 	return ($end, $align);
 
+}
+
+sub getMatchedRegions {
+	#get all the matched regions from a cigar string
+	#don't assume that cigar has been simplified in any way
+	#returns a 1D array of matched regions in the form startxxxend	(relative to read)
+
+	my ($cigar, $dir) = @_;
+	if (($dir eq '-') or ($dir eq 'r')) { $cigar = reverseCigar($cigar); }
+	
+	#check for no alignments
+	unless ($cigar =~ /M/) { return; }
+	
+	#if whole cigar is matched
+	if ($cigar =~ /^(\d+)M$/) { my ($match) = ($cigar =~ /^(\d+)M$/); return "1xxx${match}"; }
+	
+	#get and reverse letters and numbers from cigar
+	my @letters = split(/\d+/, $cigar);
+	my @numbers = split(/[A-Z]/, $cigar);
+	#since numbers precede letters, always get one extra empty element in letter array (which is at end)
+	shift @letters;
+	
+	#in order to get correct coordinates relative to read (query)
+	#need to remove any cigar operations that don't consume query (D, N, H, P)
+	for my $i (0..$#letters) {
+		if (@letters[$i] =~ /[DNHP]/) {
+			splice(@letters, $i, 1);
+			splice(@numbers, $i, 1);
+		}
+	
+	}
+	
+	#for each match in @letters, get position in read where alignment starts and length of alignment
+	my ($start, $matchedLen, $end, @aligns);
+	for my $i (0..$#letters) { 
+		if ($letters[$i] eq "M") { 
+			#get matched length
+			$matchedLen = $numbers[$i];
+		
+			#get start
+			$start = 1;
+			for my $j (0..($i-1)) { $start += $numbers[$j]; } #sum up numbers up to where match starts
+				
+			#get end
+			$end = ($start + $matchedLen - 1);
+				
+			#append to @aligns
+			push(@aligns, "${start}xxx${end}");
+		
+			}
+		}
+	return @aligns;
 }
 
 sub getSecSup {
@@ -280,28 +418,25 @@ sub isAmbigLoc {
 
 sub isRearrange {
 
-	#check for two possible types of rearrangements of a reference genome
-	# 1. Check if the alignments to one reference genome can account for the whole read
-	#			This would indicate a possible rearrangment made of known fragments from one genome
-	# 2. Check if there is a secondary alignment from one reference equivalent to the primary alignment in the second
-	#			This could indicate a possible rearrangement with a possible gap
-
-	my ($pCig, $pDir, $sup, $readlen, $otherpCig, $otherpDir, $seq) = @_;
-	# $pCig is primary alignment of the first reference
-	# $pDir is the direction of the primary alignment of the first reference
-	# $sup are the secondary and supplementary alignments of the first reference
-	# $otherpCig is the primary alignment for the second reference
-	# $otherpDir is the direction of the primary alignment for the second reference
-
+	#check for possible vector rearrangements:
+	#get start and end positions of all alignments: primary, supplementary, secondary
+	#sort alignments and check for gaps between start of read, each alignment, and end of read
+	#check if number of bases in gaps is less than $thresh * readlength
 	
-	#after processing, cigars have one matched region per alignment
-	#get location in read of matched region and its length
+	my ($pCig, $pDir, $pRef, $pPos, $sup, $seq, $thresh) = @_;
+	# $pCig is primary alignment of the first reference
+	# $pDir is the direction of the primary alignment 
+	# $sup are the secondary and supplementary alignments
+	# $thresh is the fraction of the read that must be accounted for by alignments to be considered a rearrangement
+	
+	
+	
+	#get location in read of matched regions and their lengths
 	#make array of start of matched regions and their lengths in format startxxxend
 	#need to take into account direction of read - convert everything to forward orientation
-	#need to zeropad start and length so that each have three digits, for sorting later
-	#NOTE - THIS ASSUMES READ LENGTHS LESS THAN 1000!!!
-	if ($readlen >= 1000) { print "warning: vector rearangement check doesn't work for read lengths >= 1000\n" ;}
-	
+	#need to zeropad start and length so that each have the same number of digits, for sorting later
+	my $readlen = length($seq);
+
 	
 	#note - currently considering all alignments together regardless of their reference: consider changing to check only that alignments to a sigle reference account for the whole read
 	#for vector/virus we would want to do this because probably don't have different viruses recombining?
@@ -309,110 +444,118 @@ sub isRearrange {
 	#could do this by making one @aligns per reference, and store all 
 	#note - using 1-based indexing of read alignments
 	
-	#reverse second reference primary alignment if necessary
-	if (($otherpDir eq 'r') or ($otherpDir eq '-')) { 
-		$otherpCig = reverseCigar($otherpCig); 
-	}
-	
 	my @aligns; #to store start and end of each alignment
 	
 	#first do primary alignment
-	if ($pDir eq "r") { $pCig = reverseCigar($pCig); } #reverse cigar if necessary
-	#primary alignment cigar has been processed so we can assume it only has one mapped region and one soft-clipped region
-	if 	   ($pCig =~ /^(\d+)[M]/) { push(@aligns, "1xxx${1}"); }  #simplest case is that matched region is start
-	elsif  ($pCig =~ /^(\d+)[SH](\d+)[M]$/) { push(@aligns, (${1}+1)."xxx".(${1}+${2})); }
+	@pAligns = getMatchedRegions($pCig, $pDir);
+	foreach my $align (@pAligns) { push(@aligns, join("xxx", $align, $pRef, $pPos, $pDir, $pCig)); }
 	
-	#now do rest of the alignments
+	#if no sups or secs, can't be rearrangement
+	if ($sup =~ /NA;NA/) { return ("no", 0, 0, @aligns); }
+	
+	#if fully matched, can't be rearrangement
+	if ($pCig =~ /^\d+M$/) { return ("no", 0, 0, @aligns); }
+	
+	#then do rest of the alignments
 	my @supAligns = split(";", $sup);
 	foreach my $supAlign (@supAligns) {
 	
-		if ($supAlign eq "NA") { next; } #check for no secondary alignments
-		my ($supSense, $supCig) = (split(",",$supAlign))[2,3]; #get sense and cigar from alignment
+		if (($supAlign eq "NA") or ($supAlign eq "")) { next; } #check for no secondary alignments
+		my ($supRef, $supPos, $supSense, $supCig) = (split(",",$supAlign))[0,1,2,3]; #get info about this alignment
 		
-		if ($supSense eq '-') { $supCig = reverseCigar($supCig); }
+		#need to keep the other alignment info for later output
+		my @curAligns = getMatchedRegions($supCig, $supSense);
+		foreach $align (@curAligns) { push(@aligns, join("xxx", $align, $supRef, $supPos, $supSense, $supCig)); }
 		
-		#first check for second type of rearrangement: 
-		#is this secondary alignment equivalent to the primary alignment against the other reference?
-		
-		if (($otherpCig eq $supCig) or ($otherpCig eq processCIGAR($supCig, $seq))) { return "yes"; } 	
-		
-		#get matched region(s) from alignment
-		#get and reverse letters and numbers from cigar
-		my @letters = split(/\d+/, $supCig);
-		my @numbers = split(/[A-Z]/, $supCig);
-		#since numbers precede letters, always get one extra empty element in letter array (which is at start)
-		shift @letters;
-
-		#for each match in @letters, get position in read where alignment starts and length of alignment
-		my ($start, $matchedLen, $end);
-		for my $i (0..$#letters) { 
-			if ($letters[$i] eq "M") { 
-				#get matched length
-				$matchedLen = $numbers[$i];
-		
-				#get start
-				$start = 1;
-				for my $j (0..($i-1)) { $start += $numbers[$j]; } #sum up numbers up to where match starts
-				
-				#get end
-				$end = ($start + $matchedLen - 1);
-				
-				#append to @aligns
-				push(@aligns, "${start}xxx${end}");
-		
-			}
-		}
-	}
-	
-	#add padding and sort alignments
-	#zeropadding is needed so that sorting works correctly
-	my @padded;
-	foreach my $element (@aligns) {
-		
-		#get start and end
-		my ($start, $end) = (split('xxx', $element));
-		
-		#add padding to start if not three digits
-		if ($start =~ /^(\d)$/) { $start = "00${1}"; }
-		elsif ($start =~ /^(\d\d)$/) {$start = "0${1}"; }
-		
-		#add padding to end if not three digits
-		if ($end =~ /^(\d)$/) { $end = "00${1}"; }
-		elsif ($end =~ /^(\d\d)$/) {$end = "0${1}"; }
-		
-		push(@padded, join('xxx', $start, $end));
 	}
 	
 	#sort array
-	my @sorted = sort(@padded);
+	my @sorted = sort(zeroPad(@aligns));
 	
-	#check if alignments can account for whole read
-	my $isRearrange; #to store result, "yes" or "no"
-	#check that first base is accounted for
-	#since list is sorted, if first base is accounted for then first alignment will account for it
-	if ($sorted[0] !~ "001") { return "no"; } 
-
-	#check rest of the read
-	my $currentPos = 0;
-	my $lastUsed = -1;
-	my $i = (scalar @sorted) - 1; #start at end of list and go backwards
 	
-	while (($currentPos < $readlen) and ($i != $lastUsed )) {
-		if ((split('xxx', $sorted[$i]))[0] <= ($currentPos +1))  { 
-			$currentPos = (split('xxx', $sorted[$i]))[1]; #update current position
-			$lastUsed = $i; #update last used alignment
-			$i = ((scalar @sorted) - 1); #start again at end of list	
+	#remove any nested alignments
+	#these are alignments that are completely encompassed by another alignment 
+	#ie 001xxx100 and 010xxx020 are nested and 010xxx020 should be removed
+	#also 001xxx009 and 001xxx010 are nested and 001xxx009 should be removed
+	#keep any equivalent alignments - these are pairs with identical start and stop postions
+	
+	#strategy: start at end of array and check if the current alignment and the previous alignment are nested
+	#if so, remove the nested one (which will always be the current alignment, since the list is sorted)
+	my $lastKept = $#sorted;
+	my @equivalent = ();
+	for my $i (reverse((1..$#sorted))) {
+		#get current and previous start and end
+		my ($cS, $cE) = (split('xxx', $sorted[$i]))[0,1];
+		my ($pS, $pE) = (split('xxx', $sorted[$i-1]))[0,1];
+		#if two (or more) alignments are equivalent, we don't yet know if they should both/all be removed or not
+		#just keep track of them
+		if (($cS == $pS) and ($cE == $pE)) {
+			push(@equivalent, $i);
+			next;
 		}
-		else { $i -= 1; }
+		#if current alignment and previous alignment are nested
+		if ((($cS > $pS) and ($cE < $pE)) or (($cS > $pS) and ($cE == $pE))) { 
+			#if no equivalent alignments
+			if ($#equivalent <= 0) {
+				#just remove the one alignment (the current alignment)
+				splice(@sorted, $i, 1); 
+				}
+			#if there are equivalent alignments
+			else {
+				#remove them all
+				splice(@sorted, $i, ($#equivalent+1));
+			}
+		}
+		#if current alignment and previous alignment are nested, and the previous alignment is the nested alignment
+		#eg current = 001xxx120, previous = 001xxx100
+		if (($cS == $pS) and ($cE > $pE)) {
+			#first move current alignment to the position of the previous alignment, then delete
+			@sorted[$i-1] = @sorted[$i];
+			splice(@sorted, $i, 1);
+		}
+		#reset equivalent 
+		@equivalent = ();
+		
 	}
 	
-	#check if we reached the end of the read
-	$isRearrange = ($currentPos == $readlen) ? "yes" : "no";
-
-
-
-	return $isRearrange;
-
+	#check if alignments can account for whole read
+	#check all alignments for gaps
+	#to store the number of total bases gapped and number of gaps
+	my ($gapBP, $gaps);
+	$gapBP = (split('xxx', $sorted[0]))[0] - 1; #initialise to gap between start of read and start of first alignment
+	if ($gapBP == 0) { $gaps = 0; }
+	else { $gaps = 1; }
+	
+	for my $i (1..$#sorted) {
+		#if at end of the alignments, check gap between end of read and last alignment
+		if ($i == $#sorted) {
+			#check if gap between end of read and last alignment
+			unless ((split('xxx', $sorted[$i]))[1] == $readlen) {
+				#increment gapBP and gap
+				$gapBP += $readlen - (split('xxx', $sorted[$i]))[1];
+				$gaps += 1;
+			}
+		} 
+		#if start of current alignment is greater than or equal to (end of previous alignment + 1)
+		unless ((split('xxx', $sorted[$i]))[0] <= (split('xxx', $sorted[$i-1]))[1] + 1 ) {
+			#add number of gap bases between start of current alignment and end of previous alignment to total gapped bases
+			 $gapBP +=  (split('xxx', $sorted[$i]))[0] - ((split('xxx', $sorted[$i-1]))[1] + 1);
+			$gaps += 1
+			
+		}
+	}
+	
+	my $isRearrange; #to store result, "yes" or "no"
+	
+	if ($gapBP < ($readlen - ($thresh * $readlen))) { $isRearrange = "yes"; }
+	else { $isRearrange = "no"; }
+	
+	
+	#get start and stop 
+	
+	return ($isRearrange, $gapBP, $gaps, @aligns);
+	
+	
 }
 
 sub printOutput {
@@ -468,27 +611,97 @@ sub reverseComp {
 
 sub reverseCigar {
 
+	#invert cigar string so that corresponds to opposite strand
 	my ($oriCig) = @_;
 
-	#invert cigar string so that corresponds to opposite strand
-
-	my (@letters, @numbers, $newCig, $letter, $number);
-
 	#get and reverse letters and numbers from cigar
-	@letters = reverse(split(/\d+/, $oriCig));
-	@numbers = reverse(split(/[A-Z]/, $oriCig));
-	#since numbers precede letters, always get one extra empty element in letter array (which is at end)
-	pop @letters;
+	
+	my (@letters, @numbers);
+	getCigarParts($oriCig, \@letters, \@numbers);
+	@letters = reverse(@letters);
+	@numbers = reverse(@numbers);
 	
 	#check that letters and numbers have same number of elements
 	unless ((scalar @letters) == (scalar @numbers)) { print "could not reverse cigar ${oriCig}!\n"; return;}
 	
 	#reconstruct reversed cigar
-	foreach $number (@numbers) {
+	my $newCig;
+	foreach my $number (@numbers) {
 		$newCig .= ($number.shift(@letters));	
 	}
 	
 	return $newCig;
+
+}
+
+sub updateGPos {
+	#update genomic position when looking through read for genomic coordinates
+	
+	my ($curGPos, $cigOp, $bases, $dir) = @_;
+	
+	#if operation consumes reference
+	if ($cigOp =~ /[MDN]/) { 
+		#are we going backwards or forwards?
+		if (($dir eq "f") or ($dir eq "+")) { return ($curGPos + $bases - 1); }
+		else { return ($curGPos - $bases); }
+	 }
+	 #if operation doesn't consume reference
+	 else { return $curGPos; }
+
+}
+
+sub updateRPos {
+	#update read position when looking through read for genomic coordinates
+	
+	my ($curRPos, $cigOp, $bases, $sense) = @_;
+	
+	#if operation consumes query, update
+	if ($cigOp =~ /[MIS]/) { 
+		if (($sense eq '+') or ($sense eq 'f')) {return $curRPos + $bases; }
+		else {return $curRPos - $bases; }
+	}
+	#otherwise, don't update
+	else { return $curRPos; }
+
+
+}
+
+sub zeroPad {
+	#if we have a 1D array of start and stop locations of alignments, zero-pad these in order to correctly sort by start position
+	#assume that 
+	
+	my @aligns = @_;
+	
+	#get number of digits in the longest start or stop coordinate
+	#this is the number of total digits in all coordinates after zeropadding
+	my $longest = 0;
+	foreach my $element (@aligns) {
+		
+		#get start and end
+		my ($start, $end, @other) = (split('xxx', $element));
+		
+		#check if number of digits in $start and $end is more than $longest
+		if (length($start) > $longest) { $longest = length($start); }
+		elsif (length($end) > $longest) { $longest = length($end); }
+		
+	}
+	
+	#add padding
+	my @padded;
+	foreach my $element (@aligns) {
+		
+		#get start and end
+		my ($start, $end, @other) = (split('xxx', $element));
+		
+		$start = "0" x ($longest - length($start)) . $start;
+		
+		$end = "0" x ($longest - length($end)) . $end;
+		
+		push(@padded, join('xxx', $start, $end, @other));
+	}
+	
+	return @padded;
+
 
 }
 
