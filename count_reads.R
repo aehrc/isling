@@ -7,17 +7,25 @@ library(writexl)
 data_path = "../data/"
 files <- list.files(path = data_path, recursive = TRUE, pattern = ".sam")
 
+files
+
 samtools <- "samtools"
 
-#### count mapped reads ####
+#### count mapped and unmapped reads ####
 
-aligns <- data_frame(filename = files) %>%
-  mutate(mapped = map(files, ~ system(paste0(samtools, " view -c -F 4 -F 2048 ", getwd(), "/", file.path(data_path, .)), 
+aligns <- data_frame(filename = files) 
+
+aligns <- aligns %>% 
+  mutate(mapped = map(filename, ~ system(paste0(samtools, " view -c -F 4 -F 2048 ", getwd(), "/", file.path(data_path, .)), 
                                       intern = TRUE))) %>% 
-  unnest() %>% 
-  mutate(unmapped = map(files, ~ system(paste0(samtools, " view -c -f 4 ", getwd(), "/", file.path(data_path, .)), 
+  unnest()
+
+aligns <- aligns %>% 
+  mutate(unmapped = map(filename, ~ system(paste0(samtools, " view -c -f 4 ", getwd(), "/", file.path(data_path, .)), 
                                         intern = TRUE))) %>%
   unnest() 
+
+
 
 #add extra columns
 aligns <- aligns %>% 
