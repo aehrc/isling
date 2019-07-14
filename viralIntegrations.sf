@@ -31,10 +31,8 @@ for dataset in config:
 rule all:
 	input: 
 		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES),
-		expand("../out/{dset}/host_aligned/{samp}.{host}.bwa.bam", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS),
-		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES),
-		expand("../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.bam", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS),
-		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES)
+		"../out/count_mapped.txt"
+		
 
 #### merging ###
 
@@ -135,10 +133,23 @@ rule run_int_scripts:
 
 rule run_rearrange_scripts:
 	input:
-		"../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam"
+		"../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam"
 	output:
 		txt = "../out/{dset}/rearrange/{samp}.{virus}.rearrange.txt",
 		bed = "../out/{dset}/rearrange/{samp}.{virus}.rearrange.bed"
 	run:
 		shell("perl -I . ./checkVecRearrange.pl --viral {input} --output {output.txt} --bed {output.bed}")
+
+#### visualization ####
+
+rule count_mapped:
+	input:
+		expand("../out/{dset}/host_aligned/{samp}.{host}.bwa.bam", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS),
+		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES),
+		expand("../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.bam", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS),
+		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES)
+	output:
+		"../out/count_mapped.txt"
+	run:
+		shell("./count_mapped.sh")
 	
