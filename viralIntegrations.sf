@@ -64,7 +64,7 @@ rule index:
 		"../references/{genome}.pac",
 		"../references/{genome}.sa"
 	run:
-		shell("bwa index -p {wildcards.genome} {input}")
+		shell("bwa index -p ../references/{wildcards.genome} {input}")
 
 rule align_bwa_host:
 	input:
