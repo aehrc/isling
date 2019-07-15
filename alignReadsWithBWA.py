@@ -4,7 +4,6 @@ import sys, getopt
 import os
 import argparse
 import subprocess
-import pysam
 
 def align_seqs(path, index, read1, read2, output, threshold, match, mismatch, h, threads):
 
