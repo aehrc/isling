@@ -1,6 +1,9 @@
 #### get reads from folder
 
-library(tidyverse)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
 library(stringr)
 library(writexl)
 
@@ -8,7 +11,7 @@ data_path = "../out/"
 
 #### count mapped and unmapped reads ####
 
-aligns <- read_tsv("../out/count_mapped.txt")
+aligns <- read_tsv("../out/summary/count_mapped.txt")
 
 #add extra columns
 aligns <- aligns %>% 
@@ -17,7 +20,7 @@ aligns <- aligns %>%
   mutate(aligned_to = str_match(aligns$sample, "[[:alnum:]-_]+\\.([[:alnum:]-_]+)\\.[:alpha:]+\\.bam")[,2]) %>% 
   mutate(align_type = str_match(aligns$sample, "[[:alnum:]-_]+\\.[[:alnum:]-_]+\\.([:alpha:]+)\\.bam")[,2])
 
-aligns
+write_xlsx(aligns, path = paste0(data_path, "summary/count_mapped.xlsx"))
 
 #make plot of mapped reads
 dsets <- unique(aligns$dataset)
@@ -33,7 +36,7 @@ for (j in types) {
   		geom_bar(stat = "identity", position = "dodge") +
   		theme(axis.text.x=element_text(angle=90, hjust=1)) +
   		facet_wrap(~ aligned_to)
-		ggsave(paste0(data_path, "aligns_", i, "_", j, ".pdf", sep=""))
+		ggsave(paste0(data_path, "summary/aligns_", i, "_", j, ".pdf", sep=""))
 	}
 }
 
@@ -44,7 +47,7 @@ for (i in unique(aligns$dataset)) {
     toWrite[[j]] <-aligns  %>% 
       filter(str_detect(align_type, j))
   }
-  write_xlsx(toWrite, path = paste0(data_path, "aligns_", i, ".xlsx", sep=""))
+  write_xlsx(toWrite, path = paste0(data_path, "summary/aligns_", i, ".xlsx", sep=""))
   
 }
 
