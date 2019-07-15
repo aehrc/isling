@@ -204,8 +204,8 @@ sub collectIntersect {
 ### BWA Alignments are 1-based
 	my ($viralData, $humanData, $key, $thresh) = @_;
 
-	my ($vStart, $vStop, $vOri, $seq, $vDir, $vCig, $vSec, $vSup) = (split("\t",$viralData))[3,4,5,6,7,8,-2,-1];
-	my ($hStart, $hStop, $hOri, $hDir, $hCig, $hSec, $hSup)       = (split("\t",$humanData))[3,4,5,7,8,-2,-1];
+	my ($vRef, $vStart, $vStop, $vOri, $seq, $vDir, $vCig, $vSec, $vSup) = (split("\t",$viralData))[0,3,4,5,6,7,8,-2,-1];
+	my ($hRef, $hStart, $hStop, $hOri, $hDir, $hCig, $hSec, $hSup)       = (split("\t",$humanData))[0,3,4,5,7,8,-2,-1];
 
 	if	((($vOri eq $hOri) and ($vDir eq $hDir)) or( ($vOri ne $hOri) and ($vDir ne $hDir))) { return; } # in some cases the same part of the read may be clippeed 
 	### CIGAR strings are always reported relative to the strand
@@ -248,11 +248,11 @@ sub collectIntersect {
 	
 	my $isVecRearrange;
 	if ((join(";", $vSup, $vSec)) eq "NA;NA") { $isVecRearrange = "no"; }
-	else { $isVecRearrange = (isRearrange($vCig, $vDir, (join(";", $vSup, $vSec)), $seq, $thresh))[0];}
-	 
+	else { $isVecRearrange = (isRearrange($vCig, $vDir, $vRef, $vStart, (join(";", $vSup, $vSec)), $seq, $thresh))[0];}
+
 	my $isHumRearrange;
 	if ((join(";", $hSup, $hSec)) eq "NA;NA") { $isHumRearrange = "no"; }
-	else { $isHumRearrange = (isRearrange($hCig, $hDir, (join(";", $hSup, $hSec)), $seq, $thresh))[0];}
+	else { $isHumRearrange = (isRearrange($hCig, $hDir, $hRef, $hStart, (join(";", $hSup, $hSec)), $seq, $thresh))[0];}
 	
 	#check to see if location of human alignment is ambiguous: multiple equivalent alignments accounting for human part of read
 	my $isHumAmbig;
