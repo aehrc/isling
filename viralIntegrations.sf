@@ -149,7 +149,7 @@ rule run_int_scripts:
 		perl -I . ./softClip.pl --viral {input.vSing} --human {input.hSing} --output {output.soft} --cutoff 10
 		perl -I . ./discordant.pl --viral {input.vPaired} --human {input.hPaired} --output {output.discord} --cutoff 10
 		awk 'FNR==1 && NR!=1 {{ getline; }} {{ print $0; }}' {output.soft} {output.discord} > {output.allInt}
-		sed -i 's\chr\\g' {output.allInt}
+		sed -i 's\chr\ \g' {output.allInt}
 		sort -n -k1,1 -k2,2 {output.allInt} > {output.allIntTemp}
 		cp {output.allIntTemp} {output.allInt}
 		"""
@@ -176,7 +176,7 @@ rule count_mapped:
 		expand("../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.bam", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS),
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES)
 	output:
-		temp("../out/summary/count_mapped.txt")
+		"../out/summary/count_mapped.txt"
 	conda: 
 		"envs/bwa.yml"
 	shell:
