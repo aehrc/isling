@@ -5,9 +5,10 @@ import os
 
 #### CONFIG FILE ####
 #which datasets are to be aligned to which hosts and viruses are specified in dsets.yaml
+#also whether or not to try to merge R1 and R2
 configfile: "dsets.yaml"
 
-#this is of the form { dset1: {host: host1, virus: host2}, dset2: {host: host2, virus: virus2} }
+#this is of the form { dset1: {host: host1, virus: host2, merge: True}, dset2: {host: host2, virus: virus2, merge: False} }
 
 #make four lists, with each entry in each list corresponding to one desired output file
 
@@ -15,6 +16,8 @@ DATASETS = []
 SAMPLES = []
 HOSTS = []
 VIRUSES = []
+#also make dictionary MERGE, with key dataset_sample and value True or False
+MERGE = {}
 
 for dataset in config:
 	#get files in directory and strip off "_1.fastq.gz"
@@ -24,6 +27,7 @@ for dataset in config:
 		SAMPLES.append(sample)
 		HOSTS.append(config[dataset]["host"])
 		VIRUSES.append(config[dataset]["virus"])
+		MERGE["{}_{}".format(dataset, sample)] = config[dataset]["merge"]
 
 #### target files ####
 rule all:
@@ -33,15 +37,18 @@ rule all:
 		
 
 #### merging ###
-rule merge_reads:
+
+
+
+rule seqPrep:
 	input:
 		r1 = "../data/{dset}/reads/{samp}_1.fastq.gz",
 		r2 = "../data/{dset}/reads/{samp}_2.fastq.gz"	
 	output:
-		merged = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.merged.fastq.gz",
-		proc_r1 = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.R1.fastq.gz",
-		proc_r2 = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.R2.fastq.gz",
-		all = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.fastq.gz"
+		merged = "../out/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz",
+		proc_r1 = "../out/{dset}/merged_reads/{samp}.SeqPrep_R1.fastq.gz",
+		proc_r2 = "../out/{dset}/merged_reads/{samp}.SeqPrep_R2.fastq.gz",
+		all = "../out/{dset}/merged_reads/{samp}.all.fastq.gz"
 	conda:	
 		"envs/seqprep.yml"
 	shell:
@@ -50,7 +57,50 @@ rule merge_reads:
 		cat {output.proc_r1} {output.proc_r2} {output.merged} > {output.all}
 		"""
 
+rule combine:
+	input:
+		r1 = "../data/{dset}/reads/{samp}_1.fastq.gz",
+		r2 = "../data/{dset}/reads/{samp}_2.fastq.gz"	
+	output:
+		proc_r1 = "../out/{dset}/combined_reads/{samp}.R1.fastq.gz",
+		proc_r2 = "../out/{dset}/combined_reads/{samp}.R2.fastq.gz",
+		all = "../out/{dset}/combined_reads/{samp}.all.fastq.gz"
+	shell:
+		"""
+		cp {input.r1} {output.proc_r1}
+		cp {input.r2} {output.proc_r2}
+		cat {input.r1} {input.r2} > {output.all}
+		"""
+
+
 #### alignments ####
+
+#functions for if we did seqPrep or not
+
+def get_all(wildcards):
+	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
+		folder = "merged_reads"
+	else:
+		folder = "combined_reads"
+	return "../out/{}/{}/{}.all.fastq.gz".format(wildcards.dset, folder, wildcards.samp)
+
+def get_r1(wildcards):
+	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
+		typeRead = "seqPrep_R1"
+		folder = "merged_reads"
+	else:
+		typeRead = "R1"	
+		folder = "combined_reads"
+	return "../out/{}/{}/{}.{}.fastq.gz".format(wildcards.dset, folder, wildcards.samp, typeRead)
+
+def get_r2(wildcards):
+	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
+		typeRead = "seqPrep_R2"
+		folder = "merged_reads"
+	else:
+		typeRead = "R2"	
+		folder = "combined_reads"
+	return "../out/{}/{}/{}.{}.fastq.gz".format(wildcards.dset, folder, wildcards.samp, typeRead)
 
 rule index:
 	input:
@@ -66,16 +116,17 @@ rule index:
 	shell:
 		"bwa index -p ../references/{wildcards.genome} {input}"
 
+
 rule align_bwa_host:
-	input:
-		proc_r1 = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.R1.fastq.gz",
-		proc_r2 = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.R2.fastq.gz",
-		all = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.fastq.gz",
+	input:	
 		ann = "../references/{host}.ann",
 		amb = "../references/{host}.amb",
 		bwt = "../references/{host}.bwt",
 		pac = "../references/{host}.pac",
-		sa = "../references/{host}.sa"
+		sa = "../references/{host}.sa",
+		all = get_all,
+		proc_r1 = get_r1,
+		proc_r2 = get_r2
 	output:
 		hPaired = temp("../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.sam"),
 		hSing = temp("../out/{dset}/host_aligned/{samp}.{host}.bwa.sam")
@@ -88,19 +139,16 @@ rule align_bwa_host:
 		python ./alignReadsWithBWA.py --threads {threads} --index ../references/{wildcards.host} --read1 {input.all} --output {output.hSing} --threshold 10 --hflag 200
 		"""
 
-
-
-
 rule align_bwa_virus:
 	input:
-		proc_r1 = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.R1.fastq.gz",
-		proc_r2 = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.R2.fastq.gz",
-		all = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.fastq.gz",
 		ann = "../references/{virus}.ann",
 		amb = "../references/{virus}.amb",
 		bwt = "../references/{virus}.bwt",
 		pac = "../references/{virus}.pac",
-		sa = "../references/{virus}.sa"
+		sa = "../references/{virus}.sa",
+		all = get_all,
+		proc_r1 = get_r1,
+		proc_r2 = get_r2
 	output:
 		vPaired = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam"),
 		vSing = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam")
