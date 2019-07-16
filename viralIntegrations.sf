@@ -30,8 +30,8 @@ for dataset in config:
 
 rule all:
 	input: 
-		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES),
-		"../out/summary/count_mapped.xlsx"
+		"../out/summary/count_mapped.xlsx",
+		"../out/summary/num_sites.xlsx"
 		
 
 #### merging ###
@@ -91,6 +91,8 @@ rule align_bwa_host:
 		python ./alignReadsWithBWA.py --threads {threads} --index ../references/{wildcards.host} --read1 {input.proc_r1} --read2 {input.proc_r2} --output {output.hPaired} --threshold 10 --hflag 200
 		python ./alignReadsWithBWA.py --threads {threads} --index ../references/{wildcards.host} --read1 {input.all} --output {output.hSing} --threshold 10 --hflag 200
 		"""
+
+
 
 
 rule align_bwa_virus:
@@ -192,3 +194,12 @@ rule plot_mapped:
 	script:
 		"count_reads.R"
 	
+rule summarise:
+	input: 
+		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES) 
+	output:
+		"../out/summary/num_sites.xlsx"
+	script:
+		"summarise_ints.R"
+
+		
