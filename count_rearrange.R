@@ -1,10 +1,16 @@
 #### Packages ####
-library(tidyverse)
+library(stringr)
+library(dplyr)
+library(ggplot2)
+library(purrr)
+library(tidyr)
+library(readr)
+library(writexl)
 
 #import data
 
-data_path = "../data/"
-out_path = "../out/"
+data_path = "../out/"
+out_path = "../out/summary/rearrange/"
 refiles <- list.files(path = data_path, recursive = TRUE, pattern = "rearrange.txt")
 
 #remove empty files
@@ -35,9 +41,10 @@ rearrange <- rearrange %>%
 
 
 #make summary table of number of vector rearrangements
-rearrange %>% 
+suumary <- rearrange %>% 
   group_by(possibleVecRearrange, dataset) %>% 
-  count()
+  count() %>%
+  write_xlsx(path = paste0(out_path, "num_rearrange.xlsx", sep = ""))
 
 #make pie chart of possible vector rearrange
 colns <- c("no_gaps","possibleVecRearrange")
@@ -57,7 +64,7 @@ for (i in colns) {
     theme_void() +
     theme(legend.position = "bottom") + 
     facet_wrap(vars(dataset))
-  ggsave(paste0(out_path, "rearrange_",gsub(" ", "", i), ".pdf", sep = ""))
+  ggsave(paste0(out_path, "rearrange_", i, ".pdf", sep = ""))
 
 } #end of loop over columns
   
@@ -78,8 +85,7 @@ colns <- c("virus", "start", "stop", "rearrange", "ID", "seq")
 bed <- data_frame(filename = bedfiles) %>% # create a data frame holding the file names
   mutate(integrations = map(filename, ~ read_tsv(file.path(data_path, .), 
                                                  na = c("", "NA", "?"),
-                                                 col_names = colns,
-                                                 col_types = cols(Chr = col_character(), .default =col_guess())))) %>% 
+                                                 col_names = colns))) %>% 
   unnest()
 
 #calculate midpoint of bed
