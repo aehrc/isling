@@ -1,11 +1,5 @@
 {
-"AGRF_CAGRF17513_BM3BC" : {"host" : "hg38", "virus" : "AAV_genomes"},
-"AGRF_CAGRF18349_BM3BC" : {"host" : "hg38", "virus" : "AAV_genomes"},
-"AGRF_CAGRF20923_CKP69" : {"host" : "hg38", "virus" : "AAV_genomes"},
-"FRG_OTC"		: {"host" : "hg38", "virus" : "pAAV2-OTC"},
-"OTC_vec_background" 	: {"host" : "hg38", "virus" : "AAV_genomes"},
-"mouse_with_OTC"	: {"host" : "hg38", "virus" : "pAAV2-OTC"},
-"mouse_with_OTC"	: {"host" : "mouse","virus" : "pAAV2-OTC"}
+"PRJNA485509" : {"host" : "hg38", "virus" : "Nelson2016AAVs"}
 }
 
 
