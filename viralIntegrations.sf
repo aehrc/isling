@@ -17,8 +17,8 @@ HOSTS = []
 VIRUSES = []
 
 for dataset in config:
-	#get files in directory and strip off "_R1.fastq.gz"
-	samples = [os.path.basename(f)[:-12] for f in glob.glob("../data/{}/reads/*_R1.fastq.gz".format(dataset))]
+	#get files in directory and strip off "_1.fastq.gz"
+	samples = [os.path.basename(f)[:-11] for f in glob.glob("../data/{}/reads/*_1.fastq.gz".format(dataset))]
 	for sample in samples:
 		DATASETS.append(dataset)
 		SAMPLES.append(sample)
@@ -26,8 +26,6 @@ for dataset in config:
 		VIRUSES.append(config[dataset]["virus"])
 
 #### target files ####
-
-
 rule all:
 	input: 
 		"../out/summary/count_mapped.xlsx",
@@ -35,12 +33,10 @@ rule all:
 		
 
 #### merging ###
-
-
 rule merge_reads:
 	input:
-		r1 = "../data/{dset}/reads/{samp}_R1.fastq.gz",
-		r2 = "../data/{dset}/reads/{samp}_R2.fastq.gz"	
+		r1 = "../data/{dset}/reads/{samp}_1.fastq.gz",
+		r2 = "../data/{dset}/reads/{samp}_2.fastq.gz"	
 	output:
 		merged = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.merged.fastq.gz",
 		proc_r1 = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.R1.fastq.gz",
