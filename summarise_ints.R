@@ -8,6 +8,7 @@ library(purrr)
 library(tidyr)
 library(readr)
 library(writexl)
+library(circlize)
  
 #### import data ####
 data_path = "../out/"
@@ -45,8 +46,6 @@ data <- data %>%
                                       PossibleHostTranslocation == "yes", "yes", "no")) %>% 
   mutate(has_locAmbig = ifelse( HostPossibleAmbiguous == "yes" |
                                   ViralPossibleAmbiguous == "yes", 'yes', 'no'))
-
-
 
 #discard PCR duplicates: filter for unique read sequences (merged for softClip, R1+R2 for discordant)
 data <- data %>% 
@@ -87,9 +86,11 @@ data %>%
 #write excel spreadsheets for each dataset with one sheet for each sample
 for (i in unique(data$dataset)) {
   toWrite <- list()
-  for (j in unique(data$sample)) {
-    toWrite[[j]] <-data  %>% 
-      filter(str_detect(sample, j))
+  data_filt <- data %>% 
+    filter(dataset == i)
+  for (j in unique(data_filt$sample)) {
+    toWrite[[j]] <- data_filt  %>% 
+      filter(sample == j)
   }
   write_xlsx(toWrite, path = paste(out_path, i, ".xlsx", sep = ""))
 }
@@ -121,4 +122,66 @@ for (i in colns) {
   ggsave(paste0(out_path, "pie_",gsub(" ", "", i), ".pdf", sep = ""))
 }
 
+
+#make circos plots for all datasets
+datasets <- unique(data$dataset)
+for (i in datasets) {
+  
+  #get host for this dataset
+  host <- data %>% 
+    filter(str_detect(dataset, i)) %>% 
+    select(host) %>% 
+    unique()
+  
+  #get chromosomes for host
+  chroms <- if (str_detect(host, "hg38")) {paste0("chr", c(1:22, "X", "Y"))} else {paste0("chr", c(1:20, "X", "Y"))}
+  
+  #make bed file of data with no issues
+  bed_noissues <- data %>% 
+    filter(str_detect(dataset, i)) %>% 
+    filter(has_issue == "no") %>% 
+    select(Chr:IntStop) %>%
+    mutate(Chr = paste0("chr", Chr)) %>% 
+    filter(str_detect(Chr, paste(chroms, collapse = "|"))) %>% 
+    as.data.frame()
+  
+  #make bed file of data with issues
+  bed_issues <- data %>% 
+    filter(str_detect(dataset, i)) %>% 
+    filter(has_issue == "yes") %>% 
+    select(Chr:IntStop) %>%
+    mutate(Chr = paste0("chr", Chr)) %>% 
+    filter(str_detect(Chr, paste(chroms, collapse = "|"))) %>% 
+    as.data.frame()
+  
+  #make bed file of all data
+  bed <- data %>% 
+    filter(str_detect(dataset, i)) %>% 
+    select(Chr:IntStop) %>%
+    mutate(Chr = paste0("chr", Chr)) %>% 
+    filter(str_detect(Chr, paste(chroms, collapse = "|"))) %>% 
+    as.data.frame()
+  
+  #make plot of all data
+  pdf(paste0(out_path, "hostCircos_", i, "_density_all.pdf", sep = ""))
+  if (str_detect(host, "hg38")) {circos.initializeWithIdeogram(species = host, 
+                                                               chromosome.index = chroms)} else {circos.initializeWithIdeogram(species = host)}
+  circos.genomicRainfall(bed, track.height = 0.2)
+  circos.genomicDensity(bed, track.height = 0.1)
+  dev.off()
+  circos.clear()
+  
+  #make plot of data with no issues
+  bed_list2 = list(bed_issues, bed_noissues)
+  pdf(paste0(out_path, "hostCircos_", i, "_density_issues.pdf", sep = ""))
+  if (str_detect(host, "hg38")) {circos.initializeWithIdeogram(species = host, 
+                                                               chromosome.index = chroms)}
+  else {circos.initializeWithIdeogram(species = host)}
+  circos.genomicRainfall(bed_list2, col = c("#00BFC4", "#F8766D"), track.height = 0.2)
+  circos.genomicDensity(bed_issues, col = c("#00BFC4"), track.height = 0.1)
+  circos.genomicDensity(bed_noissues, col = c("#F8766D"), track.height = 0.1)
+  dev.off()
+  circos.clear()
+  
+}
 

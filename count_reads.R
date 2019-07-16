@@ -28,11 +28,11 @@ types <- unique(aligns$align_type)
 for (j in types) {
 	for (i in dsets) {
 		aligns %>%
-		filter(str_detect(align_type, j)) %>%
-  		filter(str_detect(dataset, i)) %>% 
+		filter(align_type == j) %>%
+  		filter(dataset == i) %>% 
   		gather(key = "type", value = "number", mapped, unmapped) %>%
   		group_by(type, dataset, aligned_to) %>% 
-  		ggplot(aes(x = sample, y = number, fill = type)) +
+  		ggplot(aes(x = sample_short, y = number, fill = type)) +
   		geom_bar(stat = "identity", position = "dodge") +
   		theme(axis.text.x=element_text(angle=90, hjust=1)) +
   		facet_wrap(~ aligned_to)
@@ -45,7 +45,8 @@ for (i in unique(aligns$dataset)) {
   toWrite <- list()
   for (j in unique(aligns$align_type)) {
     toWrite[[j]] <-aligns  %>% 
-      filter(str_detect(align_type, j))
+      filter(align_type == j) %>% 
+      filter(dataset == i)
   }
   write_xlsx(toWrite, path = paste0(data_path, "summary/aligns_", i, ".xlsx", sep=""))
   
