@@ -36,7 +36,7 @@ rule all:
 		"../out/summary/num_sites.xlsx"
 		
 
-#### merging ###
+#### merging and dedup ###
 
 
 
@@ -72,9 +72,6 @@ rule combine:
 		cat {input.r1} {input.r2} > {output.all}
 		"""
 
-
-#### alignments ####
-
 #functions for if we did seqPrep or not
 
 def get_all(wildcards):
@@ -102,6 +99,27 @@ def get_r2(wildcards):
 		folder = "combined_reads"
 	return "../out/{}/{}/{}.{}.fastq.gz".format(wildcards.dset, folder, wildcards.samp, typeRead)
 
+
+rule dedup:
+	input:
+		all = get_all,
+		proc_r1 = get_r1,
+		proc_r2 = get_r2
+	output:
+		all_clumped = "../out/{dset}/dedup_reads/{samp}.all.fastq.gz",
+		R1_clumped = "../out/{dset}/dedup_reads/{samp}.R1.fastq.gz",
+		R2_clumped = "../out/{dset}/dedup_reads/{samp}.R2.fastq.gz"
+	conda:
+		"envs/bbmap.yml"
+	shell:
+		"""
+		clumpify.sh in={input.all} out={output.all_clumped} dedupe
+		clumpify.sh in={input.proc_r1} in2={input.proc_r2} out={output.R1_clumped} out2={output.R2_clumped} dedupe
+		"""
+
+
+#### alignments ####
+
 rule index:
 	input:
 		"../references/{genome}.fa"
@@ -124,9 +142,10 @@ rule align_bwa_host:
 		bwt = "../references/{host}.bwt",
 		pac = "../references/{host}.pac",
 		sa = "../references/{host}.sa",
-		all = get_all,
-		proc_r1 = get_r1,
-		proc_r2 = get_r2
+		all = "../out/{dset}/dedup_reads/{samp}.all.fastq.gz",
+		r1 = "../out/{dset}/dedup_reads/{samp}.R1.fastq.gz",
+		r2 = "../out/{dset}/dedup_reads/{samp}.R2.fastq.gz"
+
 	output:
 		hPaired = temp("../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.sam"),
 		hSing = temp("../out/{dset}/host_aligned/{samp}.{host}.bwa.sam")
@@ -135,7 +154,7 @@ rule align_bwa_host:
 	threads: 5
 	shell:		
 		"""
-		python ./alignReadsWithBWA.py --threads {threads} --index ../references/{wildcards.host} --read1 {input.proc_r1} --read2 {input.proc_r2} --output {output.hPaired} --threshold 10 --hflag 200
+		python ./alignReadsWithBWA.py --threads {threads} --index ../references/{wildcards.host} --read1 {input.r1} --read2 {input.r2} --output {output.hPaired} --threshold 10 --hflag 200
 		python ./alignReadsWithBWA.py --threads {threads} --index ../references/{wildcards.host} --read1 {input.all} --output {output.hSing} --threshold 10 --hflag 200
 		"""
 
@@ -146,9 +165,9 @@ rule align_bwa_virus:
 		bwt = "../references/{virus}.bwt",
 		pac = "../references/{virus}.pac",
 		sa = "../references/{virus}.sa",
-		all = get_all,
-		proc_r1 = get_r1,
-		proc_r2 = get_r2
+		all = "../out/{dset}/dedup_reads/{samp}.all.fastq.gz",
+		r1 = "../out/{dset}/dedup_reads/{samp}.R1.fastq.gz",
+		r2 = "../out/{dset}/dedup_reads/{samp}.R2.fastq.gz" 
 	output:
 		vPaired = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam"),
 		vSing = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam")
@@ -157,7 +176,7 @@ rule align_bwa_virus:
 	threads: 5
 	shell:	
 		"""
-		python ./alignReadsWithBWA.py --threads {threads} --index ../references/{wildcards.virus} --read1 {input.proc_r1} --read2 {input.proc_r2} --output {output.vPaired} --threshold 10 --hflag 200
+		python ./alignReadsWithBWA.py --threads {threads} --index ../references/{wildcards.virus} --read1 {input.r1} --read2 {input.r2} --output {output.vPaired} --threshold 10 --hflag 200
 		python ./alignReadsWithBWA.py --threads {threads} --index ../references/{wildcards.virus} --read1 {input.all} --output {output.vSing} --threshold 10 --hflag 200
 		"""
 
