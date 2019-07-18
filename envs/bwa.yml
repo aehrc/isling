@@ -3,6 +3,7 @@ channels:
   - bioconda
   - r
   - defaults
+  - conda-forge
 dependencies:
   - _libgcc_mutex=0.1=main
   - bwa=0.7.17=h84994c4_5
@@ -31,5 +32,5 @@ dependencies:
   - wheel=0.33.4=py37_0
   - xz=5.2.4=h14c3975_4
   - zlib=1.2.11=h7b6447c_3
-prefix: /home/sco305/Software/miniconda2/envs/bwa
+prefix: /scratch1/sco305/conda/miniconda/envs/bwa
 

@@ -109,7 +109,7 @@ dependencies:
   - smmap2=2.0.5=py36_0
   - snakemake=5.5.3=0
   - snakemake-minimal=5.5.3=py_0
-  - sqlite=3.28.0=h7b6447c_0
+  - sqlite=3.29.0=h7b6447c_0
   - tk=8.6.8=hbc83047_0
   - urllib3=1.24.2=py36_0
   - wheel=0.33.4=py36_0
@@ -120,5 +120,5 @@ dependencies:
   - yarl=1.3.0=py36h7b6447c_0
   - zlib=1.2.11=h7b6447c_3
   - zstd=1.3.7=h0b5b093_0
-prefix: /home/sco305/Software/miniconda2/envs/snakemake
+prefix: /scratch1/sco305/conda/miniconda/envs/snakemake
 
