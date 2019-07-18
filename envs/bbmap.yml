@@ -1,0 +1,13 @@
+name: bbmap
+channels:
+  - bioconda
+  - r
+  - defaults
+  - conda-forge
+dependencies:
+  - _libgcc_mutex=0.1=main
+  - bbmap=38.57=h14c3975_0
+  - libgcc-ng=9.1.0=hdf63c60_0
+  - openjdk=8.0.152=h46b5887_1
+prefix: /home/sco305/Software/miniconda2/envs/bbmap
+
