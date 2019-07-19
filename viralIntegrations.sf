@@ -33,12 +33,11 @@ for dataset in config:
 rule all:
 	input: 
 		"../out/summary/count_mapped.xlsx",
-		"../out/summary/num_sites.xlsx"
+		"../out/summary/num_sites.xlsx",
+		expand("../out/{dset}/ints/{samp}.{host}.{virus}.soft.merged.bed", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES)
 		
 
 #### merging and dedup ###
-
-
 
 rule seqPrep:
 	input:
@@ -207,12 +206,16 @@ rule run_int_scripts:
 		allInt = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
 		soft = temp("../out/{dset}/ints/{samp}.{host}.{virus}.soft.txt"),
 		discord = temp("../out/{dset}/ints/{samp}.{host}.{virus}.discordant.txt"),
-		allIntTemp = temp("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp")
+		allIntTemp = temp("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp"),
+		softBed = "../out/{dset}/ints/{samp}.{host}.{virus}.soft.bed",
+		mergedBed = "../out/{dset}/ints/{samp}.{host}.{virus}.soft.merged.bed"
+	conda:
+		"envs/bedtools.yml"
 
 	shell:
 		"""
-		perl -I . ./softClip.pl --viral {input.vSing} --human {input.hSing} --output {output.soft} --cutoff 10
-		perl -I . ./discordant.pl --viral {input.vPaired} --human {input.hPaired} --output {output.discord} --cutoff 10
+		perl -I . ./softClip.pl --viral {input.vSing} --human {input.hSing} --output {output.soft} --bed {output.softBed} --merged {output.mergedBed}
+		perl -I . ./discordant.pl --viral {input.vPaired} --human {input.hPaired} --output {output.discord} 
 		awk 'FNR==1 && NR!=1 {{ getline; }} {{ print $0; }}' {output.soft} {output.discord} > {output.allInt}
 		sed -i 's\chr\ \g' {output.allInt}
 		sort -n -k1,1 -k2,2 {output.allInt} > {output.allIntTemp}
