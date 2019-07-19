@@ -134,29 +134,6 @@ rule index:
 		"bwa index -p ../data/references/{wildcards.genome} {input}"
 
 
-rule align_bwa_host:
-	input:	
-		ann = "../data/references/{host}.ann",
-		amb = "../data/references/{host}.amb",
-		bwt = "../data/references/{host}.bwt",
-		pac = "../data/references/{host}.pac",
-		sa = "../data/references/{host}.sa",
-		all = "../out/{dset}/dedup_reads/{samp}.all.fastq.gz",
-		r1 = "../out/{dset}/dedup_reads/{samp}.R1.fastq.gz",
-		r2 = "../out/{dset}/dedup_reads/{samp}.R2.fastq.gz"
-
-	output:
-		hPaired = temp("../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.sam"),
-		hSing = temp("../out/{dset}/host_aligned/{samp}.{host}.bwa.sam")
-	conda: 
-		"envs/bwa.yml"
-	threads: 5
-	shell:		
-		"""
-		python ./alignReadsWithBWA.py --threads {threads} --index ../references/{wildcards.host} --read1 {input.r1} --read2 {input.r2} --output {output.hPaired} --threshold 10 --hflag 200
-		python ./alignReadsWithBWA.py --threads {threads} --index ../references/{wildcards.host} --read1 {input.all} --output {output.hSing} --threshold 10 --hflag 200
-		"""
-
 rule align_bwa_virus:
 	input:
 		ann = "../references/{virus}.ann",
@@ -189,8 +166,68 @@ rule convert:
 		"envs/bwa.yml"	
 	shell:
 		"""
-		samtools view -bS {input} | samtools sort - -o {output.bam}
+		samtools view -bhS {input} | samtools sort - -o {output.bam}
 		samtools index {output.bam}
+		"""
+
+rule extract_vAligned:
+	input:
+		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.bam",
+		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.bam"
+	output:
+		svSam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam",
+		pvBam_readMap_mateUnmap = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped1.bam",
+		pvBam_readUnmap_mateMap = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped2.bam",
+		pvBam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.bam",
+		pvSam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.bam"
+	conda:
+		"envs/bwa.yml"
+	shell:
+		"""
+		samtools view -h -F 0x4 -F 0x800 -o {output.svSam} {input.vSing} 
+		samtools view -hb -F 0x4 -f 0x8 -F 0x800 -o {output.pvBam_readMap_mateUnmap} {input.vPaired}
+		samtools view -hb -f 0x4 -F 0x8 -F 0x800 -o {output.pvBam_readUnmap_mateMap} {input.vPaired}
+		samtools merge {output.pvBam} {output.pvBam_readMap_mateUnmap} {output.pvBam_readUnmap_mateMap}
+		samtools view -h -o {output.pvSam} {output.pvBam}
+		"""
+
+rule extract_vAligedtoFastq:
+	input: 
+		svBam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.bam",
+		pvBam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.bam"
+	output:
+		svFastq = "../out/{dset}/reads/{samp}.bwa.mappedTo{virus}.fastq.gz",
+		pvFastq1 = "../out/{dset}/reads/{samp}.bwaPaired.mappedTo{virus}_1.fastq.gz",
+		pvFastq2 = "../out/{dset}/reads/{samp}.bwaPaired.mappedTo{virus}_2.fastq.gz"
+	conda:
+		"envs/picard.yml"
+	shell:
+		"""
+		java -jar picard.jar SamToFastq I={input.svBam} FASTQ={output.svFastq}
+		java -jar picard.jar SamToFastq I={input.pvBam} FASTQ={output.pvFastq1} SECOND_END_FASTQ={output.pvFastq2}
+		"""
+
+rule align_bwa_host:
+	input:	
+		ann = "../data/references/{host}.ann",
+		amb = "../data/references/{host}.amb",
+		bwt = "../data/references/{host}.bwt",
+		pac = "../data/references/{host}.pac",
+		sa = "../data/references/{host}.sa",
+		all = "../out/{dset}/reads/{samp}.bwa.mappedTo{virus}.fastq.gz",
+		r1 = "../out/{dset}/reads/{samp}.bwaPaired.mappedTo{virus}_1.fastq.gz",
+		r2 = "../out/{dset}/reads/{samp}.bwaPaired.mappedTo{virus}_2.fastq.gz"
+
+	output:
+		hPaired = temp("../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.sam"),
+		hSing = temp("../out/{dset}/host_aligned/{samp}.{host}.bwa.sam")
+	conda: 
+		"envs/bwa.yml"
+	threads: 5
+	shell:		
+		"""
+		python ./alignReadsWithBWA.py --threads {threads} --index ../references/{wildcards.host} --read1 {input.r1} --read2 {input.r2} --output {output.hPaired} --threshold 10 --hflag 200
+		python ./alignReadsWithBWA.py --threads {threads} --index ../references/{wildcards.host} --read1 {input.all} --output {output.hSing} --threshold 10 --hflag 200
 		"""
 
 
@@ -200,8 +237,8 @@ rule run_int_scripts:
 	input:
 		hPaired = "../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.sam",
 		hSing = "../out/{dset}/host_aligned/{samp}.{host}.bwa.sam",
-		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam",
-		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam"
+		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam",
+		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam"
 	output:
 		allInt = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
 		soft = temp("../out/{dset}/ints/{samp}.{host}.{virus}.soft.txt"),
@@ -222,8 +259,6 @@ rule run_int_scripts:
 		cp {output.allIntTemp} {output.allInt}
 		"""
 		
-
-
 rule run_rearrange_scripts:
 	input:
 		"../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam"
