@@ -25,7 +25,6 @@ files <- files[isnotempty]
 data <- data_frame(filename = files) %>% # create a data frame holding the file names
   mutate(integrations = map(filename, ~ read_tsv(file.path(data_path, .), 
 						na = c("", "NA", "?"),
-						skip = 1, 
 						col_types = cols(Chr = col_character(), NoAmbiguousBases = col_integer(), .default =col_guess())))) %>% 
   unnest()
 
