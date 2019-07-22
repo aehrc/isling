@@ -157,13 +157,23 @@ foreach my $key (keys %viralR1) {
 	if (defined $outLine) { push(@outLines, join("\t", ($outLine, $key, $combReads))); }
 }
 
-unless (@outLines) { print "No discordant read-pairs were detected\n"; } # if no integration events detected, finish
+
 
 if ($verbose) { print "Writing output...\n"; }
-printOutput($output, @outLines);
-#if ($bed)    { printBed($bed, @outLines); }
 
-#if ($merged) { printMerged($bed, $merged); }
+if (@outLines) { printOutput($output, @outLines);} #if detected integration sites, write to outfile
+else { 
+	print "No discordant read-pairs were detected\n"; 
+	open (OUTFILE, ">$output") || die "Could not open output file: $output\n";
+	close OUTFILE;
+} # if no integration events detected, make empty file
+
+
+
+
+if ($bed)    { printBed($bed, @outLines); }
+
+if ($merged) { printMerged($bed, $merged); }
 
 exit;
 
