@@ -115,8 +115,8 @@ rule dedup:
 		"envs/bbmap.yml"
 	shell:
 		"""
-		clumpify.sh in={input.all} out={output.all_clumped} dedupe
-		clumpify.sh in={input.proc_r1} in2={input.proc_r2} out={output.R1_clumped} out2={output.R2_clumped} dedupe
+		clumpify.sh -Xmx5g in={input.all} out={output.all_clumped} dedupe
+		clumpify.sh -Xmx5g in={input.proc_r1} in2={input.proc_r2} out={output.R1_clumped} out2={output.R2_clumped} dedupe
 		"""
 
 
