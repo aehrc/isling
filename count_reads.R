@@ -16,9 +16,9 @@ aligns <- read_tsv("../out/summary/count_mapped.txt")
 #add extra columns
 aligns <- aligns %>% 
   mutate(total = mapped + unmapped) %>%
-  mutate(sample_short = str_match(aligns$sample, "([[:alnum:]-_]+)\\.[[:alnum:]-_]+\\.[:alpha:]+\\.bam")[,2]) %>% 
-  mutate(aligned_to = str_match(aligns$sample, "[[:alnum:]-_]+\\.([[:alnum:]-_]+)\\.[:alpha:]+\\.bam")[,2]) %>% 
-  mutate(align_type = str_match(aligns$sample, "[[:alnum:]-_]+\\.[[:alnum:]-_]+\\.([:alpha:]+)\\.bam")[,2])
+  mutate(sample_short = str_match(aligns$sample, "^([[:alnum:]-_]+)\\.[[:alnum:]-_]+\\.[:alpha:]+\\.[[:alnum:]-_]+\\.bam")[,2]) %>% 
+  mutate(aligned_to = str_match(aligns$sample, "^[[:alnum:]-_]+\\.([[:alnum:]-_]+)\\.[:alpha:]+\\.[[:alnum:]-_]+\\.bam")[,2]) %>% 
+  mutate(align_type = str_match(aligns$sample, "^[[:alnum:]-_]+\\.[[:alnum:]-_]+\\.([:alpha:]+)\\.[[:alnum:]-_]+\\.bam")[,2])
 
 write_xlsx(aligns, path = paste0(data_path, "summary/count_mapped.xlsx"))
 
