@@ -29,6 +29,9 @@ for dataset in config:
 		VIRUSES.append(config[dataset]["virus"])
 		MERGE["{}_{}".format(dataset, sample)] = config[dataset]["merge"]
 
+#### local rules ####
+localrules: all, combine, run_int_scripts
+
 #### target files ####
 rule all:
 	input: 
@@ -58,8 +61,8 @@ rule seqPrep:
 
 rule combine:
 	input:
-		r1 = "../data/{dset}/reads/{samp}_1.fastq.gz",
-		r2 = "../data/{dset}/reads/{samp}_2.fastq.gz"	
+		r1 = "../data/reads/{dset}/{samp}_1.fastq.gz",
+		r2 = "../data/reads/{dset}/{samp}_2.fastq.gz"
 	output:
 		proc_r1 = "../out/{dset}/combined_reads/{samp}.R1.fastq.gz",
 		proc_r2 = "../out/{dset}/combined_reads/{samp}.R2.fastq.gz",
@@ -136,11 +139,11 @@ rule index:
 
 rule align_bwa_virus:
 	input:
-		ann = "../references/{virus}.ann",
-		amb = "../references/{virus}.amb",
-		bwt = "../references/{virus}.bwt",
-		pac = "../references/{virus}.pac",
-		sa = "../references/{virus}.sa",
+		ann = "../data/references/{virus}.ann",
+		amb = "../data/references/{virus}.amb",
+		bwt = "../data/references/{virus}.bwt",
+		pac = "../data/references/{virus}.pac",
+		sa = "../data/references/{virus}.sa",
 		all = "../out/{dset}/dedup_reads/{samp}.all.fastq.gz",
 		r1 = "../out/{dset}/dedup_reads/{samp}.R1.fastq.gz",
 		r2 = "../out/{dset}/dedup_reads/{samp}.R2.fastq.gz" 
@@ -156,30 +159,16 @@ rule align_bwa_virus:
 		python ./alignReadsWithBWA.py --threads {threads} --index ../data/references/{wildcards.virus} --read1 {input.all} --output {output.vSing} --threshold 10 --hflag 200
 		"""
 
-rule convert:
-	input:
-		"../out/{dset}/{host_virus}/{samp}.{host_virus_name}.{alignType}.sam"
-	output:
-		bam = "../out/{dset}/{host_virus}/{samp}.{host_virus_name}.{alignType}.bam",
-		bai = "../out/{dset}/{host_virus}/{samp}.{host_virus_name}.{alignType}.bam.bai"
-	conda: 
-		"envs/bwa.yml"	
-	shell:
-		"""
-		samtools view -bhS {input} | samtools sort - -o {output.bam}
-		samtools index {output.bam}
-		"""
-
 rule extract_vAligned:
 	input:
-		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.bam",
-		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.bam"
+		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam",
+		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam"
 	output:
-		svSam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam",
-		pvBam_readMap_mateUnmap = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped1.bam",
-		pvBam_readUnmap_mateMap = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped2.bam",
-		pvBam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.bam",
-		pvSam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam"
+		svSam = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam"),
+		pvBam_readMap_mateUnmap = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped1.bam"),
+		pvBam_readUnmap_mateMap = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped2.bam"),
+		pvBam = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.bam"),
+		pvSam = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam")
 	conda:
 		"envs/bwa.yml"
 	shell:
@@ -193,18 +182,18 @@ rule extract_vAligned:
 
 rule extract_vAligedtoFastq:
 	input: 
-		svBam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.bam",
-		pvBam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.bam"
+		svSam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam",
+		pvSam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam"
 	output:
-		svFastq = "../out/{dset}/reads/{samp}.bwa.mappedTo{virus}.fastq.gz",
-		pvFastq1 = "../out/{dset}/reads/{samp}.bwaPaired.mappedTo{virus}_1.fastq.gz",
-		pvFastq2 = "../out/{dset}/reads/{samp}.bwaPaired.mappedTo{virus}_2.fastq.gz"
+		svFastq = temp("../out/{dset}/reads/{samp}.bwa.mappedTo{virus}.fastq.gz"),
+		pvFastq1 = temp("../out/{dset}/reads/{samp}.bwaPaired.mappedTo{virus}_1.fastq.gz"),
+		pvFastq2 = temp("../out/{dset}/reads/{samp}.bwaPaired.mappedTo{virus}_2.fastq.gz")
 	conda:
 		"envs/picard.yml"
 	shell:
 		"""
-		java -jar picard.jar SamToFastq I={input.svBam} FASTQ={output.svFastq}
-		java -jar picard.jar SamToFastq I={input.pvBam} FASTQ={output.pvFastq1} SECOND_END_FASTQ={output.pvFastq2}
+		picard SamToFastq I={input.svSam} FASTQ={output.svFastq}
+		picard SamToFastq I={input.pvSam} FASTQ={output.pvFastq1} SECOND_END_FASTQ={output.pvFastq2}
 		"""
 
 rule align_bwa_host:
@@ -226,24 +215,41 @@ rule align_bwa_host:
 	threads: 5
 	shell:		
 		"""
-		python ./alignReadsWithBWA.py --threads {threads} --index ../references/{wildcards.host} --read1 {input.r1} --read2 {input.r2} --output {output.hPaired} --threshold 10 --hflag 200
-		python ./alignReadsWithBWA.py --threads {threads} --index ../references/{wildcards.host} --read1 {input.all} --output {output.hSing} --threshold 10 --hflag 200
+		python ./alignReadsWithBWA.py --threads {threads} --index ../data/references/{wildcards.host} --read1 {input.r1} --read2 {input.r2} --output {output.hPaired} --threshold 10 --hflag 200
+		python ./alignReadsWithBWA.py --threads {threads} --index ../data/references/{wildcards.host} --read1 {input.all} --output {output.hSing} --threshold 10 --hflag 200
 		"""
-
+rule convert:
+	input:
+		"../out/{dset}/{host_virus}/{samp}.{host_virus_name}.{alignType}{mapped_type}.sam"
+	output:
+		bam = "../out/{dset}/{host_virus}_bam/{samp}.{host_virus_name}.{alignType}{mapped_type}.bam",
+		bai = "../out/{dset}/{host_virus}_bam/{samp}.{host_virus_name}.{alignType}{mapped_type}.bam.bai"
+	wildcard_constraints:
+		samp = "\w+\d+",
+		host_virus_name = "[\w\d]+",
+		alignType = "bwaPaired|bwa",
+		mapped_type = "|\.[\w\d]+"
+	conda: 
+		"envs/bwa.yml"	
+	shell:
+		"""
+		samtools view -bhS {input} | samtools sort - -o {output.bam}
+		samtools index {output.bam}
+		"""
 
 #### perl scripts ####
 
 rule run_int_scripts:
 	input:
-		hPaired = "../out/{dset}/host_aligned/{samp}.{virus}Mappedreads.{host}.bwaPaired.sam",
-		hSing = "../out/{dset}/host_aligned/{samp}.{virus}Mappedreads.{host}.bwa.sam",
+		hPaired = "../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.{virus}Mappedreads.sam",
+		hSing = "../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.sam",
 		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam",
 		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam"
 	output:
 		allInt = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
-		soft = temp("../out/{dset}/ints/{samp}.{host}.{virus}.soft.txt"),
-		discord = temp("../out/{dset}/ints/{samp}.{host}.{virus}.discordant.txt"),
-		allIntTemp = temp("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp"),
+		soft = "../out/{dset}/ints/{samp}.{host}.{virus}.soft.txt",
+		discord = "../out/{dset}/ints/{samp}.{host}.{virus}.discordant.txt",
+		allIntTemp = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp",
 		softBed = "../out/{dset}/ints/{samp}.{host}.{virus}.soft.bed",
 		mergedBed = "../out/{dset}/ints/{samp}.{host}.{virus}.soft.merged.bed"
 	conda:
@@ -258,26 +264,16 @@ rule run_int_scripts:
 		sort -n -k1,1 -k2,2 {output.allInt} > {output.allIntTemp}
 		cp {output.allIntTemp} {output.allInt}
 		"""
-		
-rule run_rearrange_scripts:
-	input:
-		"../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam"
-	output:
-		txt = "../out/{dset}/rearrange/{samp}.{virus}.rearrange.txt",
-		bed = "../out/{dset}/rearrange/{samp}.{virus}.rearrange.bed"
-	conda: 
-		"envs/bwa.yml"
-	shell:
-		"perl -I . ./checkVecRearrange.pl --viral {input} --output {output.txt} --bed {output.bed}"
+
 
 #### visualization ####
 
 rule count_mapped:
 	input:
-		expand("../out/{dset}/host_aligned/{samp}.{host}.bwa.bam", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS),
-		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES),
-		expand("../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.bam", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS),
-		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES)
+		expand("../out/{dset}/host_aligned_bam/{samp}.{host}.bwa.{virus}Mappedreads.bam", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES),
+		expand("../out/{dset}/virus_aligned_bam/{samp}.{virus}.bwa.mapped.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES),
+		expand("../out/{dset}/host_aligned_bam/{samp}.{host}.bwaPaired.{virus}Mappedreads.bam", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus=VIRUSES),
+		expand("../out/{dset}/virus_aligned_bam/{samp}.{virus}.bwaPaired.mapped.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES)
 	output:
 		"../out/summary/count_mapped.txt"
 	conda: 
