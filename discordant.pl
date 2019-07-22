@@ -161,12 +161,7 @@ foreach my $key (keys %viralR1) {
 
 if ($verbose) { print "Writing output...\n"; }
 
-if (@outLines) { printOutput($output, @outLines);} #if detected integration sites, write to outfile
-else { 
-	print "No discordant read-pairs were detected\n"; 
-	open (OUTFILE, ">$output") || die "Could not open output file: $output\n";
-	close OUTFILE;
-} # if no integration events detected, make empty file
+printOutput($output, @outLines); #write to outfile: if no sites detected will be header only
 
 
 
