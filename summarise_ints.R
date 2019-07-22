@@ -172,16 +172,17 @@ for (i in datasets) {
   circos.clear()
   
   #make plot of data with no issues
-  bed_list2 = list(bed_issues, bed_noissues)
-  pdf(paste0(out_path, "hostCircos_", i, "_density_issues.pdf", sep = ""))
-  if (str_detect(host, "hg38")) {circos.initializeWithIdeogram(species = host, 
-                                                               chromosome.index = chroms)}
-  else {circos.initializeWithIdeogram(species = host)}
-  circos.genomicRainfall(bed_list2, col = c("#00BFC4", "#F8766D"), track.height = 0.2)
-  circos.genomicDensity(bed_issues, col = c("#00BFC4"), track.height = 0.1)
-  circos.genomicDensity(bed_noissues, col = c("#F8766D"), track.height = 0.1)
-  dev.off()
-  circos.clear()
-  
+  if (nrow(bed_issues) != 0 & nrow(bed_noissues) != 0) {
+    bed_list2 = list(bed_issues, bed_noissues)
+    pdf(paste0(out_path, "hostCircos_", i, "_density_issues.pdf", sep = ""))
+    if (str_detect(host, "hg38")) {circos.initializeWithIdeogram(species = host, 
+                                                                 chromosome.index = chroms)}
+    else {circos.initializeWithIdeogram(species = host)}
+    circos.genomicRainfall(bed_list2, col = c("#00BFC4", "#F8766D"), track.height = 0.2)
+    circos.genomicDensity(bed_issues, col = c("#00BFC4"), track.height = 0.1)
+    circos.genomicDensity(bed_noissues, col = c("#F8766D"), track.height = 0.1)
+    dev.off()
+    circos.clear()
+  }
 }
 

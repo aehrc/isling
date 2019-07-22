@@ -35,7 +35,9 @@ localrules: all, combine, run_int_scripts, merge_bed
 #### target files ####
 rule all:
 	input: 
-		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES)
+		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES),
+		"../out/summary/count_mapped.xlsx",
+		
 		
 
 #### merging and dedup ###
@@ -246,12 +248,12 @@ rule run_int_scripts:
 	output:
 		allInt = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
 		allBed = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.bed",
-		soft = "../out/{dset}/ints/{samp}.{host}.{virus}.soft.txt",
-		discord = "../out/{dset}/ints/{samp}.{host}.{virus}.discordant.txt",
-		softBed = "../out/{dset}/ints/{samp}.{host}.{virus}.soft.bed",
-		discordBed = "../out/{dset}/ints/{samp}.{host}.{virus}.discordant.bed",
-		allIntTemp = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp",
-		allBedTemp = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.bed.tmp"
+		soft = temp("../out/{dset}/ints/{samp}.{host}.{virus}.soft.txt"),
+		discord = temp("../out/{dset}/ints/{samp}.{host}.{virus}.discordant.txt"),
+		softBed = temp("../out/{dset}/ints/{samp}.{host}.{virus}.soft.bed"),
+		discordBed = temp("../out/{dset}/ints/{samp}.{host}.{virus}.discordant.bed"),
+		allIntTemp = temp("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp"),
+		allBedTemp = temp("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.bed.tmp")
 
 	shell:
 		"""
