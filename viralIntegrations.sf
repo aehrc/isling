@@ -246,14 +246,14 @@ rule run_int_scripts:
 		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam",
 		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam"
 	output:
-		allInt = temp("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"),
-		allBed = temp("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.bed"),
+		allInt = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
+		allBed = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.bed",
 		soft = temp("../out/{dset}/ints/{samp}.{host}.{virus}.soft.txt"),
 		discord = temp("../out/{dset}/ints/{samp}.{host}.{virus}.discordant.txt"),
 		softBed = temp("../out/{dset}/ints/{samp}.{host}.{virus}.soft.bed"),
 		discordBed = temp("../out/{dset}/ints/{samp}.{host}.{virus}.discordant.bed"),
-		allIntTemp = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp",
-		allBedTemp = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.bed.tmp"
+		allIntTemp = temp("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp"),
+		allBedTemp = temp("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.bed.tmp")
 
 	shell:
 		"""
