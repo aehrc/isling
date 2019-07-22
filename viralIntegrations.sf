@@ -179,7 +179,7 @@ rule extract_vAligned:
 		pvBam_readMap_mateUnmap = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped1.bam",
 		pvBam_readUnmap_mateMap = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped2.bam",
 		pvBam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.bam",
-		pvSam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.bam"
+		pvSam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam"
 	conda:
 		"envs/bwa.yml"
 	shell:
@@ -219,8 +219,8 @@ rule align_bwa_host:
 		r2 = "../out/{dset}/reads/{samp}.bwaPaired.mappedTo{virus}_2.fastq.gz"
 
 	output:
-		hPaired = temp("../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.sam"),
-		hSing = temp("../out/{dset}/host_aligned/{samp}.{host}.bwa.sam")
+		hPaired = temp("../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.{virus}Mappedreads.sam"),
+		hSing = temp("../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.sam")
 	conda: 
 		"envs/bwa.yml"
 	threads: 5
@@ -235,8 +235,8 @@ rule align_bwa_host:
 
 rule run_int_scripts:
 	input:
-		hPaired = "../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.sam",
-		hSing = "../out/{dset}/host_aligned/{samp}.{host}.bwa.sam",
+		hPaired = "../out/{dset}/host_aligned/{samp}.{virus}Mappedreads.{host}.bwaPaired.sam",
+		hSing = "../out/{dset}/host_aligned/{samp}.{virus}Mappedreads.{host}.bwa.sam",
 		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam",
 		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam"
 	output:
