@@ -9,15 +9,20 @@
 		"cpus-per-task" : "1",
 		"output" : "../slogs/{rule}.{wildcards}.log"
 	},
+	"seqPrep":
+	{	
+		"time" : "1:00:00"
+	},
+
 	"align_bwa_host":
 	{	
 		"cpus-per-task" : "5",
-		"time" : "1:00:00"
+		"time" : "2:00:00"
 	},
 	"align_bwa_virus":
 	{	
 		"cpus-per-task" : "5",
-		"time" : "1:00:00"
+		"time" : "2:00:00"
 	},
 	"merge_reads":
 	{	
