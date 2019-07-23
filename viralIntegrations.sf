@@ -48,10 +48,10 @@ rule seqPrep:
 		r1 = "../data/reads/{dset}/{samp}_1.fastq.gz",
 		r2 = "../data/reads/{dset}/{samp}_2.fastq.gz"	
 	output:
-		merged = "../out/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz",
-		proc_r1 = "../out/{dset}/merged_reads/{samp}.SeqPrep_R1.fastq.gz",
-		proc_r2 = "../out/{dset}/merged_reads/{samp}.SeqPrep_R2.fastq.gz",
-		all = "../out/{dset}/merged_reads/{samp}.all.fastq.gz"
+		merged = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz"),
+		proc_r1 = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_R1.fastq.gz"),
+		proc_r2 = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_R2.fastq.gz"),
+		all = temp("../out/{dset}/merged_reads/{samp}.all.fastq.gz")
 	conda:	
 		"envs/seqprep.yml"
 	shell:
@@ -65,9 +65,9 @@ rule combine:
 		r1 = "../data/reads/{dset}/{samp}_1.fastq.gz",
 		r2 = "../data/reads/{dset}/{samp}_2.fastq.gz"
 	output:
-		proc_r1 = "../out/{dset}/combined_reads/{samp}.R1.fastq.gz",
-		proc_r2 = "../out/{dset}/combined_reads/{samp}.R2.fastq.gz",
-		all = "../out/{dset}/combined_reads/{samp}.all.fastq.gz"
+		proc_r1 = temp("../out/{dset}/combined_reads/{samp}.R1.fastq.gz"),
+		proc_r2 = temp("../out/{dset}/combined_reads/{samp}.R2.fastq.gz"),
+		all = temp("../out/{dset}/combined_reads/{samp}.all.fastq.gz")
 	shell:
 		"""
 		cp {input.r1} {output.proc_r1}
