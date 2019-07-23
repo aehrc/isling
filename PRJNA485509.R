@@ -20,7 +20,7 @@ out_path = "../out/summary/"
 runTables <- list.files(raw_path, pattern ="SraRunTable.txt", recursive=TRUE)
 
 #import metadata
-metadata <- data_frame(metaFile = runTables) %>%
+metadata <- tibble(metaFile = runTables) %>%
   mutate(runTable = map(metaFile, ~ read_tsv(file.path(raw_path, .)))) %>%
   mutate(dataset = dirname(metaFile)) %>%
   unnest() %>%
@@ -95,20 +95,24 @@ for (i in unique(merged$dataset)) {
   if (str_detect(host, "Mus musculus")) {host <- "mm10"}
   chroms <- if (str_detect(host, "hg38")) {paste0("chr", c(1:22, "X", "Y"))} else {paste0("chr", c(1:20, "X", "Y"))}
   
-
-  for (j in unique(merged$tissue)) {
-    bed <- filter(filt, tissue == j) %>%
-             select(chr, start, stop)
-    pdf(paste0(out_path, "hostCircos_", i, "_",j, ".pdf", sep = ""))
-    if (str_detect(host, "hg38")) {circos.initializeWithIdeogram(species = host, 
-                                                               chromosome.index = chroms)} else {circos.initializeWithIdeogram(species = host)}
-    circos.genomicRainfall(bed, track.height = 0.2)
-    circos.genomicDensity(bed, track.height = 0.1)
-    dev.off()
-    circos.clear()
+  for (k in unique(filt$NucleicAcid)) {
+    filt2 <- filter(filt, NucleicAcid == k)
+    for (j in unique(filt2$tissue)) {
+      bed <- filter(filt2, tissue == j) %>%
+        select(chr, start, stop) %>%
+        as.data.frame()
+        
+      pdf(paste0(out_path, "hostCircos_", i, "_", k, "_", j, ".pdf", sep = ""))
+      if (str_detect(host, "hg38")) {circos.initializeWithIdeogram(species = host, 
+                                                                   chromosome.index = chroms)} 
+      else {circos.initializeWithIdeogram(species = host)}
+      circos.genomicRainfall(bed, track.height = 0.2)
+      circos.genomicDensity(bed, track.height = 0.1)
+      dev.off()
+      circos.clear()
+    }
   }
 }
-
 
 
 
