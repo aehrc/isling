@@ -31,20 +31,20 @@ mergedbed_cols <- c('chr', 'start', 'stop', 'nReads', 'readNames')
 merged <- metadata %>%
   mutate(beds = flatten_chr(map2(dataset, Run, ~ list.files(paste0(data_path, "/", .x, "/ints/", sep = ""), pattern=paste0(.y, ".+integrations.merged.bed", sep=""))))) %>%
   mutate(beds = flatten_chr(map2(dataset, beds, ~ paste0(data_path, "/", .x, "/ints/", .y, sep="")))) %>%
-  mutate(merged = map(beds, ~read_tsv(., col_names = mergedbed_cols))) %>%
+  mutate(merged = map(beds, ~read_tsv(., col_names = mergedbed_cols, col_types = cols(chr = col_character())))) %>%
   mutate(uniq_sites = map_int(merged, ~ nrow(.)))
 
 bed_cols <- c('chr', 'start', 'stop', 'readID')
 beds <- metadata %>%
   mutate(beds = flatten_chr(map2(dataset, Run, ~ list.files(paste0(data_path, "/", .x, "/ints/", sep = ""), pattern=paste0(.y, ".+integrations.bed", sep=""))))) %>%
   mutate(beds = flatten_chr(map2(dataset, beds, ~ paste0(data_path, "/", .x, "/ints/", .y, sep="")))) %>%
-  mutate(merged = map(beds, ~read_tsv(., col_names = bed_cols))) %>%
+  mutate(merged = map(beds, ~read_tsv(., col_names = bed_cols, col_types = cols(chr = col_character())))) %>%
   mutate(uniq_sites = map_int(merged, ~ nrow(.)))
 
 ints <- metadata %>%
   mutate(out = flatten_chr(map2(dataset, Run, ~ list.files(paste0(data_path, "/", .x, "/ints/", sep = ""), pattern=paste0(.y, ".+integrations.txt", sep=""))))) %>%
   mutate(out = flatten_chr(map2(dataset, out, ~ paste0(data_path, "/", .x, "/ints/", .y, sep="")))) %>%
-  mutate(merged = map(out, ~read_tsv(.))) %>%
+  mutate(merged = map(out, ~read_tsv(., col_types = cols(Chr = col_character())))) %>%
   mutate(uniq_sites = map_int(merged, ~ nrow(.)))
 
 #save summary of data with number of sites included
