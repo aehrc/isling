@@ -86,7 +86,7 @@ def get_all(wildcards):
 
 def get_r1(wildcards):
 	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
-		typeRead = "seqPrep_R1"
+		typeRead = "SeqPrep_R1"
 		folder = "merged_reads"
 	else:
 		typeRead = "R1"	
@@ -95,7 +95,7 @@ def get_r1(wildcards):
 
 def get_r2(wildcards):
 	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
-		typeRead = "seqPrep_R2"
+		typeRead = "SeqPrep_R2"
 		folder = "merged_reads"
 	else:
 		typeRead = "R2"	
