@@ -35,7 +35,7 @@ merged <- metadata %>%
   mutate(uniq_sites = map_int(merged, ~ nrow(.)))
 
 bed_cols <- c('chr', 'start', 'stop', 'readID')
-bed <- metadata %>%
+beds <- metadata %>%
   mutate(beds = flatten_chr(map2(dataset, Run, ~ list.files(paste0(data_path, "/", .x, "/ints/", sep = ""), pattern=paste0(.y, ".+integrations.bed", sep=""))))) %>%
   mutate(beds = flatten_chr(map2(dataset, beds, ~ paste0(data_path, "/", .x, "/ints/", .y, sep="")))) %>%
   mutate(merged = map(beds, ~read_tsv(., col_names = bed_cols))) %>%
@@ -83,9 +83,11 @@ for (i in unique(merged$dataset)) {
 ###unnest tibbles to plot individual sites ####
 
 merged <- unnest(merged)
-bed <- unnest(bed)
+beds <- unnest(beds)
 ints <- unnest(ints)
 
+
+#### circos plots for host ####
 #plot location of merged bed sites for each tissue
 for (i in unique(merged$dataset)) {
  filt <- filter(merged, dataset == i)
@@ -102,7 +104,7 @@ for (i in unique(merged$dataset)) {
         select(chr, start, stop) %>%
         as.data.frame()
         
-      pdf(paste0(out_path, "hostCircos_", i, "_", k, "_", j, ".pdf", sep = ""))
+      pdf(paste0(out_path, "hostCircos_merged_", i, "_", k, "_", j, ".pdf", sep = ""))
       if (str_detect(host, "hg38")) {circos.initializeWithIdeogram(species = host, 
                                                                    chromosome.index = chroms)} 
       else {circos.initializeWithIdeogram(species = host)}
@@ -116,4 +118,92 @@ for (i in unique(merged$dataset)) {
 
 
 
+#plot location of merged bed sites for each sample
+for (i in unique(merged$dataset)) {
+  filt <- filter(merged, dataset == i)
+  host <- filt %>% 
+    select(Organism) %>% 
+    unique()
+  if (str_detect(host, "Mus musculus")) {host <- "mm10"}
+  chroms <- if (str_detect(host, "hg38")) {paste0("chr", c(1:22, "X", "Y"))} else {paste0("chr", c(1:20, "X", "Y"))}
+  
+    for (j in unique(filt$Run)) {
+      bed <- filter(filt, Run == j) %>%
+        select(chr, start, stop) %>%
+        as.data.frame()
+      type <- filter(filt, Run == j) %>% select(NucleicAcid) %>%  unique()
+      run <- filter(filt, Run == j) %>% select(Run) %>%  unique()
+      age <- filter(filt, Run == j) %>% select(age) %>%  unique()
+      tissue <- filter(filt, Run == j) %>% select(tissue) %>%  unique()
+      
+      pdf(paste0(out_path, "hostCircos_merged_", i, "_", j, ".pdf", sep = ""))
+      if (str_detect(host, "hg38")) {circos.initializeWithIdeogram(species = host, 
+                                                                   chromosome.index = chroms)} else {circos.initializeWithIdeogram(species = host)}
+      circos.genomicRainfall(bed, track.height = 0.2)
+      circos.genomicDensity(bed, track.height = 0.1)
+      title(sprintf("Type: %s; run: %s; age: %s; tissue: %s", type, run, age, tissue))
+      dev.off()
+      circos.clear()
+    }
+}
+
+
+#do same for un-merged bed files
+for (i in unique(beds$dataset)) {
+  filt <- filter(beds, dataset == i)
+  host <- filt %>% 
+    select(Organism) %>% 
+    unique()
+  if (str_detect(host, "Mus musculus")) {host <- "mm10"}
+  chroms <- if (str_detect(host, "hg38")) {paste0("chr", c(1:22, "X", "Y"))} else {paste0("chr", c(1:20, "X", "Y"))}
+  
+  for (k in unique(filt$NucleicAcid)) {
+    filt2 <- filter(filt, NucleicAcid == k)
+    for (j in unique(filt2$tissue)) {
+      bed <- filter(filt2, tissue == j) %>%
+        select(chr, start, stop) %>%
+        as.data.frame()
+      
+      pdf(paste0(out_path, "hostCircos_unmerged_", i, "_", k, "_", j, ".pdf", sep = ""))
+      if (str_detect(host, "hg38")) {circos.initializeWithIdeogram(species = host, 
+                                                                   chromosome.index = chroms)} 
+      else {circos.initializeWithIdeogram(species = host)}
+      circos.genomicRainfall(bed, track.height = 0.2)
+      circos.genomicDensity(bed, track.height = 0.1)
+      dev.off()
+      circos.clear()
+    }
+  }
+}
+
+
+
+#plot location of merged bed sites for each sample
+for (i in unique(beds$dataset)) {
+  filt <- filter(beds, dataset == i)
+  host <- filt %>% 
+    select(Organism) %>% 
+    unique()
+  if (str_detect(host, "Mus musculus")) {host <- "mm10"}
+  chroms <- if (str_detect(host, "hg38")) {paste0("chr", c(1:22, "X", "Y"))} else {paste0("chr", c(1:20, "X", "Y"))}
+  
+  for (j in unique(filt$Run)) {
+    bed <- filter(filt, Run == j) %>%
+      select(chr, start, stop) %>%
+      as.data.frame()
+    type <- filter(filt, Run == j) %>% select(NucleicAcid) %>%  unique()
+    run <- filter(filt, Run == j) %>% select(Run) %>%  unique()
+    age <- filter(filt, Run == j) %>% select(age) %>%  unique()
+    tissue <- filter(filt, Run == j) %>% select(tissue) %>%  unique()
+    
+    pdf(paste0(out_path, "hostCircos_unmerged_", i, "_", j, ".pdf", sep = ""))
+    if (str_detect(host, "hg38")) {circos.initializeWithIdeogram(species = host, 
+                                                                 chromosome.index = chroms)} else {circos.initializeWithIdeogram(species = host)}
+    circos.genomicRainfall(bed, track.height = 0.2)
+    circos.genomicDensity(bed, track.height = 0.1)
+    title(sprintf("Type: %s; run: %s; age: %s; tissue: %s", type, run, age, tissue))
+    dev.off()
+    circos.clear()
+  }
+}
 
