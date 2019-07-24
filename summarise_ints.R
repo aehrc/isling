@@ -17,15 +17,12 @@ out_path = "../out/summary/"
 
 files <- list.files(data_path, pattern =".integrations.txt", recursive=TRUE)
 
-#remove empty files
-isnotempty <- map(files, ~file.info(paste(data_path, ., sep=''))$size != 0) %>% unlist()
-files <- files[isnotempty]
-
 #import all datasets
 data <- data_frame(filename = files) %>% # create a data frame holding the file names
   mutate(integrations = map(filename, ~ read_tsv(file.path(data_path, .), 
 						na = c("", "NA", "?"),
-						col_types = cols(Chr = col_character(), NoAmbiguousBases = col_integer(), .default =col_guess())))) %>% 
+						col_types = cols(Chr = col_character(), NoAmbiguousBases = col_integer(), .default =col_guess())))) %>%
+  filter(flatten_lgl(map(integrations, ~ nrow(.) != 0))) %>% 
   unnest()
 
 
@@ -34,7 +31,6 @@ data <- data %>%
   mutate(dataset = dirname(dirname(filename))) %>% 
   mutate(sample = str_extract(basename(filename), "^[\\w]+(?=\\.)")) %>% 
   mutate( host = ifelse(str_detect(basename(filename), "mouse|mm10"), "mm10", "hg38"))
-
 
 #add summary columns based on ambiguites/issues
 data <- data %>% 
