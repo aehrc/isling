@@ -9,6 +9,10 @@
 		"cpus-per-task" : "1",
 		"output" : "../slogs/{rule}.{wildcards}.log"
 	},
+	"dedup":
+	{	
+		"cpus-per-task" : "2"
+	},
 	"seqPrep":
 	{	
 		"time" : "1:00:00"

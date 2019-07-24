@@ -56,7 +56,7 @@ rule dedup:
 		"envs/bbmap.yml"
 	shell:
 		"""
-		clumpify.sh -Xmx5g in={input.r1} in2={input.r2} out={output.R1_clumped} out2={output.R2_clumped} dedupe tossbrokenreads
+		clumpify.sh -Xmx10g in={input.r1} in2={input.r2} out={output.R1_clumped} out2={output.R2_clumped} dedupe tossbrokenreads
 		"""
 
 rule seqPrep:
