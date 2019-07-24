@@ -56,13 +56,13 @@ rule dedup:
 		"envs/bbmap.yml"
 	shell:
 		"""
-		clumpify.sh -Xmx5g in={input.r1} in2={input.r2} out={output.R1_clumped} out2={output.R2_clumped} dedupe
+		clumpify.sh -Xmx5g in={input.r1} in2={input.r2} out={output.R1_clumped} out2={output.R2_clumped} dedupe tossbrokenreads
 		"""
 
 rule seqPrep:
 	input:
-		R1_clumped = "../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
-		R2_clumped = "../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
+		r1 = "../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
+		r2 = "../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
 	output:
 		merged = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz"),
 		proc_r1 = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_1.fastq.gz"),
@@ -78,8 +78,8 @@ rule seqPrep:
 
 rule combine:
 	input:
-		R1_clumped = "../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
-		R2_clumped = "../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
+		r1 = "../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
+		r2 = "../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
 	output:
 		proc_r1 = temp("../out/{dset}/combined_reads/{samp}.1.fastq.gz"),
 		proc_r2 = temp("../out/{dset}/combined_reads/{samp}.2.fastq.gz"),
