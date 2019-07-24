@@ -21,13 +21,15 @@ MERGE = {}
 
 for dataset in config:
 	#get files in directory and strip off "_1.fastq.gz"
-	samples = [os.path.basename(f)[:-11] for f in glob.glob("../data/reads/{}/*_1.fastq.gz".format(dataset))]
+	samples = [os.path.basename(f)[:-12] for f in glob.glob("../data/reads/{}/*_R1.fastq.gz".format(dataset))]
 	for sample in samples:
 		DATASETS.append(dataset)
 		SAMPLES.append(sample)
 		HOSTS.append(config[dataset]["host"])
 		VIRUSES.append(config[dataset]["virus"])
 		MERGE["{}_{}".format(dataset, sample)] = config[dataset]["merge"]
+
+
 
 #### local rules ####
 localrules: all, combine, run_int_scripts, merge_bed
@@ -45,12 +47,12 @@ rule all:
 
 rule seqPrep:
 	input:
-		r1 = "../data/reads/{dset}/{samp}_1.fastq.gz",
-		r2 = "../data/reads/{dset}/{samp}_2.fastq.gz"	
+		r1 = "../data/reads/{dset}/{samp}_R1.fastq.gz",
+		r2 = "../data/reads/{dset}/{samp}_R2.fastq.gz"	
 	output:
 		merged = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz"),
-		proc_r1 = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_R1.fastq.gz"),
-		proc_r2 = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_R2.fastq.gz"),
+		proc_r1 = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_1.fastq.gz"),
+		proc_r2 = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_2.fastq.gz"),
 		all = temp("../out/{dset}/merged_reads/{samp}.all.fastq.gz")
 	conda:	
 		"envs/seqprep.yml"
@@ -62,11 +64,11 @@ rule seqPrep:
 
 rule combine:
 	input:
-		r1 = "../data/reads/{dset}/{samp}_1.fastq.gz",
-		r2 = "../data/reads/{dset}/{samp}_2.fastq.gz"
+		r1 = "../data/reads/{dset}/{samp}_R1.fastq.gz",
+		r2 = "../data/reads/{dset}/{samp}_R2.fastq.gz"
 	output:
-		proc_r1 = temp("../out/{dset}/combined_reads/{samp}.R1.fastq.gz"),
-		proc_r2 = temp("../out/{dset}/combined_reads/{samp}.R2.fastq.gz"),
+		proc_r1 = temp("../out/{dset}/combined_reads/{samp}.1.fastq.gz"),
+		proc_r2 = temp("../out/{dset}/combined_reads/{samp}.2.fastq.gz"),
 		all = temp("../out/{dset}/combined_reads/{samp}.all.fastq.gz")
 	shell:
 		"""
@@ -86,19 +88,19 @@ def get_all(wildcards):
 
 def get_r1(wildcards):
 	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
-		typeRead = "SeqPrep_R1"
+		typeRead = "SeqPrep_1"
 		folder = "merged_reads"
 	else:
-		typeRead = "R1"	
+		typeRead = "1"	
 		folder = "combined_reads"
 	return "../out/{}/{}/{}.{}.fastq.gz".format(wildcards.dset, folder, wildcards.samp, typeRead)
 
 def get_r2(wildcards):
 	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
-		typeRead = "SeqPrep_R2"
+		typeRead = "SeqPrep_2"
 		folder = "merged_reads"
 	else:
-		typeRead = "R2"	
+		typeRead = "2"	
 		folder = "combined_reads"
 	return "../out/{}/{}/{}.{}.fastq.gz".format(wildcards.dset, folder, wildcards.samp, typeRead)
 
@@ -110,8 +112,8 @@ rule dedup:
 		proc_r2 = get_r2
 	output:
 		all_clumped = "../out/{dset}/dedup_reads/{samp}.all.fastq.gz",
-		R1_clumped = "../out/{dset}/dedup_reads/{samp}.R1.fastq.gz",
-		R2_clumped = "../out/{dset}/dedup_reads/{samp}.R2.fastq.gz"
+		R1_clumped = "../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
+		R2_clumped = "../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
 	conda:
 		"envs/bbmap.yml"
 	shell:
@@ -146,8 +148,8 @@ rule align_bwa_virus:
 		pac = "../data/references/{virus}.pac",
 		sa = "../data/references/{virus}.sa",
 		all = "../out/{dset}/dedup_reads/{samp}.all.fastq.gz",
-		r1 = "../out/{dset}/dedup_reads/{samp}.R1.fastq.gz",
-		r2 = "../out/{dset}/dedup_reads/{samp}.R2.fastq.gz" 
+		r1 = "../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
+		r2 = "../out/{dset}/dedup_reads/{samp}.2.fastq.gz" 
 	output:
 		vPaired = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam"),
 		vSing = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam")
@@ -226,10 +228,10 @@ rule convert:
 		bam = "../out/{dset}/{host_virus}_bam/{samp}.{host_virus_name}.{alignType}{mapped_type}.bam",
 		bai = "../out/{dset}/{host_virus}_bam/{samp}.{host_virus_name}.{alignType}{mapped_type}.bam.bai"
 	wildcard_constraints:
-		samp = "\w+\d+",
-		host_virus_name = "[\w\d]+",
+		samp = "[\w\d_]+",
+		host_virus_name = "[\w\d-]+",
 		alignType = "bwaPaired|bwa",
-		mapped_type = "|\.[\w\d]+"
+		mapped_type = "|\.[\w\d-]+"
 	conda: 
 		"envs/bwa.yml"	
 	shell:
