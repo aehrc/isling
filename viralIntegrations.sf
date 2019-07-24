@@ -45,10 +45,24 @@ rule all:
 
 #### merging and dedup ###
 
-rule seqPrep:
+rule dedup:
 	input:
 		r1 = "../data/reads/{dset}/{samp}_R1.fastq.gz",
 		r2 = "../data/reads/{dset}/{samp}_R2.fastq.gz"	
+	output:
+		R1_clumped = "../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
+		R2_clumped = "../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
+	conda:
+		"envs/bbmap.yml"
+	shell:
+		"""
+		clumpify.sh -Xmx5g in={input.r1} in2={input.r2} out={output.R1_clumped} out2={output.R2_clumped} dedupe
+		"""
+
+rule seqPrep:
+	input:
+		R1_clumped = "../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
+		R2_clumped = "../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
 	output:
 		merged = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz"),
 		proc_r1 = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_1.fastq.gz"),
@@ -64,8 +78,8 @@ rule seqPrep:
 
 rule combine:
 	input:
-		r1 = "../data/reads/{dset}/{samp}_R1.fastq.gz",
-		r2 = "../data/reads/{dset}/{samp}_R2.fastq.gz"
+		R1_clumped = "../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
+		R2_clumped = "../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
 	output:
 		proc_r1 = temp("../out/{dset}/combined_reads/{samp}.1.fastq.gz"),
 		proc_r2 = temp("../out/{dset}/combined_reads/{samp}.2.fastq.gz"),
@@ -76,6 +90,24 @@ rule combine:
 		cp {input.r2} {output.proc_r2}
 		cat {input.r1} {input.r2} > {output.all}
 		"""
+
+
+
+#### alignments ####
+
+rule index:
+	input:
+		"../data/references/{genome}.fa"
+	output:
+		"../data/references/{genome}.ann",
+		"../data/references/{genome}.amb",
+		"../data/references/{genome}.bwt",
+		"../data/references/{genome}.pac",
+		"../data/references/{genome}.sa"
+	conda: 
+		"envs/bwa.yml"
+	shell:
+		"bwa index -p ../data/references/{wildcards.genome} {input}"
 
 #functions for if we did seqPrep or not
 
@@ -105,41 +137,6 @@ def get_r2(wildcards):
 	return "../out/{}/{}/{}.{}.fastq.gz".format(wildcards.dset, folder, wildcards.samp, typeRead)
 
 
-rule dedup:
-	input:
-		all = get_all,
-		proc_r1 = get_r1,
-		proc_r2 = get_r2
-	output:
-		all_clumped = "../out/{dset}/dedup_reads/{samp}.all.fastq.gz",
-		R1_clumped = "../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
-		R2_clumped = "../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
-	conda:
-		"envs/bbmap.yml"
-	shell:
-		"""
-		clumpify.sh -Xmx5g in={input.all} out={output.all_clumped} dedupe
-		clumpify.sh -Xmx5g in={input.proc_r1} in2={input.proc_r2} out={output.R1_clumped} out2={output.R2_clumped} dedupe
-		"""
-
-
-#### alignments ####
-
-rule index:
-	input:
-		"../data/references/{genome}.fa"
-	output:
-		"../data/references/{genome}.ann",
-		"../data/references/{genome}.amb",
-		"../data/references/{genome}.bwt",
-		"../data/references/{genome}.pac",
-		"../data/references/{genome}.sa"
-	conda: 
-		"envs/bwa.yml"
-	shell:
-		"bwa index -p ../data/references/{wildcards.genome} {input}"
-
-
 rule align_bwa_virus:
 	input:
 		ann = "../data/references/{virus}.ann",
@@ -147,9 +144,9 @@ rule align_bwa_virus:
 		bwt = "../data/references/{virus}.bwt",
 		pac = "../data/references/{virus}.pac",
 		sa = "../data/references/{virus}.sa",
-		all = "../out/{dset}/dedup_reads/{samp}.all.fastq.gz",
-		r1 = "../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
-		r2 = "../out/{dset}/dedup_reads/{samp}.2.fastq.gz" 
+		all = get_all,
+		r1 = get_r1,
+		r2 = get_r2
 	output:
 		vPaired = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam"),
 		vSing = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam")
