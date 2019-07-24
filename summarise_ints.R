@@ -16,14 +16,19 @@ out_path = "../out/summary/"
 
 
 files <- list.files(data_path, pattern =".integrations.txt", recursive=TRUE)
+merged_files <- list.files(data_path, pattern =".integrations.merged.bed", recursive=TRUE)
 
 #import all datasets
-data <- data_frame(filename = files) %>% # create a data frame holding the file names
+data <- tibble(filename = files) %>% # create a data frame holding the file names
   mutate(integrations = map(filename, ~ read_tsv(file.path(data_path, .), 
 						na = c("", "NA", "?"),
 						col_types = cols(Chr = col_character(), NoAmbiguousBases = col_integer(), .default =col_guess())))) %>%
-  filter(flatten_lgl(map(integrations, ~ nrow(.) != 0))) %>% 
-  unnest()
+  mutate(merged_filename = merged_files) %>% 
+  mutate(merged = map(merged_files, ~read_tsv(file.path(data_path, .),
+                                              na = c("", "NA", "?"),
+                                              col_names = c("Chr", "Start", "Stop", "No_reads", "Reads")))) %>% 
+  mutate(total_count = flatten_int(map(integrations, ~nrow(.)))) %>% 
+  mutate(merged_count = flatten_int(map(merged, ~nrow(.))))
 
 
 #add extra columns with sample name, dataset, host
@@ -31,6 +36,20 @@ data <- data %>%
   mutate(dataset = dirname(dirname(filename))) %>% 
   mutate(sample = str_extract(basename(filename), "^[\\w]+(?=\\.)")) %>% 
   mutate( host = ifelse(str_detect(basename(filename), "mouse|mm10"), "mm10", "hg38"))
+
+#write xls with summary of number of sites and merged sites
+data %>% 
+  select(-integrations) %>% 
+  select(-merged) %>% 
+  write_xlsx(path = paste0(out_path, "num_sites.xlsx"))
+
+#select all integrations
+data <- data %>% 
+  select(-merged_filename) %>% 
+  select(-merged) %>% 
+  filter(flatten_lgl(map(integrations, ~ nrow(.) != 0))) %>% 
+  unnest()
+
 
 #add summary columns based on ambiguites/issues
 data <- data %>% 
@@ -90,12 +109,6 @@ for (i in unique(data$dataset)) {
   }
   write_xlsx(toWrite, path = paste(out_path, i, ".xlsx", sep = ""))
 }
-
-#get summary of number of sites per dataset
-data %>% 
-  group_by(dataset, filename) %>% 
-  count()  %>% 
-  write_xlsx(path = paste0(out_path, "num_sites.xlsx"))
 
 #loop over columns to make pie charts of all columns
 colns <- c("OverlapType", "PossibleVectorRearrangement", "PossibleHostTranslocation", "HostPossibleAmbiguous", "ViralPossibleAmbiguous", "has_issue", "has_rearrangement", "has_locAmbig")
