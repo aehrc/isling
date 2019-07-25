@@ -36,10 +36,16 @@
 	{
 		"time" : "2:00:00"
 	},
-	"extract_junction_reads":
+	"extract_junction_reads_host":
 	{
 		"time" : "1:00:00",
 		"cpus-per-task" : "3"
-	}	
+	}	,
+	"extract_junction_reads_virus":
+	{
+		"time" : "1:00:00",
+		"cpus-per-task" : "3",
+		"mem" : "10Gb"
+	}
 	
 }
