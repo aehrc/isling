@@ -10,6 +10,7 @@ use ViralIntegration;
 use Getopt::Long;
 
 my $cutoff = 20; # default clipping cutoff
+my $tol = 2; #when processing CIGARS, combine any IDPN elements between matched regions with this number of bases or less
 my $viral;
 my $human;
 my $output = "integrationSites.txt";
@@ -70,12 +71,19 @@ while (my $vl = <VIRAL>) {
 	if ($parts[1] & 0x800) { next(); } # skip supplementary alignments
 	if ($parts[1] & 0x2) { next(); } # skip mapped in proper pair
 	
+	#for read pairs where one read is mapped and the other is not:
 	#want reads where if not mapped, mate is mapped, or vice versa
 	
-	unless ((($parts[1] & 0x8) and !($parts[1] & 0x4)) or (!($parts[1] & 0x8) and ($parts[1] & 0x4))) { next; }
+	#but if allowing some clipping, might have case were one read has small portion mapped facing into the junction
+	#so in this case also need to consider reads where both mates are mapped
+	
+	#so essentially only exclude reads where both reads are unmapped
+	
+	if (($parts[1] & 0x8) and ($parts[1] & 0x4)) { next; }
 
 	#get cigar
-	my $cig = $parts[5]; # Don't process cigar for now; could be a cigar or * if unmapped
+	my $cig = processCIGAR2($parts[5], $tol); # Note that could be a cigar or * if unmapped
+	
 	
 	#get sequence and orientation
 	my ($seq, $seqOri);	
@@ -106,7 +114,7 @@ while (my $hl = <HUMAN>) {
 	my @parts = split(' ', $hl); #get fields from each alignment
 	
 	#want reads where if not mapped, mate is mapped, or vice versa
-	unless ((($parts[1] & 0x8) and !($parts[1] & 0x4)) or (!($parts[1] & 0x8) and ($parts[1] & 0x4))) { next; }
+	if (!($parts[1] & 0x8) and !($parts[1] & 0x4)) { next; }
 	
 	unless ((exists $viralR1{$parts[0]}) and (exists $viralR2{$parts[0]})) { next; } #only consider reads from viral alignment
 	
@@ -114,7 +122,7 @@ while (my $hl = <HUMAN>) {
 	if ($parts[1] & 0x2) { next(); } # skip mapped in proper pair
 	
 	#get cigar
-	my $cig = $parts[5]; # Don't process cigar for now; could be a cigar or * if unmapped
+	my $cig = processCIGAR2($parts[5], $tol); # Note that could be a cigar or * if unmapped
 	
 	#get sequence and orientation
 	my ($seq, $seqOri);	
@@ -140,11 +148,11 @@ close HUMAN;
 ### Integration coordinates are not exact, but assigned to the middle part of the human read
 my @outLines;
 if ($verbose) { print "Finding discordant read-pairs...\n"; }
-foreach my $key (keys %viralR1) {
+foreach my $key (keys %humanR1) {
 
 	#check that read ID is found for all hashes
-	unless ( exists $viralR2{$key} ) { next; } 
-	unless ( exists $humanR1{$key} ) { next; }
+	unless ( exists $viralR1{$key} ) { next; } 
+	unless ( exists $viralR2{$key} ) { next; }
 	unless ( exists $humanR2{$key} ) { next; }
 
 	# Find discordant read pairs
@@ -190,43 +198,56 @@ sub findDiscordant {
 	my ($hR1ori, $hR1ref, $hR1start, $hR1cig, $hR1inPair, $hR1sec, $hR1sup) = (split('xxx', $hR1))[1, 2, 3, 4, 5, 6, 7];
 	my ($hR2ori, $hR2ref, $hR2start, $hR2cig, $hR2inPair, $hR2sec, $hR2sup) = (split('xxx', $hR2))[1, 2, 3, 4, 5, 6, 7];
 
+	#discordant read-pair can be either one mate mapped and one unmapped
+	#or one mate mostly mapped and the other with only a small mapped region
+	
+	#find if R1 and R2 are mostly mapped or unmapped
+	my ($vR1map, $vR1mapBP) = isMapped($vR1cig, $cutoff);
+	my ($vR2map, $vR2mapBP) = isMapped($vR2cig, $cutoff);
+	my ($hR1map, $hR1mapBP) = isMapped($hR1cig, $cutoff);
+	my ($hR2map, $hR2mapBP) = isMapped($hR2cig, $cutoff);
+	
 	#check that we do have complementary discordant read-pairs in human and viral alignments
-	unless ((( $vR1cig eq "*") and ($vR2cig =~ /^\d+M$/)) or (( $vR2cig eq "*") and ($vR1cig =~ /^\d+M$/))) { return; }
-	unless ((( $hR1cig eq "*") and ($hR2cig =~ /^\d+M$/)) or (( $hR2cig eq "*") and ($hR1cig =~ /^\d+M$/))) { return; }
-	if ((($vR1cig eq "*") and ($hR1cig eq "*")) or (($vR1cig =~ /^\d+M$/) and ($hR1cig =~ /^\d+M$/))) { return; }
+	#check that both reads are not either both mapped or unmapped in each alignment
+	unless (($vR1map ne $vR2map) and ($hR1map ne $hR2map)) { return; }
+	unless (($vR1map eq $hR2map) and ($hR2map eq $vR1map)) { return; }
+	
+	#if a read-pair has gotten to this point, check that number of unmapped bases in 'map'
+	#is less than $cutoff
+	#do this to make sure we're reasonably confident of mapping and avoid reads with relatively
+	#small mapped regions (eg 91S25M34S) getting through
+	
+	my $readlen1 = length($seq1);
+	my $readlen2 = length($seq2);
 	
 	#get reference for virus and human based on which is mapped
 	my ($hRef, $vRef, $hSeq, $vSeq);
-	if ($hR1cig ne "*") { #if human matched R1
+	if ($hR1map eq "map") { #if human matched R1
+		unless (($readlen1 - $hR1mapBP) < $cutoff) { return; } #check unmapped bases is less than cutoff
+		unless (($readlen2 - $vR2mapBP) < $cutoff) { return; } #check unmapped bases is less than cutoff
 		$hRef = $hR1ref; 
 		$hSeq = $seq1; 
 		$vRef = $vR2ref;
 		$vSeq = $seq2;
 	}
 	else { #if human matched R2
+		unless (($readlen2 - $hR2mapBP) < $cutoff) { return; } #check unmapped bases is less than cutoff
+		unless (($readlen1 - $vR1mapBP) < $cutoff) { return; } #check unmapped bases is less than cutoff
 		$hRef = $hR2ref; 
 		$hSeq = $seq2;
 		$vRef = $vR1ref;
 		$vSeq = $seq1; 
 	}	
 	
-	my $readlen1 = length($seq1);
-	my $readlen2 = length($seq2);
-	
 	#find if junction is human/virus or virus/human
 	#find approximate location of junction on both human and virus side (assign to end of read closest to junction)
 	#position indicated in SAM file is left-most mapping base: for forward reads this is 5' end, for reverse it's 3'
 	my ($junct, $hIntStart, $hIntStop, $vIntStart, $vIntStop, $isVecRearrange, $isHumRearrange, $isHumAmbig, $isVirAmbig);
-	if ($hR1cig ne "*") { #if R1 is matched in human
-	
-		#left-most mapped base is at position $hR1start, so need to add length of sequence to get position
-		$hIntStart = $hR1start + $readlen1 - 1;
-		$hIntStop = $hR1start + $readlen1;
+	if ($hR1map eq "map") { #if R1 is matched in human
 		
-		#opposite for viral read
-		$vIntStart = $vR2start -1;
-		$vIntStop = $vR2start;
-		
+		#get integration start and stop positions
+		($hIntStart, $hIntStop, $vIntStart, $vIntStop) = getIntPos($hR1cig, $hR1ori, $hR1start, $readlen1, $vR2cig, $vR2ori, $vR2start, $readlen2);
+
 		#get type of junction
 		if ($hR1ori eq 'f') 	{ $junct = 'hv'; } #if human R1 is forward, orientation is hv
 		elsif ($hR1ori eq 'r') 	{ $junct = 'vh'; } #otherwise orientation is vh
@@ -246,15 +267,10 @@ sub findDiscordant {
 		if ($vR2sec eq "NA") { $isVirAmbig = "no";}
 		else { $isVirAmbig = isAmbigLoc($vR2ori, $vR2cig, $vR2sec);}
 	}
-	elsif ($hR2cig ne '*') { #if R2 is matched in human
+	elsif ($hR2map eq 'map') { #if R2 is matched in human
 	
-		#left-most mapped base is at postion $hR2start
-		$hIntStart = $hR2start - 1;
-		$hIntStop = $hR2start;
-		
-		#left-most mapped base is at position $vR1start, so need to add length of sequence to get position
-		$vIntStart = $vR1start + $readlen1 -1;
-		$vIntStop = $vR1start + $readlen1;
+		#get integration start and stop positions
+		($vIntStart, $vIntStop, $hIntStart, $hIntStop) = getIntPos($vR1cig, $vR1ori, $vR1start, $readlen1, $hR2cig, $hR2ori, $hR2start, $readlen2);
 		
 		#get type of junction
 		if ($hR2ori eq 'r')		{ $junct = 'hv'; } #if human R2 is reverse, orientation is hv
@@ -275,8 +291,7 @@ sub findDiscordant {
 		if ($vR1sec eq "NA") { $isVirAmbig = "no";}
 		else { $isVirAmbig = isAmbigLoc($vR1ori, $vR1cig, $vR1sec);}
 	}
-
-	return($hRef, $hIntStart, $hIntStop, $vRef, $vIntStart, $vIntStop, '?', 'discordant', $junct, $hSeq, $vSeq, '-', join(';', $hR1sec, $hR2sec), join(';', $vR1sec, $vR2sec), 'NA', 'NA', $isVirAmbig, $isHumAmbig);
+		return($hRef, $hIntStart, $hIntStop, $vRef, $vIntStart, $vIntStop, '?', 'discordant', $junct, $hSeq, $vSeq, '-', join(';', $hR1sec, $hR2sec), join(';', $vR1sec, $vR2sec), 'NA', 'NA', $isVirAmbig, $isHumAmbig);
 
 }
 
@@ -297,3 +312,84 @@ sub printHelp {
 	exit;
 }
 
+sub isMapped{
+
+	my ($cig, $cutoff) = @_;
+	
+	#check if cigar is 'mapped' or not
+	
+	#read is considered to be unmapped if number of mapped bases is less than $cutoff
+	#otherwise it's mapped
+	
+	#return 'map' or 'unmap' for mapped or unmapped read respectively
+	#also return number of mapped bases
+	
+	if ($cig =~ /\*/) { return ('unmap', 0); }
+	
+	my (@letters, @numbers);
+	getCigarParts($cig, \@letters, \@numbers);
+	
+	my $mappedBP =0 ;
+	for my $i (0..$#letters) {
+		if ($letters[$i] =~ /M/) { $mappedBP += $numbers[$i]; }
+	}
+
+	if ($mappedBP > $cutoff) { return ('map', $mappedBP); }
+	return ('unmap', $mappedBP);
+	
+}
+
+sub getIntPos {
+
+	my ($mapR1cig, $mapR1ori, $mapR1start, $readlen1, $mapR2cig, $mapR2ori, $mapR2start, $readlen2) = @_;
+	#get positions of last mapped base facing in towards junction
+	#
+	
+	#regardless of whether R1 is mapped in reverse or forward orientation,
+	#the estimate of int site position will always be pos (1-based left-most mapping postion) 
+	#plus the read length
+	my $R1IntStart = $mapR1start + getLastMapped($mapR1cig, $mapR1ori) - 1;
+	my $R1IntStop = $R1IntStart;
+
+	#similarly, estimate for R2 is always at pos (1-based mapping position)
+	my $R2IntStart = $mapR2start;
+	my $R2IntStop = $R2IntStart;
+
+	return ($R1IntStart, $R1IntStop, $R2IntStart, $R2IntStop);
+
+}
+
+sub getLastMapped {
+
+	#return the position of the last mapped base relative to the read
+
+	my ($cig, $ori) = @_;
+	
+	#reverse cigar if read is reverse
+	if (($ori eq '-') or ($ori eq 'r')) { $cig = reverseCigar($cig); }
+	
+	
+	#get all regions from cigar
+	my (@letters, @numbers);
+	getCigarParts($cig, \@letters, \@numbers);
+	
+	#remove any operations that don't consume query
+	for my $i (0..$#letters) {
+			if ($letters[$i] !~ /[MIS]/) {
+			splice(@letters, $i, 1);
+			splice(@numbers, $i, 1);
+		}
+	}
+	
+	my $lastMapped;
+	for my $i (reverse(0..$#letters)) { #look through CIGAR from start to end
+		if ($letters[$i] =~ /M/) { #if we've found the first match
+			#lastMapped is the sum of the operations up to and including this one
+			$lastMapped = eval join("+", @numbers[0..($i)]);		
+			last;
+		}
+	}
+
+	return $lastMapped;
+
+}
