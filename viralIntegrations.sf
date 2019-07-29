@@ -21,15 +21,16 @@ MERGE = {}
 
 for dataset in config:
 	#get files in directory and strip off "_1.fastq.gz"
-	samples = [os.path.basename(f)[:-12] for f in glob.glob("../data/reads/{}/*_R1.fastq.gz".format(dataset))]
+	samples = [os.path.basename(f)[:-11] for f in glob.glob("../data/reads/{}/*_1.fastq.gz".format(dataset))]
 	for sample in samples:
 		DATASETS.append(dataset)
 		SAMPLES.append(sample)
 		HOSTS.append(config[dataset]["host"])
 		VIRUSES.append(config[dataset]["virus"])
 		MERGE["{}_{}".format(dataset, sample)] = config[dataset]["merge"]
+		print(dataset)
 
-
+print(DATASETS)
 
 #### local rules ####
 localrules: all, combine, run_int_scripts, merge_bed
@@ -47,8 +48,8 @@ rule all:
 
 rule dedup:
 	input:
-		r1 = "../data/reads/{dset}/{samp}_R1.fastq.gz",
-		r2 = "../data/reads/{dset}/{samp}_R2.fastq.gz"	
+		r1 = "../data/reads/{dset}/{samp}_1.fastq.gz",
+		r2 = "../data/reads/{dset}/{samp}_2.fastq.gz"	
 	output:
 		R1_clumped = "../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
 		R2_clumped = "../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
@@ -56,7 +57,7 @@ rule dedup:
 		"envs/bbmap.yml"
 	shell:
 		"""
-		clumpify.sh -Xmx5g in={input.r1} in2={input.r2} out={output.R1_clumped} out2={output.R2_clumped} dedupe subs=0
+		clumpify.sh -Xmx10g in={input.r1} in2={input.r2} out={output.R1_clumped} out2={output.R2_clumped} dedupe subs=0
 		"""
 
 rule seqPrep:
