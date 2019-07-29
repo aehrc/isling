@@ -329,7 +329,9 @@ rule extract_junction_reads_host:
 		cut -f19 {input.allInt} > {output.queries}
 		if [ -s "{output.queries}" ]; then
 			samtools view -H {input.hSing} > {output.hSingJunctSam}
-			samtools view {input.hSing} | grep -f {output.queries} >> {output.hSingJunctSam}
+			while IFS= read -r line; do
+				samtools view {input.hsing} | grep $line >> {output.hsingJunctSam}
+			done < {output.queries}
 			samtools sort -o {output.hSingJunctBam} {output.hSingJunctSam}
 			samtools index {output.hSingJunctBam}
 		else

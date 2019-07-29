@@ -39,7 +39,8 @@
 	"extract_junction_reads_host":
 	{
 		"time" : "1:00:00",
-		"cpus-per-task" : "3"
+		"cpus-per-task" : "3",
+		"mem" : "20Gb"
 	}	,
 	"extract_junction_reads_virus":
 	{
