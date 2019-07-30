@@ -6,7 +6,7 @@ import os
 #### CONFIG FILE ####
 #which datasets are to be aligned to which hosts and viruses are specified in dsets.yaml
 #also whether or not to try to merge R1 and R2
-configfile: "dsets.yaml"
+configfile: "../proj-spcfc/dsets.yaml"
 
 #this is of the form { dset1: {host: host1, virus: host2, merge: True}, dset2: {host: host2, virus: virus2, merge: False} }
 
@@ -28,12 +28,10 @@ for dataset in config:
 		HOSTS.append(config[dataset]["host"])
 		VIRUSES.append(config[dataset]["virus"])
 		MERGE["{}_{}".format(dataset, sample)] = config[dataset]["merge"]
-		print(dataset)
 
-print(DATASETS)
 
 #### local rules ####
-localrules: all, combine, run_int_scripts, merge_bed
+localrules: all, combine, merge_bed
 
 #### target files ####
 rule all:

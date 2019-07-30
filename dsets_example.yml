@@ -1,0 +1,7 @@
+{
+"PRJNA485509" : {"host" : "mouse", "virus" : "Nelson2016AAVs", "merge" : "False"},
+"PRJNA298941" : {"host" : "hg38", "virus" : "hbv", "merge" : "True"},
+"PRJNA298941_AAV" : {"host" : "hg38", "virus" : "AAV_genomes", "merge" : "True"}
+}
+
+
