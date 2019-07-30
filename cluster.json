@@ -11,8 +11,7 @@
 	},
 	"dedup":
 	{	
-		"cpus-per-task" : "2",
-		"mem" : "20Gb",
+		"cpus-per-task" : "4",
 		"time" : "0:30:00"
 	},
 	"seqPrep":
@@ -41,14 +40,22 @@
 	"extract_junction_reads_host":
 	{
 		"time" : "1:00:00",
-		"cpus-per-task" : "3",
-		"mem" : "20Gb"
-	}	,
+		"cpus-per-task" : "4"
+	},
 	"extract_junction_reads_virus":
 	{
 		"time" : "1:00:00",
-		"cpus-per-task" : "3",
-		"mem" : "20Gb"
+		"cpus-per-task" : "4"
+	},
+	"count_mapped":
+	{
+		"time" : "6:00:00",
+		"cpus-per-task" : "3"
+	}	,
+	"summarise":
+	{
+		"time" : "1:00:00",
+		"cpus-per-task" : "10"
 	}
 	
 }
