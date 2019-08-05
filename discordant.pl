@@ -169,10 +169,10 @@ foreach my $key (keys %humanR1) {
 
 if ($verbose) { print "Writing output...\n"; }
 
-printOutput($output, @outLines); #write to outfile: if no sites detected will be header only
+my $header = "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNoAmbiguousBases\tOverlapType\tOrientation\tHostSeq\tViralSeq\tAmbiguousSeq\tHostSecondaryAlignments\tViralSecondaryAlignments\tPossibleHostTranslocation\tPossibleVectorRearrangement\tHostPossibleAmbiguous\tViralPossibleAmbiguous\tReadID\tmerged\n";
+		
 
-
-
+printOutput($output, $header, @outLines); #write to outfile: if no sites detected will be header only
 
 if ($bed)    { printBed($bed, @outLines); }
 
