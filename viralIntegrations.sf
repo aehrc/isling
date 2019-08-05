@@ -54,8 +54,8 @@ rule rename:
 		r2_out = temp("../out/reads/{dset}/{samp}_2.fastq.gz")
 	shell:
 		"""
-		cp {r1} {r1_out}
-		cp {r2} {r2_out}
+		cp {input.r1} {output.r1_out}
+		cp {input.r2} {output.r2_out}
 		"""
 
 rule copy:
