@@ -247,6 +247,7 @@ rule run_int_scripts:
 	output:
 		allInt = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
 		allBed = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.bed",
+		short = "../out/{dset}/ints/{samp}.{host}.{virus}.short.txt,
 		soft = temp("../out/{dset}/ints/{samp}.{host}.{virus}.soft.txt"),
 		discord = temp("../out/{dset}/ints/{samp}.{host}.{virus}.discordant.txt"),
 		softBed = temp("../out/{dset}/ints/{samp}.{host}.{virus}.soft.bed"),
@@ -265,6 +266,7 @@ rule run_int_scripts:
 		cat {output.softBed} {output.discordBed} > {output.allBed}
 		sort -k1,1 -k2,2n {output.allBed} > {output.allBedTemp}
 		cp {output.allBedTemp} {output.allBed}
+		perl -I ./short.pl --viral {input.vSing} --human {input.hSing} --output {output.short}
 		"""
 
 rule merge_bed:
