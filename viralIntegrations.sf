@@ -32,7 +32,7 @@ for dataset in config:
 
 
 #### local rules ####
-localrules: all, combine, merge_bed
+localrules: all, combine, rename, copy, merge_bed
 
 #### target files ####
 rule all:

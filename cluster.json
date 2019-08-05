@@ -18,7 +18,10 @@
 	{	
 		"time" : "1:00:00"
 	},
-
+	"extract_vAligedtoFastq":
+	{
+		"time" : "00:30:00"
+	},
 	"align_bwa_host":
 	{	
 		"cpus-per-task" : "5",
