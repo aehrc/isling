@@ -274,6 +274,7 @@ rule run_int_scripts:
 	output:
 		allInt = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
 		allBed = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.bed",
+		short = "../out/{dset}/ints/{samp}.{host}.{virus}.short.txt",
 		soft = temp("../out/{dset}/ints/{samp}.{host}.{virus}.soft.txt"),
 		discord = temp("../out/{dset}/ints/{samp}.{host}.{virus}.discordant.txt"),
 		softBed = temp("../out/{dset}/ints/{samp}.{host}.{virus}.soft.bed"),
@@ -283,8 +284,8 @@ rule run_int_scripts:
 
 	shell:
 		"""
-		perl -I . ./softClip.pl --viral {input.vSing} --human {input.hSing} --output {output.soft} --bed {output.softBed}
-		perl -I . ./discordant.pl --viral {input.vPaired} --human {input.hPaired} --output {output.discord} --bed {output.discordBed} 
+		perl -I. ./softClip.pl --viral {input.vSing} --human {input.hSing} --output {output.soft} --bed {output.softBed}
+		perl -I. ./discordant.pl --viral {input.vPaired} --human {input.hPaired} --output {output.discord} --bed {output.discordBed} 
 		sed -e '2,${{/Chr/d' -e '}}' {output.soft} {output.discord} > {output.allInt}
 		sed -i 's\chr\ \g' {output.allInt}
 		sort -n -k1,1 -k2,2n {output.allInt} > {output.allIntTemp}
@@ -292,6 +293,7 @@ rule run_int_scripts:
 		cat {output.softBed} {output.discordBed} > {output.allBed}
 		sort -k1,1 -k2,2n {output.allBed} > {output.allBedTemp}
 		cp {output.allBedTemp} {output.allBed}
+		perl -I. ./short.pl --viral {input.vSing} --human {input.hSing} --output {output.short}
 		"""
 
 rule merge_bed:
