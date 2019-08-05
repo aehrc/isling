@@ -247,7 +247,7 @@ rule run_int_scripts:
 	output:
 		allInt = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
 		allBed = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.bed",
-		short = "../out/{dset}/ints/{samp}.{host}.{virus}.short.txt,
+		short = "../out/{dset}/ints/{samp}.{host}.{virus}.short.txt",
 		soft = temp("../out/{dset}/ints/{samp}.{host}.{virus}.soft.txt"),
 		discord = temp("../out/{dset}/ints/{samp}.{host}.{virus}.discordant.txt"),
 		softBed = temp("../out/{dset}/ints/{samp}.{host}.{virus}.soft.bed"),
