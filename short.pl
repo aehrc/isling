@@ -167,14 +167,14 @@ foreach my $key (keys %viralIntegrations) {
 		my @hostData = split('xxx', $humanIntegrations{$key});
 		my ($ID, $seq) = split('xxx', $key);
 		
-		push(@outLines, join('\t', $hostData[2], $hostData[3], $hostData[4], $viralData[2], $viralData[3], $viralData[4], $ID, $seq));
+		push(@outLines, join("\t", $hostData[2], $hostData[3], $hostData[4], $viralData[2], $viralData[3], $viralData[4], $ID, $seq));
 		
 	}
 }
 
 
 #print file
-my $header = join("\t", "HostRef", "HostPos", "HostCig", "ViralRef", "ViralPos", "ViralCig", "ID", "seq");
+my $header = join("\t", "HostRef", "HostPos", "HostCig", "ViralRef", "ViralPos", "ViralCig", "ID", "seq\n");
 
 if ($verbose) { print "Writing output...\n"; }
 
