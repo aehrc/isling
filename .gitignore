@@ -6,3 +6,4 @@ Rstudio_plots.Rproj
 test_data
 .DS_store
 .snakemake
+Rplots.pdf
