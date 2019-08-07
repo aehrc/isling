@@ -4,21 +4,63 @@ import sys, getopt
 import os
 import argparse
 import subprocess
+import re
 
-def align_seqs(path, index, read1, read2, output, threshold, match, mismatch, h, threads, insert, delete):
-
+def build_bwa_args(path, index, read1, read2, output, threshold, match, mismatch, h, threads, insert, delete):
 	#build bwa args
-	bwa_args = [path, "mem", "-t", str(threads), "-A", str(match), "-B", str(mismatch), "-O", "{delete},{insert}", "-L", "0,0", "-T", str(threshold), "-h", str(h), index, read1]
+	bwa_args = [path, "mem", "-t", str(threads), "-A", str(match), "-B", str(mismatch), "-O", "{},{}".format(delete, insert), "-L", "0,0", "-T", str(threshold), "-h", str(h), index, read1]
 
 	#check if read1 and 2, or just read1
 	if read2 is not None:
 		bwa_args.append(read2)
+	return bwa_args
+
+
+def align_seqs(path, index, read1, read2, output, threshold, match, mismatch, h, threads, insert, delete):
+
+	#if insert is a comma-seperated string of values, split into list
+	if re.search(",", insert):
+		insert = insert.split(",")
+	
+	#construct a list of bwa arguments, and a list of output filenames
+	bwa_args_lst = []
+	outputs = []
+
+	#get part of output filename before ".sam"
+	#first strip out .insert\d+ if it's in there
+	output_name = re.search("(.+)\.insert\d+(.+)", output)
+	if output_name:
+		#if there is a match, splice together two parts either side of insert
+		output_name = output_name.group(1)+output_name.group(2)
+	else:
+		#otherwise just use output as provided to script
+		output_name = output
+	#remove .sam
+	base_name = re.search("^(.+)*\.sam$", output_name)
+	if base_name:
+		output_base = base_name.group(1)
+	else: 
+		raise ValueError("Check output name contains .sam")
+
+	#if multiple alingments to be done
+	if len(insert) > 1:
+		for val in insert:
+			#add bwa args to list
+			bwa_args_lst.append(build_bwa_args(path, index, read1, read2, output, threshold, match, mismatch, h, threads, val, delete))
+			#add output to list
+			outputs.append("{}.insert{}.sam".format(output_base, val))
+
+	#if only one alignment
+	else:
+		bwa_args_lst.append(build_bwa_args(path, index, read1, read2, output, threshold, match, mismatch, h, threads, insert, delete))
+		outputs.append(output)
 
 
 	#do aligning 
-	p = subprocess.Popen(bwa_args, stdout=open(output, "w"))
-	p.communicate()
-
+	for i, args in enumerate(bwa_args_lst):
+		p = subprocess.Popen(args, stdout=open(outputs[i], "w"))
+		p.communicate()
+		p.wait()
 
 def main(argv):
 	#get arguments
