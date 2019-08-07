@@ -26,7 +26,7 @@ for dataset in config["datasets"]:
 	samples = [os.path.basename(f)[:-11] for f in glob.glob("../../data/reads/{}/*_1.fastq.gz".format(dataset))]
 	samples = samples + [os.path.basename(f)[:-12] for f in glob.glob("../../data/reads/{}/*_R1.fastq.gz".format(dataset))]
 	for sample in samples:
-		for insert in config["insert-penalty"]:
+		for insert in config["insert-penalty"].split(","):
 			DATASETS.append(dataset)
 			SAMPLES.append(sample)
 			HOSTS.append(config["datasets"][dataset]["host"])
@@ -186,7 +186,7 @@ rule align_bwa_host:
 		inserts = config["insert-penalty"]
 
 	output:
-		"../../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.insert{insert}.sam"
+		expand("../../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.insert{insert}.sam", insert=inserts.split(","))
 	conda: 
 		"../envs/bwa.yml"
 	threads: 5
