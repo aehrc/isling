@@ -19,7 +19,7 @@ files <- list.files(data_path, pattern =".integrations.txt", recursive=TRUE)
 merged_files <- list.files(data_path, pattern =".integrations.merged.bed", recursive=TRUE)
 
 #import all datasets
-data <- tibble(filename = files) %>% # create a data frame holding the file names
+df <- tibble(filename = files) %>% # create a data frame holding the file names
   mutate(integrations = map(filename, ~ read_tsv(file.path(data_path, .), 
 						na = c("", "NA", "?"),
 						col_types = cols(Chr = col_character(), NoAmbiguousBases = col_integer(), .default =col_guess())))) %>%
@@ -32,19 +32,19 @@ data <- tibble(filename = files) %>% # create a data frame holding the file name
 
 
 #add extra columns with sample name, dataset, host
-data <- data %>% 
+df <- df %>% 
   mutate(dataset = dirname(dirname(filename))) %>% 
   mutate(sample = str_extract(basename(filename), "^[\\w]+(?=\\.)")) %>% 
   mutate( host = ifelse(str_detect(basename(filename), "mouse|mm10"), "mm10", "hg38"))
 
 #write xls with summary of number of sites and merged sites
-data %>% 
+df %>% 
   select(-integrations) %>% 
   select(-merged) %>% 
   write_xlsx(path = paste0(out_path, "num_sites.xlsx"))
 
 #select all integrations
-data <- data %>% 
+df <- df %>% 
   select(-merged_filename) %>% 
   select(-merged) %>% 
   filter(flatten_lgl(map(integrations, ~ nrow(.) != 0))) %>% 
@@ -52,7 +52,7 @@ data <- data %>%
 
 
 #add summary columns based on ambiguites/issues
-data <- data %>% 
+df <- df %>% 
   mutate(has_issue = ifelse((PossibleVectorRearrangement == "yes" | 
                                PossibleHostTranslocation == "yes" |
                                HostPossibleAmbiguous == "yes" |
@@ -63,14 +63,14 @@ data <- data %>%
                                   ViralPossibleAmbiguous == "yes", 'yes', 'no'))
 
 #discard PCR duplicates: filter for unique read sequences (merged for softClip, R1+R2 for discordant)
-data <- data %>% 
+df <- df %>% 
   distinct(merged, .keep_all = TRUE)
 
 #check rate of false negatives for vector rearrangement:
 #look for events on chromosome X or 14 in mouse data aligned against human
 #that aren't marked as possible vector rearrangmenets
 
-mouse_align_hg38 <- data %>% 
+mouse_align_hg38 <- df %>% 
   filter(dataset == "mouse_with_OTC") %>% 
   filter(host == "hg38") %>% 
   mutate(on_14_or_x = str_detect(Chr, "14|X"))
@@ -90,18 +90,18 @@ for (i in unique(mouse_align_hg38$sample)) {
 write_xlsx(toWrite, path =  paste(out_path, "mouse_with_OTC_hg38align.xlsx", sep = ""))
 
 #remove mouse data aligned against human from the rest of analysis
-data <- data %>% 
+df <- df %>% 
 filter(!(dataset == "mouse_with_OTC" & host == "hg38"))
 
-data %>%
+df %>%
   group_by(dataset, PossibleVectorRearrangement, host) %>% 
   summarise( count = n())
 
 
 #write excel spreadsheets for each dataset with one sheet for each sample
-for (i in unique(data$dataset)) {
+for (i in unique(df$dataset)) {
   toWrite <- list()
-  data_filt <- data %>% 
+  data_filt <- df %>% 
     filter(dataset == i)
   for (j in unique(data_filt$sample)) {
     toWrite[[j]] <- data_filt  %>% 
@@ -113,7 +113,7 @@ for (i in unique(data$dataset)) {
 #loop over columns to make pie charts of all columns
 colns <- c("OverlapType", "PossibleVectorRearrangement", "PossibleHostTranslocation", "HostPossibleAmbiguous", "ViralPossibleAmbiguous", "has_issue", "has_rearrangement", "has_locAmbig")
 for (i in colns) {
-  data %>%
+  df %>%
     mutate(dataset = as.factor(dataset)) %>% #need to make this a factor for complete to work
     count(!!ensym(i), dataset) %>% # get counts by coln[i] and dataset
     complete(!!ensym(i), dataset, fill = list(n = 0)) %>% #fill in zero rows
@@ -137,7 +137,7 @@ datasets <- unique(data$dataset)
 for (i in datasets) {
   
   #get host for this dataset
-  host <- data %>% 
+  host <- df %>% 
     filter(str_detect(dataset, i)) %>% 
     select(host) %>% 
     unique()
@@ -146,7 +146,7 @@ for (i in datasets) {
   chroms <- if (str_detect(host, "hg38")) {paste0("chr", c(1:22, "X", "Y"))} else {paste0("chr", c(1:20, "X", "Y"))}
   
   #make bed file of data with no issues
-  bed_noissues <- data %>% 
+  bed_noissues <- df %>% 
     filter(str_detect(dataset, i)) %>% 
     filter(has_issue == "no") %>% 
     select(Chr:IntStop) %>%
@@ -155,7 +155,7 @@ for (i in datasets) {
     as.data.frame()
   
   #make bed file of data with issues
-  bed_issues <- data %>% 
+  bed_issues <- df %>% 
     filter(str_detect(dataset, i)) %>% 
     filter(has_issue == "yes") %>% 
     select(Chr:IntStop) %>%
@@ -164,7 +164,7 @@ for (i in datasets) {
     as.data.frame()
   
   #make bed file of all data
-  bed <- data %>% 
+  bed <- df %>% 
     filter(str_detect(dataset, i)) %>% 
     select(Chr:IntStop) %>%
     mutate(Chr = paste0("chr", Chr)) %>% 

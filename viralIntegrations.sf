@@ -32,7 +32,7 @@ for dataset in config:
 
 
 #### local rules ####
-localrules: all, combine, rename, copy, merge_bed
+localrules: all, combine, rename, copy
 
 #### target files ####
 rule all:
@@ -333,7 +333,9 @@ rule plot_mapped:
 	
 rule summarise:
 	input: 
-		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES) 
+		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES),
+		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES)
+
 	output:
 		"../out/summary/num_sites.xlsx"
 	conda:
