@@ -42,7 +42,8 @@ localrules: all, rename, copy
 rule all:
 	input: 
 		"../../out/summary/count_short.txt",
-		"../../out/summary/count_mapped.xlsx"
+		"../../out/summary/count_mapped.xlsx",
+		expand("../../out/{dset}/ints/{samp}.{host}.{virus}.insert{insert}.short.txt", zip, dset = DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES, insert=INSERTS)
 		
 		
 
@@ -257,7 +258,7 @@ rule count_short:
 	output:
 		"../../out/summary/count_short.txt"
 	shell:
-		"wc -l ../../out/*/ints/*short.txt > ../../out/summary/count_short.txt"
+		"./count_short {output}"
 
 
 
