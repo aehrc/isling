@@ -186,7 +186,7 @@ rule align_bwa_host:
 		inserts = config["insert-penalty"]
 
 	output:
-		expand("../../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.insert{insert}.sam", insert=inserts.split(","))
+		expand("../../out/{{dset}}/host_aligned/{{samp}}.{{host}}.bwa.{{virus}}Mappedreads.insert{{insert}}.sam", insert=config["insert-penalty"].split(","))
 	conda: 
 		"../envs/bwa.yml"
 	threads: 5
@@ -223,7 +223,7 @@ rule run_int_scripts:
 		short = "../../out/{dset}/ints/{samp}.{host}.{virus}.insert{insert}.short.txt"
 	shell:
 		"""
-		perl -I. .././short.pl --viral {input.vSing} --human {input.hSing} --output {output.short}
+		perl -I.. ../short.pl --viral {input.vSing} --human {input.hSing} --output {output.short}
 		"""
 	
 #### visualization ####
