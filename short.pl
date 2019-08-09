@@ -77,7 +77,10 @@ while (my $vl = <VIRAL>) {
 	
 	unless ($cig =~ /(^\d+[SH].*\d+[SH]$)/) { next; } # want alignments where both ends are clipped
 	
-	my $matched = 
+	#number of mapped bases must be more than $cutoff
+	my (@insert) = ($cig =~ /(\d+)M/g);
+	my $mapBP = eval join("+", @insert);
+	if ($mapBP < $cutoff) { next; }
 	
 	my $seq;
 	my $ori;
@@ -122,10 +125,11 @@ while (my $hl = <HUMAN>) {
 	
 	#only want alignments where matched region is more than cutoff
 	my ($match1, $match2) = ($cig =~ /^(\d+)M.+[ISDNPH](\d+)M$/);
-	if (($match1 < 20) or ($match2 < 20)) { next; }
+	if (($match1 < $cutoff) or ($match2 < $cutoff)) { next; }
 	
 	#also want alignments where inserted region is more than cutoff
 	my (@insert) = ($cig =~ /(\d+)I/g);
+
 	
 	my $seq;
 	my $ori;
