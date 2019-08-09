@@ -221,10 +221,12 @@ rule run_int_scripts:
 		hSing = "../../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.insert{insert}.sam",
 		vSing = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam"
 	output:
-		short = "../../out/{dset}/ints/{samp}.{host}.{virus}.insert{insert}.short.txt"
+		short = "../../out/{dset}/ints/{samp}.{host}.{virus}.insert{insert}.short.txt",
+		shortThresh = "../../out/{dset}/ints/{samp}.{host}.{virus}.insert{insert}.shortIthresh.txt"
 	shell:
 		"""
 		perl -I.. ../short.pl --viral {input.vSing} --human {input.hSing} --output {output.short}
+		perl -I.. short_Icutoff.pl --viral {input.vSing} --human {input.hSing} --output {output.shortThresh}
 		"""
 	
 #### visualization ####
@@ -239,7 +241,7 @@ rule count_mapped:
 	conda: 
 		"../envs/bwa.yml"
 	shell:
-		".././count_mapped.sh"
+		"../count_mapped.sh"
 
 rule plot_mapped:
 	input:
