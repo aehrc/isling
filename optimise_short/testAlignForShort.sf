@@ -41,7 +41,7 @@ localrules: all, rename, copy
 #### target files ####
 rule all:
 	input: 
-		"../../out/summary/count_short.txt",
+		"../../out/summary/short_test/count_short.xlsx",
 		"../../out/summary/count_mapped.xlsx",
 		expand("../../out/{dset}/ints/{samp}.{host}.{virus}.insert{insert}.short.txt", zip, dset = DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES, insert=INSERTS)
 		
