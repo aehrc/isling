@@ -125,7 +125,7 @@ while (my $hl = <HUMAN>) {
 	if (($match1 < 20) or ($match2 < 20)) { next; }
 	
 	#also want alignments where inserted region is more than cutoff
-	my (@insert) = ($cig =~ /[ISDNPHM](\d+)I[ISDNPHM]/);
+	my (@insert) = ($cig =~ /(\d+)I/g);
 	
 	my $seq;
 	my $ori;
