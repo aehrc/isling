@@ -256,9 +256,11 @@ rule count_short:
 		short = expand("../../out/{dset}/ints/{samp}.{host}.{virus}.insert{insert}.short.txt", zip, dset = DATASETS, samp = SAMPLES, host =HOSTS, virus = VIRUSES, insert=INSERTS)
 
 	output:
-		"../../out/summary/count_short.txt"
-	shell:
-		"./count_short {output}"
+		"../../out/summary/short_test/count_short.xlsx"
+	conda:
+		"../envs/rscripts.yml"
+	script:
+		"./analyse_short.R"
 
 
 
