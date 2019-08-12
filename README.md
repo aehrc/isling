@@ -19,7 +19,7 @@ Pipeline requires conda and snakemake.  Currently have conda environment called 
 	- Wrote script to first identify reads that look like they might be short insertions: clipped on both sides in viral alignment (more than cutoff bases), mapped on both ends in human alignment (more than cutoff bases) with insertion in the middle
 	- Used snakefile and scripts in `optimise_short` to try to optimise the alignment to identify more short insertions.  First tried to vary the penatly for a new insertion between 0 and the default (6).  See section optimise_short below.
 
-## `optimize_short`
+## Optimizing detection of short integrations
 
 This folder contains scripts for optimization of identifying short insertions.  The idea was to try different alignment parameters in order to find the parameters that give the most insertions.  Tried this on a number of different datasets: most CMRI datasets, a subest (100 samples) of human/hbv dataset (PRJNA298941), as well as mouse/AAV dataset (PRJNA485509).
 
