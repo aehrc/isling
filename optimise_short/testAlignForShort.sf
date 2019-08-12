@@ -106,6 +106,21 @@ rule seqPrep:
 		cat {output.proc_r1} {output.proc_r2} {output.merged} > {output.all}
 		"""
 
+rule combine:
+	input:
+		r1 = "../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
+		r2 = "../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
+	output:
+		proc_r1 = temp("../out/{dset}/combined_reads/{samp}.1.fastq.gz"),
+		proc_r2 = temp("../out/{dset}/combined_reads/{samp}.2.fastq.gz"),
+		all = temp("../out/{dset}/combined_reads/{samp}.all.fastq.gz")
+	shell:
+		"""
+		cp {input.r1} {output.proc_r1}
+		cp {input.r2} {output.proc_r2}
+		cat {input.r1} {input.r2} > {output.all}
+		"""
+
 
 #### alignments ####
 
