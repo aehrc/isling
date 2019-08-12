@@ -1,6 +1,8 @@
 # AAV integration detection pipeline
 
-Inherited from Laurence Wilson.  He wrote it to detect AAV integration sites in data from mice (FRG or wild-type) treated with AAV, from collaborators at Westmead (CMRI).
+Inherited from Laurence Wilson.  He wrote it to detect AAV integration sites (chimeric reads only) in data from mice (FRG or wild-type) treated with AAV, from collaborators at Westmead (CMRI).
+
+Pipeline requires conda and snakemake.  Currently have conda environment called `snakemake`, which I'm activating in wrapper script `run_ints.sh`.  This runs the pipeline on the cluster (cluster config `cluster.json`), using conda to fufill dependencies (`envs/*.yml` contains specifications of conda environments).
 
 ## Changes from original pipeline
 
@@ -15,7 +17,13 @@ Inherited from Laurence Wilson.  He wrote it to detect AAV integration sites in 
  - Added de-duplication step prior to alingment (using `clumpify` from `BBMap`).  This can't be done after alignment because different reads might be removed from the host and viral alignments.
  - Added script `short.pl` to look for short insertions.
 	- Wrote script to first identify reads that look like they might be short insertions: clipped on both sides in viral alignment (more than cutoff bases), mapped on both ends in human alignment (more than cutoff bases) with insertion in the middle
-	- Used snakefile and scripts in `optimise_short` to try to optimise the alignment to identify more short insertions.  First tried to vary the penatly for a new insertion between 0 and the default (6)
+	- Used snakefile and scripts in `optimise_short` to try to optimise the alignment to identify more short insertions.  First tried to vary the penatly for a new insertion between 0 and the default (6).  See section optimise_short below.
+
+## `optimize_short`
+
+This folder contains scripts for optimization of identifying short insertions.  The idea was to try different alignment parameters in order to find the parameters that give the most insertions.  Tried this on a number of different datasets: most CMRI datasets, a subest (100 samples) of human/hbv dataset (PRJNA298941), as well as mouse/AAV dataset (PRJNA485509).
+
+Varied penalty for creating an insertion between 0 and 6.  In general, most samples had no integration sites, some had one or two.  The most were found in the human/hbv dataset, although inspection of these indicated that within each sample, mostly it's just one site with lots of supporting reads.  Judging by number of short integrations, it's best to have a penalty of 0.  Howver, this does sometimes result in CIGAR containing a few smaller inserted regions seperated by multiple small matched regions, rather than just one larger insertion.  If going this route, might need to combine adjacent M/I CIGAR operations in decection script.
 
 ## To do
 
