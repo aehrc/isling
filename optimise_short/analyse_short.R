@@ -53,10 +53,11 @@ count(short, delta_byInsPenalty != 0) %>% filter(`delta_byInsPenalty != 0`)
 #this table should be empty
 filter(short, delta_byIthresh > 0 & Ithresh)
 
+
 #write table to excel
 short %>% 
   select(-short) %>% 
-  write_xlsx(path =  paste(out_path, "count_short.xlsx", sep = ""))
+  write_xlsx(path =  paste(out_path, "short_test/count_short.xlsx", sep = ""))
 
 
 #### plots ####
@@ -68,8 +69,9 @@ short %>%
 ggplot() +
   geom_line(aes(x = insPenalty, y = delta_byInsPenalty, group = sample)) +
   geom_count(aes(x = insPenalty, y = delta_byInsPenalty)) +
-  facet_wrap(vars(dataset))
-ggsave(filename = paste(out_path, "count_short_insPenaltydelta.pdf", sep = ""))
+  facet_wrap(vars(dataset)) +
+  theme(legend.position='none')
+ggsave(filename = paste(out_path, "short_test/count_short_insPenaltydelta.pdf", sep = ""))
 
 short %>% 
   filter(!Ithresh) %>%
@@ -77,5 +79,6 @@ short %>%
 ggplot() +
   geom_line(aes(x = insPenalty, y = total_count, group = sample, color=sample)) +
   geom_count(aes(x = insPenalty, y = total_count)) +
-  facet_wrap(vars(dataset))
-ggsave(filename = paste(out_path, "count_short_insPenalty.pdf", sep = ""), width=20, height=8)
+  facet_wrap(vars(dataset))  +
+  theme(legend.position='none')
+ggsave(filename = paste(out_path, "short_test/count_short_insPenalty.pdf", sep = ""), width=20, height=8)
