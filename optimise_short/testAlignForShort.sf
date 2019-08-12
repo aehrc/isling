@@ -237,7 +237,7 @@ rule count_mapped:
 		expand("../../out/{dset}/virus_aligned_bam/{samp}.{virus}.bwa.mapped.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES)
 
 	output:
-		"../../out/summary/count_mapped.txt"
+		"../../out/summary/short_test/count_mapped.txt"
 	conda: 
 		"../envs/bwa.yml"
 	shell:
@@ -246,9 +246,9 @@ rule count_mapped:
 
 rule plot_mapped:
 	input:
-		"../../out/summary/count_mapped.txt"
+		"../../out/summary/short_test/count_mapped.txt"
 	output:
-		"../../out/summary/count_mapped.xlsx"
+		"../../out/summary/short_test/count_mapped.xlsx"
 	conda:
 		"../envs/rscripts.yml"
 	script:

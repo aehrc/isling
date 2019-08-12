@@ -6,7 +6,7 @@
 PROJ="`pwd`/../.."  #NOTE NEED TO RUN FROM scripts DIRECTORY IN THE CORRECT PROJECT!
 DATA=${PROJ}/out
 
-printf "sample\tdataset\tmapped\tunmapped\n" > ${PROJ}/out/summary/count_mapped.txt
+printf "sample\tdataset\tmapped\tunmapped\n" > ${PROJ}/out/summary/short_test/count_mapped.txt
 files=($(find ${DATA}/*/*/*bam -maxdepth 0 -type f))
 for file in "${files[@]}"; do
 	DATASET=`dirname $file | xargs dirname | xargs basename`
