@@ -196,7 +196,7 @@ rule align_bwa_host:
 
 rule convert:
 	input:
-		"../../out/{dset}/{host_virus}/{samp}.{host_virus_name}.{alignType}{mapped_type}.sam"
+		"../../out/{dset}/{host_virus}/{samp}.{host_virus_name}.{alignType}{mapped_type}{insert_type}.sam"
 	output:
 		bam = "../../out/{dset}/{host_virus}_bam/{samp}.{host_virus_name}.{alignType}{mapped_type}{insert_type}.bam",
 		bai = "../../out/{dset}/{host_virus}_bam/{samp}.{host_virus_name}.{alignType}{mapped_type}{insert_type}.bam.bai"
