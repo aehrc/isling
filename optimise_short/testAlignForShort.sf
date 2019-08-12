@@ -239,7 +239,7 @@ rule count_mapped:
 	conda: 
 		"../envs/bwa.yml"
 	shell:
-		".././count_mapped.sh"
+		"./count_mapped.sh"
 
 rule plot_mapped:
 	input:
