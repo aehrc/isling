@@ -11,7 +11,7 @@ data_path = "../../out/"
 
 #### count mapped and unmapped reads ####
 
-aligns <- read_tsv("../../out/summary/count_mapped.txt")
+aligns <- read_tsv("../../out/summary/short_test/count_mapped.txt")
 
 #add extra columns
 aligns <- aligns %>% 

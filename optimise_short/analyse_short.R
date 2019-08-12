@@ -38,7 +38,7 @@ short <- short %>%
   mutate(delta_byInsPenalty = total_count - lag(total_count, order_by = insPenalty)) %>%
   mutate(hasChange_byInsPenalty = delta_byInsPenalty !=0) %>%
   ungroup() %>%
-  mutate(delta_byIthresh = total_count - lag(total_count, order_by = sample)
+  mutate(delta_byIthresh = total_count - lag(total_count, order_by = sample))
 
 #groups where changing insPenalty had an effect on number of short integrations
 count(short, delta_byInsPenalty != 0) %>% filter(`delta_byInsPenalty != 0`)
