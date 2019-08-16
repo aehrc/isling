@@ -210,7 +210,7 @@ sub collectIntersect {
 	my ($vRef, $vStart, $vStop, $vOri, $seq, $vDir, $vCig, $vSec, $vSup) = (split("\t",$viralData))[0,3,4,5,6,7,8,-2,-1];
 	my ($hRef, $hStart, $hStop, $hOri, $hDir, $hCig, $hSec, $hSup)       = (split("\t",$humanData))[0,3,4,5,7,8,-2,-1];
 
-	if	((($vOri eq $hOri) and ($vDir eq $hDir)) or( ($vOri ne $hOri) and ($vDir ne $hDir))) { return; } # in some cases the same part of the read may be clippeed 
+	if	((($vOri eq $hOri) and ($vDir eq $hDir)) or(($vOri ne $hOri) and ($vDir ne $hDir))) { return; } # in some cases the same part of the read may be clippeed 
 	### CIGAR strings are always reported relative to the strand
 	### 100M50S on a fwd read = 50S100M on a rev read
 	### Therefore if integration position and read orientation match (e.g. ++ and ff) same part of the read is clipped
