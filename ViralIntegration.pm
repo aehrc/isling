@@ -3,7 +3,7 @@
 package ViralIntegration;
 use Exporter;
 @ISA = ('Exporter');
-@EXPORT = qw(analyzeRead processCIGAR processCIGAR2 extractSeqCoords extractOutput extractCoords extractSequence getCigarParts getGenomicCoords getMatchedRegion getMatchedRegions getSecSup isAmbigLoc isRearrange printOutput printBed printMerged reverseComp reverseCigar);
+@EXPORT = qw(analyzeRead processCIGAR processCIGAR2 extractSeqCoords extractOutput extractCoords extractSequence gapOrOverlap getCigarParts getGenomicCoords getMatchedRegion getMatchedRegions getSecSup isAmbigLoc isRearrange printOutput printBed printMerged reverseComp reverseCigar);
 
 
 ##### subroutines #####
@@ -275,8 +275,23 @@ sub extractSequence {
 ### Extract relevant sequence
 	my ($seq, $start, $stop, $ori, $overlap) = @_;
 
-	if ($ori eq "-") { return($seq = substr($seq, ($stop + $overlap))); }
+	if (($ori eq "-") or ($ori eq 'r')) { return($seq = substr($seq, ($stop + $overlap))); }
 	else			 { return($seq = substr($seq, 0, ($start - $overlap + 1))); }
+
+}
+
+sub gapOrOverlap {
+	
+	#calculate if there's a gap or overlap based on the start of one matched region and end end of the previous region
+	# pass in stop of first region and start of second region relative to read	
+	
+	my ($stop1, $start2) = @_;
+	
+	if ($stop1 == $start2) { return "none"; }
+	if ($stop1 > $start2) { return "overlap"; }
+	if ($stop1 < $start2) { return "gap"; }
+	
+	return;
 
 }
 
@@ -296,17 +311,16 @@ sub getCigarParts {
 }
 
 sub getGenomicCoords {
-	#get genomic coordinates of matched region (specified by start and stop relative to the read)
+	#get genomic coordinates of cigar operation (specified by start and stop relative to the read)
 	#using cigar, direction and POS (1-based leftmost mapping position of first CIGAR operation that consumes a reference base [M, D, N])
 	#need to consider CIGAR operations that consume read [MIS=X] or not [DNHP], 
 	#and those that consume reference [MDN] or not [ISHP]
 	
 	#without processing the cigar, might have more than one matched region per alignment so want to get coordinates for one that is specified
 	
-	my ($start, $stop, $pos, $sense, $cig, $readlen) = @_;
+	my ($start, $stop, $pos, $sense, $cig) = @_;
 	
 	#need to know what the coordinate of the start of the read is, given the left-most mapping position of M, D or N cigar operation
-	#first simplify cigar to remove 
 	
 	#get all regions from cigar
 	my (@letters, @numbers);
@@ -388,6 +402,8 @@ sub getMatchedRegions {
 	#returns a 1D array of matched regions in the form startxxxend	(relative to read)
 
 	my ($cigar, $dir) = @_;
+	
+	
 	if (($dir eq '-') or ($dir eq 'r')) { $cigar = reverseCigar($cigar); }
 	
 	#check for no alignments
@@ -398,7 +414,7 @@ sub getMatchedRegions {
 	
 	#get letters and numbers from cigar
 	my (@letters, @numbers);
-	getCigarParts($oriCig, \@letters, \@numbers);
+	getCigarParts($cigar, \@letters, \@numbers);
 	
 	
 	#in order to get correct coordinates relative to read (query)
@@ -498,7 +514,7 @@ sub isAmbigLoc {
 	my ($primEnd, $aligL);
 	if    (($cig =~ /^(\d+)[M]/)) { $aligL = $1; $primEnd = 'start'; }
 	elsif (($cig =~ /(\d+)[M]$/)) { $aligL = $1; $primEnd = 'end';   }
-	else 	{print "Can't figure out which end of the read is clipped in the primary alignment"; } #this shouldn't happen
+	else 	{print "Can't figure out which end of the read is clipped in the primary alignment\n"; } #this shouldn't happen
 	
 	my ($secCigar, $secSense, $secEnd, $secAligL, $secAlignment);
 	my $isAmbiguous = "";
