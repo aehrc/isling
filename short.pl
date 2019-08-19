@@ -17,7 +17,7 @@ use Getopt::Long;
 
 my $cutoff = 20; # default clipping cutoff
 my $thresh = 0.95; #default amount of read that must be covered by alignments for rearrangement
-my $tol = 5; #when processing CIGARS, combine any IDPN elements between M regions with this number of bases or less
+my $tol = 3; #when processing CIGARS, combine any IDPN elements between M regions with this number of bases or less
 my $viral;
 my $human;
 my $output = "short.txt";
@@ -83,14 +83,14 @@ while (my $vl = <VIRAL>) {
 	if ($mapBP < $cutoff) { next; }
 	
 	my $seq;
-	my $ori;
+	my $dir;
 	if ($parts[1] & 0x10) { 
 		($seq) = reverseComp($parts[9]); 
-		$ori   = 'r';
+		$dir   = 'r';
 	}
 	else				  { 
 		$seq = $parts[9]; 
-		$ori = 'f';
+		$dir = 'f';
 	}
 
 	#get read ID, aligned viral reference, alignment start
@@ -99,7 +99,7 @@ while (my $vl = <VIRAL>) {
 	#get supplementary (SA) and secondary (XA) alignments in order to check for possible vector rearrangements
 	my ($vSec, $vSup) = getSecSup($vl);
 	
-	$viralIntegrations{join("xxx",($parts[0],$seq))} = join("xxx", $seq, $ori, $ref, $start, $cig, $vSec, $vSup); 
+	$viralIntegrations{join("xxx",($parts[0],$seq))} = join("xxx", $seq, $dir, $ref, $start, $cig, $vSec, $vSup); 
 }
 close VIRAL;
 
@@ -131,14 +131,14 @@ while (my $hl = <HUMAN>) {
 	#my (@insert) = ($cig =~ /(\d+)I/g);
 
 	my $seq;
-	my $ori;
+	my $Dir;
 	if ($parts[1] & 0x10) { 
 		($seq) = reverseComp($parts[9]); 
-		$ori   = 'r';
+		$Dir   = 'r';
 	}
 	else				  { 
 		$seq = $parts[9]; 
-		$ori = 'f';
+		$Dir = 'f';
 	}
 	
 	#get read ID, aligned viral reference, alignment pos
@@ -148,7 +148,7 @@ while (my $hl = <HUMAN>) {
 	
 		my ($hSec, $hSup) = getSecSup($hl);
 		
-		$humanIntegrations{join("xxx",($parts[0],$seq))} = join("xxx", $seq, $ori, $ref, $start, $cig, $hSec, $hSup);
+		$humanIntegrations{join("xxx",($parts[0],$seq))} = join("xxx", $seq, $Dir, $ref, $start, $cig, $hSec, $hSup);
 	}
 }
 close HUMAN;
@@ -218,8 +218,8 @@ sub analyseShort{
 	my ($viralData, $hostData, $ID, $seq) = @_;
 	
 	#get data from input
-	my ($vOri, $vRef, $vPos, $vCig, $vSec, $vSup) = (split("xxx",$viralData))[1,2,3,4,5,6];
-	my ($hOri, $hRef, $hPos, $hCig, $hSec, $hSup) = (split("xxx",$hostData))[1,2,3,4,5,6];
+	my ($vDir, $vRef, $vPos, $vCig, $vSec, $vSup) = (split("xxx",$viralData))[1,2,3,4,5,6];
+	my ($hDir, $hRef, $hPos, $hCig, $hSec, $hSup) = (split("xxx",$hostData))[1,2,3,4,5,6];
 	
 	#arrays to store output
 	#attributes of output:
@@ -250,11 +250,11 @@ sub analyseShort{
 	#get int location relative to read
 	
 	#get start and stop locations of matched regions relative to read
-	my @hMatched = getMatchedRegions($hCig, $hOri); #this should be start and end of read, plus some possible internal ones
-	my @vMatched = getMatchedRegions($vCig, $vOri); #this should be middle of the read somewhere
+	my @hMatched = getMatchedRegions($hCig, $hDir); #this should be start and end of read, plus some possible internal ones
+	my @vMatched = getMatchedRegions($vCig, $vDir); #this should be middle of the read somewhere
 	
 	#get inserted region in viral read
-	my $hInsert = getInserted($hCig, $hOri);
+	my $hInsert = getInserted($hCig, $hDir);
 	
 	#make sure that inserted bases in human alignment are in the same part of read as matched region in viral alignment
 	#since matched regions can break up inserted region, if there is more than one inserted region, 
@@ -282,58 +282,59 @@ sub analyseShort{
 	#always calculate as right - left (relative to read)
 	## ie for $ambig1, orientation is host-virus, so right is virus and left is host
 	#so for $ambig1, overlap gives negative value and gap gives positive
-	my $ambig1 = $vMatchStart - $hMatch1Stop;
+	my $ambig1 = $vMatchStart - $hMatch1Stop - 1; #1-based, so need to subtract 1
 	#for $ambig2, overlap gives positive value and gap gives negative
-	my $ambig2 = $hMatch2Start - $vMatchStop;
+	my $ambig2 = $hMatch2Start - $vMatchStop - 1;
 	
 	#calculate start and stop genomic positions  
 	my ($hg1Start, $hg1Stop, $hg2Start, $hg2Stop, $vg1Start, $vg1Stop, $vg2Start, $vg2Stop);
 	
 	#get genomic coordinates of matched regions for host
 	#note that if the read is reverse, start and stop will be swapped (so need to use start for first insertion and stop for second)
-	my ($hgMatch1Start, $hgMatch1Stop) = getGenomicCoords($hMatch1Start, $hMatch1Stop, $hPos, $hOri, $hCig);
-	my ($hgMatch2Start, $hgMatch2Stop) = getGenomicCoords($hMatch2Start, $hMatch2Stop, $hPos, $hOri, $hCig);
+	my ($hgMatch1Start, $hgMatch1Stop) = getGenomicCoords($hMatch1Start, $hMatch1Stop, $hPos, $hDir, $hCig);
+	my ($hgMatch2Start, $hgMatch2Stop) = getGenomicCoords($hMatch2Start, $hMatch2Stop, $hPos, $hDir, $hCig);
 	#calculate insertion positions from matched regions
 	#note that if the read is forward, (start, stop) will be ascending and opposite for reverse read
-	if (($hOri eq 'f') or ($hOri eq '+')) {
-		($hg1Start, $hg1Stop) = sort {$a <=> $b} ($hgMatch1Stop-$ambig1, $hgMatch1Stop); #overlap means negative $ambig, gap means positive $ambig
-		($hg2Start, $hg2Stop) = sort {$a <=> $b}($hgMatch2Start, $hgMatch2Start+$ambig2); #overlap means positive $ambig, gap means negative
+	if (($hDir eq 'f') or ($hDir eq '+')) {
+		($hg1Start, $hg1Stop) = sort {$a <=> $b} ($hgMatch1Stop, $hgMatch1Stop+$ambig1); #overlap means negative $ambig, gap means positive $ambig
+		($hg2Start, $hg2Stop) = sort {$a <=> $b} ($hgMatch2Start, $hgMatch2Start-$ambig2); #overlap means positive $ambig, gap means negative
 	}
 	else {
-		($hg1Start, $hg1Stop) = sort {$a <=> $b}($hgMatch1Start, $hgMatch1Start+$ambig1);
-		($hg2Start, $hg2Stop) = sort {$a <=> $b}($hgMatch2Stop+$ambig2, $hgMatch2Stop);
+		($hg1Start, $hg1Stop) = sort {$a <=> $b} ($hgMatch1Start, $hgMatch1Start+$ambig1);
+		($hg2Start, $hg2Stop) = sort {$a <=> $b} ($hgMatch2Stop, $hgMatch2Stop-$ambig2);
 	}
 	## viral coordinates
-	my ($vgMatchStart, $vgMatchStop) = getGenomicCoords($vMatchStart, $vMatchStop, $vPos, $vOri, $vCig); #this assumes a single matched region, so could be problematic if there are more than one
-	if (($vOri eq 'f') or ($vOri eq '-')) {
-		($vg1Start, $vg1Stop) = sort {$a <=> $b}($vgMatchStart-$ambig1, $vgMatchStart);
+	my ($vgMatchStart, $vgMatchStop) = getGenomicCoords($vMatchStart, $vMatchStop, $vPos, $vDir, $vCig); #this assumes a single matched region, so could be problematic if there are more than one
+	if (($vDir eq 'f') or ($vDir eq '-')) {
+		($vg1Start, $vg1Stop) = sort {$a <=> $b}($vgMatchStart, $vgMatchStart-$ambig1);
 		($vg2Start, $vg2Stop) = sort {$a <=> $b}($vgMatchStop, $vgMatchStop+$ambig2);
 	}
 	else {
-		($vg1Start, $vg1Stop) = sort {$a <=> $b}($vgMatchStop, $vgMatchStop+$ambig1);
-		($vg2Start, $vg2Stop) = sort {$a <=> $b}($vgMatchStart-$ambig2, $vgMatchStart);
+		($vg1Start, $vg1Stop) = sort {$a <=> $b}($vgMatchStop, $vgMatchStop-$ambig1);
+		($vg2Start, $vg2Stop) = sort {$a <=> $b}($vgMatchStart, $vgMatchStart+$ambig2);
 	}
 	
 	#check for ambiguity and rearrangement
 	my $vRe;
 	if ((join(";", $vSup, $vSec)) eq "NA;NA") { $vRe = "no"; }
-	else { $vRe = (isRearrange($vCig, $vOri, $vRef, $vPos, (join(";", $vSup, $vSec)), $seq, $thresh))[0];}
+	else { $vRe = (isRearrange($vCig, $vDir, $vRef, $vPos, (join(";", $vSup, $vSec)), $seq, $thresh))[0];}
 
 	my $hRe;
 	if ((join(";", $hSup, $hSec)) eq "NA;NA") { $hRe = "no"; }
-	else { $hRe = (isRearrange($hCig, $hOri, $hRef, $hPos, (join(";", $hSup, $hSec)), $seq, $thresh))[0];}
+	else { $hRe = (isRearrange($hCig, $hDir, $hRef, $hPos, (join(";", $hSup, $hSec)), $seq, $thresh))[0];}
 	
 	#check to see if location of human alignment is ambiguous: multiple equivalent alignments accounting for human part of read
 	my $hAmbig;
 	if ($hSec eq "NA") { $hAmbig = "no";}
-	else { $hAmbig = isAmbigLoc($hOri, $hCig, $hSec);}
+	else { $hAmbig = isAmbigLoc($hDir, $hCig, $hSec, 'short', $seq, $tol);}
 	
 	#check to see if location of viral alignment is ambiguous: multiple equivalent alignments accounting for viral part of read
 	my $vAmbig;
 	if ($vSec eq "NA") { $vAmbig = "no";}
-	else { $vAmbig = isAmbigLoc($vOri, $vCig, $vSec);}
+	else { $vAmbig = isAmbigLoc($vDir, $vCig, $vSec, 'short', $seq, $tol);}
 
 	#extract relevant parts of read
+	#NEED TO FIX THIS
 	my $hostSeq1 = substr($seq, $hMatch1Start, $hMatch1Stop);
 	my $viralSeq1 = substr($seq, $vMatchStart, $vMatchStop);
 	my @ambigCoords1 = sort { $a <=> $b } ($hMatch1Stop, $vMatchStart);
@@ -359,9 +360,9 @@ sub getInserted {
 	#get inserted portion of read, based on CIGAR, and noting that some inserted regions may be broken up by matched regions
 	#so if there is more than one inserted region, assume that inserted region stretches from start of first one to end of last one
 	
-	my ($cig, $ori) = @_;
+	my ($cig, $dir) = @_;
 	
-	if (($ori eq '-') or ($ori eq 'r')) { $cig = reverseCigar($cig); }
+	if (($dir eq '-') or ($dir eq 'r')) { $cig = reverseCigar($cig); }
 	
 	#get all regions from cigar
 	my (@letters, @numbers);
