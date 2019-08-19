@@ -11,6 +11,7 @@ use Getopt::Long;
 
 my $cutoff = 20; # default clipping cutoff
 my $thresh = 0.95; #default amount of read that must be covered by alignments for rearrangement
+my $tol = 3; #when processing CIGARS, combine any IDPN elements between M regions with this number of bases or less
 my $viral;
 my $human;
 my $output = "integrationSites.txt";
@@ -260,12 +261,12 @@ sub collectIntersect {
 	#check to see if location of human alignment is ambiguous: multiple equivalent alignments accounting for human part of read
 	my $isHumAmbig;
 	if ($hSec eq "NA") { $isHumAmbig = "no";}
-	else { $isHumAmbig = isAmbigLoc($hDir, $hCig, $hSec);}
+	else { $isHumAmbig = isAmbigLoc($hDir, $hCig, $hSec, 'soft', $seq, $tol);}
 	
 	#check to see if location of viral alignment is ambiguous: multiple equivalent alignments accounting for viral part of read
 	my $isVirAmbig;
 	if ($vSec eq "NA") { $isVirAmbig = "no";}
-	else { $isVirAmbig = isAmbigLoc($vDir, $vCig, $vSec);}
+	else { $isVirAmbig = isAmbigLoc($vDir, $vCig, $vSec, 'soft', $seq, $tol);}
 
 	### Calculate the start and stop positions of the viral and human sequences relative to the read
 	my ($hRStart,$hRStop) = extractSeqCoords($hOri, $hDir, $hAlig, abs($overlap1), $readlen);

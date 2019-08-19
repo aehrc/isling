@@ -287,9 +287,9 @@ sub gapOrOverlap {
 	
 	my ($stop1, $start2) = @_;
 	
-	if ($stop1 == $start2) { return "none"; }
-	if ($stop1 > $start2) { return "overlap"; }
-	if ($stop1 < $start2) { return "gap"; }
+	if ($stop1 + 1 == $start2) { return "none"; } #1-based, so if they're bookended then there's no gap
+	if ($stop1 + 1 > $start2) { return "overlap"; }
+	if ($stop1 + 1 < $start2) { return "gap"; }
 	
 	return;
 
@@ -497,48 +497,44 @@ sub getSecSup {
 sub isAmbigLoc {
 ### check for ambiguity in location of integration site in human or viral genome
 ## look to see if there are any secondary alignments that are equivalent to primary alignment
+## there is ambiguity if the CIGAR string is identical for the primary and a secondary alignment
 
 	#$dir is direction of primary alignment ('f' or 'r')
 	#$cig is cigar of primary alignment
 	#$sec is secondary alignments in the form /(chr,pos,CIGAR,NM;)*/
-	#$aligL is number of bases mapped in primary alignment
-	my ($dir, $cig, $sec) = @_;
+	#$type is type of integration - either 'soft', 'discordant' or 'short' (need this to know how to process CIGAR)
+	#$seq is the read sequence (need for processCIGAR for soft-clipped reads)
+	#tol is max number of bases to combine for processCIGAR2
+	my ($dir, $cig, $sec, $type, $seq, $tol) = @_;
 	
-	#get if match is at start or end of read
+	#check type is one of the three options
+	unless (($type eq 'short') or ($type eq 'discordant') or ($type eq 'soft')) {
+		print "wrong type input when checking for ambiguous location\n";
+		return;
+	}
 	
 	
 	#if alignment is in reverse orientation, convert to forward by reversing the cigar
 	if ($dir eq 'r') { $cig = reverseCigar($cig); }
 	
-	#get if matched region is at start or end
-	my ($primEnd, $aligL);
-	if    (($cig =~ /^(\d+)[M]/)) { $aligL = $1; $primEnd = 'start'; }
-	elsif (($cig =~ /(\d+)[M]$/)) { $aligL = $1; $primEnd = 'end';   }
-	else 	{print "Can't figure out which end of the read is clipped in the primary alignment\n"; } #this shouldn't happen
-	
-	my ($secCigar, $secSense, $secEnd, $secAligL, $secAlignment);
 	my $isAmbiguous = "";
 	my @secs = split(";", $sec); # split secondary alignments to check one by one
-	foreach $secAlignment (@secs) {
+	foreach my $secAlignment (@secs) {
 	
 		if ($secAlignment eq "NA") { next; } #check for no secondary alignments
 		my ($secSense, $secCigar) = (split(",",$secAlignment))[2,3]; #get sense and cigar from 
 		
-		if ($secCigar =~ /(^\d+[SH].*\d+[SH]$)/) { next; } #skip alignments where both ends are clipped
-		if ($secCigar =~ /(^\d+[M].*\d+[M]$)/) { next; } #skip alignments where both ends are matched
-		
-		unless ($secCigar =~ /^\d+[M]|\d+[M]$/) { next; } #make sure one end is matched
+		#process cigar as appropriate for read type
+		if ($type eq 'soft') { $secCigar1 = processCIGAR($secCigar,$seq);}
+		$secCigar = processCIGAR2($secCigar, $tol);
 	
-		#check for if mapped is at start AND end (below assumes just one end mapped)
-		#get if mapped part of supplementary alignment is at beginning or end of read
-		if ($secSense eq '-') { $secCigar = reverseCigar($secCigar); } #reverse read if necessary
+		if ($secSense eq '-') { $secCigar = reverseCigar($secCigar); } #reverse cigar if necessary
 		
-		if	  (($secCigar =~ /^(\d+)M/)) { $secEnd = 'start';  ($secAligL) = ($secCigar =~ /^(\d+)M/);}
-		elsif (($secCigar =~ /(\d+)M$/)) { $secEnd = 'end'	 ;  ($secAligL) = ($secCigar =~ /[A-Z](\d+)M$/);}
-		else { next; } #if mapped part not at start or end
-		
-		#if end of the read is the same and number of bases matched is the same, there is ambiguity
-		if (($primEnd eq $secEnd) and ($secAligL == $aligL)) { $isAmbiguous = "yes"; } 
+		#if cigars match, there is ambiguity
+		if ($secCigar eq $cig) { $isAmbiguous = "yes"; } 
+		if ($secCigar1) {
+			if ($secCigar1 eq $cig) { $isAmbiguous = "yes"; }
+		}
 	}
 	#if haven't found any ambiguity yet
 	if ($isAmbiguous eq "") { $isAmbiguous = "no"; }
@@ -546,6 +542,8 @@ sub isAmbigLoc {
 	return $isAmbiguous;
 
 }
+
+
 
 sub isRearrange {
 
