@@ -10,7 +10,8 @@ use ViralIntegration;
 use Getopt::Long;
 
 my $cutoff = 20; # default clipping cutoff
-my $tol = 2; #when processing CIGARS, combine any IDPN elements between matched regions with this number of bases or less
+my $thresh = 0.95; #default amount of read that must be covered by alignments for rearrangement
+my $tol = 3; #when processing CIGARS, combine any IDPN elements between matched regions with this number of bases or less
 my $viral;
 my $human;
 my $output = "integrationSites.txt";
@@ -97,7 +98,6 @@ while (my $vl = <VIRAL>) {
 	my ($vSec, $vSup) = getSecSup($vl);
 	
 	#get if first or second in pair
-	my $inPair;
 	if ($parts[1] & 0x40) 		{ $viralR1{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $vSec, $vSup); }
 	elsif ($parts[1] & 0x80) 	{ $viralR2{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $vSec, $vSup); }
 
@@ -192,10 +192,10 @@ sub findDiscordant {
 ### BWA Alignments are 1-based
 	my ($key, $vR1, $vR2, $hR1, $hR2) = @_;
 	
-	my ($seq1, $vR1ori, $vR1ref, $vR1start, $vR1cig, $vR1inPair, $vR1sec, $vR1sup) = (split('xxx', $vR1))[0, 1, 2, 3, 4, 5, 6, 7];
-	my ($seq2, $vR2ori, $vR2ref, $vR2start, $vR2cig, $vR2inPair, $vR2sec, $vR2sup) = (split('xxx', $vR2))[0, 1, 2, 3, 4, 5, 6, 7];
-	my ($hR1ori, $hR1ref, $hR1start, $hR1cig, $hR1inPair, $hR1sec, $hR1sup) = (split('xxx', $hR1))[1, 2, 3, 4, 5, 6, 7];
-	my ($hR2ori, $hR2ref, $hR2start, $hR2cig, $hR2inPair, $hR2sec, $hR2sup) = (split('xxx', $hR2))[1, 2, 3, 4, 5, 6, 7];
+	my ($seq1, $vR1ori, $vR1ref, $vR1start, $vR1cig, $vR1sec, $vR1sup) = (split('xxx', $vR1))[0, 1, 2, 3, 4, 5, 6];
+	my ($seq2, $vR2ori, $vR2ref, $vR2start, $vR2cig, $vR2sec, $vR2sup) = (split('xxx', $vR2))[0, 1, 2, 3, 4, 5, 6];
+	my ($hR1ori, $hR1ref, $hR1start, $hR1cig, $hR1sec, $hR1sup) = (split('xxx', $hR1))[1, 2, 3, 4, 5, 6];
+	my ($hR2ori, $hR2ref, $hR2start, $hR2cig, $hR2sec, $hR2sup) = (split('xxx', $hR2))[1, 2, 3, 4, 5, 6];
 
 	#discordant read-pair can be either one mate mapped and one unmapped
 	#or one mate mostly mapped and the other with only a small mapped region
@@ -252,19 +252,21 @@ sub findDiscordant {
 		elsif ($hR1ori eq 'r') 	{ $junct = 'vh'; } #otherwise orientation is vh
 		
 		#check for ambiguities
-		#if ((join(";", $vR2sup, $vR2sec)) eq "NA;NA") { $isVecRearrange = "no"; }
-		#else { $isVecRearrange = isRearrange($vR2cig, $vR2ori, (join(";", $vR2sup, $vR2sec)), $readlen2, $hR1cig, $hR1ori);}
+		if ((join(";", $vR2sup, $vR2sec)) eq "NA;NA") { $isVecRearrange = "no"; }
+		else { $isVecRearrange = (isRearrange($vR2cig, $vR2ori, $vR2ref, $vR2start, (join(";", $vR2sup, $vR2sec)), $seq2, $thresh))[0];}
+		
+		if ((join(";", $hR1sec, $hR1sup)) eq "NA;NA") { $isHumRearrange = "no"; }
+		else { $isHumRearrange = (isRearrange($hR1cig, $hR1ori, $hR1ref, $hR1start, (join(";", $hR1sec, $hR1sup)), $seq1, $thresh))[0];}
 	 
-		#if ((join(";", $hR1sup, $hR1sec)) eq "NA;NA") { $isHumRearrange = "no"; }
-		#else { $isHumRearrange = isRearrange($hR1cig, $hR1ori, (join(";", $hR1sup, $hR1sec)), $readlen1, $vR1cig, $vR1ori);}
+		
 	
 		#check to see if location of human alignment is ambiguous: multiple equivalent alignments accounting for human part of read
 		if ($hR1sec eq "NA") { $isHumAmbig = "no";}
-		else { $isHumAmbig = isAmbigLoc($hR1ori, $hR1cig, $hR1sec);}
+		else { $isHumAmbig = isAmbigLoc($hR1ori, $hR1cig, $hR1sec, 'discordant', $seq1, $tol);}
 	
 		#check to see if location of viral alignment is ambiguous: multiple equivalent alignments accounting for viral part of read
 		if ($vR2sec eq "NA") { $isVirAmbig = "no";}
-		else { $isVirAmbig = isAmbigLoc($vR2ori, $vR2cig, $vR2sec);}
+		else { $isVirAmbig = isAmbigLoc($vR2ori, $vR2cig, $vR2sec, 'discordant', $seq2, $tol);}
 	}
 	elsif ($hR2map eq 'map') { #if R2 is matched in human
 	
@@ -276,21 +278,21 @@ sub findDiscordant {
 		elsif ($hR2ori eq 'f') { $junct = 'vh'; } #if human R2 is forward, orientation is vh
 	
 		#check for ambiguities
-		#if ((join(";", $vR1sup, $vR1sec)) eq "NA;NA") { $isVecRearrange = "no"; }
-		#else { $isVecRearrange = isRearrange($vR1cig, $vR1ori, (join(";", $vR1sup, $vR1sec)), $readlen1, $hR2cig, $hR2ori);}
-	 
-		#if ((join(";", $hR2sup, $hR2sec)) eq "NA;NA") { $isHumRearrange = "no"; }
-		#else { $isHumRearrange = isRearrange($hR2cig, $hR2ori, (join(";", $hR2sup, $hR2sec)), $readlen2, $vR2cig, $vR2ori);}
-	
+		if ((join(";", $vR1sup, $vR1sec)) eq "NA;NA") { $isVecRearrange = "no"; }
+		else { $isVecRearrange = (isRearrange($vR1cig, $vR1ori, $vR1ref, $vR1start, (join(";", $vR1sup, $vR1sec)), $seq1, $thresh))[0];}
+		
+		if ((join(";", $hR2sup, $hR2sec)) eq "NA;NA") { $isHumRearrange = "no"; }
+		else { $isHumRearrange = (isRearrange($hR2cig, $hR2ori, $hR2ref, $hR2start, (join(";", $hR2sup, $hR2sec)), $seq2, $thresh))[0];}
+	 	
 		#check to see if location of human alignment is ambiguous: multiple equivalent alignments accounting for human part of read
 		if ($hR2sec eq "NA") { $isHumAmbig = "no";}
-		else { $isHumAmbig = isAmbigLoc($hR2ori, $hR2cig, $hR2sec);}
+		else { $isHumAmbig = isAmbigLoc($hR2ori, $hR2cig, $hR2sec, 'discordant', $seq2, $tol);}
 	
 		#check to see if location of viral alignment is ambiguous: multiple equivalent alignments accounting for viral part of read
 		if ($vR1sec eq "NA") { $isVirAmbig = "no";}
-		else { $isVirAmbig = isAmbigLoc($vR1ori, $vR1cig, $vR1sec);}
+		else { $isVirAmbig = isAmbigLoc($vR1ori, $vR1cig, $vR1sec, 'discordant', $seq1, $tol);}
 	}
-		return($hRef, $hIntStart, $hIntStop, $vRef, $vIntStart, $vIntStop, '?', 'discordant', $junct, $hSeq, $vSeq, '-', join(';', $hR1sec, $hR2sec), join(';', $vR1sec, $vR2sec), 'NA', 'NA', $isVirAmbig, $isHumAmbig);
+		return($hRef, $hIntStart, $hIntStop, $vRef, $vIntStart, $vIntStop, '?', 'discordant', $junct, $hSeq, $vSeq, '-', join(';', $hR1sec, $hR2sec), join(';', $vR1sec, $vR2sec), $isHumRearrange, $isVecRearrange, $isVirAmbig, $isHumAmbig);
 
 }
 
