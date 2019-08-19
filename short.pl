@@ -280,24 +280,39 @@ sub analyseShort{
 	
 	#number of ambiguous bases
 	#always calculate as right - left (relative to read)
+	## ie for $ambig1, orientation is host-virus, so right is virus and left is host
+	#so for $ambig1, overlap gives negative value and gap gives positive
 	my $ambig1 = $vMatchStart - $hMatch1Stop;
+	#for $ambig2, overlap gives positive value and gap gives negative
 	my $ambig2 = $hMatch2Start - $vMatchStop;
 	
 	#calculate start and stop genomic positions  
+	my ($hg1Start, $hg1Stop, $hg2Start, $hg2Stop, $vg1Start, $vg1Stop, $vg2Start, $vg2Stop);
 	
-	## first integration
-	## genomic start position of first human matched region
+	#get genomic coordinates of matched regions for host
+	#note that if the read is reverse, start and stop will be swapped (so need to use start for first insertion and stop for second)
 	my ($hgMatch1Start, $hgMatch1Stop) = getGenomicCoords($hMatch1Start, $hMatch1Stop, $hPos, $hOri, $hCig);
-	my ($hg1Start, $hg1Stop) = sort { $a <=> $b } ($hgMatch1Stop, $hgMatch1Stop+$ambig1);
+	my ($hgMatch2Start, $hgMatch2Stop) = getGenomicCoords($hMatch2Start, $hMatch2Stop, $hPos, $hOri, $hCig);
+	#calculate insertion positions from matched regions
+	#note that if the read is forward, (start, stop) will be ascending and opposite for reverse read
+	if (($hOri eq 'f') or ($hOri eq '+')) {
+		($hg1Start, $hg1Stop) = sort {$a <=> $b} ($hgMatch1Stop-$ambig1, $hgMatch1Stop); #overlap means negative $ambig, gap means positive $ambig
+		($hg2Start, $hg2Stop) = sort {$a <=> $b}($hgMatch2Start, $hgMatch2Start+$ambig2); #overlap means positive $ambig, gap means negative
+	}
+	else {
+		($hg1Start, $hg1Stop) = sort {$a <=> $b}($hgMatch1Start, $hgMatch1Start+$ambig1);
+		($hg2Start, $hg2Stop) = sort {$a <=> $b}($hgMatch2Stop+$ambig2, $hgMatch2Stop);
+	}
 	## viral coordinates
 	my ($vgMatchStart, $vgMatchStop) = getGenomicCoords($vMatchStart, $vMatchStop, $vPos, $vOri, $vCig); #this assumes a single matched region, so could be problematic if there are more than one
-	my ($vg1Start, $vg1Stop) = sort { $a <=> $b } ($vgMatchStart-$ambig1, $vgMatchStart);
-	
-	## second integration
-	my ($hgMatch2Start, $hgMatch2Stop) = getGenomicCoords($hMatch2Start, $hMatch2Stop, $hPos, $hOri, $hCig);
-	my ($hg2Start, $hg2Stop) = sort { $a <=> $b } ($hgMatch2Start-$ambig2, $hgMatch2Start);
-	
-	my ($vg2Start, $vg2Stop) = sort { $a <=> $b } ($vgMatchStop+$ambig2, $vgMatchStop);
+	if (($vOri eq 'f') or ($vOri eq '-')) {
+		($vg1Start, $vg1Stop) = sort {$a <=> $b}($vgMatchStart-$ambig1, $vgMatchStart);
+		($vg2Start, $vg2Stop) = sort {$a <=> $b}($vgMatchStop, $vgMatchStop+$ambig2);
+	}
+	else {
+		($vg1Start, $vg1Stop) = sort {$a <=> $b}($vgMatchStop, $vgMatchStop+$ambig1);
+		($vg2Start, $vg2Stop) = sort {$a <=> $b}($vgMatchStart-$ambig2, $vgMatchStart);
+	}
 	
 	#check for ambiguity and rearrangement
 	my $vRe;

@@ -257,7 +257,7 @@ sub extractOutput {
 	#else		  	{ $overlapSeq = substr($human[6], ($human[3]-$overlap), $overlap); }
 
 	my $outline = join("\t", ($human[0], $humanStart, $humanStop, $viral[0], 
-				  $viralStart, $viralStop, $overlap, $overlaptype, $human[5], 
+				  $viralStart, $viralStop, $overlap, $overlaptype, $intData[7], 
 				  $humanSeq, $viralSeq, $overlapSeq, $hSec, $vSec, $hRearrange, $vRearrange, $hAmbig, $vAmbig));
 
 	return($outline);
