@@ -1,7 +1,25 @@
-{
-"PRJNA485509" : {"host" : "mouse", "virus" : "Nelson2016AAVs", "merge" : "False"},
-"PRJNA298941" : {"host" : "hg38", "virus" : "hbv", "merge" : "True"},
-"PRJNA298941_AAV" : {"host" : "hg38", "virus" : "AAV_genomes", "merge" : "True"}
-}
-
-
+datasets:
+    AGRF_CAGRF17513_BM3BC:
+        host: "hg38"
+        virus: "AAV_genomes"
+        merge: "True"
+    AGRF_CAGRF18349_BM3BC:
+        host: "hg38"
+        virus: "AAV_genomes"
+        merge: "True"
+    AGRF_CAGRF20923_CKP69:
+        host: "hg38"
+        virus: "AAV_genomes"
+        merge: "True"
+    FRG_OTC:
+        host: "hg38"
+        virus: "pAAV2-OTC"
+        merge: "True"
+    mouse_with_OTC:
+        host: "mouse"
+        virus: "pAAV2-OTC"
+        merge: "True"
+    OTC_vec_background:
+        host: "hg38"
+        virus: "AAV_genomes"
+        merge: "True"
