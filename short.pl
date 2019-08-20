@@ -286,6 +286,9 @@ sub analyseShort{
 	#for $ambig2, overlap gives positive value and gap gives negative
 	my $ambig2 = $hMatch2Start - $vMatchStop - 1;
 	
+	#number of inserted bases:
+	my $inserted = $hInsertStop - $hInsertStart - 1;
+	
 	#calculate start and stop genomic positions  
 	my ($hg1Start, $hg1Stop, $hg2Start, $hg2Stop, $vg1Start, $vg1Stop, $vg2Start, $vg2Stop);
 	
@@ -297,11 +300,13 @@ sub analyseShort{
 	#note that if the read is forward, (start, stop) will be ascending and opposite for reverse read
 	if (($hDir eq 'f') or ($hDir eq '+')) {
 		($hg1Start, $hg1Stop) = sort {$a <=> $b} ($hgMatch1Stop, $hgMatch1Stop+$ambig1); #overlap means negative $ambig, gap means positive $ambig
-		($hg2Start, $hg2Stop) = sort {$a <=> $b} ($hgMatch2Start, $hgMatch2Start-$ambig2); #overlap means positive $ambig, gap means negative
+		#for second matched region, multiple matched regions in the middle of the read will mean that the coordinates aren't right next to first site
+		#so instead of using genomic coordinates of second match (as above, just add 1 to stop of first match)
+		($hg2Start, $hg2Stop) = sort {$a <=> $b} ($hgMatch1Stop+1, $hgMatch1Stop-$ambig2+1); #overlap means positive $ambig, gap means negative
 	}
 	else {
 		($hg1Start, $hg1Stop) = sort {$a <=> $b} ($hgMatch1Start, $hgMatch1Start+$ambig1);
-		($hg2Start, $hg2Stop) = sort {$a <=> $b} ($hgMatch2Stop, $hgMatch2Stop-$ambig2);
+		($hg2Start, $hg2Stop) = sort {$a <=> $b} ($hgMatch1Start-1, $hgMatch1Start-$ambig2-1);
 	}
 	## viral coordinates
 	my ($vgMatchStart, $vgMatchStop) = getGenomicCoords($vMatchStart, $vMatchStop, $vPos, $vDir, $vCig); #this assumes a single matched region, so could be problematic if there are more than one
