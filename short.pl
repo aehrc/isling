@@ -352,7 +352,7 @@ sub analyseShort{
 	
 	#output:
 	## two arrays, one for each integration
-	## hRef, hStart, hStop, vRef, vStart, vStop, noAmbigbases, overlapType, orientiation, hostseq, viralseq, ambigSeq, hostSec, viralSec, possible translocation, possible vector rearrangement, host ambiguous, viral ambiguous, readID, seq
+	## hRef, hStart, hStop, vRef, vStart, vStop, noAmbigbases, overlapType, orientation, hostseq, viralseq, ambigSeq, hostSec, viralSec, possible translocation, possible vector rearrangement, host ambiguous, viral ambiguous, readID, seq
 	
 	my $int1Data = join("\t", $hRef, $hg1Start, $hg1Stop, $vRef, $vg1Start, $vg1Stop, abs($ambig1), $overlap1, 'hv', $hostSeq1, $viralSeq1, $ambigSeq1, $hSec, $vSec, $hRe, $vRe, $hAmbig, $vAmbig, $ID, $seq);
 	my $int2Data = join("\t", $hRef, $hg2Start, $hg2Stop, $vRef, $vg2Start, $vg2Stop, abs($ambig2), $overlap2, 'vh', $hostSeq2, $viralSeq2, $ambigSeq2, $hSec, $vSec, $hRe, $vRe, $hAmbig, $vAmbig, $ID, $seq);
