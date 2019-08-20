@@ -18,6 +18,9 @@ Pipeline requires conda and snakemake.  Currently have conda environment called 
  - Added script `short.pl` to look for short insertions.
 	- Wrote script to first identify reads that look like they might be short insertions: clipped on both sides in viral alignment (more than cutoff bases), mapped on both ends in human alignment (more than cutoff bases) with insertion in the middle
 	- Used snakefile and scripts in `optimise_short` to try to optimise the alignment to identify more short insertions.  First tried to vary the penatly for a new insertion between 0 and the default (6).  See section optimise_short below.
+	
+## Discordant read-pairs
+
 
 ## Short insertions
 
