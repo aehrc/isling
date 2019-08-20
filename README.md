@@ -19,19 +19,31 @@ Pipeline requires conda and snakemake.  Currently have conda environment called 
 	- Wrote script to first identify reads that look like they might be short insertions: clipped on both sides in viral alignment (more than cutoff bases), mapped on both ends in human alignment (more than cutoff bases) with insertion in the middle
 	- Used snakefile and scripts in `optimise_short` to try to optimise the alignment to identify more short insertions.  First tried to vary the penatly for a new insertion between 0 and the default (6).  See section optimise_short below.
 
-## Short integrations
+## Short insertions
 
-## Optimize\_short
+Short insertions are identified on the basis of the following criteria:
+1. Host alignment must be matched on both ends, and the length of the match must be more than a cutoff (default 20 base pairs)
+2. Host alignment must have an inserted region between the two matched regions
+3. Viral alignment must be soft-clipped on both ends with a matched region in the middle.  The number of matched bases must be more than a cutoff (default 20 base pairs)
+4. The inserted bases in the host alignment must overlap with the matched bases in the viral alignment (on the read).  This is enforced by checking that the end of the inserted region is more than the start of the matched region, and the end of the matched region is more than the start of the inserted region.
+
+Each read with a short insertion has two associated integration sites (one for each end of the insertion).  
+
+### Optimize\_short
 
 This folder contains scripts for optimization of identifying short insertions.  The idea was to try different alignment parameters in order to find the parameters that give the most insertions.  Tried this on a number of different datasets: most CMRI datasets, a subest (100 samples) of human/hbv dataset (PRJNA298941), as well as mouse/AAV dataset (PRJNA485509).
 
 Varied penalty for creating an insertion between 0 and 6.  In general, most samples had no integration sites, some had one or two.  The most were found in the human/hbv dataset, although inspection of these indicated that within each sample, mostly it's just one site with lots of supporting reads.  Judging by number of short integrations, it's best to have a penalty of 0.  Howver, this does sometimes result in CIGAR containing a few smaller inserted regions seperated by multiple small matched regions, rather than just one larger insertion.  If going this route, might need to combine adjacent M/I CIGAR operations in decection script.
 
-### Ambiguous bases in short insertions
+### Location of short insertions
 
-In chimeric reads, often don't have a clean break between virus and host.  There may be a gap or overlap between the end of the host alignment and the start of the viral alignment.  These bases are labelled 'ambiguous', because in the case of an overlap we don't know if they come from host or virus, and in the case of a gap we don't know where they come from at all.  
+One issue that came up is that for short insertions we can see both sides of the inserted viral region.  So we'd expect both to be bookended in the human genome.  However, in the first attempt at characterising these events, quirks in the alignment meant that they were not.  This comes about because of CIGARS like 58M5I7M14I7M12I16M5I112M in the host.  There are multiple small matched ares breaking up the inserted region.  For the purposes of short integrations, I treat the whole middle region, from the first to the last inserted bases, as one big insertion.  The overlaps/gaps and ambiguous bases are calculated based on this big insertion.  
 
-In the case of short insertions, we can see both sides of an integration.  Here we have more information about the integration?
+However, when calculating the genomic coordinates, I use the CIGAR and the 1-based leftmost mapping position (from the SAM file) to calculate the coordinates for each CIGAR operation, and then pick the first and last matched region for the host coordinates.  Therefore, any matched regions in the middle will throw off the genomic coordinates.
+
+There are two ways to get around this:
+1. Adjust alignment - make the gap creation penalty more than the gap extension penalty.  Hopefully this results in one long insertion, rather than one broken up by multiple matches.  This could be fiddly
+2. Combine all inserted regions in CIGAR within script.  This might be easier because it doesn't involve mucking around with alignment.  Try this first.
 
 
 
@@ -40,3 +52,5 @@ In the case of short insertions, we can see both sides of an integration.  Here 
  - Write a third script, `short.pl` to look for short insertions.  These would appear as a mapped portion on both sides in the human alignment with an insertion in the middle, and in the viral alingment they would appear as soft-clipped on both sides with a mapped region in the middle.
  - Check errors in `discordant.pl`
  - Fix bug in `softClip.pl` where sometimes can't get host/viral sequences from the read
+ - Get genetic elements in which integrations occur
+ - Improved visualisations
