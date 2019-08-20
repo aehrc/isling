@@ -30,7 +30,6 @@ for dataset in config["datasets"]:
 		VIRUSES.append(config["datasets"][dataset]["virus"])
 		MERGE["{}_{}".format(dataset, sample)] = config["datasets"][dataset]["merge"]
 
-print(DATASETS)
 
 #### local rules ####
 localrules: all, combine, rename, copy
