@@ -19,16 +19,16 @@ VIRUSES = []
 #also make dictionary MERGE, with key dataset_sample and value True or False
 MERGE = {}
 
-for dataset in config:
+for dataset in config["datasets"]:
 	#get files in directory and strip off "_1.fastq.gz"
 	samples = [os.path.basename(f)[:-11] for f in glob.glob("../data/reads/{}/*_1.fastq.gz".format(dataset))]
 	samples = samples + [os.path.basename(f)[:-12] for f in glob.glob("../data/reads/{}/*_R1.fastq.gz".format(dataset))]
 	for sample in samples:
 		DATASETS.append(dataset)
 		SAMPLES.append(sample)
-		HOSTS.append(config[dataset]["host"])
-		VIRUSES.append(config[dataset]["virus"])
-		MERGE["{}_{}".format(dataset, sample)] = config[dataset]["merge"]
+		HOSTS.append(config["datasets"][dataset]["host"])
+		VIRUSES.append(config["datasets"][dataset]["virus"])
+		MERGE["{}_{}".format(dataset, sample)] = config["datasets"][dataset]["merge"]
 
 
 #### local rules ####
@@ -39,7 +39,7 @@ rule all:
 	input: 
 		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES),
 		"../out/summary/count_mapped.xlsx",
-		"../out/summary/num_sites.xlsx"
+#		"../out/summary/num_sites.xlsx"
 		
 		
 
@@ -175,7 +175,8 @@ rule align_bwa_virus:
 		r2 = get_r2
 	output:
 		vPaired = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam"),
-		vSing = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam")
+		vSing = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam"),
+		vShort = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.sam")
 	conda: 
 		"envs/bwa.yml"
 	threads: 5
@@ -183,14 +184,17 @@ rule align_bwa_virus:
 		"""
 		python ./alignReadsWithBWA.py --threads {threads} --index ../data/references/{wildcards.virus} --read1 {input.r1} --read2 {input.r2} --output {output.vPaired} --threshold 10 --hflag 200
 		python ./alignReadsWithBWA.py --threads {threads} --index ../data/references/{wildcards.virus} --read1 {input.all} --output {output.vSing} --threshold 10 --hflag 200
+		python ./alignReadsWithBWA.py --threads {threads} --index ../data/references/{wildcards.virus} --read1 {input.all} --output {output.vShort} --threshold 10 --hflag 200 --insert 0
 		"""
 
 rule extract_vAligned:
 	input:
 		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam",
-		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam"
+		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam",
+		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.sam"
 	output:
 		svSam = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam"),
+		shortvSam = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.mapped.sam"),
 		pvBam_readMap_mateUnmap = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped1.bam"),
 		pvBam_readUnmap_mateMap = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped2.bam"),
 		pvBam = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.bam"),
@@ -200,6 +204,7 @@ rule extract_vAligned:
 	shell:
 		"""
 		samtools view -h -F 0x4 -F 0x800 -o {output.svSam} {input.vSing} 
+		samtools view -h -F 0x4 -F 0x800 -o {output.shortvSam} {input.vShort} 
 		samtools view -hb -F 0x4 -f 0x8 -F 0x800 -o {output.pvBam_readMap_mateUnmap} {input.vPaired}
 		samtools view -hb -f 0x4 -F 0x8 -F 0x800 -o {output.pvBam_readUnmap_mateMap} {input.vPaired}
 		samtools merge {output.pvBam} {output.pvBam_readMap_mateUnmap} {output.pvBam_readUnmap_mateMap}
@@ -209,9 +214,11 @@ rule extract_vAligned:
 rule extract_vAligedtoFastq:
 	input: 
 		svSam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam",
-		pvSam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam"
+		pvSam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam",
+		shortvSam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.mapped.sam" 
 	output:
 		svFastq = temp("../out/{dset}/reads/{samp}.bwa.mappedTo{virus}.fastq.gz"),
+		shortvFastq = temp("../out/{dset}/reads/{samp}.bwaShort.mappedTo{virus}.fastq.gz"),
 		pvFastq1 = temp("../out/{dset}/reads/{samp}.bwaPaired.mappedTo{virus}_1.fastq.gz"),
 		pvFastq2 = temp("../out/{dset}/reads/{samp}.bwaPaired.mappedTo{virus}_2.fastq.gz")
 	conda:
@@ -219,6 +226,7 @@ rule extract_vAligedtoFastq:
 	shell:
 		"""
 		picard SamToFastq I={input.svSam} FASTQ={output.svFastq}
+		picard SamToFastq I={input.shortvSam} FASTQ={output.shortvFastq}
 		picard SamToFastq I={input.pvSam} FASTQ={output.pvFastq1} SECOND_END_FASTQ={output.pvFastq2}
 		"""
 
@@ -230,12 +238,14 @@ rule align_bwa_host:
 		pac = "../data/references/{host}.pac",
 		sa = "../data/references/{host}.sa",
 		all = "../out/{dset}/reads/{samp}.bwa.mappedTo{virus}.fastq.gz",
+		allShort = "../out/{dset}/reads/{samp}.bwaShort.mappedTo{virus}.fastq.gz",
 		r1 = "../out/{dset}/reads/{samp}.bwaPaired.mappedTo{virus}_1.fastq.gz",
 		r2 = "../out/{dset}/reads/{samp}.bwaPaired.mappedTo{virus}_2.fastq.gz"
 
 	output:
 		hPaired = temp("../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.{virus}Mappedreads.sam"),
-		hSing = temp("../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.sam")
+		hSing = temp("../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.sam"),
+		hShort = temp("../out/{dset}/host_aligned/{samp}.{host}.bwaShort.{virus}Mappedreads.sam")
 	conda: 
 		"envs/bwa.yml"
 	threads: 5
@@ -243,6 +253,7 @@ rule align_bwa_host:
 		"""
 		python ./alignReadsWithBWA.py --threads {threads} --index ../data/references/{wildcards.host} --read1 {input.r1} --read2 {input.r2} --output {output.hPaired} --threshold 10 --hflag 200
 		python ./alignReadsWithBWA.py --threads {threads} --index ../data/references/{wildcards.host} --read1 {input.all} --output {output.hSing} --threshold 10 --hflag 200
+		python ./alignReadsWithBWA.py --threads {threads} --index ../data/references/{wildcards.host} --read1 {input.allShort} --output {output.hShort} --threshold 10 --hflag 200 --insert 0
 		"""
 rule convert:
 	input:
@@ -253,7 +264,7 @@ rule convert:
 	wildcard_constraints:
 		samp = "[\w\d_]+",
 		host_virus_name = "[\w\d-]+",
-		alignType = "bwaPaired|bwa",
+		alignType = "bwaShort|bwaPaired|bwa",
 		mapped_type = "|\.[\w\d-]+"
 	conda: 
 		"envs/bwa.yml"	
@@ -270,7 +281,10 @@ rule run_int_scripts:
 		hPaired = "../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.{virus}Mappedreads.sam",
 		hSing = "../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.sam",
 		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam",
-		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam"
+		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam",
+		hShort = "../out/{dset}/host_aligned/{samp}.{host}.bwaShort.{virus}Mappedreads.sam",
+		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.sam"
+
 	output:
 		allInt = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
 		allBed = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.bed",
@@ -279,6 +293,7 @@ rule run_int_scripts:
 		discord = temp("../out/{dset}/ints/{samp}.{host}.{virus}.discordant.txt"),
 		softBed = temp("../out/{dset}/ints/{samp}.{host}.{virus}.soft.bed"),
 		discordBed = temp("../out/{dset}/ints/{samp}.{host}.{virus}.discordant.bed"),
+		shortBed = temp("../out/{dset}/ints/{samp}.{host}.{virus}.short.bed"),
 		allIntTemp = temp("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp"),
 		allBedTemp = temp("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.bed.tmp")
 
@@ -286,14 +301,14 @@ rule run_int_scripts:
 		"""
 		perl -I. ./softClip.pl --viral {input.vSing} --human {input.hSing} --output {output.soft} --bed {output.softBed}
 		perl -I. ./discordant.pl --viral {input.vPaired} --human {input.hPaired} --output {output.discord} --bed {output.discordBed} 
-		sed -e '2,${{/Chr/d' -e '}}' {output.soft} {output.discord} > {output.allInt}
+		perl -I. ./short.pl --viral {input.vShort} --human {input.hShort} --output {output.short} --bed {output.shortBed}
+		sed -e '2,${{/Chr/d' -e '}}' {output.soft} {output.discord} {output.short} > {output.allInt}
 		sed -i 's\chr\ \g' {output.allInt}
 		sort -n -k1,1 -k2,2n {output.allInt} > {output.allIntTemp}
 		cp {output.allIntTemp} {output.allInt}
-		cat {output.softBed} {output.discordBed} > {output.allBed}
+		cat {output.softBed} {output.discordBed} {output.shortBed} > {output.allBed}
 		sort -k1,1 -k2,2n {output.allBed} > {output.allBedTemp}
 		cp {output.allBedTemp} {output.allBed}
-		perl -I. ./short.pl --viral {input.vSing} --human {input.hSing} --output {output.short}
 		"""
 
 rule merge_bed:
@@ -331,16 +346,16 @@ rule plot_mapped:
 	script:
 		"count_reads.R"
 	
-rule summarise:
-	input: 
-		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES),
-		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES)
-
-	output:
-		"../out/summary/num_sites.xlsx"
-	conda:
-		"envs/rscripts.yml"
-	script:
-		"summarise_ints.R"
+#rule summarise:
+#	input: 
+#		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt", zip, dset = DATASETS, samp = SAMPLES, #host = HOSTS, virus = VIRUSES),
+#		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed", zip, dset = DATASETS, samp = #SAMPLES, host = HOSTS, virus = VIRUSES)
+#
+#	output:
+#		"../out/summary/num_sites.xlsx"
+#	conda:
+#		"envs/rscripts.yml"
+#	script:
+#		"summarise_ints.R"
 
 		
