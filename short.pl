@@ -184,6 +184,9 @@ if ($verbose) { print "Writing output...\n"; }
 
 printOutput($output, $header, @outLines); #write to outfile: if no sites detected will be header only
 
+if ($bed)    { printBed($bed, @outLines); }
+
+
 
 exit;
 
