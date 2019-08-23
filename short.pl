@@ -168,11 +168,13 @@ foreach my $key (keys %viralIntegrations) {
 		#get ID and seq from key
 		my ($ID, $seq) = split('xxx', $key);
 		
+		#analyse short integration
 		my ($int1Data, $int2Data) = analyseShort($viralIntegrations{$key}, $humanIntegrations{$key}, $ID, $seq);
-		
-		push(@outLines, $int1Data);
-		push(@outLines, $int2Data);
-		
+		#push to array of data
+		if ($int1Data) {
+			push(@outLines, $int1Data);
+			push(@outLines, $int2Data);
+		}
 	}
 }
 
