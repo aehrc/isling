@@ -40,6 +40,11 @@
 	{
 		"time" : "2:00:00"
 	},
+	"run_int_scripts":
+	{
+		"time" : "1:00:00",
+		"cpus-per-task" : "1"
+	},
 	"extract_junction_reads_host":
 	{
 		"time" : "1:00:00",
