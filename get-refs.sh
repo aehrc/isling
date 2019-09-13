@@ -34,5 +34,18 @@ mv GCF_000001635.26_GRCm38.p6_genomic.fna mouse.fa
 #gunzip GCF_000001635.26_GRCm38.p6_genomic.fna.gz
 #cat GCF_000001635.26_GRCm38.p6_genomic.fna | awk '{if($0 ~ /^>/){print ">chr"$1} else {print}}'  | sed -e 's/chr>/chr/g' > mouse.fa
 
+## macaque macaca fasicularis
+mkdir -p macaque
+cd macaque
+wget ftp://ftp.ensembl.org/pub/release-97/fasta/macaca_fascicularis/dna/*dna.chromosome*.gz
+
+zcat *.fa.gz | perl -pe 's/^>(\w+).+$/>chr$1/' | perl -pe 's/^>chrMT/>chrM/' > ../macaque.fa
+
+cd ..
+
+wget ftp://ftp.ensembl.org/pub/release-97/gtf/macaca_fascicularis/Macaca_fascicularis.Macaca_fascicularis_5.0.97.gtf.gz
+gunzip Macaca_fascicularis.Macaca_fascicularis_5.0.97.gtf.gz
+mv Macaca_fascicularis.Macaca_fascicularis_5.0.97.gtf Macaca_fascicularis.Macaca_fascicularis_5.0.97.gff
+
 
 
