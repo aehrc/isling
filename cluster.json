@@ -20,7 +20,7 @@
 	},
 	"extract_vAligedtoFastq":
 	{
-		"time" : "00:30:00"
+		"time" : "00:45:00"
 	},
 	"align_bwa_host":
 	{	
