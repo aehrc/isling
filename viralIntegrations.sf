@@ -93,15 +93,18 @@ rule seqPrep:
 		r1 = "../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
 		r2 = "../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
 	output:
-		merged = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz"),
-		proc_r1 = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_1.fastq.gz"),
-		proc_r2 = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_2.fastq.gz"),
-		all = temp("../out/{dset}/merged_reads/{samp}.all.fastq.gz")
+		merged = "../out/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz",
+		proc_r1 = "../out/{dset}/merged_reads/{samp}.SeqPrep_1.fastq.gz",
+		proc_r2 = "../out/{dset}/merged_reads/{samp}.SeqPrep_2.fastq.gz",
+		all = "../out/{dset}/merged_reads/{samp}.all.fastq.gz"
 	conda:	
 		"envs/seqprep.yml"
+	params:
+		A = lambda wildcards: config["datasets"][wildcards.dset]["read1-adapt"],
+		B = lambda wildcards: config["datasets"][wildcards.dset]["read2-adapt"]
 	shell:
 		"""
-		SeqPrep -f {input.r1} -r {input.r2} -1 {output.proc_r1} -2 {output.proc_r2} -s {output.merged}
+		SeqPrep -A {params.A} -B {params.B} -f {input.r1} -r {input.r2} -1 {output.proc_r1} -2 {output.proc_r2} -s {output.merged}
 		cat {output.proc_r1} {output.proc_r2} {output.merged} > {output.all}
 		"""
 
@@ -110,16 +113,41 @@ rule combine:
 		r1 = "../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
 		r2 = "../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
 	output:
-		proc_r1 = temp("../out/{dset}/combined_reads/{samp}.1.fastq.gz"),
-		proc_r2 = temp("../out/{dset}/combined_reads/{samp}.2.fastq.gz"),
-		all = temp("../out/{dset}/combined_reads/{samp}.all.fastq.gz")
+		proc_r1 = "../out/{dset}/processed_reads/{samp}.1.fastq.gz",
+		proc_r2 = "../out/{dset}/processed_reads/{samp}.2.fastq.gz",
+		all = "../out/{dset}/processed_reads/{samp}.all.fastq.gz"
 	shell:
 		"""
 		cp {input.r1} {output.proc_r1}
 		cp {input.r2} {output.proc_r2}
 		cat {input.r1} {input.r2} > {output.all}
 		"""
+#functions for if we did seqPrep or not
 
+def get_all(wildcards):
+	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
+		folder = "merged_reads"
+	else:
+		folder = "processed_reads"
+	return "../out/{}/{}/{}.all.fastq.gz".format(wildcards.dset, folder, wildcards.samp)
+
+def get_r1(wildcards):
+	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
+		typeRead = "SeqPrep_1"
+		folder = "merged_reads"
+	else:
+		typeRead = "1"	
+		folder = "processed_reads"
+	return "../out/{}/{}/{}.{}.fastq.gz".format(wildcards.dset, folder, wildcards.samp, typeRead)
+
+def get_r2(wildcards):
+	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
+		typeRead = "SeqPrep_2"
+		folder = "merged_reads"
+	else:
+		typeRead = "2"	
+		folder = "processed_reads"
+	return "../out/{}/{}/{}.{}.fastq.gz".format(wildcards.dset, folder, wildcards.samp, typeRead)
 
 
 #### alignments ####
@@ -137,33 +165,6 @@ rule index:
 		"envs/bwa.yml"
 	shell:
 		"bwa index -p ../data/references/{wildcards.genome} {input}"
-
-#functions for if we did seqPrep or not
-
-def get_all(wildcards):
-	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
-		folder = "merged_reads"
-	else:
-		folder = "combined_reads"
-	return "../out/{}/{}/{}.all.fastq.gz".format(wildcards.dset, folder, wildcards.samp)
-
-def get_r1(wildcards):
-	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
-		typeRead = "SeqPrep_1"
-		folder = "merged_reads"
-	else:
-		typeRead = "1"	
-		folder = "combined_reads"
-	return "../out/{}/{}/{}.{}.fastq.gz".format(wildcards.dset, folder, wildcards.samp, typeRead)
-
-def get_r2(wildcards):
-	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
-		typeRead = "SeqPrep_2"
-		folder = "merged_reads"
-	else:
-		typeRead = "2"	
-		folder = "combined_reads"
-	return "../out/{}/{}/{}.{}.fastq.gz".format(wildcards.dset, folder, wildcards.samp, typeRead)
 
 
 rule align_bwa_virus:
@@ -188,6 +189,21 @@ rule align_bwa_virus:
 		python ./alignReadsWithBWA.py --threads {threads} --index ../data/references/{wildcards.virus} --read1 {input.r1} --read2 {input.r2} --output {output.vPaired} --threshold 10 --hflag 200
 		python ./alignReadsWithBWA.py --threads {threads} --index ../data/references/{wildcards.virus} --read1 {input.all} --output {output.vSing} --threshold 10 --hflag 200
 		python ./alignReadsWithBWA.py --threads {threads} --index ../data/references/{wildcards.virus} --read1 {input.all} --output {output.vShort} --threshold 10 --hflag 200 --insert 0
+		"""
+
+
+rule fastqc:
+	input:
+		all_reads = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.bam"
+	output:
+		all_reads = "../out/{dset}/post_fastqc/{samp}.{virus}.bwa.fastqc.html"
+	params:
+		outpath = lambda wildcards: "../out/{wildcards.dset}/post_fastqc"
+	conda:
+		"envs/fastqc.yml"
+	shell:
+		"""
+		fastqc -o {params.outpath} {input.all_reads}
 		"""
 
 rule extract_vAligned:
