@@ -192,19 +192,19 @@ rule align_bwa_virus:
 		"""
 
 
-rule fastqc:
-	input:
-		all_reads = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.bam"
-	output:
-		all_reads = "../out/{dset}/post_fastqc/{samp}.{virus}.bwa.fastqc.html"
-	params:
-		outpath = lambda wildcards: "../out/{wildcards.dset}/post_fastqc"
-	conda:
-		"envs/fastqc.yml"
-	shell:
-		"""
-		fastqc -o {params.outpath} {input.all_reads}
-		"""
+#rule fastqc:
+#	input:
+#		all_reads = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.bam"
+#	output:
+#		all_reads = "../out/{dset}/post_fastqc/{samp}.{virus}.bwa.fastqc.html"
+#	params:
+#		outpath = lambda wildcards: "../out/{wildcards.dset}/post_fastqc"
+#	conda:
+#		"envs/fastqc.yml"
+#	shell:
+#		"""
+#		fastqc -o {params.outpath} {input.all_reads}
+#		"""
 
 rule extract_vAligned:
 	input:
