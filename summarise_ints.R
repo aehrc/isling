@@ -35,7 +35,7 @@ df <- tibble(filename = files) %>% # create a data frame holding the file names
 df <- df %>% 
   mutate(dataset = dirname(dirname(filename))) %>% 
   mutate(sample = str_extract(basename(filename), "^[\\w]+(?=\\.)")) %>% 
-  mutate( host = ifelse(str_detect(basename(filename), "mouse|mm10"), "mm10", "hg38"))
+  mutate( host = ifelse(str_detect(basename(filename), "mouse|mm10"), "mm10", ifelse(str_detect(basename(filename), "macaque|macaca"), "macFas5", "hg38")))
 
 #write xls with summary of number of sites and merged sites
 df %>% 
@@ -133,7 +133,7 @@ for (i in colns) {
 
 
 #make circos plots for all datasets
-datasets <- unique(data$dataset)
+datasets <- unique(df$dataset)
 for (i in datasets) {
   
   #get host for this dataset
@@ -143,7 +143,7 @@ for (i in datasets) {
     unique()
   
   #get chromosomes for host
-  chroms <- if (str_detect(host, "hg38")) {paste0("chr", c(1:22, "X", "Y"))} else {paste0("chr", c(1:20, "X", "Y"))}
+  chroms <- if (str_detect(host, "hg38")) {paste0("chr", c(1:22, "X", "Y", "M"))} 
   
   #make bed file of data with no issues
   bed_noissues <- df %>% 
@@ -170,6 +170,8 @@ for (i in datasets) {
     mutate(Chr = paste0("chr", Chr)) %>% 
     filter(str_detect(Chr, paste(chroms, collapse = "|"))) %>% 
     as.data.frame()
+
+  #if any of these are empty, skip to next dataset
   
   #make plot of all data
   pdf(paste0(out_path, "hostCircos_", i, "_density_all.pdf", sep = ""))
