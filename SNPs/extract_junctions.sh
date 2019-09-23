@@ -1,30 +1,19 @@
 #!/bin/bash
 
 
-## snakemake inputs
-#input:
-#	allInt = "../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
-#	vSing = "../../out/{dset}/virus_aligned_bam/{samp}.{virus}.bwa.bam"
-#output:
-#	vSingJunctSam = temp("../../out/{dset}/junct_aligns/{samp}.{virus}.bwa.junctReads.sam"),
-#	vSingJunctBam = "../../out/{dset}/junct_aligns/{samp}.{virus}.bwa.junctReads.bam",
-#	queries = temp("../../out/{dset}/ints/{samp}.{virus}.bwa.junctReads.txt")
-
-##test files
 #inputs
-allInt=/scratch1/sco305/intvi_cmri/out/london_macaque_OTC/ints/7_S1.macaque.pAAV2-OTC.integrations.txt
-vSing=/scratch1/sco305/intvi_cmri/out/london_macaque_OTC/virus_aligned_bam7_S1.pAAV2-OTC.bwa.mapped.bam
-hSing=/scratch1/sco305/intvi_cmri/out/london_macaque_OTC/host_aligned_bam/7_S1.macaque.bwa.pAAV2-OTCMappedreads.bam
+allInt=$1 	#integration site txt file
+hSing=$2	#human mapped bam file
+vSing=$3	#virus mapped bam file
 
-#intermediate
-vqueries=7.vJunct.txt
-hqueries=7.hJunct.txt
+#intermediate files
+hqueries=$4
 
 #outputs
-vSingJunctSam=7.vMapped.junct.sam
-vSingJunctBam=7.vMapped.junct.bam
-hSingJunctSam=7.hMapped.junct.sam
-hSingJunctBam=7.hMapped.junct.bam
+hSingJunctSam=$5	#human output sam
+hSingJunctBam=$6	#human output bam
+vSingJunctSam=$7	#virus output sam
+vSingJunctBam=$8	#virus output bam
 
 #integration site txt file format:
 #field1: host chr
@@ -36,11 +25,7 @@ hSingJunctBam=7.hMapped.junct.bam
 #field19: read name
 
 #get host coordinates and read names
-cut -f1,2,3,19 $allInt | tail -n +2 > $hqueries
-
-#get virus coordinates and read names
-cut -f4,5,6,19 $allInt | tail -n +2 > $vqueries
-
+cut -f1,2,3,4,5,6,19 $allInt | tail -n +2 > $hqueries
 
 #if we had some integration sites
 if [ -s $hqueries ]; then
@@ -48,15 +33,23 @@ if [ -s $hqueries ]; then
 	samtools view -H $hSing > $hSingJunctSam
 	#get reads from host 
 	while IFS= read -r line; do
-		chr=`echo $line | awk '{print $1}'`
-		start=`echo $line | awk '{print $2}'`
-		stop=`echo $line | awk '{print $3}'`
-		name=`echo $line | awk '{print $4}'`
-		samtools view $hSing chr${chr}:${start}-${stop} | grep $name >> $hSingJunctSam
+		hchr=`echo $line | awk '{print $1}'`
+		hstart=`echo $line | awk '{print $2}'`
+		hstop=`echo $line | awk '{print $3}'`
+		vchr=`echo $line | awk '{print $4}'`
+		vstart=`echo $line | awk '{print $5}'`
+		vstop=`echo $line | awk '{print $6}'`
+		name=`echo $line | awk '{print $7}'`
+		samtools view $hSing chr${hchr}:${hstart}-${hstop} | grep $name >> $hSingJunctSam
+		samtools view $vSing ${vchr}:${vstart}-${vstop} | grep $name >> $vSingJunctSam
 	done < $hqueries
 	samtools sort -o $hSingJunctBam $hSingJunctSam
+	samtools sort -o $vSingJunctBam $vSingJunctSam
 	samtools index $hSingJunctBam
+	samtools index $vSingJunctBam
 else
 	touch $hSingJunctBam
 	touch $hSingJunctSam
+	touch $vSingJunctBam
+	touch $vSingJunctSam
 fi
