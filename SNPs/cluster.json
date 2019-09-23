@@ -72,6 +72,10 @@
 	"refseq":
 	{
 		"time" : "0:30:00"
+	}	,
+	"extract_junction_reads":
+	{
+		"time" : "1:00:00"
 	}
 	
 }

@@ -185,6 +185,7 @@ rule align_bwa_virus:
 		python ../alignReadsWithBWA.py --threads {threads} --index ../../data/references/{wildcards.virus} --read1 {input.r1} --read2 {input.r2} --output {output.vPaired} --threshold 10 --hflag 200
 		python ../alignReadsWithBWA.py --threads {threads} --index ../../data/references/{wildcards.virus} --read1 {input.all} --output {output.vSing} --threshold 10 --hflag 200
 		python ../alignReadsWithBWA.py --threads {threads} --index ../../data/references/{wildcards.virus} --read1 {input.all} --output {output.vShort} --threshold 10 --hflag 200 --insert 0
+		wait
 		"""
 
 rule extract_vAligned:
@@ -280,8 +281,8 @@ rule run_int_scripts:
 	input:
 		hPaired = "../../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.{virus}Mappedreads.sam",
 		hSing = "../../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.sam",
-		vPaired = "../../../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam",
-		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam",
+		vPaired = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam",
+		vSing = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam",
 		hShort = "../../out/{dset}/host_aligned/{samp}.{host}.bwaShort.{virus}Mappedreads.sam",
 		vShort = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.sam"
 
@@ -368,10 +369,10 @@ rule extract_junction_reads:
 		"../envs/bwa.yml"
 	shell:
 		"""
-		cut -f1,2,3,4,5,6,19 {input.allInt} > {output.queries}
+		cut -f1,2,3,4,5,6,19 {input.allInt} | tail -n +2 > {output.queries}
 		if [ -s "{output.queries}" ]; then
-			samtools view -H {input.hSing} | tail -n +2  > {output.hSingJunctSam}
-			samtools view -H {input.vSing} | tail -n +2 > {output.vSingJunctSam}
+			samtools view -H {input.hSing} > {output.hSingJunctSam}
+			samtools view -H {input.vSing} > {output.vSingJunctSam}
 			while IFS= read -r line; do
 				hchr=`echo $line | awk '{{print $1}}'`
 				hstart=`echo $line | awk '{{print $2}}'`
