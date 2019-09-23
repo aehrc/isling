@@ -31,6 +31,7 @@ cut -f1,2,3,4,5,6,19 $allInt | tail -n +2 > $hqueries
 if [ -s $hqueries ]; then
 	#get header from input bam
 	samtools view -H $hSing > $hSingJunctSam
+	samtools view -H $vSing > $vSingJunctSam
 	#get reads from host 
 	while IFS= read -r line; do
 		hchr=`echo $line | awk '{print $1}'`
