@@ -307,12 +307,12 @@ rule run_int_scripts:
 	output:
 		allInt = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
 		allBed = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.bed",
-		short = "../out/{dset}/ints/{samp}.{host}.{virus}.short.txt",
-		soft = "../out/{dset}/ints/{samp}.{host}.{virus}.soft.txt",
-		discord = "../out/{dset}/ints/{samp}.{host}.{virus}.discordant.txt",
-		softBed = "../out/{dset}/ints/{samp}.{host}.{virus}.soft.bed",
-		discordBed = "../out/{dset}/ints/{samp}.{host}.{virus}.discordant.bed",
-		shortBed = "../out/{dset}/ints/{samp}.{host}.{virus}.short.bed",
+		short = temp("../out/{dset}/ints/{samp}.{host}.{virus}.short.txt"),
+		soft = temp("../out/{dset}/ints/{samp}.{host}.{virus}.soft.txt"),
+		discord = temp("../out/{dset}/ints/{samp}.{host}.{virus}.discordant.txt"),
+		softBed = temp("../out/{dset}/ints/{samp}.{host}.{virus}.soft.bed"),
+		discordBed = temp("../out/{dset}/ints/{samp}.{host}.{virus}.discordant.bed"),
+		shortBed = temp("../out/{dset}/ints/{samp}.{host}.{virus}.short.bed"),
 		allIntTemp = temp("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp"),
 		allBedTemp = temp("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.bed.tmp")
 
