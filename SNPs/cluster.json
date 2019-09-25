@@ -7,7 +7,7 @@
 		"ntasks-per-node" : "1",
 		"nodes" : "1",
 		"cpus-per-task" : "1",
-		"output" : "../slogs/{rule}.{wildcards}.log"
+		"output" : "../../slogs/{rule}.{wildcards}.log"
 	},
 	"dedup":
 	{	
@@ -68,6 +68,14 @@
 	"refseq":
 	{
 		"time" : "0:30:00"
+	}	,
+	"refseq":
+	{
+		"time" : "0:30:00"
+	}	,
+	"extract_junction_reads":
+	{
+		"time" : "10:00:00"
 	}
 	
 }
