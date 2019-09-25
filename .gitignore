@@ -7,3 +7,4 @@ test_data
 .DS_store
 .snakemake
 Rplots.pdf
+benchmarking/LW_benchmarking/
