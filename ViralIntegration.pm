@@ -647,6 +647,10 @@ sub isRearrange {
 		
 	}
 	
+	#if at this point we only have one alignment left, can't be a vector rearrangement
+	if ($#sorted == 0) { return "no"; }
+	
+	
 	#check if alignments can account for whole read
 	#check all alignments for gaps
 	#to store the number of total bases gapped and number of gaps
@@ -655,6 +659,7 @@ sub isRearrange {
 	if ($gapBP == 0) { $gaps = 0; }
 	else { $gaps = 1; }
 	
+	#check all alingments for gaps
 	for my $i (1..$#sorted) {
 		#if at end of the alignments, check gap between end of read and last alignment
 		if ($i == $#sorted) {
@@ -670,9 +675,10 @@ sub isRearrange {
 			#add number of gap bases between start of current alignment and end of previous alignment to total gapped bases
 			 $gapBP +=  (split('xxx', $sorted[$i]))[0] - ((split('xxx', $sorted[$i-1]))[1] + 1);
 			$gaps += 1
-			
+		
 		}
 	}
+
 	
 	my $isRearrange; #to store result, "yes" or "no"
 	
