@@ -161,7 +161,7 @@ foreach my $key (keys %humanR1) {
 	# Once the positions are collected, put together the output	
 	my $outLine;
 	if ((scalar @intData) > 1) { $outLine = join("\t", @intData); }
-	my $combReads = join("", (split("xxx", $viralR1{$key}))[0], (split("xxx", $viralR2{$key}))[0]);
+	my $combReads = join("xxx", (split("xxx", $viralR1{$key}))[0], (split("xxx", $viralR2{$key}))[0]);
 	if (defined $outLine) { push(@outLines, join("\t", ($outLine, $key, $combReads))); }
 }
 
