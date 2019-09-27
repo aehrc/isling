@@ -18,8 +18,22 @@ Pipeline requires conda and snakemake.  Currently have conda environment called 
  - Added script `short.pl` to look for short insertions.
 	- Wrote script to first identify reads that look like they might be short insertions: clipped on both sides in viral alignment (more than cutoff bases), mapped on both ends in human alignment (more than cutoff bases) with insertion in the middle
 	- Used snakefile and scripts in `optimise_short` to try to optimise the alignment to identify more short insertions.  First tried to vary the penatly for a new insertion between 0 and the default (6).  See section optimise_short below.
+
+## Identifying ambiguities and possible issues
+
+Claus identified two possible issues that might be occuring.  The first relates to reads that can be accounted for by multiple alignments to the same refrence (possible rearrangement), and the second relates to reads where the primary alignment is equivalent to a secondary alignment, so we can't unambigously assign an integration site (possible location ambiguity).
+
+### Possible rearrangements
+
+Identify possible rearrangements (either vector rearrangements or host translocations) as reads where multiple alignments to one genome span most of the read.  Currently if 95% of bases in read are accounted for by any number of alignments from one genome, that read is flagged as a possible 
+
+### Location ambiguity
+
+To identify reads where a location of the integration can't be unambigouosly defined, look for alignments where the CIGAR for the primary alignment is the same as the CIGAR for any of the secondary alignemnts.  Note that this approach disregards mismatches, which are appear as matched in the CIGAR.
 	
 ## Discordant read-pairs
+
+Identify discordant read-pairs (`discordant.pl`) by identifying unmerged pairs where one read is mapped and one unmapped in one alignment, and vice versa for the other alignment.  Allow some soft-clipping in mapped reads and mapping in unmapped reads here - a read is considered mapped if it has a number of soft-clipped bases that is less than a threshould (say 20), and unmapped if it has a number of mapped bases that is less than the same threshould.
 
 
 ## Short insertions
@@ -40,7 +54,7 @@ Varied penalty for creating an insertion between 0 and 6.  In general, most samp
 
 ### Location of short insertions
 
-One issue that came up is that for short insertions we can see both sides of the inserted viral region.  So we'd expect both to be bookended in the human genome.  However, in the first attempt at characterising these events, quirks in the alignment meant that they were not.  This comes about because of CIGARS like 58M5I7M14I7M12I16M5I112M in the host.  There are multiple small matched ares breaking up the inserted region.  For the purposes of short integrations, I treat the whole middle region, from the first to the last inserted bases, as one big insertion.  The overlaps/gaps and ambiguous bases are calculated based on this big insertion.  
+One issue that came up is that for short insertions we can see both sides of the inserted viral region.  So we'd expect both to be bookended in the human genome.  However, in the first attempt at characterising these events, quirks in the alignment meant that they were not.  This comes about because of CIGARS like 58M5I7M14I7M12I16M5I112M in the host.  There are multiple small matched ares breaking up the inserted region.  For the purposes of short integrations, I treat the whole middle region, from the first to the last inserted bases, as one big insertion.  The overlaps/gaps and ambiguous bases are calculated based on this big insertion.
 
 However, when calculating the genomic coordinates, I use the CIGAR and the 1-based leftmost mapping position (from the SAM file) to calculate the coordinates for each CIGAR operation, and then pick the first and last matched region for the host coordinates.  Therefore, any matched regions in the middle will throw off the genomic coordinates.
 
@@ -49,10 +63,14 @@ There are two ways to get around this:
 2. Combine all inserted regions in CIGAR within script.  This might be easier because it doesn't involve mucking around with alignment.  Try this first.
 
 
+## Variants
+
+It would be good to distinguish between vector rearrangements and insertions in the regions where the vector and the human genome are homologous (hAAT \[SERPINA1\] promoter, OTC enhancer).  Can do this by looking for variants between vector and human genome in this region: there are a few in the hAAT promoter.  Interrograte this by extracting only the junction fragments from the alignment.  Made a seperate snakefile to do this, in folder 'SNPs'.
+
+
 
 ## To do
 
- - Write a third script, `short.pl` to look for short insertions.  These would appear as a mapped portion on both sides in the human alignment with an insertion in the middle, and in the viral alingment they would appear as soft-clipped on both sides with a mapped region in the middle.
  - Check errors in `discordant.pl`
  - Fix bug in `softClip.pl` where sometimes can't get host/viral sequences from the read
  - Get genetic elements in which integrations occur
