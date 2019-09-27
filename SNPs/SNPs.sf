@@ -353,22 +353,36 @@ rule count_mapped:
 
 #### extract junction fragments and look for variants ####
 
-rule extract_junction_reads:
+rule extract_virus_junction_reads:
 	input:
 		allInt = "../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
-		hSing = "../../out/{dset}/host_aligned_bam/{samp}.{host}.bwa.{virus}Mappedreads.bam",
-		vSing = "../../out/{dset}/virus_aligned_bam/{samp}.{virus}.bwa.bam"
+		vSing = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam"
 	output:
-		queries = temp("../../out/{dset}/ints/{samp}.{host}.bwa.{virus}Mappedreads.junctReads.txt"),
-		hSingJunctSam = "../../out/{dset}/junct_aligns_host/{samp}.{host}.bwa.{virus}Mappedreads.junctReads.sam",
-		hSingJunctBam = "../../out/{dset}/junct_aligns_host/{samp}.{host}.bwa.{virus}Mappedreads.junctReads.bam",
-		vSingJunctSam = "../../out/{dset}/junct_aligns_virus/{samp}.{virus}.bwa.{host}junctReads.sam",
+		vSingJunctSam = temp("../../out/{dset}/junct_aligns_virus/{samp}.{virus}.bwa.{host}junctReads.sam"),
 		vSingJunctBam = "../../out/{dset}/junct_aligns_virus/{samp}.{virus}.bwa.{host}junctReads.bam"
 	conda:
 		"../envs/bwa.yml"
 	shell:
 		"""
-		./extract_junctions.sh {input.allInt} {input.hSing} {input.vSing} {output.queries} {output.hSingJunctSam} {output.hSingJunctBam} {output.vSingJunctSam} {output.vSingJunctBam}
+		perl extract_junctions.pl --sam {input.vSing}--ints {input.allInt} --junctSam {output.vSingJunctSam}
+		samtools view -bhS {output.vSingJunctSam} | samtools sort - -o {output.vSingJunctBam}
+		samtools index {output.vSingJunctBam}
+	"""
+
+rule extract_host_junction_reads:
+	input:
+		allInt = "../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
+		hSing = "../../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.sam"
+	output:
+		hSingJunctSam = temp("../../out/{dset}/junct_aligns_host/{samp}.{host}.bwa.{virus}junctReads.sam"),
+		hSingJunctBam = "../../out/{dset}/junct_aligns_host/{samp}.{host}.bwa.{virus}junctReads.bam"
+	conda:
+		"../envs/bwa.yml"
+	shell:
+		"""
+		perl extract_junctions.pl --sam {input.hSing}--ints {input.allInt} --junctSam {output.hSingJunctSam}
+		samtools view -bhS {output.hSingJunctSam} | samtools sort - -o {output.hSingJunctBam}
+		samtools index {output.hSingJunctBam}
 		"""
 
 
