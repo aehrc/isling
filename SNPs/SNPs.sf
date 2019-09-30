@@ -19,16 +19,16 @@ VIRUSES = []
 #also make dictionary MERGE, with key dataset_sample and value True or False
 MERGE = {}
 
-for dataset in config["datasets"]:
+for dataset in config:
 	#get files in directory and strip off "_1.fastq.gz"
 	samples = [os.path.basename(f)[:-11] for f in glob.glob("../../data/reads/{}/*_1.fastq.gz".format(dataset))]
 	samples = samples + [os.path.basename(f)[:-12] for f in glob.glob("../../data/reads/{}/*_R1.fastq.gz".format(dataset))]
 	for sample in samples:
 		DATASETS.append(dataset)
 		SAMPLES.append(sample)
-		HOSTS.append(config["datasets"][dataset]["host"])
-		VIRUSES.append(config["datasets"][dataset]["virus"])
-		MERGE["{}_{}".format(dataset, sample)] = config["datasets"][dataset]["merge"]
+		HOSTS.append(config[dataset]["host"])
+		VIRUSES.append(config[dataset]["virus"])
+		MERGE["{}_{}".format(dataset, sample)] = config[dataset]["merge"]
 
 #### local rules ####
 localrules: all, combine, run_int_scripts, merge_bed
@@ -36,8 +36,8 @@ localrules: all, combine, run_int_scripts, merge_bed
 #### target files ####
 rule all:
 	input: 
-		expand("../../out/{dset}/junct_aligns_host/{samp}.{host}.bwa.{virus}Mappedreads.junctReads.sam", zip, dset=DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES),
-		expand("../../out/{dset}/junct_aligns_virus/{samp}.{virus}.bwa.{host}junctReads.sam", zip, dset=DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES)
+		expand("../../out/{dset}/virus_juncts/{samp}.{virus}.bwa.{host}juncts.mapped.bam", zip, dset=DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES),
+		expand("../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}Mappedreads.{virus}Juncts.bam", zip, dset=DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES)
 
 
 
@@ -95,8 +95,8 @@ rule seqPrep:
 	conda:	
 		"../envs/seqprep.yml"
 	params:
-		A = lambda wildcards: config["datasets"][wildcards.dset]["read1-adapt"],
-		B = lambda wildcards: config["datasets"][wildcards.dset]["read2-adapt"]
+		A = lambda wildcards: config[wildcards.dset]["read1-adapt"],
+		B = lambda wildcards: config[wildcards.dset]["read2-adapt"]
 	shell:
 		"""
 		SeqPrep -A {params.A} -B {params.B} -f {input.r1} -r {input.r2} -1 {output.proc_r1} -2 {output.proc_r2} -s {output.merged}
@@ -356,31 +356,31 @@ rule count_mapped:
 rule extract_virus_junction_reads:
 	input:
 		allInt = "../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
-		vSing = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam"
+		vSing = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam"
 	output:
-		vSingJunctSam = temp("../../out/{dset}/junct_aligns_virus/{samp}.{virus}.bwa.{host}junctReads.sam"),
-		vSingJunctBam = "../../out/{dset}/junct_aligns_virus/{samp}.{virus}.bwa.{host}junctReads.bam"
+		vSingJunctSam = temp("../../out/{dset}/virus_juncts/{samp}.{virus}.bwa.{host}juncts.mapped.sam"),
+		vSingJunctBam = "../../out/{dset}/virus_juncts/{samp}.{virus}.bwa.{host}juncts.mapped.bam"
 	conda:
 		"../envs/bwa.yml"
 	shell:
 		"""
-		perl extract_junctions.pl --sam {input.vSing}--ints {input.allInt} --junctSam {output.vSingJunctSam}
+		perl extract_junctions.pl --sam {input.vSing} --ints {input.allInt} --junctSam {output.vSingJunctSam}
 		samtools view -bhS {output.vSingJunctSam} | samtools sort - -o {output.vSingJunctBam}
 		samtools index {output.vSingJunctBam}
-	"""
+		"""
 
 rule extract_host_junction_reads:
 	input:
 		allInt = "../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
 		hSing = "../../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.sam"
 	output:
-		hSingJunctSam = temp("../../out/{dset}/junct_aligns_host/{samp}.{host}.bwa.{virus}junctReads.sam"),
-		hSingJunctBam = "../../out/{dset}/junct_aligns_host/{samp}.{host}.bwa.{virus}junctReads.bam"
+		hSingJunctSam = temp("../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}Mappedreads.{virus}Juncts.sam"),
+		hSingJunctBam = "../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}Mappedreads.{virus}Juncts.bam"
 	conda:
 		"../envs/bwa.yml"
 	shell:
 		"""
-		perl extract_junctions.pl --sam {input.hSing}--ints {input.allInt} --junctSam {output.hSingJunctSam}
+		perl extract_junctions.pl --sam {input.hSing} --ints {input.allInt} --junctSam {output.hSingJunctSam}
 		samtools view -bhS {output.hSingJunctSam} | samtools sort - -o {output.hSingJunctBam}
 		samtools index {output.hSingJunctBam}
 		"""
