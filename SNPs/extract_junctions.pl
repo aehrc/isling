@@ -22,10 +22,10 @@ if ($help) { printHelp(); }
 unless ($sam and $ints and $junctSam) { printHelp(); }
 
 ## first read integration site file
-## extract the IDs of the reads and their sequences to grab from the alingment files
-## store these in an array in the format IDxxxseq
+## extract the IDs of the reads and their sequences to grab from the alignment files
+## store these in a hash in the format IDxxxseq
 
-my @juncts;
+my %juncts;
 
 open (INTS, $ints) || die "Could not open integration site file: $ints\n";
 while (my $int = <INTS>) {
@@ -34,14 +34,36 @@ while (my $int = <INTS>) {
 	my @parts = split("\t", $int);
 
 	#add to array of queries
-	push(@juncts, join("xxx", $parts[18], $parts[19]));
+	$juncts{join("xxx", $parts[18], $parts[19])} = 1;
 
 }
 
 close(INTS);
 
-#then look through each aligment file (host and vector).  If there is a match between an element of @juncts and the line, output the line
-checkAlignment($sam, $junctSam, @juncts);
+#check for matches between array of IDs and sequences, and an alignment file
+#output new alignment file of matches
+
+open (IN, $sam) || die "Could not open input host alignment file: $sam\n";
+open (OUT, ">", $junctSam) || die "Could not open output host alingment file: $junctSam\n";
+while (my $line = <IN>) {
+	
+	#output header lines
+	if ($line =~ /^@/) { print OUT $line; next; }
+
+	#get fields from line
+	my ($flag, $ID, $seq) = (split("\t", $line))[1,0,9];
+
+	if ($flag & 0x800) { next; } # skip supplementary alignments
+	
+	#if sequence is reverse, reverse complement it
+	if ($flag & 0x10) { ($seq) = reverseComp($seq); }
+	
+	#if IDxxxkey is in the hash, write the line
+	if (exists $juncts{join("xxx", $ID, $seq)}) { print OUT $line; }
+	}
+}
+close(IN);
+close(OUT);
 
 exit;
 
@@ -60,42 +82,6 @@ sub printHelp {
 	print "\t--help:    Print this help message and quit\n";
 
 	exit;
-}
-
-sub checkAlignment{
-
-#check for matches between array of IDs and sequences, and an alignment file
-#output new alignment file of matches
-
-my $infile = shift @_; #path to infile is first input
-my $outfile = shift @_; #path to outfile is second input
-my @queries = @_; #everything else is queries
-
-open (IN, $infile) || die "Could not open input host alignment file: $infile\n";
-open (OUT, ">", $outfile) || die "Could not open output host alingment file: $outfile\n";
-while (my $line = <IN>) {
-	
-	#output header lines
-	if ($line =~ /^@/) { print OUT $line; next; }
-
-	#get fields from line
-	my ($flag, $ID, $seq) = (split("\t", $line))[1,0,9];
-
-	if ($flag & 0x800) { next; } # skip supplementary alignments
-
-	#if read ID is a match
-	my @matched = grep {/$ID/} @queries;
-	
-	if (@matched) {
-		#if sequence is reverse, reverse complement it
-		if ($flag & 0x10) { ($seq) = reverseComp($seq); }
-		#if sequence is a match, write line
-		if ( grep {/$seq/} @matched) { print OUT $line; }
-	}
-}
-close(IN);
-close(OUT);
-
 }
 
 sub reverseComp {
