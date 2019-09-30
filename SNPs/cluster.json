@@ -72,14 +72,6 @@
 	"refseq":
 	{
 		"time" : "0:30:00"
-	}	,
-	"extract_host_junction_reads":
-	{
-		"time" : "2:00:00"
-	}	,
-	"extract_virus_junction_reads":
-	{
-		"time" : "4:00:00"
 	}
 	
 	
