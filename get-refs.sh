@@ -47,13 +47,15 @@ mkdir -p macaque
 cd macaque
 wget ftp://ftp.ensembl.org/pub/release-97/fasta/macaca_fascicularis/dna/*dna.chromosome*.gz
 
-zcat *.fa.gz | perl -pe 's/^>(\w+).+$/>chr$1/' | perl -pe 's/^>chrMT/>chrM/' > ../macaque.fa
+#zcat *.fa.gz | perl -pe 's/^>(\w+).+$/>chr$1/' | perl -pe 's/^>chrMT/>chrM/' > ../macaque.fa
+zcat *.fa.gz > ../macaque.fa
 
 cd ..
 
-wget ftp://ftp.ensembl.org/pub/release-97/gtf/macaca_fascicularis/Macaca_fascicularis.Macaca_fascicularis_5.0.97.gtf.gz
-gunzip Macaca_fascicularis.Macaca_fascicularis_5.0.97.gtf.gz
-mv Macaca_fascicularis.Macaca_fascicularis_5.0.97.gtf Macaca_fascicularis.Macaca_fascicularis_5.0.97.gff
+wget ftp://ftp.ensembl.org/pub/release-97/gff3/macaca_fascicularis/Macaca_fascicularis.Macaca_fascicularis_5.0.97.gff3.gz
+gunzip Macaca_fascicularis.Macaca_fascicularis_5.0.97.gff3.gz
+#sed s/^/chr/g Macaca_fascicularis.Macaca_fascicularis_5.0.97.gff3 | sed 's/^chr##/##/g' > Macaca_fascicularis_5.0.97.gff
+mv Macaca_fascicularis.Macaca_fascicularis_5.0.97.gff3 Macaca_fascicularis_5.0.97.gff
 
 
 
