@@ -72,7 +72,7 @@ while (my $vl = <VIRAL>) {
 
 	if ($parts[2] eq "*") { next; } # skip unaligned reads
 
-	my $cig = processCIGAR2($parts[5], $tol); # Process the CIGAR string to account for small insertions/deletions
+	my ($cig, $combinedBases) = processCIGAR2($parts[5], $tol); # Process the CIGAR string to account for small insertions/deletions
 	unless ($cig) { next; } # keep checking to make sure double clipped reads don't sneak through
 	
 	unless ($cig =~ /(^\d+[SH].*\d+[SH]$)/) { next; } # want alignments where both ends are clipped
@@ -98,8 +98,9 @@ while (my $vl = <VIRAL>) {
 	
 	#get supplementary (SA) and secondary (XA) alignments in order to check for possible vector rearrangements
 	my ($vSec, $vSup) = getSecSup($vl);
+	my $editDist = getEditDist($vl);
 	
-	$viralIntegrations{join("xxx",($parts[0],$seq))} = join("xxx", $seq, $dir, $ref, $start, $cig, $vSec, $vSup); 
+	$viralIntegrations{join("xxx",($parts[0],$seq))} = join("xxx", $seq, $dir, $ref, $start, $cig, $vSec, $vSup, ($editDist+$combinedBases)); 
 }
 close VIRAL;
 
@@ -117,7 +118,7 @@ while (my $hl = <HUMAN>) {
 	
 	unless ($parts[5]) { next; }
 
-	my $cig = processCIGAR2($parts[5], $tol); # Process the CIGAR string to account for complex alignments
+	my ($cig, $combinedBases) = processCIGAR2($parts[5], $tol); # Process the CIGAR string to account for complex alignments
 	unless ($cig) { next; }
 	
 	unless ($cig =~ /(^\d+M.+\d+M$)/) { next; } #alignments must be matched at both ends
@@ -147,8 +148,9 @@ while (my $hl = <HUMAN>) {
 	if (exists $viralIntegrations{join("xxx",($parts[0],$seq))}) { # only consider reads that were tagged from the viral alignment, no need to consider excess reads
 	
 		my ($hSec, $hSup) = getSecSup($hl);
+		my $editDist = getEditDist($hl);
 		
-		$humanIntegrations{join("xxx",($parts[0],$seq))} = join("xxx", $seq, $Dir, $ref, $start, $cig, $hSec, $hSup);
+		$humanIntegrations{join("xxx",($parts[0],$seq))} = join("xxx", $seq, $Dir, $ref, $start, $cig, $hSec, $hSup, ($editDist+$combinedBases));
 	}
 }
 close HUMAN;
@@ -180,7 +182,7 @@ foreach my $key (keys %viralIntegrations) {
 
 
 #print file
-my $header = "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNoAmbiguousBases\tOverlapType\tOrientation\tHostSeq\tViralSeq\tAmbiguousSeq\tHostSecondaryAlignments\tViralSecondaryAlignments\tPossibleHostTranslocation\tPossibleVectorRearrangement\tHostPossibleAmbiguous\tViralPossibleAmbiguous\tReadID\tmerged\n";
+my $header = "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNoAmbiguousBases\tOverlapType\tOrientation\tHostSeq\tViralSeq\tAmbiguousSeq\tHostEditDist\tViralEditDist\tPossibleHostTranslocation\tPossibleVectorRearrangement\tHostPossibleAmbiguous\tViralPossibleAmbiguous\tReadID\tmerged\n";		
 
 if ($verbose) { print "Writing output...\n"; }
 
@@ -344,7 +346,7 @@ sub analyseShort{
 	else { $vAmbig = isAmbigLoc($vDir, $vCig, $vSec, 'short', $seq, $tol);}
 
 	#extract relevant parts of read
-	#NEED TO FIX THIS
+
 	my $hostSeq1 = substr($seq, $hMatch1Start, $hMatch1Stop);
 	my $viralSeq1 = substr($seq, $vMatchStart, $vMatchStop);
 	my @ambigCoords1 = sort { $a <=> $b } ($hMatch1Stop, $vMatchStart);

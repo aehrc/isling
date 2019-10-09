@@ -3,7 +3,7 @@
 package ViralIntegration;
 use Exporter;
 @ISA = ('Exporter');
-@EXPORT = qw(analyzeRead processCIGAR processCIGAR2 extractSeqCoords extractOutput extractCoords extractSequence gapOrOverlap getCigarParts getGenomicCoords getMatchedRegion getMatchedRegions getSecSup isAmbigLoc isRearrange printOutput printBed printMerged reverseComp reverseCigar);
+@EXPORT = qw(getEditDist analyzeRead processCIGAR processCIGAR2 extractSeqCoords extractOutput extractCoords extractSequence gapOrOverlap getCigarParts getGenomicCoords getMatchedRegion getMatchedRegions getSecSup isAmbigLoc isRearrange printOutput printBed printMerged reverseComp reverseCigar);
 
 
 ##### subroutines #####
@@ -38,160 +38,6 @@ sub analyzeRead {
 	return ($intStart, $intStop, $relStart, $relStop, $end)
 }
 
-sub processCIGAR {
-	my ($oriCig,$seq) = @_;
-
-	my ($clipped, $other, $order);
-
-	# Order:
-	#	1 - clipped,matched
-	#	2 - matched,clipped
-
-	if ($oriCig =~ /^\d+[SH].+\d+[SH]$/) { return; } # skip if a double clipped read got through
-	elsif ($oriCig =~ /^(\d+)[SH](.+)$/) { ($clipped, $other, $order) = ($1,$2,1); }
-	elsif ($oriCig =~ /^(.+[MIDP])(\d+)[SH]$/) { ($other, $clipped, $order) = ($1,$2,2); }
-	# Note I don't save if it's hard/soft clipped, only the number of bases
-
-	# The CIGAR String can have multiple combinations of the following features:
-	# M - matched
-	# S - soft clipped (bases kept in the read)
-	# H - hard clipped (bases removed from the read)
-	# I - inserted seqeunce
-	# D - deleted sequence
-	# P - padding
-
-	# I, D and P can break up a matched segment (e.g. MIPM) but should still be counted as a single matched sequence
-	# I needs to be included in the final "matched" count - because everything is done relative to the read
-	# P needs to be removed in the final "matched" count  - because it is just adding space to help the read align
-	# D needs to be removed in the final "matched" count  - because it adds space where base was missing
-
-	# The full "matched" sequence, can be calculated as length(read) - length(clipped).
-	# This will give the total amount of the read that was aligned (matched) and the part of the read that wasn't (clipped)
-	# The assumption is that everything else is either matched or inserted (and therefore should still be counted)
-
-	my $matched = length($seq) - $clipped;		
-	
-	# Construct simplified CIGAR string (only contains matched and clipped)
-	if ($order == 1) { return(join('',($clipped,"S",$matched,"M"))); }
-	else		 { return(join('',($matched,"M",$clipped,"S"))); }
-}
-
-sub processCIGAR2 {
-
-	# The CIGAR String can have multiple combinations of the following features:
-	# M - matched
-	# S - soft clipped (bases kept in the read)
-	# H - hard clipped (bases removed from the read)
-	# I - inserted seqeunce
-	# D - deleted sequence
-	# P - padding
-	# N - skipped region from reference (only relevant for introns)
-	
-	#process CIGAR to remove small I, D, P and N cigar operations that break up a matched region
-	#total number of bases in small I, D, P and N operations should be less than $tol in order to be removed
-	
-	#don't assume that result of processing should be read with only one soft-clipped and one matched region 
-	#(as was assumed by original processCIGAR subroutine)
-	
-	#CIGAR operations that consume query bases need to be incorporated into the nearest matched region ()
-	#CIGAR operations that don't consume query bases can be discarded
-	
-	#strategy for processing:
-	#if CIGAR contains no I, D or P, N operations just return orignal CIGAR
-	#similarly, if there's no matched regions, return the original CIGAR
-	
-	#if there's only one matched region in the read, return the original CIGAR
-	
-	#otherwise consider each CIGAR operation - split into letters and numbers
-	#if the CIGAR contains one or more [IDPN] operation between two M operations,
-	#and the number of bases in those [IDPN] operations is less than $tol,
-	#combine those [IDPN] operations with the two adjacent M operations to leave only 
-	#one matched region
-	
-	#I operation consumes query, so these bases should be added to the number of bases in the two adjacent M operations
-	#[DNP] operations don't consume query, so these bases can be discarded
-	
-	#also consider [IDPN] between a matched region and the start or end of the read
-		#combine with the matched region
-	#also consider [IDPN] between a matched region and a soft-clipped region (this shouldn't happen???)
-	
-	my ($oriCig, $tol) = @_;
-
-	#if no [IDP] operations, return original CIGAR
-	#or if doesn't contain any match operations, also return original CIGAR 
-	#(this could happen if read is unmapped, so CIGAR is *)
-	if ($oriCig !~ /[IDPNM]/) { return $oriCig; }
-	
-	#get letters and numbers in CIGAR as array
-	my (@letters, @numbers);
-	getCigarParts($oriCig, \@letters, \@numbers);
-	
-	#if CIGAR only has one operation, return original CIGAR
-	if ($#letters == 0) { return $oriCig; }
-	
-	#add zero-length matched regions at start and end of letters and numbers in order to 
-	#properly combine [IDPN] operations that occur at the start or end of read
-	unshift(@letters, 'M');
-	unshift(@numbers, '0');
-	push(@letters, 'M');
-	push(@numbers, '0');
-	
-	#look backwards through @letters, and merge any [IDPN] operations with a length of less than $tol
-	#that are sandwiched between two M operations
-	my $lastM = $#letters;
-	my $bases;
-	for my $i (reverse((0..$#letters))) {
-		#check if this element is M
-		if ($letters[$i] =~ /M/) {
-		
-			#don't want to combine soft-clips - it is common to have a few bases soft-clipped at either end of the read
-			#the ends of the read is the only place this would occur - from SAM format:
-			#"S may only have H operations between them and the ends of the CIGAR string"
-			
-			#so if there's an S in the operations sandwiched between two M's
-			#just move on
-			
-			my @Sops = grep { $_ =~ /S/ } @letters[$i..$lastM];
-			if( $#Sops >= 0) { $lastM = $i; next; }
-			
-			#check the number of bases between this M and the last M
-			$bases = eval join("+", @numbers[$i+1..$lastM-1]);
-			if ($bases <= $tol) {
-				
-				#combine the elements between the two Ms
-				#need to consider whether to add bases to total or not
-				#only add bases to total if CIGAR operation consumes query ([MI])
-				#otherwise discard bases
-				my $total;
-				for my $j ($i..$lastM) {
-				if ($letters[$j] =~ /[MIS]/) { $total += $numbers[$j]; }
-				}
-				
-				splice(@letters, $i+1, $lastM-$i);
-				splice(@numbers, $i, $lastM-$i+1, $total);
-			}
-			#reassign $lastM for next step
-			$lastM = $i;
-		}
-	}	
-	
-	#before reconstructing CIGAR, need to remove any 0M operations added
-	for my $i (reverse((0..$#letters))) {
-		if ($numbers[$i] == 0) {
-			splice(@letters, $i, 1);
-			splice(@numbers, $i, 1);
-		}	
-	}
-	
-	#reconstruct CIGAR
-	my $newCig;
-	foreach my $number (@numbers) {
-		$newCig .= ($number.shift(@letters));	
-	}
-	
-	return $newCig;
-}
-
 sub extractSeqCoords {
 ### Extract coordinates of the human/viral sequences relative to read
 
@@ -218,11 +64,8 @@ sub extractOutput {
 	my @viral = split("\t",$viralData);
 	my @human = split("\t",$humanData);
 
-	my $vSec = $viral[-2];
-	my $hSec = $human[-2];
-	
-	my $vSup = $viral[-1];
-	my $hSup = $human[-1];
+	my $vNM = $viral[-1];
+	my $hNM = $human[-1];
 
 	my $overlap = $intData[6];
 	
@@ -242,8 +85,7 @@ sub extractOutput {
 	### Account for overlap, this won't be included in either the human or viral segments
 	my $viralSeq = substr($viral[6], $intData[4]-1, ($intData[5]-$intData[4]+1));
 	my $humanSeq = substr($human[6], $intData[2]-1, ($intData[3]-$intData[2]+1));
-	#my $viralSeq = extractSequence($intData[4], $intData[5]);
-	#my $humanSeq = extractSequence($intData[2], $intData[3]);
+
 
 	my $overlapSeq;
 	if ($overlap > 0) { # only extract overlap sequence if there is one
@@ -253,12 +95,9 @@ sub extractOutput {
 	else { $overlapSeq = ''; }# leave overlapSeq undefined
 
 
-	#if ($viral[5] eq "+") 	{ $overlapSeq = substr($viral[6], ($viral[3]-$overlap), $overlap); }
-	#else		  	{ $overlapSeq = substr($human[6], ($human[3]-$overlap), $overlap); }
-
 	my $outline = join("\t", ($human[0], $humanStart, $humanStop, $viral[0], 
 				  $viralStart, $viralStop, $overlap, $overlaptype, $intData[7], 
-				  $humanSeq, $viralSeq, $overlapSeq, $hSec, $vSec, $hRearrange, $vRearrange, $hAmbig, $vAmbig));
+				  $humanSeq, $viralSeq, $overlapSeq, $hNM, $vNM, $hRearrange, $vRearrange, $hAmbig, $vAmbig));
 
 	return($outline);
 }
@@ -494,6 +333,19 @@ sub getSecSup {
 
 }
 
+sub getEditDist {
+#get edit distance (NM)  from line
+
+	my ($line) = @_;
+	
+	#get supplementary alignments from SA field
+	my ($nm);
+	($nm) = ($line =~ /NM:i:(\d+)\s/);
+
+	return ($nm);
+	
+}
+
 sub isAmbigLoc {
 ### check for ambiguity in location of integration site in human or viral genome
 ## look to see if there are any secondary alignments that are equivalent to primary alignment
@@ -518,6 +370,7 @@ sub isAmbigLoc {
 	if ($dir eq 'r') { $cig = reverseCigar($cig); }
 	
 	my $isAmbiguous = "";
+	my $dummy;
 	my @secs = split(";", $sec); # split secondary alignments to check one by one
 	foreach my $secAlignment (@secs) {
 	
@@ -525,8 +378,8 @@ sub isAmbigLoc {
 		my ($secSense, $secCigar) = (split(",",$secAlignment))[2,3]; #get sense and cigar from 
 		
 		#process cigar as appropriate for read type
-		if ($type eq 'soft') { $secCigar1 = processCIGAR($secCigar,$seq);}
-		$secCigar = processCIGAR2($secCigar, $tol);
+		if ($type eq 'soft') { ($secCigar1, $dummy) = processCIGAR($secCigar,$seq);}
+		($secCigar, $dummy) = processCIGAR2($secCigar, $tol);
 	
 		if ($secSense eq '-') { $secCigar = reverseCigar($secCigar); } #reverse cigar if necessary
 		
@@ -542,8 +395,6 @@ sub isAmbigLoc {
 	return $isAmbiguous;
 
 }
-
-
 
 sub isRearrange {
 
@@ -734,6 +585,176 @@ sub printMerged {
 	close MERGED;
 	
 	unlink($temp);
+}
+
+sub processCIGAR {
+	my ($oriCig,$seq) = @_;
+
+	my ($clipped, $other, $order);
+
+	# Order:
+	#	1 - clipped,matched
+	#	2 - matched,clipped
+
+	if ($oriCig =~ /^\d+[SH].+\d+[SH]$/) { return; } # skip if a double clipped read got through
+	elsif ($oriCig =~ /^(\d+)[SH](.+)$/) { ($clipped, $other, $order) = ($1,$2,1); }
+	elsif ($oriCig =~ /^(.+[MIDP])(\d+)[SH]$/) { ($other, $clipped, $order) = ($1,$2,2); }
+	# Note I don't save if it's hard/soft clipped, only the number of bases
+
+	# The CIGAR String can have multiple combinations of the following features:
+	# M - matched
+	# S - soft clipped (bases kept in the read)
+	# H - hard clipped (bases removed from the read)
+	# I - inserted seqeunce
+	# D - deleted sequence
+	# P - padding
+
+	# I, D and P can break up a matched segment (e.g. MIPM) but should still be counted as a single matched sequence
+	# I needs to be included in the final "matched" count - because everything is done relative to the read
+	# P needs to be removed in the final "matched" count  - because it is just adding space to help the read align
+	# D needs to be removed in the final "matched" count  - because it adds space where base was missing
+
+	# The full "matched" sequence, can be calculated as length(read) - length(clipped).
+	# This will give the total amount of the read that was aligned (matched) and the part of the read that wasn't (clipped)
+	# The assumption is that everything else is either matched or inserted (and therefore should still be counted)
+
+	my $matched = length($seq) - $clipped;	
+	
+	# also calculate the number of bases added to the matched region, to add to the edit distance
+	#get the number of bases originally in the matched region
+	my @matchedRegions = getMatchedRegions($oriCig, '+');
+	my $sum = 0;
+	foreach my $region (@matchedRegions) {
+		my ($start, $end) = split("xxx", $region);
+		$sum += $end - $start + 1;
+	}
+	# number of bases added is final matched bases - original matched bases
+	my $addedBases = $matched - $sum;
+	
+	# Construct simplified CIGAR string (only contains matched and clipped)
+	if ($order == 1) { return(join('',($clipped,"S",$matched,"M")), $addedBases); }
+	else		 { return(join('',($matched,"M",$clipped,"S")), $addedBases); }
+}
+
+sub processCIGAR2 {
+
+	# The CIGAR String can have multiple combinations of the following features:
+	# M - matched
+	# S - soft clipped (bases kept in the read)
+	# H - hard clipped (bases removed from the read)
+	# I - inserted seqeunce
+	# D - deleted sequence
+	# P - padding
+	# N - skipped region from reference (only relevant for introns)
+	
+	#process CIGAR to remove small I, D, P and N cigar operations that break up a matched region
+	#total number of bases in small I, D, P and N operations should be less than $tol in order to be removed
+	
+	#don't assume that result of processing should be read with only one soft-clipped and one matched region 
+	#(as was assumed by original processCIGAR subroutine)
+	
+	#CIGAR operations that consume query bases need to be incorporated into the nearest matched region ()
+	#CIGAR operations that don't consume query bases can be discarded
+	
+	#strategy for processing:
+	#if CIGAR contains no I, D or P, N operations just return orignal CIGAR
+	#similarly, if there's no matched regions, return the original CIGAR
+	
+	#if there's only one matched region in the read, return the original CIGAR
+	
+	#otherwise consider each CIGAR operation - split into letters and numbers
+	#if the CIGAR contains one or more [IDPN] operation between two M operations,
+	#and the number of bases in those [IDPN] operations is less than $tol,
+	#combine those [IDPN] operations with the two adjacent M operations to leave only 
+	#one matched region
+	
+	#I operation consumes query, so these bases should be added to the number of bases in the two adjacent M operations
+	#[DNP] operations don't consume query, so these bases can be discarded
+	
+	#also consider [IDPN] between a matched region and the start or end of the read
+		#combine with the matched region
+	#also consider [IDPN] between a matched region and a soft-clipped region (this shouldn't happen???)
+	
+	my ($oriCig, $tol) = @_;
+
+	#if no [IDP] operations, return original CIGAR
+	#or if doesn't contain any match operations, also return original CIGAR 
+	#(this could happen if read is unmapped, so CIGAR is *)
+	if ($oriCig !~ /[IDPNM]/) { return $oriCig; }
+	
+	#get letters and numbers in CIGAR as array
+	my (@letters, @numbers);
+	getCigarParts($oriCig, \@letters, \@numbers);
+	
+	#if CIGAR only has one operation, return original CIGAR
+	if ($#letters == 0) { return $oriCig; }
+	
+	#add zero-length matched regions at start and end of letters and numbers in order to 
+	#properly combine [IDPN] operations that occur at the start or end of read
+	unshift(@letters, 'M');
+	unshift(@numbers, '0');
+	push(@letters, 'M');
+	push(@numbers, '0');
+	
+	#look backwards through @letters, and merge any [IDPN] operations with a length of less than $tol
+	#that are sandwiched between two M operations
+	my $lastM = $#letters;
+	my $bases;
+	my $combinedbases = 0;
+	for my $i (reverse((0..$#letters))) {
+		#check if this element is M
+		if ($letters[$i] =~ /M/) {
+		
+			#don't want to combine soft-clips - it is common to have a few bases soft-clipped at either end of the read
+			#the ends of the read is the only place this would occur - from SAM format:
+			#"S may only have H operations between them and the ends of the CIGAR string"
+			
+			#so if there's an S in the operations sandwiched between two M's
+			#just move on
+			
+			my @Sops = grep { $_ =~ /S/ } @letters[$i..$lastM];
+			if( $#Sops >= 0) { $lastM = $i; next; }
+			
+			#check the number of bases between this M and the last M
+			$bases = eval join("+", @numbers[$i+1..$lastM-1]);
+			if ($bases <= $tol) {
+				
+				#combine the elements between the two Ms
+				#need to consider whether to add bases to total or not
+				#only add bases to total if CIGAR operation consumes query ([MI])
+				#otherwise discard bases
+				my $total;
+				for my $j ($i..$lastM) {
+				if ($letters[$j] =~ /[MIS]/) { $total += $numbers[$j]; }
+				}
+				#add number of bases to count and cut out of cigar
+				$combinedBases += $letters[$i+1];
+				splice(@letters, $i+1, $lastM-$i);
+				splice(@numbers, $i, $lastM-$i+1, $total);
+
+			}
+			#reassign $lastM for next step
+			$lastM = $i;
+		}
+	}	
+	
+	#before reconstructing CIGAR, need to remove any 0M operations added
+	for my $i (reverse((0..$#letters))) {
+		if ($numbers[$i] == 0) {
+			splice(@letters, $i, 1);
+			splice(@numbers, $i, 1);
+		}	
+	}
+	
+	#reconstruct CIGAR
+	my $newCig;
+	foreach my $number (@numbers) {
+		$newCig .= ($number.shift(@letters));	
+	}
+	
+	#return both new cigar and number of bases converted to matched (for edit distance)
+	
+	return $newCig, $combinedBases;
 }
 
 sub reverseComp {

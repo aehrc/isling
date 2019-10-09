@@ -46,7 +46,7 @@ my %humanIntegrations;
 ### Junctions are defined by the CIGAR string: SM or MS
 ### Save the resulting information in a hash:
 ###	key: 	{ReadID}xxx{ReadSequence}
-###	value:	{TargetID}xxx{ViralIntegrationData}xxx{Sequence}xxx{SeqOrientation}xxx{CIGAR}xxx{XA}xxx{SA}
+###	value:	{TargetID}xxx{ViralIntegrationData}xxx{Sequence}xxx{SeqOrientation}xxx{CIGAR}xxx{XA}xxx{SA}XX{NM}
 ###		SeqOrientation: f = aligned in fwd orientation
 ###				r = aligned in rev orientation
 ###		Sequence is always given in fwd orientation
@@ -68,7 +68,7 @@ while (my $vl = <VIRAL>) {
 
 	unless ($parts[5] =~ /^\d+[SH]|\d+[SH]$/) { next; } # at least one end of the read must be clipped in order to be considered
 
-	my $cig = processCIGAR($parts[5], $parts[9]); # Process the CIGAR string to account for complex alignments
+	my ($cig, $addedBases) = processCIGAR($parts[5], $parts[9]); # Process the CIGAR string to account for complex alignments
 	unless ($cig) { next; } # keep checking to make sure double clipped reads don't sneak through
 
 	### Store informaton about the integration site:
@@ -86,11 +86,12 @@ while (my $vl = <VIRAL>) {
 	
 	#get supplementary (SA) and secondary (XA) alignments in order to check for possible vector rearrangements
 	my ($vSec, $vSup) = getSecSup($vl);
+	my $editDist = getEditDist($vl) + $addedBases;
 	
 	
-	if   (@viralInt and ($parts[1] & 0x10)) { $viralIntegrations{join("xxx", ($parts[0],(reverseComp($parts[9]))[0]))} = join("\t",($parts[2], @viralInt, (reverseComp($parts[9]))[0], 'r', $cig, $vSec, $vSup)); }
-	elsif (@viralInt) 			{ $viralIntegrations{join("xxx", ($parts[0],$parts[9]))}	           = join("\t",($parts[2], @viralInt, $parts[9],                   'f', $cig, $vSec, $vSup)); } 
-	#$viralIntegrations{join("xxx", ($parts[0],$parts[9]))} = join("\t",($parts[2], @viralInt, $parts[9]));
+	if   (@viralInt and ($parts[1] & 0x10)) { $viralIntegrations{join("xxx", ($parts[0],(reverseComp($parts[9]))[0]))} = join("\t",($parts[2], @viralInt, (reverseComp($parts[9]))[0], 'r', $cig, $vSec, $vSup, $editDist)); }
+	elsif (@viralInt) 			{ $viralIntegrations{join("xxx", ($parts[0],$parts[9]))}	           = join("\t",($parts[2], @viralInt, $parts[9],                   'f', $cig, $vSec, $vSup, $editDist)); } 
+
 }
 close VIRAL;
 
@@ -113,7 +114,7 @@ while (my $hl = <HUMAN>) {
 	
 	unless ($parts[5] =~ /^\d+[SH]|\d+[SH]$/) { next; }
 
-	my $cig = processCIGAR($parts[5], $parts[9]); # Process the CIGAR string to account for complex alignments
+	my ($cig, $addedBases) = processCIGAR($parts[5], $parts[9]); # Process the CIGAR string to account for complex alignments
 	unless ($cig) { next; }
 
 	my $seq;
@@ -130,13 +131,14 @@ while (my $hl = <HUMAN>) {
 	if (exists $viralIntegrations{join("xxx",($parts[0],$seq))}) { # only consider reads that were tagged from the viral alignment, no need to consider excess reads
 	
 		my ($hSec, $hSup) = getSecSup($hl);
+		my $editDist = getEditDist($hl) + $addedBases;
 		
 		my @humanInt;
 		if    ($cig =~ /^\d+[SH].+\d+[SH]$/) { @humanInt = undef; }
 		elsif ($cig =~ /(^\d+)[SH]/)         { if ($1 > $cutoff) { @humanInt = analyzeRead($parts[3], $cig, "-"); } }
 		elsif ($cig =~ /(\d+)[SH]$/)         { if ($1 > $cutoff) { @humanInt = analyzeRead($parts[3], $cig, "+"); } }
 
-		if (@humanInt) { $humanIntegrations{join("xxx",($parts[0],$seq))} = join("\t",($parts[2], @humanInt, $seq, $ori, $cig, $hSec, $hSup)); }
+		if (@humanInt) { $humanIntegrations{join("xxx",($parts[0],$seq))} = join("\t",($parts[2], @humanInt, $seq, $ori, $cig, $hSec, $hSup, $editDist)); }
 	}
 }
 close HUMAN;
@@ -168,7 +170,7 @@ foreach my $key (keys %viralIntegrations) {
 
 if ($verbose) { print "Writing output...\n"; }
 
-my $header = "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNoAmbiguousBases\tOverlapType\tOrientation\tHostSeq\tViralSeq\tAmbiguousSeq\tHostSecondaryAlignments\tViralSecondaryAlignments\tPossibleHostTranslocation\tPossibleVectorRearrangement\tHostPossibleAmbiguous\tViralPossibleAmbiguous\tReadID\tmerged\n";		
+my $header = "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNoAmbiguousBases\tOverlapType\tOrientation\tHostSeq\tViralSeq\tAmbiguousSeq\tHostEditDist\tViralEditDist\tPossibleHostTranslocation\tPossibleVectorRearrangement\tHostPossibleAmbiguous\tViralPossibleAmbiguous\tReadID\tmerged\n";		
 
 printOutput($output, $header, @outLines); #write to outfile: if no sites detected will be header only
 
@@ -208,8 +210,8 @@ sub collectIntersect {
 ### BWA Alignments are 1-based
 	my ($viralData, $humanData, $key, $thresh) = @_;
 
-	my ($vRef, $vStart, $vStop, $vOri, $seq, $vDir, $vCig, $vSec, $vSup) = (split("\t",$viralData))[0,3,4,5,6,7,8,-2,-1];
-	my ($hRef, $hStart, $hStop, $hOri, $hDir, $hCig, $hSec, $hSup)       = (split("\t",$humanData))[0,3,4,5,7,8,-2,-1];
+	my ($vRef, $vStart, $vStop, $vOri, $seq, $vDir, $vCig, $vSec, $vSup) = (split("\t",$viralData))[0,3,4,5,6,7,8,-3,-2];
+	my ($hRef, $hStart, $hStop, $hOri, $hDir, $hCig, $hSec, $hSup)       = (split("\t",$humanData))[0,3,4,5,7,8,-3,-2];
 
 	if	((($vOri eq $hOri) and ($vDir eq $hDir)) or(($vOri ne $hOri) and ($vDir ne $hDir))) { return; } # in some cases the same part of the read may be clippeed 
 	### CIGAR strings are always reported relative to the strand

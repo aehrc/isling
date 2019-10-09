@@ -83,7 +83,7 @@ while (my $vl = <VIRAL>) {
 	if (($parts[1] & 0x8) and ($parts[1] & 0x4)) { next; }
 
 	#get cigar
-	my $cig = processCIGAR2($parts[5], $tol); # Note that could be a cigar or * if unmapped
+	my ($cig, $editDist2) = processCIGAR2($parts[5], $tol); # Note that could be a cigar or * if unmapped
 	
 	
 	#get sequence and orientation
@@ -96,10 +96,11 @@ while (my $vl = <VIRAL>) {
 	
 	#get supplementary (SA) and secondary (XA) alignments in order to check for possible vector rearrangements
 	my ($vSec, $vSup) = getSecSup($vl);
+	my $editDist = getEditDist($vl);
 	
 	#get if first or second in pair
-	if ($parts[1] & 0x40) 		{ $viralR1{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $vSec, $vSup); }
-	elsif ($parts[1] & 0x80) 	{ $viralR2{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $vSec, $vSup); }
+	if ($parts[1] & 0x40) 		{ $viralR1{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $vSec, $vSup, ($editDist+$editDist2)); }
+	elsif ($parts[1] & 0x80) 	{ $viralR2{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $vSec, $vSup, ($editDist+$editDist2)); }
 
 }
 close VIRAL;
@@ -122,7 +123,7 @@ while (my $hl = <HUMAN>) {
 	if ($parts[1] & 0x2) { next(); } # skip mapped in proper pair
 	
 	#get cigar
-	my $cig = processCIGAR2($parts[5], $tol); # Note that could be a cigar or * if unmapped
+	my ($cig, $editDist2) = processCIGAR2($parts[5], $tol); # Note that could be a cigar or * if unmapped
 	
 	#get sequence and orientation
 	my ($seq, $seqOri);	
@@ -134,10 +135,11 @@ while (my $hl = <HUMAN>) {
 	
 	#get supplementary (SA) and secondary (XA) alignments in order to check for possible vector rearrangements
 	my ($hSec, $hSup) = getSecSup($hl);
+	my $editDist = getEditDist($hl);
 	
 	#get if first or second in pair and add to appropriate array
-	if ($parts[1] & 0x40) 		{ $humanR1{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $hSec, $hSup);}
-	elsif ($parts[1] & 0x80)  	{ $humanR2{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $hSec, $hSup); }
+	if ($parts[1] & 0x40) 		{ $humanR1{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $hSec, $hSup, ($editDist+$editDist2));}
+	elsif ($parts[1] & 0x80)  	{ $humanR2{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $hSec, $hSup, ($editDist+$editDist2)); }
 
 }
 close HUMAN;
@@ -169,7 +171,7 @@ foreach my $key (keys %humanR1) {
 
 if ($verbose) { print "Writing output...\n"; }
 
-my $header = "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNoAmbiguousBases\tOverlapType\tOrientation\tHostSeq\tViralSeq\tAmbiguousSeq\tHostSecondaryAlignments\tViralSecondaryAlignments\tPossibleHostTranslocation\tPossibleVectorRearrangement\tHostPossibleAmbiguous\tViralPossibleAmbiguous\tReadID\tmerged\n";
+my $header = "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNoAmbiguousBases\tOverlapType\tOrientation\tHostSeq\tViralSeq\tAmbiguousSeq\tHostEditDist\tViralEditDist\tPossibleHostTranslocation\tPossibleVectorRearrangement\tHostPossibleAmbiguous\tViralPossibleAmbiguous\tReadID\tmerged\n";		
 		
 printOutput($output, $header, @outLines); #write to outfile: if no sites detected will be header only
 
