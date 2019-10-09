@@ -63,8 +63,8 @@ df <- df %>%
                                   ViralPossibleAmbiguous == "yes", 'yes', 'no'))
 
 #discard PCR duplicates: filter for unique read sequences (merged for softClip, R1+R2 for discordant)
-df <- df %>% 
-  distinct(merged, .keep_all = TRUE)
+#df <- df %>% 
+#  distinct(merged, .keep_all = TRUE)
 
 #check rate of false negatives for vector rearrangement:
 #look for events on chromosome X or 14 in mouse data aligned against human

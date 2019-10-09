@@ -30,11 +30,15 @@ my %juncts;
 open (INTS, $ints) || die "Could not open integration site file: $ints\n";
 while (my $int = <INTS>) {
 
+	chomp($int); #remove trailing newline
+
 	#get fields from line
 	my @parts = split("\t", $int);
+	my $key = join("xxx", $parts[18], $parts[19]);
+	
 
 	#add to array of queries
-	$juncts{join("xxx", $parts[18], $parts[19])} = 1;
+	$juncts{$key} = 1;
 
 }
 
@@ -54,13 +58,16 @@ while (my $line = <IN>) {
 	my ($flag, $ID, $seq) = (split("\t", $line))[1,0,9];
 
 	if ($flag & 0x800) { next; } # skip supplementary alignments
+
+	if ($flag & 0x4) { next; } # skip unmapped alignments
 	
 	#if sequence is reverse, reverse complement it
 	if ($flag & 0x10) { ($seq) = reverseComp($seq); }
 	
-	#if IDxxxkey is in the hash, write the line
-	if (exists $juncts{join("xxx", $ID, $seq)}) { print OUT $line; }
-	}
+	#if IDxxxseq is in the hash, write the line
+	my $key = join("xxx", $ID, $seq);
+	if (exists $juncts{$key}) { print OUT $line; }
+
 }
 close(IN);
 close(OUT);

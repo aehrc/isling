@@ -20,17 +20,17 @@ REFSEQ = []
 #also make dictionary MERGE, with key dataset_sample and value True or False
 MERGE = {}
 
-for dataset in config["datasets"]:
+for dataset in config:
 	#get files in directory and strip off "_1.fastq.gz"
 	samples = [os.path.basename(f)[:-11] for f in glob.glob("../data/reads/{}/*_1.fastq.gz".format(dataset))]
 	samples = samples + [os.path.basename(f)[:-12] for f in glob.glob("../data/reads/{}/*_R1.fastq.gz".format(dataset))]
 	for sample in samples:
 		DATASETS.append(dataset)
 		SAMPLES.append(sample)
-		HOSTS.append(config["datasets"][dataset]["host"])
-		VIRUSES.append(config["datasets"][dataset]["virus"])
-		REFSEQ.append(config["datasets"][dataset]["refseq"][:-4])
-		MERGE["{}_{}".format(dataset, sample)] = config["datasets"][dataset]["merge"]
+		HOSTS.append(config[dataset]["host"])
+		VIRUSES.append(config[dataset]["virus"])
+		REFSEQ.append(config[dataset]["refseq"][:-4])
+		MERGE["{}_{}".format(dataset, sample)] = config[dataset]["merge"]
 
 
 #### local rules ####
@@ -39,7 +39,9 @@ localrules: all, combine, rename, copy
 #### target files ####
 rule all:
 	input: 
-		expand("../out/{dset}/ints/{samp}.{host}.{virus}.{refseq}.merged.bed", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES, refseq = REFSEQ)
+		expand("../out/{dset}/ints/{samp}.{host}.{virus}.{refseq}.merged.bed", zip, dset=DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES, refseq=REFSEQ),
+		expand("../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.bam", zip, dset = DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES),
+		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES)
 #		"../out/summary/count_mapped.xlsx",
 		
 #		"../out/summary/num_sites.xlsx"
@@ -100,8 +102,8 @@ rule seqPrep:
 	conda:	
 		"envs/seqprep.yml"
 	params:
-		A = lambda wildcards: config["datasets"][wildcards.dset]["read1-adapt"],
-		B = lambda wildcards: config["datasets"][wildcards.dset]["read2-adapt"]
+		A = lambda wildcards: config[wildcards.dset]["read1-adapt"],
+		B = lambda wildcards: config[wildcards.dset]["read2-adapt"]
 	shell:
 		"""
 		SeqPrep -A {params.A} -B {params.B} -f {input.r1} -r {input.r2} -1 {output.proc_r1} -2 {output.proc_r2} -s {output.merged}
@@ -276,15 +278,10 @@ rule align_bwa_host:
 		"""
 rule convert:
 	input:
-		"../out/{dset}/{host_virus}/{samp}.{host_virus_name}.{alignType}{mapped_type}.sam"
+		"../out/{dset}/{host_virus}/{name}.sam"
 	output:
-		bam = "../out/{dset}/{host_virus}_bam/{samp}.{host_virus_name}.{alignType}{mapped_type}.bam",
-		bai = "../out/{dset}/{host_virus}_bam/{samp}.{host_virus_name}.{alignType}{mapped_type}.bam.bai"
-	wildcard_constraints:
-		samp = "[\w\d_]+",
-		host_virus_name = "[\w\d-]+",
-		alignType = "bwaShort|bwaPaired|bwa",
-		mapped_type = "|\.[\w\d-]+"
+		bam = "../out/{dset}/{host_virus}/{name}.bam",
+		bai = "../out/{dset}/{host_virus}/{name}.bam.bai"
 	conda: 
 		"envs/bwa.yml"	
 	shell:
