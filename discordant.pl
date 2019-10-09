@@ -194,9 +194,9 @@ sub findDiscordant {
 ### BWA Alignments are 1-based
 	my ($key, $vR1, $vR2, $hR1, $hR2) = @_;
 	
-	my ($seq1, $vR1ori, $vR1ref, $vR1start, $vR1cig, $vR1sec, $vR1sup) = (split('xxx', $vR1))[0, 1, 2, 3, 4, 5, 6];
+	my ($seq1, $vR1ori, $vR1ref, $vR1start, $vR1cig, $vR1sec, $vR1sup, $vNM1) = (split('xxx', $vR1))[0, 1, 2, 3, 4, 5, 6, -1];
 	my ($seq2, $vR2ori, $vR2ref, $vR2start, $vR2cig, $vR2sec, $vR2sup) = (split('xxx', $vR2))[0, 1, 2, 3, 4, 5, 6];
-	my ($hR1ori, $hR1ref, $hR1start, $hR1cig, $hR1sec, $hR1sup) = (split('xxx', $hR1))[1, 2, 3, 4, 5, 6];
+	my ($hR1ori, $hR1ref, $hR1start, $hR1cig, $hR1sec, $hR1sup, $hNM) = (split('xxx', $hR1))[1, 2, 3, 4, 5, 6, -1];
 	my ($hR2ori, $hR2ref, $hR2start, $hR2cig, $hR2sec, $hR2sup) = (split('xxx', $hR2))[1, 2, 3, 4, 5, 6];
 
 	#discordant read-pair can be either one mate mapped and one unmapped
@@ -294,7 +294,7 @@ sub findDiscordant {
 		if ($vR1sec eq "NA") { $isVirAmbig = "no";}
 		else { $isVirAmbig = isAmbigLoc($vR1ori, $vR1cig, $vR1sec, 'discordant', $seq1, $tol);}
 	}
-		return($hRef, $hIntStart, $hIntStop, $vRef, $vIntStart, $vIntStop, '?', 'discordant', $junct, $hSeq, $vSeq, '-', join(';', $hR1sec, $hR2sec), join(';', $vR1sec, $vR2sec), $isHumRearrange, $isVecRearrange, $isVirAmbig, $isHumAmbig);
+		return($hRef, $hIntStart, $hIntStop, $vRef, $vIntStart, $vIntStop, '?', 'discordant', $junct, $hSeq, $vSeq, '-', $hNM, $vNM, $isHumRearrange, $isVecRearrange, $isVirAmbig, $isHumAmbig);
 
 }
 
