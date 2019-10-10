@@ -97,6 +97,9 @@ while (my $vl = <VIRAL>) {
 	#get supplementary (SA) and secondary (XA) alignments in order to check for possible vector rearrangements
 	my ($vSec, $vSup) = getSecSup($vl);
 	my $editDist = getEditDist($vl);
+
+	#if the read is not matched, cant get edit distance  - just set it to 0
+	unless ($editDist) { $editDist = 0; $editDist2 = 0; } 
 	
 	#get if first or second in pair
 	if ($parts[1] & 0x40) 		{ $viralR1{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $vSec, $vSup, ($editDist+$editDist2)); }
@@ -137,6 +140,9 @@ while (my $hl = <HUMAN>) {
 	my ($hSec, $hSup) = getSecSup($hl);
 	my $editDist = getEditDist($hl);
 	
+	#if the read is not matched, cant get edit distance  - just set it to 0
+	unless ($editDist) { $editDist = 0; $editDist2 = 0; } 
+	
 	#get if first or second in pair and add to appropriate array
 	if ($parts[1] & 0x40) 		{ $humanR1{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $hSec, $hSup, ($editDist+$editDist2));}
 	elsif ($parts[1] & 0x80)  	{ $humanR2{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $hSec, $hSup, ($editDist+$editDist2)); }
@@ -159,10 +165,10 @@ foreach my $key (keys %humanR1) {
 
 	# Find discordant read pairs
 	my @intData = findDiscordant($key, $viralR1{$key}, $viralR2{$key}, $humanR1{$key}, $humanR2{$key});
-	
+	unless (@intData) { next; }	
+
 	# Once the positions are collected, put together the output	
-	my $outLine;
-	if ((scalar @intData) > 1) { $outLine = join("\t", @intData); }
+	my $outLine = join("\t", @intData);
 	my $combReads = join("xxx", (split("xxx", $viralR1{$key}))[0], (split("xxx", $viralR2{$key}))[0]);
 	if (defined $outLine) { push(@outLines, join("\t", ($outLine, $key, $combReads))); }
 }
@@ -195,9 +201,9 @@ sub findDiscordant {
 	my ($key, $vR1, $vR2, $hR1, $hR2) = @_;
 	
 	my ($seq1, $vR1ori, $vR1ref, $vR1start, $vR1cig, $vR1sec, $vR1sup, $vNM1) = (split('xxx', $vR1))[0, 1, 2, 3, 4, 5, 6, -1];
-	my ($seq2, $vR2ori, $vR2ref, $vR2start, $vR2cig, $vR2sec, $vR2sup) = (split('xxx', $vR2))[0, 1, 2, 3, 4, 5, 6];
-	my ($hR1ori, $hR1ref, $hR1start, $hR1cig, $hR1sec, $hR1sup, $hNM) = (split('xxx', $hR1))[1, 2, 3, 4, 5, 6, -1];
-	my ($hR2ori, $hR2ref, $hR2start, $hR2cig, $hR2sec, $hR2sup) = (split('xxx', $hR2))[1, 2, 3, 4, 5, 6];
+	my ($seq2, $vR2ori, $vR2ref, $vR2start, $vR2cig, $vR2sec, $vR2sup, $vNM2) = (split('xxx', $vR2))[0, 1, 2, 3, 4, 5, 6, -1];
+	my ($hR1ori, $hR1ref, $hR1start, $hR1cig, $hR1sec, $hR1sup, $hNM1) = (split('xxx', $hR1))[1, 2, 3, 4, 5, 6, -1];
+	my ($hR2ori, $hR2ref, $hR2start, $hR2cig, $hR2sec, $hR2sup, $hNM2) = (split('xxx', $hR2))[1, 2, 3, 4, 5, 6, -1];
 
 	#discordant read-pair can be either one mate mapped and one unmapped
 	#or one mate mostly mapped and the other with only a small mapped region
@@ -222,22 +228,26 @@ sub findDiscordant {
 	my $readlen2 = length($seq2);
 	
 	#get reference for virus and human based on which is mapped
-	my ($hRef, $vRef, $hSeq, $vSeq);
+	my ($hRef, $vRef, $hSeq, $vSeq, $hNM, $vNM);
 	if ($hR1map eq "map") { #if human matched R1
 		unless (($readlen1 - $hR1mapBP) < $cutoff) { return; } #check unmapped bases is less than cutoff
 		unless (($readlen2 - $vR2mapBP) < $cutoff) { return; } #check unmapped bases is less than cutoff
 		$hRef = $hR1ref; 
 		$hSeq = $seq1; 
+		$hNM = $hNM1;
 		$vRef = $vR2ref;
 		$vSeq = $seq2;
+		$vNM = $vNM2;
 	}
 	else { #if human matched R2
 		unless (($readlen2 - $hR2mapBP) < $cutoff) { return; } #check unmapped bases is less than cutoff
 		unless (($readlen1 - $vR1mapBP) < $cutoff) { return; } #check unmapped bases is less than cutoff
 		$hRef = $hR2ref; 
 		$hSeq = $seq2;
+		$hNM = $hNM2;
 		$vRef = $vR1ref;
 		$vSeq = $seq1; 
+		$vNM = $vNM1;
 	}	
 	
 	#find if junction is human/virus or virus/human

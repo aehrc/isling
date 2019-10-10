@@ -680,14 +680,14 @@ sub processCIGAR2 {
 	#if no [IDP] operations, return original CIGAR
 	#or if doesn't contain any match operations, also return original CIGAR 
 	#(this could happen if read is unmapped, so CIGAR is *)
-	if ($oriCig !~ /[IDPNM]/) { return $oriCig; }
+	if ($oriCig !~ /[IDPNM]/) { return $oriCig, 0; }
 	
 	#get letters and numbers in CIGAR as array
 	my (@letters, @numbers);
 	getCigarParts($oriCig, \@letters, \@numbers);
 	
 	#if CIGAR only has one operation, return original CIGAR
-	if ($#letters == 0) { return $oriCig; }
+	if ($#letters == 0) { return $oriCig, 0; }
 	
 	#add zero-length matched regions at start and end of letters and numbers in order to 
 	#properly combine [IDPN] operations that occur at the start or end of read
