@@ -64,9 +64,6 @@ sub extractOutput {
 	my @viral = split("\t",$viralData);
 	my @human = split("\t",$humanData);
 
-	my $vNM = $viral[-1];
-	my $hNM = $human[-1];
-
 	my $overlap = $intData[6];
 	
 	my $overlaptype = $intData[8];
@@ -76,6 +73,12 @@ sub extractOutput {
 	
 	my $hAmbig = $intData[11];
 	my $vAmbig = $intData[12];
+	
+	my $vNM = $viral[-1];
+	my $hNM = $human[-1];
+	
+	my $totalNM = $hNM + $vNM;
+	if ($overlaptype eq 'gap') { $totalNM += $overlap; }
 
 	### Extract junction coordinates relative to the target sequence
 	my ($viralStart, $viralStop) = extractCoords($viral[1], $viral[2], $viral[5], $overlap);
@@ -97,7 +100,7 @@ sub extractOutput {
 
 	my $outline = join("\t", ($human[0], $humanStart, $humanStop, $viral[0], 
 				  $viralStart, $viralStop, $overlap, $overlaptype, $intData[7], 
-				  $humanSeq, $viralSeq, $overlapSeq, $hNM, $vNM, $hRearrange, $vRearrange, $hAmbig, $vAmbig));
+				  $humanSeq, $viralSeq, $overlapSeq, $hNM, $vNM, $totalNM, $hRearrange, $vRearrange, $hAmbig, $vAmbig));
 
 	return($outline);
 }
