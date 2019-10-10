@@ -41,7 +41,7 @@ rule all:
 	input: 
 		expand("../out/{dset}/ints/{samp}.{host}.{virus}.{refseq}.merged.bed", zip, dset=DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES, refseq=REFSEQ),
 		expand("../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.bam", zip, dset = DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES),
-		expand("../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.{virus}Mappedreads.sam", zip, dset = DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES)
+		expand("../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.{virus}Mappedreads.sam", zip, dset = DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES),
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES ),
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES)
 #		"../out/summary/count_mapped.xlsx",
