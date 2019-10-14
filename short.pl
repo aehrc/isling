@@ -148,7 +148,21 @@ while (my $hl = <HUMAN>) {
 	if (exists $viralIntegrations{join("xxx",($parts[0],$seq))}) { # only consider reads that were tagged from the viral alignment, no need to consider excess reads
 	
 		my ($hSec, $hSup) = getSecSup($hl);
+		
+		# get edit distance
 		my $editDist = getEditDist($hl);
+		
+		# edit distance includes inserted bases, which aren't relevant for host alingment (these are the viral bases)
+		# so remove the number of inserted bases from the edit distance
+		my @letters;
+		my @numbers;
+		my $insertedBases = 0;
+		getCigarParts($cig, \@letters, \@numbers);
+		foreach my $i (0..$#letters) {
+			if ($letters[$i] eq 'I') { $insertedBases += $numbers[$i]; }
+		}
+		
+		$editDist -= $insertedBases;
 		
 		$humanIntegrations{join("xxx",($parts[0],$seq))} = join("xxx", $seq, $Dir, $ref, $start, $cig, $hSec, $hSup, ($editDist+$combinedBases));
 	}
@@ -182,7 +196,7 @@ foreach my $key (keys %viralIntegrations) {
 
 
 #print file
-my $header = "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNoAmbiguousBases\tOverlapType\tOrientation\tHostSeq\tViralSeq\tAmbiguousSeq\tHostEditDist\tViralEditDist\tTotalEditDist\tPossibleHostTranslocation\tPossibleVectorRearrangement\tHostPossibleAmbiguous\tViralPossibleAmbiguous\tReadID\tmerged\n";		
+my $header = "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNoAmbiguousBases\tOverlapType\tOrientation\tHostSeq\tViralSeq\tAmbiguousSeq\tHostEditDist\tViralEditDist\tTotalEditDist\tPossibleHostTranslocation\tPossibleVectorRearrangement\tHostPossibleAmbiguous\tViralPossibleAmbiguous\tType\tReadID\tmerged\n";		
 
 if ($verbose) { print "Writing output...\n"; }
 
@@ -357,12 +371,19 @@ sub analyseShort{
 	my @ambigCoords2 = sort { $a <=> $b } ($hMatch2Start, $vMatchStop);
 	my $ambigSeq2 = substr($seq, $ambigCoords2[0], $ambigCoords2[1]);	
 	
+	#calculate total edit distance
+	my $totalNM1 = $vNM + $hNM;
+	my $totalNM2 = $vNM + $hNM;
+	
+	if ($overlap1 eq 'gap') { $totalNM1 += abs($ambig1); }
+	if ($overlap2 eq 'gap') { $totalNM2 += abs($ambig2); }
+	
 	#output:
 	## two arrays, one for each integration
 	## hRef, hStart, hStop, vRef, vStart, vStop, noAmbigbases, overlapType, orientation, hostseq, viralseq, ambigSeq, hostSec, viralSec, possible translocation, possible vector rearrangement, host ambiguous, viral ambiguous, readID, seq
 	
-	my $int1Data = join("\t", $hRef, $hg1Start, $hg1Stop, $vRef, $vg1Start, $vg1Stop, abs($ambig1), $overlap1, 'hv', $hostSeq1, $viralSeq1, $ambigSeq1, $hNM, $vNM, $hRe, $vRe, $hAmbig, $vAmbig, $ID, $seq);
-	my $int2Data = join("\t", $hRef, $hg2Start, $hg2Stop, $vRef, $vg2Start, $vg2Stop, abs($ambig2), $overlap2, 'vh', $hostSeq2, $viralSeq2, $ambigSeq2, $hNM, $vNM, $hRe, $vRe, $hAmbig, $vAmbig, $ID, $seq);
+	my $int1Data = join("\t", $hRef, $hg1Start, $hg1Stop, $vRef, $vg1Start, $vg1Stop, abs($ambig1), $overlap1, 'hv', $hostSeq1, $viralSeq1, $ambigSeq1, $hNM, $vNM, $totalNM1, $hRe, $vRe, $hAmbig, $vAmbig, 'short', $ID, $seq);
+	my $int2Data = join("\t", $hRef, $hg2Start, $hg2Stop, $vRef, $vg2Start, $vg2Stop, abs($ambig2), $overlap2, 'vh', $hostSeq2, $viralSeq2, $ambigSeq2, $hNM, $vNM, $totalNM2, $hRe, $vRe, $hAmbig, $vAmbig, 'short', $ID, $seq);
 	
 	return ($int1Data, $int2Data);
 }

@@ -177,7 +177,7 @@ foreach my $key (keys %humanR1) {
 
 if ($verbose) { print "Writing output...\n"; }
 
-my $header = "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNoAmbiguousBases\tOverlapType\tOrientation\tHostSeq\tViralSeq\tAmbiguousSeq\tHostEditDist\tViralEditDist\tTotalEditDist\tPossibleHostTranslocation\tPossibleVectorRearrangement\tHostPossibleAmbiguous\tViralPossibleAmbiguous\tReadID\tmerged\n";		
+my $header = "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNoAmbiguousBases\tOverlapType\tOrientation\tHostSeq\tViralSeq\tAmbiguousSeq\tHostEditDist\tViralEditDist\tTotalEditDist\tPossibleHostTranslocation\tPossibleVectorRearrangement\tHostPossibleAmbiguous\tViralPossibleAmbiguous\tType\tReadID\tmerged\n";		
 		
 printOutput($output, $header, @outLines); #write to outfile: if no sites detected will be header only
 
@@ -304,7 +304,7 @@ sub findDiscordant {
 		if ($vR1sec eq "NA") { $isVirAmbig = "no";}
 		else { $isVirAmbig = isAmbigLoc($vR1ori, $vR1cig, $vR1sec, 'discordant', $seq1, $tol);}
 	}
-		return($hRef, $hIntStart, $hIntStop, $vRef, $vIntStart, $vIntStop, '?', 'discordant', $junct, $hSeq, $vSeq, '-', $hNM, $vNM, $isHumRearrange, $isVecRearrange, $isVirAmbig, $isHumAmbig);
+		return($hRef, $hIntStart, $hIntStop, $vRef, $vIntStart, $vIntStop, '?', 'discordant', $junct, $hSeq, $vSeq, '-', $hNM, $vNM, ($hNM + $vNM), $isHumRearrange, $isVecRearrange, $isVirAmbig, $isHumAmbig, 'discordant');
 
 }
 
