@@ -37,7 +37,9 @@ localrules: all, combine, run_int_scripts, merge_bed
 rule all:
 	input: 
 		expand("../../out/{dset}/virus_juncts/{samp}.{virus}.bwa.{host}juncts.mapped.bam", zip, dset=DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES),
-		expand("../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}Mappedreads.{virus}Juncts.bam", zip, dset=DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES)
+		expand("../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}Mappedreads.{virus}Juncts.bam", zip, dset=DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES),
+		expand("../../out/{dset}/virus_juncts/{samp}.{virus}.bwa.{host}juncts0NM.mapped.bam", zip, dset=DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES),
+		expand("../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}Mappedreads.{virus}Juncts0NM.bam", zip, dset=DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES)
 
 
 
@@ -351,8 +353,8 @@ rule count_mapped:
 	shell:
 		"../count_mapped.sh"
 
-#### extract junction fragments and look for variants ####
 
+#### extract junction fragments and look for variants ####
 rule extract_virus_junction_reads:
 	input:
 		allInt = "../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
@@ -383,6 +385,39 @@ rule extract_host_junction_reads:
 		perl extract_junctions.pl --sam {input.hSing} --ints {input.allInt} --junctSam {output.hSingJunctSam}
 		samtools view -bhS {output.hSingJunctSam} | samtools sort - -o {output.hSingJunctBam}
 		samtools index {output.hSingJunctBam}
+		"""
+
+#### extract junction fragments with zero edit distance ####
+rule extract_virus_junction_reads0:
+	input:
+		allInt = "../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
+		vSing = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam"
+	output:
+		vSingJunctSam0 = temp("../../out/{dset}/virus_juncts/{samp}.{virus}.bwa.{host}juncts0NM.mapped.sam"),
+		vSingJunctBam0 = "../../out/{dset}/virus_juncts/{samp}.{virus}.bwa.{host}juncts0NM.mapped.bam"
+	conda:
+		"../envs/bwa.yml"
+	shell:
+		"""
+		perl extract_junctions_0NM.pl --sam {input.vSing} --ints {input.allInt} --junctSam {output.vSingJunctSam0}
+		samtools view -bhS {output.vSingJunctSam0} | samtools sort - -o {output.vSingJunctBam0}
+		samtools index {output.vSingJunctBam0}
+		"""
+
+rule extract_host_junction_reads0:
+	input:
+		allInt = "../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
+		hSing = "../../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.sam"
+	output:
+		hSingJunctSam0 = temp("../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}Mappedreads.{virus}Juncts0NM.sam"),
+		hSingJunctBam0 = "../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}Mappedreads.{virus}Juncts0NM.bam"
+	conda:
+		"../envs/bwa.yml"
+	shell:
+		"""
+		perl extract_junctions_0NM.pl --sam {input.hSing} --ints {input.allInt} --junctSam {output.hSingJunctSam0}
+		samtools view -bhS {output.hSingJunctSam0} | samtools sort - -o {output.hSingJunctBam0}
+		samtools index {output.hSingJunctBam0}
 		"""
 
 

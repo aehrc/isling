@@ -66,7 +66,14 @@ while (my $line = <IN>) {
 	
 	#if IDxxxseq is in the hash, write the line
 	my $key = join("xxx", $ID, $seq);
-	if (exists $juncts{$key}) { print OUT $line; }
+	if (exists $juncts{$key}) { 
+		#check edit distance is 0
+		if ($line =~ /NM:i:0/) {
+			print OUT $line; 
+		}
+	}
+
+
 
 }
 close(IN);
