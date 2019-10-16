@@ -6,7 +6,7 @@ import os
 #### CONFIG FILE ####
 #which datasets are to be aligned to which hosts and viruses are specified in dsets.yaml
 #also whether or not to try to merge R1 and R2
-configfile: "../../proj-spcfc/dsets.yaml"
+configfile: "../../proj-spcfc/SNPs.yml"
 
 #this is of the form { dset1: {host: host1, virus: host2, merge: True}, dset2: {host: host2, virus: virus2, merge: False} }
 
@@ -19,16 +19,22 @@ VIRUSES = []
 #also make dictionary MERGE, with key dataset_sample and value True or False
 MERGE = {}
 
+#also make list of samples for each dataset, store in dictionary with dataset name as key
+set_samples = {}
+
+
 for dataset in config:
 	#get files in directory and strip off "_1.fastq.gz"
 	samples = [os.path.basename(f)[:-11] for f in glob.glob("../../data/reads/{}/*_1.fastq.gz".format(dataset))]
 	samples = samples + [os.path.basename(f)[:-12] for f in glob.glob("../../data/reads/{}/*_R1.fastq.gz".format(dataset))]
+	set_samples[dataset] = []
 	for sample in samples:
 		DATASETS.append(dataset)
 		SAMPLES.append(sample)
 		HOSTS.append(config[dataset]["host"])
 		VIRUSES.append(config[dataset]["virus"])
 		MERGE["{}_{}".format(dataset, sample)] = config[dataset]["merge"]
+		set_samples[dataset].append(sample)
 
 #### local rules ####
 localrules: all, combine, run_int_scripts, merge_bed
@@ -421,4 +427,27 @@ rule extract_host_junction_reads0:
 		"""
 
 
+#### pileup ####	
+rule host_pileup:
+	input:
+		sams = expand("../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}Mappedreads.{virus}Juncts.bam", host = set_samples[dset])
+	output:
+		pileup = "../../out/{dset}/pileups/{samp}.{host}.bwa.juncts.pileup.txt"
+	conda:
+		"../envs/bwa.yml"
+	params:
+		regions = "../../data/references/" + config[dset][regions] + ".fa"
+		reference = "../../data/references/" + config[dset][host]
+	shell:
+		"""
+		echo "samtools mpileup -C50 -f {params.reference} -r {params.regions} -o {output.pileup} {input.sams}"
+		touch output
+		"""
+		
+		
+		
+		
+		
+		
+		
 		
