@@ -436,11 +436,11 @@ rule host_pileup:
 	conda:
 		"../envs/bwa.yml"
 	params:
-		regions = "../../data/references/" + config[dset][regions] + ".fa"
-		reference = "../../data/references/" + config[dset][host]
+		regions = f"../../data/references/{config[dset][regions]}.fa"
+		ref = f"../../data/references/{config[dset][host]}"
 	shell:
 		"""
-		echo "samtools mpileup -C50 -f {params.reference} -r {params.regions} -o {output.pileup} {input.sams}"
+		echo "samtools mpileup -C50 -f {params.ref} -r {params.regions} -o {output.pileup} {input.sams}"
 		touch output
 		"""
 		
