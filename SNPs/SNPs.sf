@@ -45,7 +45,8 @@ rule all:
 	input: 
 		expand("../../out/{dset}/variants/{dset}.{host}.bwa.{virus}juncts.freebayes.vcf", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES), 
 		expand("../../out/{dset}/virus_juncts/{samp}.{virus}.bwa.{host}juncts0NM.mapped.bam", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES, samp=SAMPLES),
-		expand("../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}Mappedreads.{virus}Juncts0NM.bam", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES, samp=SAMPLES)
+		expand("../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}Mappedreads.{virus}Juncts0NM.bam", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES, samp=SAMPLES),
+		expand("../../out/{dset}/variants/{dset}.{virus}.bwa.{host}juncts.freebayes.vcf", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES, samp=SAMPLES)
 
 #### merging and dedup ###
 
@@ -426,14 +427,14 @@ rule extract_host_junction_reads0:
 
 
 #### variant calling ####
-def pileup_input(wildcards):
+def pileup_input_host(wildcards):
 	samples = set_samples[wildcards.dset]
 	samples = [f"../../out/{wildcards.dset}/host_juncts/{sample}.{wildcards.host}.bwa.{wildcards.virus}Mappedreads.{wildcards.virus}Juncts.bam" for sample in samples]
 	return samples
 		
-rule freebayes:
+rule freebayes_host:
 	input:
-		sams = pileup_input
+		sams = pileup_input_host
 	output:
 		vcf = "../../out/{dset}/variants/{dset}.{host}.bwa.{virus}juncts.freebayes.vcf"
 	conda:
@@ -444,11 +445,31 @@ rule freebayes:
 	threads: 5
 	shell:
 		"""
-		freebayes -f {params.ref} -t {params.regions} -p 1 --haplotype-length 0 --min-alternate-count 2 --min-alternate-fraction 0 --pooled-continuous {input.sams} | bcftools filter -i'QUAL>20' > {output.vcf}
+		freebayes -f {params.ref} -t {params.regions} -p 1 --haplotype-length 0 --min-alternate-count 2 --min-alternate-fraction 0 --pooled-continuous --report-monomorphic {input.sams} | awk '{{if (($0 ~ /^#/) || ( $6 > 5)) print}}' > {output.vcf}
 		"""
 
 		
+def pileup_input_virus(wildcards):
+	samples = set_samples[wildcards.dset]
+	samples = [f"../../out/{wildcards.dset}/virus_juncts/{samp}.{wildcards.virus}.bwa.{wildcards.host}juncts.mapped.bam" for sample in samples]
+	return samples
 		
+rule freebayes_virus:
+	input:
+		sams = pileup_input_virus
+	output:
+		vcf = "../../out/{dset}/variants/{dset}.{virus}.bwa.{host}juncts.freebayes.vcf"
+	conda:
+		"../envs/bcftools.yml"
+	params:
+		regions = lambda wildcards: "../../data/references/" + config[wildcards.dset]["regions"],
+		ref = lambda wildcards: "../../data/references/" + config[wildcards.dset]["virus"] + ".fa"
+	threads: 5
+	shell:
+		"""
+		freebayes -f {params.ref} -t {params.regions} -p 1 --haplotype-length 0 --min-alternate-count 2 --min-alternate-fraction 0 --pooled-continuous --report-monomorphic {input.sams} | awk '{{if (($0 ~ /^#/) || ( $6 > 5)) print}}' > {output.vcf}
+		"""
+	
 		
 		
 		
