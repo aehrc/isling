@@ -20,10 +20,10 @@ VIRUSES = []
 MERGE = {}
 
 #also make list of samples for each dataset, store in dictionary with dataset name as key
+#for pileup input
 set_samples = {}
 
-
-for dataset in config:
+for dataset in config.keys():
 	#get files in directory and strip off "_1.fastq.gz"
 	samples = [os.path.basename(f)[:-11] for f in glob.glob("../../data/reads/{}/*_1.fastq.gz".format(dataset))]
 	samples = samples + [os.path.basename(f)[:-12] for f in glob.glob("../../data/reads/{}/*_R1.fastq.gz".format(dataset))]
@@ -36,18 +36,17 @@ for dataset in config:
 		MERGE["{}_{}".format(dataset, sample)] = config[dataset]["merge"]
 		set_samples[dataset].append(sample)
 
+
 #### local rules ####
 localrules: all, combine, run_int_scripts, merge_bed
 
 #### target files ####
 rule all:
 	input: 
-		expand("../../out/{dset}/virus_juncts/{samp}.{virus}.bwa.{host}juncts.mapped.bam", zip, dset=DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES),
-		expand("../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}Mappedreads.{virus}Juncts.bam", zip, dset=DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES),
-		expand("../../out/{dset}/virus_juncts/{samp}.{virus}.bwa.{host}juncts0NM.mapped.bam", zip, dset=DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES),
-		expand("../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}Mappedreads.{virus}Juncts0NM.bam", zip, dset=DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES)
-
-
+		expand("../../out/{dset}/variants/{dset}.{host}.bwa.{virus}juncts.freebayes.vcf", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES), 
+		expand("../../out/{dset}/virus_juncts/{samp}.{virus}.bwa.{host}juncts0NM.mapped.bam", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES, samp=SAMPLES),
+		expand("../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}Mappedreads.{virus}Juncts0NM.bam", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES, samp=SAMPLES),
+		expand("../../out/{dset}/variants/{dset}.{virus}.bwa.{host}juncts.freebayes.vcf", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES, samp=SAMPLES)
 
 #### merging and dedup ###
 
@@ -373,7 +372,7 @@ rule extract_virus_junction_reads:
 	shell:
 		"""
 		perl extract_junctions.pl --sam {input.vSing} --ints {input.allInt} --junctSam {output.vSingJunctSam}
-		samtools view -bhS {output.vSingJunctSam} | samtools sort - -o {output.vSingJunctBam}
+		samtools view -bh {output.vSingJunctSam} | samtools sort - -o {output.vSingJunctBam}
 		samtools index {output.vSingJunctBam}
 		"""
 
@@ -382,14 +381,14 @@ rule extract_host_junction_reads:
 		allInt = "../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
 		hSing = "../../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.sam"
 	output:
-		hSingJunctSam = temp("../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}Mappedreads.{virus}Juncts.sam"),
+		hSingJunctSam = "../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}Mappedreads.{virus}Juncts.sam",
 		hSingJunctBam = "../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}Mappedreads.{virus}Juncts.bam"
 	conda:
 		"../envs/bwa.yml"
 	shell:
 		"""
 		perl extract_junctions.pl --sam {input.hSing} --ints {input.allInt} --junctSam {output.hSingJunctSam}
-		samtools view -bhS {output.hSingJunctSam} | samtools sort - -o {output.hSingJunctBam}
+		samtools view -bh {output.hSingJunctSam} | samtools sort - -o {output.hSingJunctBam}
 		samtools index {output.hSingJunctBam}
 		"""
 
@@ -427,25 +426,50 @@ rule extract_host_junction_reads0:
 		"""
 
 
-#### pileup ####	
-rule host_pileup:
+#### variant calling ####
+def pileup_input_host(wildcards):
+	samples = set_samples[wildcards.dset]
+	samples = [f"../../out/{wildcards.dset}/host_juncts/{sample}.{wildcards.host}.bwa.{wildcards.virus}Mappedreads.{wildcards.virus}Juncts.bam" for sample in samples]
+	return samples
+		
+rule freebayes_host:
 	input:
-		sams = expand("../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}Mappedreads.{virus}Juncts.bam", host = set_samples[dset])
+		sams = pileup_input_host
 	output:
-		pileup = "../../out/{dset}/pileups/{samp}.{host}.bwa.juncts.pileup.txt"
+		vcf = "../../out/{dset}/variants/{dset}.{host}.bwa.{virus}juncts.freebayes.vcf"
 	conda:
-		"../envs/bwa.yml"
+		"../envs/bcftools.yml"
 	params:
-		regions = f"../../data/references/{config[dset][regions]}.fa"
-		ref = f"../../data/references/{config[dset][host]}"
+		regions = lambda wildcards: "../../data/references/" + config[wildcards.dset]["regions"],
+		ref = lambda wildcards: "../../data/references/" + config[wildcards.dset]["host"] + ".fa"
+	threads: 5
 	shell:
 		"""
-		echo "samtools mpileup -C50 -f {params.ref} -r {params.regions} -o {output.pileup} {input.sams}"
-		touch output
+		freebayes -f {params.ref} -t {params.regions} -p 1 --haplotype-length 0 --min-alternate-count 2 --min-alternate-fraction 0 --pooled-continuous --report-monomorphic {input.sams} | awk '{{if (($0 ~ /^#/) || ( $6 > 5)) print}}' > {output.vcf}
 		"""
+
 		
+def pileup_input_virus(wildcards):
+	samples = set_samples[wildcards.dset]
+	samples = [f"../../out/{wildcards.dset}/virus_juncts/{samp}.{wildcards.virus}.bwa.{wildcards.host}juncts.mapped.bam" for sample in samples]
+	return samples
 		
-		
+rule freebayes_virus:
+	input:
+		sams = pileup_input_virus
+	output:
+		vcf = "../../out/{dset}/variants/{dset}.{virus}.bwa.{host}juncts.freebayes.vcf"
+	conda:
+		"../envs/bcftools.yml"
+	params:
+		regions = lambda wildcards: "../../data/references/" + config[wildcards.dset]["regions"],
+		ref = lambda wildcards: "../../data/references/" + config[wildcards.dset]["virus"] + ".fa"
+	threads: 5
+	shell:
+		"""
+		freebayes -f {params.ref} -t {params.regions} -p 1 --haplotype-length 0 --min-alternate-count 2 --min-alternate-fraction 0 --pooled-continuous --report-monomorphic {input.sams} | awk '{{if (($0 ~ /^#/) || ( $6 > 5)) print}}' > {output.vcf}
+		"""
+	
 		
 		
 		

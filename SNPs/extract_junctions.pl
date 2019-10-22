@@ -12,10 +12,10 @@ my $junctSam; #output sam file for juctions aligment
 
 my $help;
 
-GetOptions('ints=s' => \$ints,
-		   'sam=s' => \$sam,
-		   'junctSam=s'  => \$junctSam,
-	           'help',    => \$help);
+GetOptions(	'ints=s' => \$ints,
+		'sam=s' => \$sam,
+		'junctSam=s'  => \$junctSam,
+	        'help',    => \$help);
 
 if ($help) { printHelp(); }
 
@@ -43,6 +43,11 @@ while (my $int = <INTS>) {
 }
 
 close(INTS);
+
+#check that there were some integrations
+
+if ((scalar keys %juncts) == 0) { print "Warning: didn't find any integrations in $ints\n"; }
+
 
 #check for matches between array of IDs and sequences, and an alignment file
 #output new alignment file of matches

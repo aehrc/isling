@@ -6,17 +6,24 @@
 
 
 #hg38 - version recommended by Heng Li (https://lh3.github.io/2017/11/13/which-human-reference-genome-to-use)
-wget ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna.gz
-gunzip GCA_000001405.15_GRCh38_no_alt_analysis_set.fna.gz
-mv GCA_000001405.15_GRCh38_no_alt_analysis_set.fna hg38.fa
+#wget ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna.gz
+#gunzip GCA_000001405.15_GRCh38_no_alt_analysis_set.fna.gz
+#mv GCA_000001405.15_GRCh38_no_alt_analysis_set.fna hg38.fa
 
 #hg38 refSeq
-wget ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_full_analysis_set.refseq_annotation.gff.gz
-gunzip GCA_000001405.15_GRCh38_full_analysis_set.refseq_annotation.gff.gz
+#wget ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_full_analysis_set.refseq_annotation.gff.gz
+#gunzip GCA_000001405.15_GRCh38_full_analysis_set.refseq_annotation.gff.gz
 #get genes from hg38 refSeq
-awk '{ if (($0 ~ /^#/) || ($3 ~ /gene/)) { print } }' GCA_000001405.15_GRCh38_full_analysis_set.refseq_annotation.gff > hg38_genes.gff
+#awk '{ if (($0 ~ /^#/) || ($3 ~ /gene/)) { print } }' GCA_000001405.15_GRCh38_full_analysis_set.refseq_annotation.gff > hg38_genes.gff
 #get exons from hg38 refseq
-awk '{ if (($0 ~ /^#/) || ($3 ~ /exon/)) { print } }' GCA_000001405.15_GRCh38_full_analysis_set.refseq_annotation.gff > hg38_exons.gff
+#awk '{ if (($0 ~ /^#/) || ($3 ~ /exon/)) { print } }' GCA_000001405.15_GRCh38_full_analysis_set.refseq_annotation.gff > hg38_exons.gff
+
+
+#hg38 GENCODE
+wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/GRCh38.primary_assembly.genome.fa.gz
+wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/gencode.v32.annotation.gff3.gz
+mv GRCh38.primary_assembly.genome.fa.gz GRCh38.fa.gz
+mv gencode.v32.annotation.gff3.gz GRCh38.gencode.v32.annotation.gff3.gz
 
 
 #hg19 - version used by HGT-ID
@@ -29,13 +36,19 @@ awk '{ if (($0 ~ /^#/) || ($3 ~ /exon/)) { print } }' GCA_000001405.15_GRCh38_fu
 #wget ftp://ftp.ncbi.nlm.nih.gov/genomes/archive/old_genbank/Eukaryotes/vertebrates_mammals/Mus_musculus/GRCm38/Primary_Assembly/assembled_chromosomes/FASTA/*.fa.gz
 #cd ..
 #zcat mouse/*.fa.gz | awk '{if($0 ~ /^>/){print ">chr"$5} else {print}}' | sed -e 's/chr>/chr/g' | sed -e 's/,//g' > mouse.fa
-wget ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/635/GCF_000001635.26_GRCm38.p6/GCF_000001635.26_GRCm38.p6_genomic.fna.gz
-gunzip GCF_000001635.26_GRCm38.p6_genomic.fna.gz
-mv GCF_000001635.26_GRCm38.p6_genomic.fna mouse.fa
+#wget ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/635/GCF_000001635.26_GRCm38.p6/GCF_000001635.26_GRCm38.p6_genomic.fna.gz
+#gunzip GCF_000001635.26_GRCm38.p6_genomic.fna.gz
+#mv GCF_000001635.26_GRCm38.p6_genomic.fna mouse.fa
+#wget ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/635/GCF_000001635.26_GRCm38.p6/GCF_000001635.26_GRCm38.p6_genomic.gff.gz
+#gunzip *gz
+#mv GCF_000001635.26_GRCm38.p6_genomic.fna mouse.fa
 
-wget ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/635/GCF_000001635.26_GRCm38.p6/GCF_000001635.26_GRCm38.p6_genomic.gff.gz
-gunzip *gz
-mv GCF_000001635.26_GRCm38.p6_genomic.fna mouse.fa
+#mouse genome from GENCODE
+wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M23/GRCm38.primary_assembly.genome.fa.gz
+wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M23/gencode.vM23.annotation.gff3.gz
+mv GRCm38.primary_assembly.genome.fa.gz GRCm38.fa.gz
+mv gencode.vM23.annotation.gff3.gz GRCm38.gencode.vM23.annotation.gff3.gz
+gunzip *.gz
 
 
 #wget ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/635/GCF_000001635.26_GRCm38.p6/GCF_000001635.26_GRCm38.p6_genomic.fna.gz 
