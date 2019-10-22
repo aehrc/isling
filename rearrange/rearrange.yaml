@@ -1,6 +1,7 @@
 {
 "FRG_OTC"		: {"virus" : "pAAV2-OTC"},
-"mouse_with_OTC"	: {"virus" : "pAAV2-OTC"}
+"mouse_with_OTC"	: {"virus" : "pAAV2-OTC"},
+"london_macaque_OTC"	: {"virus" : "pAAV2-OTC"} 
 }
 
 

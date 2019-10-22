@@ -17,7 +17,7 @@ VIRUSES = []
 
 for dataset in config:
 	#get files in directory and strip off "_R1.fastq.gz"
-	samples = [os.path.basename(f)[:-12] for f in glob.glob("../data/{}/reads/*_R1.fastq.gz".format(dataset))]
+	samples = [os.path.basename(f)[:-12] for f in glob.glob("../../data/{}/reads/*_R1.fastq.gz".format(dataset))]
 	for sample in samples:
 		DATASETS.append(dataset)
 		SAMPLES.append(sample)
@@ -39,9 +39,9 @@ rule merge_reads:
 		r1 = "../data/{dset}/reads/{samp}_R1.fastq.gz",
 		r2 = "../data/{dset}/reads/{samp}_R2.fastq.gz"	
 	output:
-		merged = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.merged.fastq.gz",
-		proc_r1 = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.R1.fastq.gz",
-		proc_r2 = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.R2.fastq.gz",
+		merged = "../../out/{dset}/merged_reads/{samp}.seqPrep_processed.merged.fastq.gz",
+		proc_r1 = "../../out/{dset}/merged_reads/{samp}.seqPrep_processed.R1.fastq.gz",
+		proc_r2 = "../../out/{dset}/merged_reads/{samp}.seqPrep_processed.R2.fastq.gz",
 		all = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.fastq.gz"
 	conda:	
 		"envs/seqprep.yml"
@@ -55,45 +55,45 @@ rule merge_reads:
 
 rule index:
 	input:
-		"../references/{genome}.fa"
+		"../../references/{genome}.fa"
 	output:
-		"../references/{genome}.ann",
-		"../references/{genome}.amb",
-		"../references/{genome}.bwt",
-		"../references/{genome}.pac",
-		"../references/{genome}.sa"
+		"../../references/{genome}.ann",
+		"../../references/{genome}.amb",
+		"../../references/{genome}.bwt",
+		"../../references/{genome}.pac",
+		"../../references/{genome}.sa"
 	conda: 
 		"envs/bwa.yml"
 	shell:
-		"bwa index -p ../references/{wildcards.genome} {input}"
+		"bwa index -p ../../references/{wildcards.genome} {input}"
 
 
 rule align_bwa_virus:
 	input:
-		all = "../out/{dset}/merged_reads/{samp}.seqPrep_processed.fastq.gz",
-		ann = "../references/{virus}.ann",
-		amb = "../references/{virus}.amb",
-		bwt = "../references/{virus}.bwt",
-		pac = "../references/{virus}.pac",
-		sa = "../references/{virus}.sa"
+		all = "../../out/{dset}/merged_reads/{samp}.seqPrep_processed.fastq.gz",
+		ann = "../../references/{virus}.ann",
+		amb = "../../references/{virus}.amb",
+		bwt = "../../references/{virus}.bwt",
+		pac = "../../references/{virus}.pac",
+		sa = "../../references/{virus}.sa"
 	output:
-		vSing = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam")
+		vSing = temp("../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam")
 	conda: 
-		"envs/bwa.yml"
+		"../envs/bwa.yml"
 	threads: 5
 	shell:	
 		"""
-		python ./alignReadsWithBWA.py --threads {threads} --index ../references/{wildcards.virus} --read1 {input.all} --output {output.vSing} --threshold 10 --hflag 200
+		python ../alignReadsWithBWA.py --threads {threads} --index ../../references/{wildcards.virus} --read1 {input.all} --output {output.vSing} --threshold 10 --hflag 200
 		"""
 
 rule convert:
 	input:
-		"../out/{dset}/{host_virus}/{samp}.{host_virus_name}.{alignType}.sam"
+		"../../out/{dset}/{host_virus}/{samp}.{host_virus_name}.{alignType}.sam"
 	output:
-		bam = "../out/{dset}/{host_virus}/{samp}.{host_virus_name}.{alignType}.bam",
-		bai = "../out/{dset}/{host_virus}/{samp}.{host_virus_name}.{alignType}.bam.bai"
+		bam = "../../out/{dset}/{host_virus}/{samp}.{host_virus_name}.{alignType}.bam",
+		bai = "../../out/{dset}/{host_virus}/{samp}.{host_virus_name}.{alignType}.bam.bai"
 	conda: 
-		"envs/bwa.yml"	
+		"../envs/bwa.yml"	
 	shell:
 		"""
 		samtools view -bS {input} | samtools sort - -o {output.bam}
@@ -107,26 +107,26 @@ rule convert:
 
 rule run_rearrange_scripts:
 	input:
-		"../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam"
+		"../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam"
 	output:
-		txt = "../out/{dset}/rearrange/{samp}.{virus}.rearrange.txt",
-		bed = "../out/{dset}/rearrange/{samp}.{virus}.rearrange.bed"
+		txt = "../../out/{dset}/rearrange/{samp}.{virus}.rearrange.txt",
+		bed = "../../out/{dset}/rearrange/{samp}.{virus}.rearrange.bed"
 	conda: 
-		"envs/bwa.yml"
+		"../envs/bwa.yml"
 	shell:
-		"perl -I . ./checkVecRearrange.pl --viral {input} --output {output.txt} --bed {output.bed}"
+		"perl -I .. ../checkVecRearrange.pl --viral {input} --output {output.txt} --bed {output.bed}"
 
 
 #### visualisation ####
 
 rule summarise_rearrange:
 	input:
-		txt = expand("../out/{dset}/rearrange/{samp}.{virus}.rearrange.txt", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES),
-		bed = expand("../out/{dset}/rearrange/{samp}.{virus}.rearrange.bed", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES)
+		txt = expand("../../out/{dset}/rearrange/{samp}.{virus}.rearrange.txt", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES),
+		bed = expand("../../out/{dset}/rearrange/{samp}.{virus}.rearrange.bed", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES)
 	output:
-		"../out/summary/rearrange/num_rearrange.xlsx"
+		"../../out/summary/rearrange/num_rearrange.xlsx"
 	conda:
-		"envs/rscripts.yml"
+		"../envs/rscripts.yml"
 	script:
 		"count_rearrange.R"
 
