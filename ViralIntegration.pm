@@ -433,12 +433,6 @@ sub isRearrange {
 	@pAligns = getMatchedRegions($pCig, $pDir);
 	foreach my $align (@pAligns) { push(@aligns, join("xxx", $align, $pRef, $pPos, $pDir, $pCig)); }
 	
-	#if no sups or secs, can't be rearrangement
-	if ($sup =~ /NA;NA/) { return ("no", 0, 0, @aligns); }
-	
-	#if fully matched, can't be rearrangement
-	if ($pCig =~ /^\d+M$/) { return ("no", 0, 0, @aligns); }
-	
 	#then do rest of the alignments
 	my @supAligns = split(";", $sup);
 	foreach my $supAlign (@supAligns) {
@@ -499,11 +493,7 @@ sub isRearrange {
 		#reset equivalent 
 		@equivalent = ();
 		
-	}
-	
-	#if at this point we only have one alignment left, can't be a vector rearrangement
-	if ($#sorted == 0) { return "no"; }
-	
+	}	
 	
 	#check if alignments can account for whole read
 	#check all alignments for gaps
@@ -536,7 +526,7 @@ sub isRearrange {
 	
 	my $isRearrange; #to store result, "yes" or "no"
 	
-	if ($gapBP < ($readlen - ($thresh * $readlen))) { $isRearrange = "yes"; }
+	if ($gapBP < ($readlen - ($thresh * $readlen)) & ($#sorted > 0)) { $isRearrange = "yes"; }
 	else { $isRearrange = "no"; }
 	
 	
