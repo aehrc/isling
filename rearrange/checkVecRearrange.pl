@@ -4,8 +4,6 @@
 use strict;
 use warnings;
 
-use lib '.';
-
 use ViralIntegration;
 use Getopt::Long;
 
@@ -16,7 +14,7 @@ my $verbose;
 my $thresh = 0.95;
 my $help;
 
-GetOptions('thesh=f'  => \$thresh,
+GetOptions(	   'thesh=f'  => \$thresh,
 		   'viral=s'  => \$viral,
 		   'output=s' => \$output,
 		   'bed=s'	  => \$bed,
@@ -29,25 +27,19 @@ unless ($viral) { printHelp(); }
 
 if (($thresh < 0) or ($thresh > 1)) { printHelp(); }
 
-my %viralReads;
-### These hashes contain the information about the integration sites within the resepctive genomes
-### Data is saved as a tab seperated string
-### Read name => Chr intStart intStop relStart relStop orientation readSeqeunce
 
-
-### Collect junction reads from viral genome
-### Junctions are defined by the CIGAR string: SM or MS
-### Save the resulting information in a hash:
-###	key: 	{ReadID}xxx{ReadSequence}
-###	value:	{TargetID}xxx{Sequence}xxx{SeqOrientation}xxx{CIGAR}xxx{XA}xxx{SA}
-###		SeqOrientation: f = aligned in fwd orientation
-###				r = aligned in rev orientation
-###		Sequence is always given in fwd orientation
-### XA is the secondary alignments in the XA field (from BWA)
-### SA is the supplementary alignments in the SA field (from BWA)
-
+#open input file
 open (VIRAL, $viral) || die "Could not open viral alignment file: $viral\n";
 if ($verbose) { print "Processing viral alignment...\n"; }
+my ($rearrange, $line, $bedline);
+
+#open output file(s)
+open (OUTFILE, ">$output") || die "Could not open output file: $output\n";
+if ($bed) { open (BEDFILE, ">$bed") || die "Could not open output file: $output\n"; }
+
+print OUTFILE "ReadID\tpossibleVecRearrange\tTotalGapBP\tGaps\tsups+secs\tseq\n";
+
+#read input file and write to output file
 while (my $vl = <VIRAL>) {
 	if ($vl =~ /^@/) { next; } # skip header lines
 
@@ -59,18 +51,21 @@ while (my $vl = <VIRAL>) {
 	if ($parts[2] eq "*") { next; } # skip unaligned reads
 
 	my $cig = $parts[5]; 
-	unless ($cig) { next; } # keep checking to make sure double clipped reads don't sneak through
 
 	#get information about location of alignment
 	my $ref = $parts[2];
 	my $pos = $parts[3];
-	
+
+	#get read ID
+	my $ID = $parts[0];
 	
 	#get supplementary (SA) and secondary (XA) alignments in order to check for possible vector rearrangements
-	my ($vSec, $vSup) = getSecSup($vl);
+	my ($sec, $sup) = getSecSup($vl);
 	
+	#get sequence and orientation
 	my $seq;
 	my $ori;
+	#reverse complement sequence if necessary
 	if ($parts[1] & 0x10) { 
 		($seq) = reverseComp($parts[9]); 
 		$ori   = 'r';
@@ -80,58 +75,40 @@ while (my $vl = <VIRAL>) {
 		$ori = 'f';
 	}
 	
-	$viralReads{join("xxx", ($parts[0],$seq))} = join("xxx",($parts[2], $seq, $ori, $cig, $vSec, $vSup, $pos)); 
+	#check for possible rearrangements
+	my @reData = isRearrange($cig, $ori, $ref, $pos, (join(";", $sup, $sec)), $seq, $thresh);
+	my $isRearrange = shift @reData;
+	my $gapBP = shift @reData;
+	my $gaps = shift @reData;
+	my @aligns = @reData;
+		
+	# print to bed file
+	if ($bed) {			
+		foreach my $align (@aligns) {
+			#get info from this alignment
+			my ($start, $stop, $ref, $pos, $sense, $cig) = split("xxx", $align);
+				
+			#get coordinates in virus
+			my ($gStart, $gStop) = getGenomicCoords($start, $stop, $pos, $sense, $cig);
+				
+			#make line and print to file
+			$bedline = join("\t", $ref, $gStart, $gStop, $isRearrange, $ID);
+			print BEDFILE "$bedline\n";
+		}		
+	}
+
+	#print to txt file
+	$line = join("\t", $ID, $isRearrange, $gapBP, $gaps, $sup, $seq);
+	print OUTFILE "$line\n";
 
 }
+
+#close files
 close VIRAL;
-
-my ($rearrange, $line, $bedline);
-open (OUTFILE, ">$output") || die "Could not open output file: $output\n";
-if ($bed) { open (BEDFILE, ">$bed") || die "Could not open output file: $output\n"; }
-print OUTFILE "ReadID\tpossibleVecRearrange\tTotalGapBP\tGaps\tsups+secs\tseq\n";
-
-
-foreach my $key (keys %viralReads) {
-		#get info from alignments
-		my $seq = (split("xxx",$key))[1];
-		my ($pCig, $pDir, $pSec, $pSup, $pos, $ref) = (split("xxx",$viralReads{$key}))[3,2,4,5,6,0];
-		my $sup = join(";", $pSec, $pSup);
-		
-		#get if possible vector rearrangement
-		my @reData = isRearrange($pCig, $pDir, $ref, $pos, $sup, $seq, $thresh);
-		my $isRearrange = shift @reData;
-		my $gapBP = shift @reData;
-		my $gaps = shift @reData;
-		my @aligns = @reData;
-		$line = join("\t", (split("xxx",$key))[0], $isRearrange, $gapBP, $gaps, $sup, $seq);
-		
-		#print to txt file
-		print OUTFILE "$line\n";
-		
-		# print to bed file
-		if ($bed) {			
-			foreach my $align (@aligns) {
-				#get info from this alignment
-				my ($start, $stop, $ref, $pos, $sense, $cig) = split("xxx", $align);
-				
-				#get genomic coordinates
-				my ($gStart, $gStop) = getGenomicCoords($start, $stop, $pos, $sense, $cig);
-				
-				#make line and print to file
-				$bedline = join("\t", $ref, $gStart, $gStop, $isRearrange, (split("xxx",$key))[0], (split("xxx",$key))[1]);
-				print BEDFILE "$bedline\n";
-			}
-		
-			
-		}
-		
-		
-		
-		#print to bed file
-		
-}
-
 close OUTFILE;
+if ($bed) { close BEDFILE; }
+
+#subroutines
 
 sub printHelp {
 	print "Pipeline for detection of viral integration sites within a genome\n\n";
