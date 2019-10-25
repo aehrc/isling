@@ -1,0 +1,46 @@
+{
+	"__default__":
+	{
+		"mem-per-cpu" :"5GB",
+		"mail-user" : "suzanne.scott@csiro.au",
+		"time" : "0:15:00",
+		"ntasks-per-node" : "1",
+		"nodes" : "1",
+		"cpus-per-task" : "1",
+		"output" : "../../slogs/{rule}.{wildcards}.log"
+	},
+	"dedup":
+	{	
+		"cpus-per-task" : "4",
+		"time" : "0:30:00"
+	},
+	"seqPrep":
+	{	
+		"time" : "1:00:00"
+	},
+	"align_bwa_virus":
+	{	
+		"cpus-per-task" : "5",
+		"time" : "2:00:00"
+	},
+	"merge_reads":
+	{	
+		"time" : "0:20:00"
+	},
+	"index":
+	{
+		"time" : "2:00:00"
+	},
+	"run_rearrange_scripts":
+	{
+		"time" : "1:00:00",
+		"cpus-per-task" : "1"
+	},
+	"summarise_rearrange":
+	{
+		"cpus-per-task" : "8",
+		"time" : "1:00:00"
+	}
+
+	
+}
