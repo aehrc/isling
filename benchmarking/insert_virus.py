@@ -444,6 +444,7 @@ class ViralChunk:
 		#check if chunk has already been split into parts
 		if self.isSplit is False:
 			self.split(n)
+			
 		#if has been split into a different number of parts, just use that number
 		else:
 			n = len(self.breakpoints)
@@ -464,6 +465,10 @@ class ViralChunk:
 		#replace keys with shuffled numbers
 		self.pieces = {order[key]:value for key, value in self.pieces.items()}
 			
+	def delete(self, n):
+		#delete a random piece from a viral chunk of n pieces
+		
+		pass
 	
 		print(self.bases)
 if __name__ == "__main__":
