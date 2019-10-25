@@ -8,6 +8,8 @@ import os
 #also whether or not to try to merge R1 and R2
 configfile: "../proj-spcfc/dsets.yaml"
 
+references_path = "../data/references/"
+
 #this is of the form { dset1: {host: host1, virus: host2, merge: True, refseq: refseq1}, dset2: {host: host2, virus: virus2, merge: False, refseq: refseq1} }
 
 #make four lists, with each entry in each list corresponding to one desired output file
@@ -167,8 +169,10 @@ rule index:
 		"../data/references/{genome}.sa"
 	conda: 
 		"envs/bwa.yml"
+	params:
+		prefix = lambda wildcards: references_path + wildcards.genome
 	shell:
-		"bwa index -p ../data/references/{wildcards.genome} {input}"
+		"bwa index -p {params.prefix} {input}"
 
 
 rule align_bwa_virus:
@@ -185,30 +189,17 @@ rule align_bwa_virus:
 		vPaired = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam"),
 		vSing = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam"),
 		vShort = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.sam")
+	params:
+		index = lambda wildcards: references_path + wildcards.virus
 	conda: 
 		"envs/bwa.yml"
 	threads: 5
 	shell:	
 		"""
-		python ./alignReadsWithBWA.py --threads {threads} --index ../data/references/{wildcards.virus} --read1 {input.r1} --read2 {input.r2} --output {output.vPaired} --threshold 10 --hflag 200
-		python ./alignReadsWithBWA.py --threads {threads} --index ../data/references/{wildcards.virus} --read1 {input.all} --output {output.vSing} --threshold 10 --hflag 200
-		python ./alignReadsWithBWA.py --threads {threads} --index ../data/references/{wildcards.virus} --read1 {input.all} --output {output.vShort} --threshold 10 --hflag 200 --insert 0
+		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.r1} --read2 {input.r2} --output {output.vPaired} --threshold 10 --hflag 200
+		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.all} --output {output.vSing} --threshold 10 --hflag 200
+		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.all} --output {output.vShort} --threshold 10 --hflag 200 --insert 0
 		"""
-
-
-#rule fastqc:
-#	input:
-#		all_reads = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.bam"
-#	output:
-#		all_reads = "../out/{dset}/post_fastqc/{samp}.{virus}.bwa.fastqc.html"
-#	params:
-#		outpath = lambda wildcards: "../out/{wildcards.dset}/post_fastqc"
-#	conda:
-#		"envs/fastqc.yml"
-#	shell:
-#		"""
-#		fastqc -o {params.outpath} {input.all_reads}
-#		"""
 
 rule extract_vAligned:
 	input:
@@ -271,12 +262,14 @@ rule align_bwa_host:
 		hShort = temp("../out/{dset}/host_aligned/{samp}.{host}.bwaShort.{virus}Mappedreads.sam")
 	conda: 
 		"envs/bwa.yml"
+	params:
+		index = lambda wildcards: references_path + wildcards.host
 	threads: 5
 	shell:		
 		"""
-		python ./alignReadsWithBWA.py --threads {threads} --index ../data/references/{wildcards.host} --read1 {input.r1} --read2 {input.r2} --output {output.hPaired} --threshold 10 --hflag 200
-		python ./alignReadsWithBWA.py --threads {threads} --index ../data/references/{wildcards.host} --read1 {input.all} --output {output.hSing} --threshold 10 --hflag 200
-		python ./alignReadsWithBWA.py --threads {threads} --index ../data/references/{wildcards.host} --read1 {input.allShort} --output {output.hShort} --threshold 10 --hflag 200 --insert 0
+		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.r1} --read2 {input.r2} --output {output.hPaired} --threshold 10 --hflag 200
+		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.all} --output {output.hSing} --threshold 10 --hflag 200
+		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.allShort} --output {output.hShort} --threshold 10 --hflag 200 --insert 0
 		"""
 rule convert:
 	input:
