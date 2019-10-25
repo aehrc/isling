@@ -1,21 +1,16 @@
 datasets:
-    FRG_OTC:
-        host: "hg38"
-        virus: "pAAV2-OTC"
-        merge: "True"
-	    refseq: "GCA_000001405.15_GRCh38_full_analysis_set.refseq_annotation.gff"
-	    regions: "hg38_pileup.bed"
-	london_macaque_OTC:
-	    host: "macaque"
-	    virus: "pAAV2-OTC"
-	    merge: "True"
-	    refseq: "Macaca_fascicularis_5.0.97.gff"
-	    regions: "macfas5_OTC_SERPINA1_pileup.bed"
-	AGRF_CAGRF21377_CNW6N:
-        host: "hg38"
-        virus: "pAAV2-OTC"
-        merge: "True"
-	    refseq: "GCA_000001405.15_GRCh38_full_analysis_set.refseq_annotation.gff"
-	    regions: "hg38_pileup.bed"
-	    
-	    
+  FRG_OTC:
+     host: "GRCh38"
+     virus: "pAAV2-OTC"
+     merge: "True"
+     regions: "hg38_pileup.bed"
+  london_macaque_OTC:
+     host: "macFas5"
+     virus: "pAAV2-OTC"
+     merge: "True"
+     regions: "macfas5_OTC_SERPINA1_pileup.bed"
+  AGRF_CAGRF21377_CNW6N:
+     host: "GRCh38"
+     virus: "pAAV2-OTC"
+     merge: "True"
+     regions: "hg38_pileup.bed"

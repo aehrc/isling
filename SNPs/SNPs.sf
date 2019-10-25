@@ -38,351 +38,39 @@ for dataset in config.keys():
 
 
 #### local rules ####
-localrules: all, combine, run_int_scripts, merge_bed
+localrules: all, convert
 
 #### target files ####
 rule all:
 	input: 
-		expand("../../out/{dset}/variants/{dset}.{host}.bwa.{virus}juncts.freebayes.vcf", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES), 
-		expand("../../out/{dset}/virus_juncts/{samp}.{virus}.bwa.{host}juncts0NM.mapped.bam", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES, samp=SAMPLES),
-		expand("../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}Mappedreads.{virus}Juncts0NM.bam", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES, samp=SAMPLES),
-		expand("../../out/{dset}/variants/{dset}.{virus}.bwa.{host}juncts.freebayes.vcf", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES, samp=SAMPLES)
+		expand("../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}-juncts0NM.bam", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES, samp=SAMPLES),
+		expand("../../out/{dset}/host_variants/{dset}.{host}.bwa.{virus}-juncts.freebayes.vcf", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES), 
+		expand("../../out/{dset}/host_variants/{dset}.{host}.bwa.{virus}-juncts.pileup.vcf", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES, samp=SAMPLES),
+		expand("../../out/{dset}/virus_juncts/{samp}.{virus}.bwa.{host}-juncts0NM.bam", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES, samp=SAMPLES),
+		expand("../../out/{dset}/virus_variants/{dset}.{virus}.bwa.{host}-juncts.pileup.vcf", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES, samp=SAMPLES),
+		expand("../../out/{dset}/virus_variants/{dset}.{virus}.bwa.{host}-juncts.freebayes.vcf", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES, samp=SAMPLES),
 
-#### merging and dedup ###
-
-rule rename:
-	input:
-		r1 = "../../data/reads/{dset}/{samp}_R1.fastq.gz",
-		r2 = "../../data/reads/{dset}/{samp}_R2.fastq.gz"
-	output:
-		r1_out = temp("../../out/reads/{dset}/{samp}_1.fastq.gz"),
-		r2_out = temp("../../out/reads/{dset}/{samp}_2.fastq.gz")
-	shell:
-		"""
-		cp {input.r1} {output.r1_out}
-		cp {input.r2} {output.r2_out}
-		"""
-
-rule copy:
-	input:
-		r1 = "../data/reads/{dset}/{samp}_1.fastq.gz",
-		r2 = "../data/reads/{dset}/{samp}_2.fastq.gz"
-	output:
-		r1_out = temp("../out/reads/{dset}/{samp}_1.fastq.gz"),
-		r2_out = temp("../out/reads/{dset}/{samp}_2.fastq.gz")
-	shell:
-		"""
-		cp {input.r1} {output.r1_out}
-		cp {input.r2} {output.r2_out}
-		"""
-
-rule dedup:
-	input:
-		r1 = "../../out/reads/{dset}/{samp}_1.fastq.gz",
-		r2 = "../../out/reads/{dset}/{samp}_2.fastq.gz"	
-	output:
-		R1_clumped = "../../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
-		R2_clumped = "../../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
-	conda:
-		"../envs/bbmap.yml"
-	shell:
-		"""
-		clumpify.sh -Xmx10g in={input.r1} in2={input.r2} out={output.R1_clumped} out2={output.R2_clumped} dedupe subs=0
-		"""
-
-rule seqPrep:
-	input:
-		r1 = "../../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
-		r2 = "../../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
-	output:
-		merged = "../../out/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz",
-		proc_r1 = "../../out/{dset}/merged_reads/{samp}.SeqPrep_1.fastq.gz",
-		proc_r2 = "../../out/{dset}/merged_reads/{samp}.SeqPrep_2.fastq.gz",
-		all = "../../out/{dset}/merged_reads/{samp}.all.fastq.gz"
-	conda:	
-		"../envs/seqprep.yml"
-	params:
-		A = lambda wildcards: config[wildcards.dset]["read1-adapt"],
-		B = lambda wildcards: config[wildcards.dset]["read2-adapt"]
-	shell:
-		"""
-		SeqPrep -A {params.A} -B {params.B} -f {input.r1} -r {input.r2} -1 {output.proc_r1} -2 {output.proc_r2} -s {output.merged}
-		cat {output.proc_r1} {output.proc_r2} {output.merged} > {output.all}
-		"""
-
-rule combine:
-	input:
-		r1 = "../../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
-		r2 = "../../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
-	output:
-		proc_r1 = "../../out/{dset}/processed_reads/{samp}.1.fastq.gz",
-		proc_r2 = "../../out/{dset}/processed_reads/{samp}.2.fastq.gz",
-		all = "../../out/{dset}/processed_reads/{samp}.all.fastq.gz"
-	shell:
-		"""
-		cp {input.r1} {output.proc_r1}
-		cp {input.r2} {output.proc_r2}
-		cat {input.r1} {input.r2} > {output.all}
-		"""
-#functions for if we did seqPrep or not
-
-def get_all(wildcards):
-	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
-		folder = "merged_reads"
-	else:
-		folder = "processed_reads"
-	return "../../out/{}/{}/{}.all.fastq.gz".format(wildcards.dset, folder, wildcards.samp)
-
-def get_r1(wildcards):
-	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
-		typeRead = "SeqPrep_1"
-		folder = "merged_reads"
-	else:
-		typeRead = "1"	
-		folder = "processed_reads"
-	return "../../out/{}/{}/{}.{}.fastq.gz".format(wildcards.dset, folder, wildcards.samp, typeRead)
-
-def get_r2(wildcards):
-	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
-		typeRead = "SeqPrep_2"
-		folder = "merged_reads"
-	else:
-		typeRead = "2"	
-		folder = "processed_reads"
-	return "../../out/{}/{}/{}.{}.fastq.gz".format(wildcards.dset, folder, wildcards.samp, typeRead)
-
-
-#### alignments ####
-
-rule index:
-	input:
-		"../../data/references/{genome}.fa"
-	output:
-		"../../data/references/{genome}.ann",
-		"../../data/references/{genome}.amb",
-		"../../data/references/{genome}.bwt",
-		"../../data/references/{genome}.pac",
-		"../../data/references/{genome}.sa"
-	conda: 
-		"../envs/bwa.yml"
-	shell:
-		"bwa index -p ../../data/references/{wildcards.genome} {input}"
-
-
-rule align_bwa_virus:
-	input:
-		ann = "../../data/references/{virus}.ann",
-		amb = "../../data/references/{virus}.amb",
-		bwt = "../../data/references/{virus}.bwt",
-		pac = "../../data/references/{virus}.pac",
-		sa = "../../data/references/{virus}.sa",
-		all = get_all,
-		r1 = get_r1,
-		r2 = get_r2
-	output:
-		vPaired = temp("../../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam"),
-		vSing = temp("../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam"),
-		vShort = temp("../../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.sam")
-	conda: 
-		"../envs/bwa.yml"
-	threads: 5
-	shell:	
-		"""
-		python ../alignReadsWithBWA.py --threads {threads} --index ../../data/references/{wildcards.virus} --read1 {input.r1} --read2 {input.r2} --output {output.vPaired} --threshold 10 --hflag 200
-		python ../alignReadsWithBWA.py --threads {threads} --index ../../data/references/{wildcards.virus} --read1 {input.all} --output {output.vSing} --threshold 10 --hflag 200
-		python ../alignReadsWithBWA.py --threads {threads} --index ../../data/references/{wildcards.virus} --read1 {input.all} --output {output.vShort} --threshold 10 --hflag 200 --insert 0
-		wait
-		"""
-
-rule extract_vAligned:
-	input:
-		vPaired = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam",
-		vSing = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam",
-		vShort = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.sam"
-	output:
-		svSam = temp("../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam"),
-		shortvSam = temp("../../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.mapped.sam"),
-		pvBam_readMap_mateUnmap = temp("../../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped1.bam"),
-		pvBam_readUnmap_mateMap = temp("../../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped2.bam"),
-		pvBam = temp("../../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.bam"),
-		pvSam = temp("../../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam")
-	conda:
-		"../envs/bwa.yml"
-	shell:
-		"""
-		samtools view -h -F 0x4 -F 0x800 -o {output.svSam} {input.vSing} 
-		samtools view -h -F 0x4 -F 0x800 -o {output.shortvSam} {input.vShort} 
-		samtools view -hb -F 0x4 -f 0x8 -F 0x800 -o {output.pvBam_readMap_mateUnmap} {input.vPaired}
-		samtools view -hb -f 0x4 -F 0x8 -F 0x800 -o {output.pvBam_readUnmap_mateMap} {input.vPaired}
-		samtools merge {output.pvBam} {output.pvBam_readMap_mateUnmap} {output.pvBam_readUnmap_mateMap}
-		samtools view -h -o {output.pvSam} {output.pvBam}
-		"""
-
-rule extract_vAligedtoFastq:
-	input: 
-		svSam = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam",
-		pvSam = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam",
-		shortvSam = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.mapped.sam" 
-	output:
-		svFastq = temp("../../out/{dset}/reads/{samp}.bwa.mappedTo{virus}.fastq.gz"),
-		shortvFastq = temp("../../out/{dset}/reads/{samp}.bwaShort.mappedTo{virus}.fastq.gz"),
-		pvFastq1 = temp("../../out/{dset}/reads/{samp}.bwaPaired.mappedTo{virus}_1.fastq.gz"),
-		pvFastq2 = temp("../../out/{dset}/reads/{samp}.bwaPaired.mappedTo{virus}_2.fastq.gz")
-	conda:
-		"../envs/picard.yml"
-	shell:
-		"""
-		picard SamToFastq I={input.svSam} FASTQ={output.svFastq}
-		picard SamToFastq I={input.shortvSam} FASTQ={output.shortvFastq}
-		picard SamToFastq I={input.pvSam} FASTQ={output.pvFastq1} SECOND_END_FASTQ={output.pvFastq2}
-		"""
-
-rule align_bwa_host:
-	input:	
-		ann = "../../data/references/{host}.ann",
-		amb = "../../data/references/{host}.amb",
-		bwt = "../../data/references/{host}.bwt",
-		pac = "../../data/references/{host}.pac",
-		sa = "../../data/references/{host}.sa",
-		all = "../../out/{dset}/reads/{samp}.bwa.mappedTo{virus}.fastq.gz",
-		allShort = "../../out/{dset}/reads/{samp}.bwaShort.mappedTo{virus}.fastq.gz",
-		r1 = "../../out/{dset}/reads/{samp}.bwaPaired.mappedTo{virus}_1.fastq.gz",
-		r2 = "../../out/{dset}/reads/{samp}.bwaPaired.mappedTo{virus}_2.fastq.gz"
-
-	output:
-		hPaired = temp("../../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.{virus}Mappedreads.sam"),
-		hSing = temp("../../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.sam"),
-		hShort = temp("../../out/{dset}/host_aligned/{samp}.{host}.bwaShort.{virus}Mappedreads.sam")
-	conda: 
-		"../envs/bwa.yml"
-	threads: 5
-	shell:		
-		"""
-		python ../alignReadsWithBWA.py --threads {threads} --index ../../data/references/{wildcards.host} --read1 {input.r1} --read2 {input.r2} --output {output.hPaired} --threshold 10 --hflag 200
-		python ../alignReadsWithBWA.py --threads {threads} --index ../../data/references/{wildcards.host} --read1 {input.all} --output {output.hSing} --threshold 10 --hflag 200
-		python ../alignReadsWithBWA.py --threads {threads} --index ../../data/references/{wildcards.host} --read1 {input.allShort} --output {output.hShort} --threshold 10 --hflag 200 --insert 0
-		"""
+#### convert bam to sam ####
 rule convert:
 	input:
-		"../../out/{dset}/{host_virus}/{samp}.{host_virus_name}.{alignType}{mapped_type}.sam"
+		"../../out/{dset}/{host_virus}/{name}.bam"
 	output:
-		bam = "../../out/{dset}/{host_virus}_bam/{samp}.{host_virus_name}.{alignType}{mapped_type}.bam",
-		bai = "../../out/{dset}/{host_virus}_bam/{samp}.{host_virus_name}.{alignType}{mapped_type}.bam.bai"
-	wildcard_constraints:
-		samp = "[\w\d_]+",
-		host_virus_name = "[\w\d-]+",
-		alignType = "bwaShort|bwaPaired|bwa",
-		mapped_type = "|\.[\w\d-]+"
+		sam = "../../out/{dset}/{host_virus}/{name}.sam"
 	conda: 
 		"../envs/bwa.yml"	
 	shell:
 		"""
-		samtools view -bhS {input} | samtools sort - -o {output.bam}
-		samtools index {output.bam}
+		samtools view -h {input} > {output.sam}
 		"""
 
-#### perl scripts ####
-
-rule run_int_scripts:
-	input:
-		hPaired = "../../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.{virus}Mappedreads.sam",
-		hSing = "../../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.sam",
-		vPaired = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam",
-		vSing = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam",
-		hShort = "../../out/{dset}/host_aligned/{samp}.{host}.bwaShort.{virus}Mappedreads.sam",
-		vShort = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.sam"
-
-	output:
-		allInt = "../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
-		allBed = "../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.bed",
-		short = temp("../../out/{dset}/ints/{samp}.{host}.{virus}.short.txt"),
-		soft = temp("../../out/{dset}/ints/{samp}.{host}.{virus}.soft.txt"),
-		discord = temp("../../out/{dset}/ints/{samp}.{host}.{virus}.discordant.txt"),
-		softBed = temp("../../out/{dset}/ints/{samp}.{host}.{virus}.soft.bed"),
-		discordBed = temp("../../out/{dset}/ints/{samp}.{host}.{virus}.discordant.bed"),
-		shortBed = temp("../../out/{dset}/ints/{samp}.{host}.{virus}.short.bed"),
-		allIntTemp = temp("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp"),
-		allBedTemp = temp("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.bed.tmp")
-
-	shell:
-		"""
-		perl -I.. ../softClip.pl --viral {input.vSing} --human {input.hSing} --output {output.soft} --bed {output.softBed}
-		perl -I.. ../discordant.pl --viral {input.vPaired} --human {input.hPaired} --output {output.discord} --bed {output.discordBed} 
-		perl -I.. ../short.pl --viral {input.vShort} --human {input.hShort} --output {output.short} --bed {output.shortBed}
-		sed -e '2,${{/Chr/d' -e '}}' {output.soft} {output.discord} {output.short} > {output.allInt}
-		sed -i 's\chr\ \g' {output.allInt}
-		sort -n -k1,1 -k2,2n {output.allInt} > {output.allIntTemp}
-		cp {output.allIntTemp} {output.allInt}
-		cat {output.softBed} {output.discordBed} {output.shortBed} > {output.allBed}
-		sort -k1,1 -k2,2n {output.allBed} > {output.allBedTemp}
-		cp {output.allBedTemp} {output.allBed}
-		"""
-
-rule merge_bed:
-	input:
-		bed = "../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.bed"
-	output:
-		merge = "../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed"
-	conda:
-		"../envs/bedtools.yml"
-	shell:	
-		"bedtools merge -c 5,4 -o count,distinct -i {input.bed} > {output.merge}"
-
-rule refseq:
-	input:
-		merge = "../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed",
-		ref = "../../data/references/{refseq}.gff"
-	output:
-		genes = "../../out/{dset}/ints/{samp}.{host}.{virus}.{refseq}.merged.bed"
-	wildcard_constraints:
-		samp = "[\w\d_]+",
-		host = "[\w\d-]+",
-		virus = "[\w\d-]+"
-	conda:
-		"../envs/bedtools.yml"
-	shell:
-		"bedtools intersect -loj -a {input.merge} -b {input.ref} > {output.genes}"
-	
-#### visualization ####
-
-rule count_mapped:
-	input:
-		expand("../../out/{dset}/host_aligned_bam/{samp}.{host}.bwa.{virus}Mappedreads.bam", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES),
-		expand("../../out/{dset}/virus_aligned_bam/{samp}.{virus}.bwa.mapped.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES),
-		expand("../../out/{dset}/host_aligned_bam/{samp}.{host}.bwaPaired.{virus}Mappedreads.bam", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus=VIRUSES),
-		expand("../../out/{dset}/virus_aligned_bam/{samp}.{virus}.bwaPaired.mapped.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES)
-	output:
-		"../../out/summary/count_mapped.txt"
-	conda: 
-		"../envs/bwa.yml"
-	shell:
-		"../count_mapped.sh"
-
-
-#### extract junction fragments and look for variants ####
-rule extract_virus_junction_reads:
-	input:
-		allInt = "../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
-		vSing = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam"
-	output:
-		vSingJunctSam = temp("../../out/{dset}/virus_juncts/{samp}.{virus}.bwa.{host}juncts.mapped.sam"),
-		vSingJunctBam = "../../out/{dset}/virus_juncts/{samp}.{virus}.bwa.{host}juncts.mapped.bam"
-	conda:
-		"../envs/bwa.yml"
-	shell:
-		"""
-		perl extract_junctions.pl --sam {input.vSing} --ints {input.allInt} --junctSam {output.vSingJunctSam}
-		samtools view -bh {output.vSingJunctSam} | samtools sort - -o {output.vSingJunctBam}
-		samtools index {output.vSingJunctBam}
-		"""
-
-rule extract_host_junction_reads:
+#### extract junction fragments ####
+rule extract_junction_reads_host:
 	input:
 		allInt = "../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
 		hSing = "../../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.sam"
 	output:
-		hSingJunctSam = "../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}Mappedreads.{virus}Juncts.sam",
-		hSingJunctBam = "../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}Mappedreads.{virus}Juncts.bam"
+		hSingJunctSam = temp("../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}-juncts.sam"),
+		hSingJunctBam = "../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}-juncts.bam"
 	conda:
 		"../envs/bwa.yml"
 	shell:
@@ -392,30 +80,31 @@ rule extract_host_junction_reads:
 		samtools index {output.hSingJunctBam}
 		"""
 
-#### extract junction fragments with zero edit distance ####
-rule extract_virus_junction_reads0:
+rule extract_junction_reads_virus:
 	input:
 		allInt = "../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
-		vSing = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam"
+		sing = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam"
 	output:
-		vSingJunctSam0 = temp("../../out/{dset}/virus_juncts/{samp}.{virus}.bwa.{host}juncts0NM.mapped.sam"),
-		vSingJunctBam0 = "../../out/{dset}/virus_juncts/{samp}.{virus}.bwa.{host}juncts0NM.mapped.bam"
+		singJunctSam = temp("../../out/{dset}/virus_juncts/{samp}.{virus}.bwa.{host}-juncts.sam"),
+		singJunctBam = "../../out/{dset}/virus_juncts/{samp}.{virus}.bwa.{host}-juncts.bam"
 	conda:
 		"../envs/bwa.yml"
 	shell:
 		"""
-		perl extract_junctions_0NM.pl --sam {input.vSing} --ints {input.allInt} --junctSam {output.vSingJunctSam0}
-		samtools view -bhS {output.vSingJunctSam0} | samtools sort - -o {output.vSingJunctBam0}
-		samtools index {output.vSingJunctBam0}
+		perl extract_junctions.pl --sam {input.sing} --ints {input.allInt} --junctSam {output.singJunctSam}
+		samtools view -bh {output.singJunctSam} | samtools sort - -o {output.singJunctBam}
+		samtools index {output.singJunctBam}
 		"""
 
-rule extract_host_junction_reads0:
+
+#### extract junction fragments with zero edit distance ####
+rule extract_junction_reads0_host:
 	input:
 		allInt = "../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
 		hSing = "../../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.sam"
 	output:
-		hSingJunctSam0 = temp("../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}Mappedreads.{virus}Juncts0NM.sam"),
-		hSingJunctBam0 = "../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}Mappedreads.{virus}Juncts0NM.bam"
+		hSingJunctSam0 = temp("../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}-juncts0NM.sam"),
+		hSingJunctBam0 = "../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}-juncts0NM.bam"
 	conda:
 		"../envs/bwa.yml"
 	shell:
@@ -425,18 +114,34 @@ rule extract_host_junction_reads0:
 		samtools index {output.hSingJunctBam0}
 		"""
 
+rule extract_junction_reads0_virus:
+	input:
+		allInt = "../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
+		sing = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam"
+	output:
+		singJunctSam = temp("../../out/{dset}/virus_juncts/{samp}.{virus}.bwa.{host}-juncts0NM.sam"),
+		singJunctBam = "../../out/{dset}/virus_juncts/{samp}.{virus}.bwa.{host}-juncts0NM.bam"
+	conda:
+		"../envs/bwa.yml"
+	shell:
+		"""
+		perl extract_junctions_0NM.pl --sam {input.sing} --ints {input.allInt} --junctSam {output.singJunctSam}
+		samtools view -bh {output.singJunctSam} | samtools sort - -o {output.singJunctBam}
+		samtools index {output.singJunctBam}
+		"""
 
 #### variant calling ####
+
 def pileup_input_host(wildcards):
 	samples = set_samples[wildcards.dset]
-	samples = [f"../../out/{wildcards.dset}/host_juncts/{sample}.{wildcards.host}.bwa.{wildcards.virus}Mappedreads.{wildcards.virus}Juncts.bam" for sample in samples]
+	samples = [f"../../out/{wildcards.dset}/host_juncts/{sample}.{wildcards.host}.bwa.{wildcards.virus}-juncts.bam" for sample in samples]
 	return samples
-		
-rule freebayes_host:
+
+rule pileup_host:
 	input:
 		sams = pileup_input_host
 	output:
-		vcf = "../../out/{dset}/variants/{dset}.{host}.bwa.{virus}juncts.freebayes.vcf"
+		vcf = "../../out/{dset}/host_variants/{dset}.{host}.bwa.{virus}-juncts.pileup.vcf"
 	conda:
 		"../envs/bcftools.yml"
 	params:
@@ -445,33 +150,58 @@ rule freebayes_host:
 	threads: 5
 	shell:
 		"""
-		freebayes -f {params.ref} -t {params.regions} -p 1 --haplotype-length 0 --min-alternate-count 2 --min-alternate-fraction 0 --pooled-continuous --report-monomorphic {input.sams} | awk '{{if (($0 ~ /^#/) || ( $6 > 5)) print}}' > {output.vcf}
+		bcftools mpileup -f {params.ref} -R {params.regions} {input} > {output.vcf}
 		"""
-
 		
-def pileup_input_virus(wildcards):
-	samples = set_samples[wildcards.dset]
-	samples = [f"../../out/{wildcards.dset}/virus_juncts/{samp}.{wildcards.virus}.bwa.{wildcards.host}juncts.mapped.bam" for sample in samples]
-	return samples
-		
-rule freebayes_virus:
+rule call_host:
 	input:
-		sams = pileup_input_virus
+		sams = pileup_input_host
 	output:
-		vcf = "../../out/{dset}/variants/{dset}.{virus}.bwa.{host}juncts.freebayes.vcf"
+		vcf = "../../out/{dset}/host_variants/{dset}.{host}.bwa.{virus}-juncts.freebayes.vcf"
 	conda:
 		"../envs/bcftools.yml"
 	params:
 		regions = lambda wildcards: "../../data/references/" + config[wildcards.dset]["regions"],
+		ref = lambda wildcards: "../../data/references/" + config[wildcards.dset]["host"] + ".fa"
+	threads: 5
+	shell:
+		"""
+		bcftools mpileup --max-depth 2000 -f {params.ref} -R {params.regions} {input} | bcftools call -mv --ploidy 1 -Ov -o {output.vcf}
+		"""
+
+
+
+def pileup_input_virus(wildcards):
+	samples = set_samples[wildcards.dset]
+	samples = [f"../../out/{wildcards.dset}/virus_juncts/{sample}.{wildcards.virus}.bwa.{wildcards.host}-juncts.bam" for sample in samples]
+	return samples
+
+rule pileup_virus:
+	input:
+		sams = pileup_input_virus
+	output:
+		vcf = "../../out/{dset}/virus_variants/{dset}.{virus}.bwa.{host}-juncts.pileup.vcf"
+	conda:
+		"../envs/bcftools.yml"
+	params:
 		ref = lambda wildcards: "../../data/references/" + config[wildcards.dset]["virus"] + ".fa"
 	threads: 5
 	shell:
 		"""
-		freebayes -f {params.ref} -t {params.regions} -p 1 --haplotype-length 0 --min-alternate-count 2 --min-alternate-fraction 0 --pooled-continuous --report-monomorphic {input.sams} | awk '{{if (($0 ~ /^#/) || ( $6 > 5)) print}}' > {output.vcf}
+		bcftools mpileup --max-depth 2000 -f {params.ref} {input} > {output.vcf}
 		"""
-	
 		
-		
-		
-		
-		
+rule call_virus:
+	input:
+		sams = pileup_input_virus
+	output:
+		vcf = "../../out/{dset}/virus_variants/{dset}.{virus}.bwa.{host}-juncts.freebayes.vcf"
+	conda:
+		"../envs/bcftools.yml"
+	params:
+		ref = lambda wildcards: "../../data/references/" + config[wildcards.dset]["virus"] + ".fa"
+	threads: 5
+	shell:
+		"""
+		bcftools mpileup --max-depth 2000 -f {params.ref} {input} | bcftools call -mv -Ov --ploidy 1 -o {output.vcf}
+		"""
