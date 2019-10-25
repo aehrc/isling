@@ -9,8 +9,8 @@ library(writexl)
 
 #import data
 
-data_path = "../out/"
-out_path = "../out/summary/rearrange/"
+data_path = "../../out/"
+out_path = "../../out/summary/rearrange/"
 refiles <- list.files(path = data_path, recursive = TRUE, pattern = "rearrange.txt")
 
 #remove empty files
@@ -68,6 +68,9 @@ for (i in colns) {
 
 } #end of loop over columns
   
+
+#clear arrange
+remove(rearrange)
 
 
 #make location histogram for viral rearrangements

@@ -31,103 +31,24 @@ rule all:
 		"../../out/summary/rearrange/num_rearrange.xlsx"
 		
 
-#### merging ###
-
-rule dedup:
-	input:
-		r1 = "../../out/reads/{dset}/{samp}_R1.fastq.gz",
-		r2 = "../../out/reads/{dset}/{samp}_R2.fastq.gz"	
-	output:
-		R1_clumped = "../../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
-		R2_clumped = "../../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
-	conda:
-		"envs/bbmap.yml"
-	shell:
-		"""
-		clumpify.sh -Xmx10g in={input.r1} in2={input.r2} out={output.R1_clumped} out2={output.R2_clumped} dedupe subs=0
-		"""
-
-rule merge_reads:
-	input:
-		r1 = "../../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
-		r2 = "../../out/{dset}/dedup_reads/{samp}.2.fastq.gz"	
-	output:
-		merged = "../../out/{dset}/merged_reads/{samp}.seqPrep_merged.fastq.gz",
-		proc_r1 = "../../out/{dset}/merged_reads/{samp}.seqPrep_1.fastq.gz",
-		proc_r2 = "../../out/{dset}/merged_reads/{samp}.seqPrep_2.fastq.gz",
-		all = "../out/{dset}/merged_reads/{samp}.all.fastq.gz"
-	conda:	
-		"envs/seqprep.yml"
-	shell:
-		"""
-		SeqPrep -f {input.r1} -r {input.r2} -1 {output.proc_r1} -2 {output.proc_r2} -s {output.merged}
-		cat {output.proc_r1} {output.proc_r2} {output.merged} > {output.all}
-		"""
-
-#### alignments ####
-
-rule index:
-	input:
-		"../../data/references/{genome}.fa"
-	output:
-		"../../data/references/{genome}.ann",
-		"../../data/references/{genome}.amb",
-		"../../data/references/{genome}.bwt",
-		"../../data/references/{genome}.pac",
-		"../../data/references/{genome}.sa"
-	conda: 
-		"envs/bwa.yml"
-	shell:
-		"bwa index -p ../../data/references/{wildcards.genome} {input}"
-
-
-rule align_bwa_virus:
-	input:
-		all = "../../out/{dset}/merged_reads/{samp}.all.fastq.gz",
-		ann = "../../data/references/{virus}.ann",
-		amb = "../../data/references/{virus}.amb",
-		bwt = "../../data/references/{virus}.bwt",
-		pac = "../../data/references/{virus}.pac",
-		sa = "../../data/references/{virus}.sa"
-	output:
-		vSing = temp("../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam")
-	conda: 
-		"../envs/bwa.yml"
-	threads: 5
-	shell:	
-		"""
-		python ../alignReadsWithBWA.py --threads {threads} --index ../../data/references/{wildcards.virus} --read1 {input.all} --output {output.vSing} --threshold 10 --hflag 200
-		"""
-
-rule convert:
-	input:
-		"../../out/{dset}/{host_virus}/{samp}.{host_virus_name}.{alignType}.sam"
-	output:
-		bam = "../../out/{dset}/{host_virus}/{samp}.{host_virus_name}.{alignType}.bam",
-		bai = "../../out/{dset}/{host_virus}/{samp}.{host_virus_name}.{alignType}.bam.bai"
-	conda: 
-		"../envs/bwa.yml"	
-	shell:
-		"""
-		samtools view -bS {input} | samtools sort - -o {output.bam}
-		samtools index {output.bam}
-		"""
-
 
 #### perl scripts ####
 
-
-
 rule run_rearrange_scripts:
 	input:
-		"../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam"
+		"../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.bam"
 	output:
 		txt = "../../out/{dset}/rearrange/{samp}.{virus}.rearrange.txt",
-		bed = "../../out/{dset}/rearrange/{samp}.{virus}.rearrange.bed"
+		bed = "../../out/{dset}/rearrange/{samp}.{virus}.rearrange.bed",
+		sam = temp("../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam")
 	conda: 
 		"../envs/bwa.yml"
+
 	shell:
-		"perl -I .. ./checkVecRearrange.pl --viral {input} --output {output.txt} --bed {output.bed}"
+		"""
+		samtools view {input} > {output.sam} 
+		perl -I .. ./checkVecRearrange.pl --viral {output.sam} --output {output.txt} --bed {output.bed}
+		"""
 
 
 #### visualisation ####
