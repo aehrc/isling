@@ -83,9 +83,7 @@ def main(argv):
 	insertion_types[0](host, virus, host_ints, handle, sep=args.sep)
 	insertion_types[1](host, virus, host_ints, handle, sep=args.sep)
 	insertion_types[2](host, virus, host_ints, handle, sep=args.sep)
-	
-	
-	#insertion_types[3](host, virus, host_ints, handle)
+	insertion_types[3](host, virus, host_ints, handle, sep=args.sep)
 	
 	handle.close()
 
@@ -151,7 +149,7 @@ def insertWholeRearrange(host, viruses, int_list, filehandle, sep=5):
 	#get positions of all current integrations
 	currentPos = [int.hPos for int in int_list]
 	
-		#make sure that new integration is not within args.sep bases of any current integrations
+	#make sure that new integration is not within args.sep bases of any current integrations
 	attempts = 0
 	while True:
 		#get one viral chunk
@@ -176,12 +174,30 @@ def insertWholeRearrange(host, viruses, int_list, filehandle, sep=5):
 def insertWithDeletion(host, viruses, int_list, filehandle, sep=5):
 	""" Inserts n portions of viral DNA into host genome"""
 	
-	#make integration object to store properties of integration
-	currentInt = Integration(host)
+	#get positions of all current integrations
+	currentPos = [int.hPos for int in int_list]
 	
+	#make sure that new integration is not within args.sep bases of any current integrations
+	attempts = 0
+	while True:
+		#get one viral chunk
+		currentInt = Integration(host)
+		currentInt.addDeletion(viruses, part = "whole")
+		attempts += 1
+		
+		#check that all integrations are args.sep away from new integration
+		if all([ abs(currentInt.hPos-i) > sep for i in currentPos ]):
+			break
+		#if we've made a lot of attempts, give up
+		elif attempts > max_attempts:
+			return None
 	
 	#write to output file
 	currentInt.writeIntegration(filehandle)
+	
+	print(currentInt)
+	
+	return currentInt
 	
 def checkFastaExists(file):
 	#check file exists
@@ -253,6 +269,34 @@ class Integration:
 		#add a rearranged fragment
 		self.chunk = ViralChunk(viruses, part)
 		self.chunk.rearrange(n)
+	
+	def addDeletion(self, viruses, part = "rand"):
+		"""
+		add a fragment with a deletion in the middle
+		always split into >3 pieces and delete the middle
+		"""
+		
+		#check there isn't already a fragment
+		if self.fragments > 0:
+			print("Fragment has already been added!")
+			return
+			
+	#get number of fragments to rearrange into
+		#draw from a poisson distribution with lambda = 2
+		#make sure n > 3
+		while True:
+			n = int(np.random.poisson(2))
+			if n > 3:
+				break
+		self.fragments = n
+		
+		#overlaps and gaps at each end of the integration
+		self.overlaps = (0,0) #TODO - allow for gaps and overlaps
+		
+		#add a rearranged fragment
+		self.chunk = ViralChunk(viruses, part)
+		self.chunk.delete(n)
+		self.fragments -= 1
 		
 	def doIntegration(self, filehandle):
 		"""
@@ -291,7 +335,6 @@ class Integration:
 							"/".join([str(x.seq) for x in bases])+"\n"])
 				
 		filehandle.write(line)
-
 		#match format to output of pipeline
 
 	def getStartStop(self):
@@ -389,6 +432,7 @@ class ViralChunk:
 		#store information about rearrangements
 		self.isSplit = False #has chunk been split?
 		self.isRearranged = False #has chunk been rearranged?
+		self.deletion = False #does this chunk have a deletion
 		
 	def split(self, n):
 		#split a part of a virus into n random parts
@@ -466,10 +510,33 @@ class ViralChunk:
 		self.pieces = {order[key]:value for key, value in self.pieces.items()}
 			
 	def delete(self, n):
-		#delete a random piece from a viral chunk of n pieces
+		#delete a middle from a viral chunk of n pieces
 		
-		pass
+		#if there are less than 3 pieces, just use 3
+		if n < 3:
+			n = 3
+		
+		#check if chunk has already been split into parts
+		if self.isSplit is False:
+			self.split(n)
+			
+		#if has been split into a different number of parts, just use that number
+		else:
+			n = len(self.breakpoints)
+			
+		#don't rearrange chunk if it's already been rearranged
+		if self.isRearranged is True:
+			raise ValueError("Chunk has already been rearranged!")
+			
+		self.deletion = True #deletion is now true	
+		
 	
-		print(self.bases)
+		#get piece to delete - use middle piece
+		key_del = np.around((max(self.pieces.keys()) - min(self.pieces.keys()))/2)
+		
+		#replace keys with shuffled numbers
+		del self.pieces[key_del]	
+	
+
 if __name__ == "__main__":
 	main(sys.argv[1:])
