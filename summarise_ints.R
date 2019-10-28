@@ -35,7 +35,7 @@ df <- tibble(filename = files) %>% # create a data frame holding the file names
 df <- df %>% 
   mutate(dataset = dirname(dirname(filename))) %>% 
   mutate(sample = str_extract(basename(filename), "^[\\w]+(?=\\.)")) %>% 
-  mutate( host = ifelse(str_detect(basename(filename), "mouse|mm10"), "mm10", ifelse(str_detect(basename(filename), "macaque|macaca"), "macFas5", "hg38")))
+  mutate( host = ifelse(str_detect(basename(filename), "mouse|mm10|GRCm38"), "mm10", ifelse(str_detect(basename(filename), "macaque|macaca|macFas5"), "macFas5", "hg38")))
 
 #write xls with summary of number of sites and merged sites
 df %>% 
@@ -71,7 +71,7 @@ df <- df %>%
 #that aren't marked as possible vector rearrangmenets
 
 mouse_align_hg38 <- df %>% 
-  filter(dataset == "mouse_with_OTC") %>% 
+  filter(str_detect(dataset, "mouse")) %>% 
   filter(host == "hg38") %>% 
   mutate(on_14_or_x = str_detect(Chr, "14|X"))
 
@@ -91,7 +91,7 @@ write_xlsx(toWrite, path =  paste(out_path, "mouse_with_OTC_hg38align.xlsx", sep
 
 #remove mouse data aligned against human from the rest of analysis
 df <- df %>% 
-filter(!(dataset == "mouse_with_OTC" & host == "hg38"))
+filter(!(str_detect(dataset, "mouse") & host == "hg38"))
 
 df %>%
   group_by(dataset, PossibleVectorRearrangement, host) %>% 
