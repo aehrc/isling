@@ -232,6 +232,11 @@ def checkFastaExists(file):
 			return False
 	return True
 	
+class Integrations:
+	"""
+	
+	"""
+	
 class Integration:
 	""" 
 	Class to store the properties of integrations 
