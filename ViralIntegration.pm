@@ -3,106 +3,25 @@
 package ViralIntegration;
 use Exporter;
 @ISA = ('Exporter');
-@EXPORT = qw(getEditDist analyzeRead processCIGAR processCIGAR2 extractSeqCoords extractOutput extractCoords extractSequence gapOrOverlap getCigarParts getGenomicCoords getMatchedRegion getMatchedRegions getSecSup isAmbigLoc isRearrange printOutput printBed printMerged reverseComp reverseCigar);
+@EXPORT = qw(getEditDist processCIGAR processCIGAR2 extractSeqCoords extractCoords extractSequence gapOrOverlap getCigarParts getGenomicCoords getMatchedRegion getMatchedRegions getSecSup isAmbigLoc isRearrange printOutput printBed printMerged reverseComp reverseCigar);
 
 
 ##### subroutines #####
 
-sub analyzeRead {
-### Return the positiions flanking the integration site
-### relative to the reference and the read
-### returns:
-###		intStart - integration start (relative to ref sequence)
-###		intStop  - integration stop (relative to ref sequence)
-###		relStart - integration start (relative to read sequence)
-###		relStop  - integration stop (relative to read sequence)
-	my ($start, $cigar, $end) = @_;
-	
-	my ($clipped,$mapped);
-	if ($end eq "-") { ($clipped,$mapped) = ($cigar =~ /^(\d+)[SH](\d+)M/); }
-	else 		 { ($mapped,$clipped) = ($cigar =~ /(\d+)M(\d+)[SH]$/); }
-
-	my ($intStart, $intStop, $relStart, $relStop);
-	if ($end eq "+") { 
-		$intStart = $start + $mapped; 
-		$intStop  = $start + $mapped + 1;
-		$relStart = $mapped;
-		$relStop  = $mapped + 1;
-	}
-	else {
-		$intStop  = $start;
-		$intStart = $start - 1;
-		$relStop  = $clipped;
-		$relStart = $clipped - 1;
-	}
-	return ($intStart, $intStop, $relStart, $relStop, $end)
-}
-
 sub extractSeqCoords {
 ### Extract coordinates of the human/viral sequences relative to read
+### these are the bases we know must come from human/virus (so not including any ambiguous bases)
 
-	my ($ori, $dir, $alig, $overlap, $length) = @_;
+	my ($ori, $align, $overlap, $length, $overlaptype) = @_;
 
-	if ($dir eq "f") { # Read was aligned in fwd direction
-		if ($ori eq "+") { return(1,($alig - $overlap)); }
-		else		 { return(($length - $alig + $overlap + 1),$length); }
-	} 
-	else { # Read is oriented in the rev direction
-		if ($ori eq "+") { return(($length - $alig + $overlap + 1),$length); }
-		else	         { return(1,($alig - $overlap)); }
+	if ($ori eq "+") {  #mapped part is first
+		if ($overlaptype eq "overlap") { return (1, $align - $overlap); }
+		else { return (1, $align); }
+	} 					
+	else {  #mapped part is second
+		if ($overlaptype eq "overlap") { return (($length - $align + $overlap + 1) , $length); }
+		else { return (($align + 1), $length); }
 	}
-}
-
-sub extractOutput {
-### Construct the output line
-### Output line is a tab seperated string with the following information
-### humanChr humanStart humanStop viralChr viralStar viralStop AmbiguousBases OverlapType Orientation(human) humanSeq viralSeq AmbiguousSeq HumanSecAlign ViralSecAlign
-	my ($viralData) = shift @_;
-	my ($humanData) = shift @_;
-	my @intData     = @_;
-	
-	my @viral = split("\t",$viralData);
-	my @human = split("\t",$humanData);
-
-	my $overlap = $intData[6];
-	
-	my $overlaptype = $intData[8];
-	
-	my $vRearrange = $intData[9];
-	my $hRearrange = $intData[10];
-	
-	my $hAmbig = $intData[11];
-	my $vAmbig = $intData[12];
-	
-	my $vNM = $viral[-1];
-	my $hNM = $human[-1];
-	
-	my $totalNM = $hNM + $vNM;
-	if ($overlaptype eq 'gap') { $totalNM += $overlap; }
-
-	### Extract junction coordinates relative to the target sequence
-	my ($viralStart, $viralStop) = extractCoords($viral[1], $viral[2], $viral[5], $overlap);
-	my ($humanStart, $humanStop) = extractCoords($human[1], $human[2], $human[5], $overlap);
-
-	### Extract viral and human sequence componenets of the read
-	### Account for overlap, this won't be included in either the human or viral segments
-	my $viralSeq = substr($viral[6], $intData[4]-1, ($intData[5]-$intData[4]+1));
-	my $humanSeq = substr($human[6], $intData[2]-1, ($intData[3]-$intData[2]+1));
-
-
-	my $overlapSeq;
-	if ($overlap > 0) { # only extract overlap sequence if there is one
-		if ($intData[7] eq "hv") { $overlapSeq = substr($viral[6], $intData[3], $overlap); } # order along read is Human -> Viral
-		else 			 { $overlapSeq = substr($viral[6], $intData[5], $overlap); } # order along read is Viral -> Human
-	}
-	else { $overlapSeq = ''; }# leave overlapSeq undefined
-
-
-	my $outline = join("\t", ($human[0], $humanStart, $humanStop, $viral[0], 
-				  $viralStart, $viralStop, $overlap, $overlaptype, $intData[7], 
-				  $humanSeq, $viralSeq, $overlapSeq, $hNM, $vNM, $totalNM, $hRearrange, $vRearrange, $hAmbig, $vAmbig, 'chimeric'));
-
-	return($outline);
 }
 
 sub extractCoords {
@@ -349,6 +268,8 @@ sub getEditDist {
 	
 }
 
+
+
 sub isAmbigLoc {
 ### check for ambiguity in location of integration site in human or viral genome
 ## look to see if there are any secondary alignments that are equivalent to primary alignment
@@ -567,7 +488,7 @@ sub printMerged {
 
 	my $uni = int(rand(1000000));
 	
-	my $temp = join("", ("temp.",$uni, ".bed"));
+	my $temp = join("", ("temp.", $uni, ".bed"));
 	open (TEMP, ">$temp");
 	print TEMP $sorted;
 	close TEMP;

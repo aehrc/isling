@@ -70,28 +70,28 @@ while (my $vl = <VIRAL>) {
 
 	my ($cig, $addedBases) = processCIGAR($parts[5], $parts[9]); # Process the CIGAR string to account for complex alignments
 	unless ($cig) { next; } # keep checking to make sure double clipped reads don't sneak through
-
-	### Store informaton about the integration site:
-	###	Integration Start Target = last clipped base position relative to target sequence
-	###	Integration Stop Target  = first aligned base position relative to target sequence
-	###	Integration Start Read 	 = last clipped base position relative to read length
-	###	Integration Stop Read    = first aligned base position relative to read length
-	###	Integration Orientation	 = orientation of integration site: + = after aligned sequence, - = before aligned sequence
-	my @viralInt;
-	if    ($cig =~ /^\d+[SH].+\d+[SH]$/) { @viralInt = undef; } # double check, sometimes double clipped sneak through
-	elsif ($cig =~ /(^\d+)[SH]/)   	  { if ($1 > $cutoff) { @viralInt = analyzeRead($parts[3], $cig, "-"); } } # integration site is before the viral sequence
-	elsif ($cig =~ /(\d+)[SH]$/) 	  { if ($1 > $cutoff) { @viralInt = analyzeRead($parts[3], $cig, "+"); } } # integration site is after the viral sequence
-
-	# ID = readName_seq (in forward direction)
 	
 	#get supplementary (SA) and secondary (XA) alignments in order to check for possible vector rearrangements
 	my ($vSec, $vSup) = getSecSup($vl);
 	my $editDist = getEditDist($vl) + $addedBases;
 	
+	# if read is mapped in reverse orientation, reverse-complement the sequence
+	my $seq;
+	my $dir;
+	if ($parts[1] & 0x10) {($seq) = reverseComp($parts[9]); $dir = 'r'; }
+	else { $seq = $parts[9]; $dir = 'f'; }
 	
-	if   (@viralInt and ($parts[1] & 0x10)) { $viralIntegrations{join("xxx", ($parts[0],(reverseComp($parts[9]))[0]))} = join("\t",($parts[2], @viralInt, (reverseComp($parts[9]))[0], 'r', $cig, $vSec, $vSup, $editDist)); }
-	elsif (@viralInt) 			{ $viralIntegrations{join("xxx", ($parts[0],$parts[9]))}	           = join("\t",($parts[2], @viralInt, $parts[9],                   'f', $cig, $vSec, $vSup, $editDist)); } 
-
+	#get readID
+	my $readID = $parts[0];
+	
+	#get 1-based mapping position:
+	#from SAM format: 1-based leftmost mapping POSition of the firstCIGARoperation that “consumes” a reference
+	#base (see table below).  The first base in a reference sequence has coordinate 1. POS is set as 0 for
+	#an unmapped read without coordinate.  If POS is 0, no assumptions can be made about RNAME and CIGAR
+	my $pos = $parts[3];
+	
+	$viralIntegrations{join("xxx", ($readID, $seq))} = join("\t",($parts[2], $pos, $dir, $cig, $vSec, $vSup, $editDist));
+	
 }
 close VIRAL;
 
@@ -114,31 +114,35 @@ while (my $hl = <HUMAN>) {
 	
 	unless ($parts[5] =~ /^\d+[SH]|\d+[SH]$/) { next; }
 
-	my ($cig, $addedBases) = processCIGAR($parts[5], $parts[9]); # Process the CIGAR string to account for complex alignments
-	unless ($cig) { next; }
-
 	my $seq;
-	my $ori;
+	my $dir;
 	if ($parts[1] & 0x10) { 
 		($seq) = reverseComp($parts[9]); 
-		$ori   = 'r';
+		$dir   = 'r';
 	}
 	else				  { 
 		$seq = $parts[9]; 
-		$ori = 'f';
+		$dir = 'f';
 	}
 
 	if (exists $viralIntegrations{join("xxx",($parts[0],$seq))}) { # only consider reads that were tagged from the viral alignment, no need to consider excess reads
-	
+		
+		my ($cig, $addedBases) = processCIGAR($parts[5], $parts[9]); # Process the CIGAR string to account for complex alignments
+		unless ($cig) { next; }
+		
+		#get secondary and supplementary alignments from the line
 		my ($hSec, $hSup) = getSecSup($hl);
+		
+		#get the edit distance, and add to it the bases that were removed when processing the CIGAR
 		my $editDist = getEditDist($hl) + $addedBases;
 		
-		my @humanInt;
-		if    ($cig =~ /^\d+[SH].+\d+[SH]$/) { @humanInt = undef; }
-		elsif ($cig =~ /(^\d+)[SH]/)         { if ($1 > $cutoff) { @humanInt = analyzeRead($parts[3], $cig, "-"); } }
-		elsif ($cig =~ /(\d+)[SH]$/)         { if ($1 > $cutoff) { @humanInt = analyzeRead($parts[3], $cig, "+"); } }
+		#get 1-based mapping position
+		my $pos = $parts[3];
+		
+		#get readID
+		my $readID = $parts[0];
 
-		if (@humanInt) { $humanIntegrations{join("xxx",($parts[0],$seq))} = join("\t",($parts[2], @humanInt, $seq, $ori, $cig, $hSec, $hSup, $editDist)); }
+		$humanIntegrations{join("xxx",($readID,$seq))} = join("\t",($parts[2], $pos, $dir, $cig, $hSec, $hSup, $editDist)); 
 	}
 }
 close HUMAN;
@@ -210,17 +214,24 @@ sub collectIntersect {
 ### BWA Alignments are 1-based
 	my ($viralData, $humanData, $key, $thresh) = @_;
 
-	my ($vRef, $vStart, $vStop, $vOri, $seq, $vDir, $vCig, $vSec, $vSup) = (split("\t",$viralData))[0,3,4,5,6,7,8,-3,-2];
-	my ($hRef, $hStart, $hStop, $hOri, $hDir, $hCig, $hSec, $hSup)       = (split("\t",$humanData))[0,3,4,5,7,8,-3,-2];
-
-	if	((($vOri eq $hOri) and ($vDir eq $hDir)) or(($vOri ne $hOri) and ($vDir ne $hDir))) { return; } # in some cases the same part of the read may be clippeed 
+	my ($vRef, $vPos, $vDir, $vCig, $vSec, $vSup)  = (split("\t",$viralData));
+	my ($hRef, $hPos, $hDir, $hCig, $hSec, $hSup)  = (split("\t",$humanData));
+	
+	my ($readID, $seq) = split("xxx", $key);
+	
+	## orientation of integration site: + is after aligned sequence, - is before aligned sequence
+	### ie if CIGAR is mapped/clipped orientation is +
+	### and if CIGAR is clipped/mapped orientation is -
+	### but consider direction too:
 	### CIGAR strings are always reported relative to the strand
 	### 100M50S on a fwd read = 50S100M on a rev read
-	### Therefore if integration position and read orientation match (e.g. ++ and ff) same part of the read is clipped
-	### If they all don't match (e.g. +- and fr which is equivalent to ++ and ff) then the same part of the read is clipped
-	### ++ and fr is ok because this is the same as +- and ff
-
+	my $vOri = getOri($vCig, $vDir);
+	my $hOri = getOri($hCig, $hDir);
+	
 	unless 	($vOri and $hOri) { return; } # Catch a weird case where an orientation isn't found. Appears to happen when both ends are clipped
+	
+	#if both reads have same part of read clipped/mapped, this can't be an integration
+	if	($vOri eq $hOri) { return; } 
 
 	### First find if there is any overlap between the human and viral junctions
 	### Do so by comparing the CIGAR strings
@@ -249,16 +260,14 @@ sub collectIntersect {
 	elsif 	(($hAlig + $vAlig) == ($readlen)) {	$overlaptype = "none";		} #no gap or overlap
 	else 									  {	$overlaptype = "gap";		} #gap
 	
-	
-	#check to see is whole read can be accounted for by vector rearrangements
-	
+	#check to see is whole read can be accounted for by alignments to the vector
 	my $isVecRearrange;
 	if ((join(";", $vSup, $vSec)) eq "NA;NA") { $isVecRearrange = "no"; }
-	else { $isVecRearrange = (isRearrange($vCig, $vDir, $vRef, $vStart, (join(";", $vSup, $vSec)), $seq, $thresh))[0];}
+	else { $isVecRearrange = (isRearrange($vCig, $vDir, $vRef, $vPos, (join(";", $vSup, $vSec)), $seq, $thresh))[0];}
 
 	my $isHumRearrange;
 	if ((join(";", $hSup, $hSec)) eq "NA;NA") { $isHumRearrange = "no"; }
-	else { $isHumRearrange = (isRearrange($hCig, $hDir, $hRef, $hStart, (join(";", $hSup, $hSec)), $seq, $thresh))[0];}
+	else { $isHumRearrange = (isRearrange($hCig, $hDir, $hRef, $hPos, (join(";", $hSup, $hSec)), $seq, $thresh))[0];}
 	
 	#check to see if location of human alignment is ambiguous: multiple equivalent alignments accounting for human part of read
 	my $isHumAmbig;
@@ -271,16 +280,16 @@ sub collectIntersect {
 	else { $isVirAmbig = isAmbigLoc($vDir, $vCig, $vSec, 'soft', $seq, $tol);}
 
 	### Calculate the start and stop positions of the viral and human sequences relative to the read
-	my ($hRStart,$hRStop) = extractSeqCoords($hOri, $hDir, $hAlig, abs($overlap1), $readlen);
-	my ($vRStart,$vRStop) = extractSeqCoords($vOri, $vDir, $vAlig, abs($overlap1), $readlen);
-
+	my ($hRStart,$hRStop) = extractSeqCoords($hOri, $hAlig, abs($overlap1), $readlen, $overlaptype);
+	my ($vRStart,$vRStop) = extractSeqCoords($vOri, $vAlig, abs($overlap1), $readlen, $overlaptype);
+	
 	### Collect integration start/stop positions relative to read
 	### These are the bases that flank the bond that is broken by insertion of the virus
 	### Takes any overlap into account	
 	my ($intRStart, $intRStop, $order);
 
-	if    ($hRStop < $vRStart) { ($intRStart,$intRStop,$order) = ($hRStop,$vRStart,"hv"); } # Orientation is Human -> Virus
-	elsif ($vRStop < $hRStart) { ($intRStart,$intRStop,$order) = ($vRStop,$hRStart,"vh"); } # Orientation is Virus -> Human
+	if    ($hOri eq "+") { ($intRStart,$intRStop,$order) = ($hRStop,$vRStart,"hv"); } # Orientation is Human -> Virus
+	elsif ($hOri eq "-") { ($intRStart,$intRStop,$order) = ($vRStop,$hRStart,"vh"); } # Orientation is Virus -> Human
 	else 			   { 
 		print "Something weird has happened";
 		return;
@@ -288,7 +297,90 @@ sub collectIntersect {
 
 	return($intRStart, $intRStop, $hRStart, $hRStop, $vRStart, $vRStop, $overlap1, $order, $overlaptype, $isVecRearrange, $isHumRearrange, $isHumAmbig, $isVirAmbig);
 
-	#if 	  ($vOri eq "+" and $hOri eq "-" and $vStop - 1 > $hStart) { return($hStart, $vStop); } # overalp with order virus -> human
-	#elsif ($vOri eq "-" and $hOri eq "+" and $hStop - 1 > $vStart)    { return($vStart, $hStop); } # overlap with order human -> virus
-	#else 							   	   { return($hStart, $hStop); } # if no overlap, use human positions
+}
+
+sub extractOutput {
+### Construct the output line
+### Output line is a tab seperated string with the following information
+### humanChr humanStart humanStop viralChr viralStar viralStop AmbiguousBases OverlapType Orientation(human) humanSeq viralSeq AmbiguousSeq HumanSecAlign ViralSecAlign
+	my ($viralData) = shift @_;
+	my ($humanData) = shift @_;
+	my @intData     = @_;
+	
+	#viralData and $humanData have the following fields:
+	#$refName, $pos, $dir, $cig, $vSec, $vSup, $editDist
+	
+	#intData has the fields
+	#$intRStart, $intRStop, $hRStart, $hRStop, $vRStart, $vRStop, $overlap1, $order, $overlaptype, $isVecRearrange, $isHumRearrange, $isHumAmbig, $isVirAmbig
+	
+	my @viral = split("\t",$viralData);
+	my @human = split("\t",$humanData);
+
+	my $overlap = $intData[6];
+	my $overlaptype = $intData[8];
+	
+	my $vRearrange = $intData[9];
+	my $hRearrange = $intData[10];
+	
+	my $hAmbig = $intData[11];
+	my $vAmbig = $intData[12];
+	
+	my $vNM = $viral[-1];
+	my $hNM = $human[-1];
+	
+	my $totalNM = $hNM + $vNM;
+	if ($overlaptype eq 'gap') { $totalNM += $overlap; }
+
+	### Extract junction coordinates relative to the target sequence
+	my ($viralStart, $viralStop) = extractCoords($viral[1], $viral[2], $viral[5], $overlap);
+	my ($humanStart, $humanStop) = extractCoords($human[1], $human[2], $human[5], $overlap);
+
+	### Extract viral and human sequence componenets of the read
+	### Account for overlap, this won't be included in either the human or viral segments
+	my $viralSeq = substr($viral[6], $intData[4]-1, ($intData[5]-$intData[4]+1));
+	my $humanSeq = substr($human[6], $intData[2]-1, ($intData[3]-$intData[2]+1));
+
+	my $overlapSeq;
+	if ($overlap > 0) { # only extract overlap sequence if there is one
+		if ($intData[7] eq "hv") { $overlapSeq = substr($viral[6], $intData[3], $overlap); } # order along read is Human -> Viral
+		else 			 { $overlapSeq = substr($viral[6], $intData[5], $overlap); } # order along read is Viral -> Human
+	}
+	else { $overlapSeq = ''; }# leave overlapSeq undefined
+
+
+	my $outline = join("\t", ($human[0], $humanStart, $humanStop, $viral[0], 
+				  $viralStart, $viralStop, $overlap, $overlaptype, $intData[7], 
+				  $humanSeq, $viralSeq, $overlapSeq, $hNM, $vNM, $totalNM, $hRearrange, $vRearrange, $hAmbig, $vAmbig, 'chimeric'));
+
+	return($outline);
+}
+
+
+sub getOri {
+	#get orientation of soft-clipped alignment from CIGAR
+	
+	## orientation = orientation of integration site: + is after aligned sequence, - is before aligned sequence
+	### ie if CIGAR is mapped/clipped orientation is +
+	### and if CIGAR is clipped/mapped orientation is -
+	
+	#note that CIGAR is reversed if read is mapped in reverse orientation, so 50M20S if forward is equivalent to 20S50M if reverse
+	
+	my ($cig, $dir) = @_;
+	
+	my $ori;
+	
+	#if read is forward
+	if ($dir eq 'f') {
+		if ($cig =~ /(^\d+)[SH]/)   	  { $ori = "-"; }  # integration site is before the viral sequence
+		elsif ($cig =~ /(\d+)[SH]$/) 	  { $ori = "+"; } # integration site is after the viral sequence
+	}
+	
+	#if read is reverse
+	elsif ($dir eq 'r') {
+		if ($cig =~ /(^\d+)[SH]/)   	  { $ori = "+"; }  # integration site is before the viral sequence
+		elsif ($cig =~ /(\d+)[SH]$/) 	  { $ori = "-"; } # integration site is after the viral sequence
+
+	}
+	
+	return $ori;
 }
