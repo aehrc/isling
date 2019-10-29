@@ -36,9 +36,11 @@ For example:
 
 `50S20M2I20M10S`: the operation `2I` has neighbours `20M` and `20M`.  Its length is less than `$tol`, so it will be combined. The `I` CIGAR operation consumes the query so its bases are added to the combined operation.  The final CIGAR is `50S42M10S`
 
+`50S20M2D20M10S`: the operation `2D` has neighbours `20M` and `20M`.  Its length is less than `$tol`, so it will be combined. The `D` CIGAR operation does not consume the query so its bases are not added to the combined operation.  The final CIGAR is `50S40M10S`
+
 `50S20M2I10S`: the operation `2I` is short, but the operations on either side (`20M`, `10S`) are different.  The CIGAR will be unchanged
 
-`50S20M5I20M10S`: the operation `5I` has neighbours `20M` and `20M`, but its length is more than `$tol`, so it will not be combined. The CIGAR will be unchanged
+`50S20M5I20M10S`: the operation `5I` has neighbours `20M` and `20M`, but its length is more than `$tol`, so it will not be combined. The CIGAR will be unchanged.
 
 ### Location of short insertions
 
@@ -64,7 +66,7 @@ Identify possible rearrangements (either vector rearrangements or host transloca
 
 ### Variants
 
-It would be good to distinguish between vector rearrangements and insertions in the regions where the vector and the human genome are homologous (hAAT \[SERPINA1\] promoter, OTC enhancer).  Can do this by looking for variants between vector and human genome in this region: there are a few in the hAAT promoter.  Interrograte this by extracting only the junction fragments from the alignment.  Made a seperate snakefile to do this, in folder `SNPs``.
+It would be good to distinguish between vector rearrangements and insertions in the regions where the vector and the human genome are homologous (hAAT \[SERPINA1\] promoter, OTC enhancer).  Can do this by looking for variants between vector and human genome in this region: there are a few in the hAAT promoter.  Interrograte this by extracting only the junction fragments from the alignment.  Made a seperate snakefile to do this, in folder `SNPs`.
 
 First pull out reads called as integrations by the pipeline
 
@@ -73,7 +75,10 @@ First pull out reads called as integrations by the pipeline
 
  - Check errors in `discordant.pl`
  - Fix bug in `softClip.pl` where sometimes can't get host/viral sequences from the read
- - Get genetic elements in which integrations occur
+ - Improve check for vector rearrangement - still a lot of integrations in SERPINA1/OTC that aren't marked as possible vector rearrangements
+ - Annotate integrations - genes/promoters/etc that they appear in
+ - Simulate integrations and reads to 
+ - Try out structural variation tools as another approach
  - Improved visualisations
  
  # Changes from original pipeline
@@ -89,5 +94,5 @@ First pull out reads called as integrations by the pipeline
  - Added de-duplication step prior to alingment (using `clumpify` from `BBMap`).  This can't be done after alignment because different reads might be removed from the host and viral alignments.
  - Added script `short.pl` to look for short insertions.
 	- Wrote script to first identify reads that look like they might be short insertions: clipped on both sides in viral alignment (more than cutoff bases), mapped on both ends in human alignment (more than cutoff bases) with insertion in the middle
-	- Used snakefile and scripts in `optimise_short` to try to optimise the alignment to identify more short insertions.  First tried to vary the penatly for a new insertion between 0 and the default (6).  See section optimise_short below.
+	- Used snakefile and scripts in `optimise_short` to try to optimise the alignment to identify more short insertions.  First tried to vary the penatly for a new insertion between 0 and the default (6).  See section optimise\_short.
 
