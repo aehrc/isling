@@ -10,7 +10,7 @@ use Exporter;
 
 sub extractSeqCoords {
 ### Extract coordinates of the human/viral sequences relative to read
-### these are the bases we know must come from human/virus (so not including any ambiguous bases)
+### these are the bases we know must come from human/virus (so not including any overlapped bases)
 
 	my ($ori, $align, $overlap, $length, $overlaptype) = @_;
 
@@ -20,30 +20,39 @@ sub extractSeqCoords {
 	} 					
 	else {  #mapped part is second
 		if ($overlaptype eq "overlap") { return (($length - $align + $overlap + 1) , $length); }
-		else { return (($align + 1), $length); }
+		else { return (($length - $align + 1), $length); }
 	}
 }
 
 sub extractCoords {
-### Extract genomic coordinates for matched region based on start and stop relative to read
-	my ($start, $stop, $ori, $overlap) = @_;
-
-	if ($ori eq "-") { return(($start), ($stop + $overlap)); }
-	else 		 { return(($start - $overlap), ($stop)); }	
-}
-
-sub extractSequence {
-### Extract relevant sequence
-	my ($seq, $start, $stop, $ori, $overlap) = @_;
-
-	if (($ori eq "-") or ($ori eq 'r')) { return($seq = substr($seq, ($stop + $overlap))); }
-	else			 { return($seq = substr($seq, 0, ($start - $overlap + 1))); }
-
+### Extract 0-based genomic coordinates for matched region based on start and stop relative to read
+	my ($alig, $overlap, $overlaptype, $pos, $ori) = @_;
+	
+	#$alig is number of aligned bases 
+	#$overlap is number of ambigous bases (gap or overlap)
+	#$overlaptype is type of overlap (gap, overlap, none)
+	#$pos is 1-based mapping coordiate of first mapped base (from BWA)
+	#$dir is 'f' for reads mapped in the forward direction and 'r' for reads mapped in the reverse direction
+	my ($intGStart, $intGStop);
+	
+	if ($ori eq '+') {
+		$intGStart = $pos + $alig - 1;
+		$intGStop = $pos + $alig;
+		if ($overlaptype eq "overlap") { $intGStart -= $overlap; }
+	}
+	else {
+		$intGStart = $pos - 1;
+		$intGStop = $pos;
+		if ($overlaptype eq "overlap") { $intGStop += $overlap; }
+	}
+	
+	return ($intGStart, $intGStop);
+	
 }
 
 sub gapOrOverlap {
 	
-	#calculate if there's a gap or overlap based on the start of one matched region and end end of the previous region
+	#calculate if there's a gap or overlap based on the start of one matched region and the end of the previous region
 	# pass in stop of first region and start of second region relative to read	
 	
 	my ($stop1, $start2) = @_;
@@ -131,9 +140,16 @@ sub getGenomicCoords {
 		#if we've found the right operation
 		if (($start == $rStart) and ($stop == $rStop)) {
 			#calculate gStart and gStop
-			$gStart = $pos + eval join("+", @gNumbers[0..($i-1)]);
-			$gStop = $pos - 1 + eval join("+", @gNumbers[0..$i]);
+			#coordinates relative to read are 1-based, but output 0-based 
 			
+			if ($sense eq 'f') {
+				$gStart = $pos - 1 + eval join("+", @gNumbers[0..($i-1)]);
+				$gStop = $pos + eval join("+", @gNumbers[0..$i]);
+			}
+			else {
+				$gStart = $pos + eval join("+", @gNumbers[0..$i]);
+				$gStop = $pos - 1 + eval join("+", @gNumbers[0..($i-1)]);
+			}
 			return  ($gStart < $gStop) ? ($gStart, $gStop) : ($gStop, $gStart);
 			
 		}
@@ -267,8 +283,6 @@ sub getEditDist {
 	return ($nm);
 	
 }
-
-
 
 sub isAmbigLoc {
 ### check for ambiguity in location of integration site in human or viral genome
@@ -701,38 +715,6 @@ sub reverseCigar {
 	}
 	
 	return $newCig;
-
-}
-
-sub updateGPos {
-	#update genomic position when looking through read for genomic coordinates
-	
-	my ($curGPos, $cigOp, $bases, $dir) = @_;
-	
-	#if operation consumes reference
-	if ($cigOp =~ /[MDN]/) { 
-		#are we going backwards or forwards?
-		if (($dir eq "f") or ($dir eq "+")) { return ($curGPos + $bases - 1); }
-		else { return ($curGPos - $bases); }
-	 }
-	 #if operation doesn't consume reference
-	 else { return $curGPos; }
-
-}
-
-sub updateRPos {
-	#update read position when looking through read for genomic coordinates
-	
-	my ($curRPos, $cigOp, $bases, $sense) = @_;
-	
-	#if operation consumes query, update
-	if ($cigOp =~ /[MIS]/) { 
-		if (($sense eq '+') or ($sense eq 'f')) {return $curRPos + $bases; }
-		else {return $curRPos - $bases; }
-	}
-	#otherwise, don't update
-	else { return $curRPos; }
-
 
 }
 
