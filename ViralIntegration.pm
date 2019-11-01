@@ -81,7 +81,7 @@ sub getCigarParts {
 }
 
 sub getGenomicCoords {
-	#get genomic coordinates of cigar operation (specified by start and stop relative to the read)
+	#get genomic coordinates (0-based) of cigar operation (specified by start and stop relative to the read)
 	#using cigar, direction and POS (1-based leftmost mapping position of first CIGAR operation that consumes a reference base [M, D, N])
 	#need to consider CIGAR operations that consume read [MIS=X] or not [DNHP], 
 	#and those that consume reference [MDN] or not [ISHP]
@@ -122,6 +122,7 @@ sub getGenomicCoords {
 	#loop over elements of CIGAR to calculate start and stop positions relative to read
 	for my $i (0..$#numbers) {
 		#add to rStart and rStop 
+		#rStart and rStop are 1-based
 		#if forward, need to sum from start of array to $i
 		if (($sense eq 'f') or ($sense eq '+')) {
 			#rStart for this position is 1 + (sum of @numbers up to but not including this position)
@@ -150,7 +151,7 @@ sub getGenomicCoords {
 				$gStart = $pos + eval join("+", @gNumbers[0..$i]);
 				$gStop = $pos - 1 + eval join("+", @gNumbers[0..($i-1)]);
 			}
-			return  ($gStart < $gStop) ? ($gStart, $gStop) : ($gStop, $gStart);
+			return  ($gStart, $gStop) ;
 			
 		}
 		
