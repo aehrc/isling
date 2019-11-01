@@ -302,88 +302,117 @@ sub analyseShort{
 	#number of ambiguous bases
 	#always calculate as right - left (relative to read)
 	## ie for $ambig1, orientation is host-virus, so right is virus and left is host
-	#so for $ambig1, overlap gives negative value and gap gives positive
-	my $ambig1 = $vMatchStart - $hMatch1Stop - 1; #1-based, so need to subtract 1
-	#for $ambig2, overlap gives positive value and gap gives negative
-	my $ambig2 = $hMatch2Start - $vMatchStop - 1;
+	
+	my $ambig1 = abs($hMatch1Stop - $vMatchStart) + 1; #1-based, so need to subtract 1
+	my $ambig2 = abs($hMatch2Start - $vMatchStop) + 1;
 	
 	#number of inserted bases:
-	my $inserted = $hInsertStop - $hInsertStart - 1;
+	my $inserted = $hInsertStop - $hInsertStart + 1;
 	
 	#calculate start and stop genomic positions  
 	my ($hg1Start, $hg1Stop, $hg2Start, $hg2Stop, $vg1Start, $vg1Stop, $vg2Start, $vg2Stop);
 	
 	#get genomic coordinates of matched regions for host
 	#note that if the read is reverse, start and stop will be swapped (so need to use start for first insertion and stop for second)
+	#note that output of getGenomicCoords is 0-based
 	my ($hgMatch1Start, $hgMatch1Stop) = getGenomicCoords($hMatch1Start, $hMatch1Stop, $hPos, $hDir, $hCig);
 	my ($hgMatch2Start, $hgMatch2Stop) = getGenomicCoords($hMatch2Start, $hMatch2Stop, $hPos, $hDir, $hCig);
-	#calculate insertion positions from matched regions
+	
 	#note that if the read is forward, (start, stop) will be ascending and opposite for reverse read
-	if (($hDir eq 'f') or ($hDir eq '+')) {
-		($hg1Start, $hg1Stop) = sort {$a <=> $b} ($hgMatch1Stop, $hgMatch1Stop+$ambig1); #overlap means negative $ambig, gap means positive $ambig
-		#for second matched region, multiple matched regions in the middle of the read will mean that the coordinates aren't right next to first site
-		#so instead of using genomic coordinates of second match (as above, just add 1 to stop of first match)
-		($hg2Start, $hg2Stop) = sort {$a <=> $b} ($hgMatch1Stop+1, $hgMatch1Stop-$ambig2+1); #overlap means positive $ambig, gap means negative
-	}
-	else {
-		($hg1Start, $hg1Stop) = sort {$a <=> $b} ($hgMatch1Start, $hgMatch1Start+$ambig1);
-		($hg2Start, $hg2Stop) = sort {$a <=> $b} ($hgMatch1Start-1, $hgMatch1Start-$ambig2-1);
-	}
+	#genomic coordinates refer to location of integration site (not mapped region)
+	#in the case of an overlap, this is the genomic coordinates of the overlapped bases (which could be either host or viral)
+	#in the case of a gap or a clean junction, this is the genomic coordinates of the last mapped base
+	#don't give the coordinates of the gapped bases because they don't align to the host, and therefore their genomic coordinates are not defined
+	
+	##host coordinates
+	if ($overlap1 eq 'overlap') { ($hg1Start, $hg1Stop) = ($hgMatch1Stop - 1, $hgMatch1Stop + $ambig1); }
+	else 						{ ($hg1Start, $hg1Stop) = ($hgMatch1Stop - 1, $hgMatch1Stop); }
+	#for second matched region, one or more deletions/matched regions in the middle of the read will mean that the coordinates 
+	#aren't right next to first site
+	#but still use second matched region
+	if ($overlap2 eq 'overlap') { ($hg2Start, $hg2Stop) = ($hgMatch2Start - $ambig2, $hgMatch2Start + 1); }
+	else 						{ ($hg2Start, $hg2Stop) = ($hgMatch2Start, $hgMatch2Start + 1); }		
+
 	## viral coordinates
 	my ($vgMatchStart, $vgMatchStop) = getGenomicCoords($vMatchStart, $vMatchStop, $vPos, $vDir, $vCig); #this assumes a single matched region, so could be problematic if there are more than one
-	if (($vDir eq 'f') or ($vDir eq '-')) {
-		($vg1Start, $vg1Stop) = sort {$a <=> $b}($vgMatchStart, $vgMatchStart-$ambig1);
-		($vg2Start, $vg2Stop) = sort {$a <=> $b}($vgMatchStop, $vgMatchStop+$ambig2);
-	}
-	else {
-		($vg1Start, $vg1Stop) = sort {$a <=> $b}($vgMatchStop, $vgMatchStop-$ambig1);
-		($vg2Start, $vg2Stop) = sort {$a <=> $b}($vgMatchStart, $vgMatchStart+$ambig2);
-	}
+	if ($overlap1 eq 'overlap') { ($vg1Start, $vg1Stop) = ($vgMatchStart - $ambig1, $vgMatchStart  + 1); }
+	else 						{ ($vg1Start, $vg1Stop) = ($vgMatchStart, $vgMatchStart + 1); }
+	if ($overlap2 eq 'overlap') { ($vg2Start, $vg2Stop) = ($vgMatchStop - 1, $vgMatchStop + $ambig2); }
+	else 						{ ($vg2Start, $vg2Stop) = ($vgMatchStop - 1, $vgMatchStop); }
 	
 	#check for ambiguity and rearrangement
 	my $vRe;
-	if ((join(";", $vSup, $vSec)) eq "NA;NA") { $vRe = "no"; }
-	else { $vRe = (isRearrange($vCig, $vDir, $vRef, $vPos, (join(";", $vSup, $vSec)), $seq, $thresh))[0];}
+	if ((join(";", $vSup, $vSec)) eq "NA;NA") 	{ $vRe = "no"; }
+	else 										{ $vRe = (isRearrange($vCig, $vDir, $vRef, $vPos, (join(";", $vSup, $vSec)), $seq, $thresh))[0];}
 
 	my $hRe;
-	if ((join(";", $hSup, $hSec)) eq "NA;NA") { $hRe = "no"; }
-	else { $hRe = (isRearrange($hCig, $hDir, $hRef, $hPos, (join(";", $hSup, $hSec)), $seq, $thresh))[0];}
+	if ((join(";", $hSup, $hSec)) eq "NA;NA") 	{ $hRe = "no"; }
+	else 										{ $hRe = (isRearrange($hCig, $hDir, $hRef, $hPos, (join(";", $hSup, $hSec)), $seq, $thresh))[0];}
 	
 	#check to see if location of human alignment is ambiguous: multiple equivalent alignments accounting for human part of read
 	my $hAmbig;
-	if ($hSec eq "NA") { $hAmbig = "no";}
-	else { $hAmbig = isAmbigLoc($hDir, $hCig, $hSec, 'short', $seq, $tol);}
+	if ($hSec eq "NA") 	{ $hAmbig = "no";}
+	else				{ $hAmbig = isAmbigLoc($hDir, $hCig, $hSec, 'short', $seq, $tol);}
 	
 	#check to see if location of viral alignment is ambiguous: multiple equivalent alignments accounting for viral part of read
 	my $vAmbig;
-	if ($vSec eq "NA") { $vAmbig = "no";}
-	else { $vAmbig = isAmbigLoc($vDir, $vCig, $vSec, 'short', $seq, $tol);}
+	if ($vSec eq "NA") 	{ $vAmbig = "no";}
+	else 				{ $vAmbig = isAmbigLoc($vDir, $vCig, $vSec, 'short', $seq, $tol);}
 
 	#extract relevant parts of read
-
-	my $hostSeq1 = substr($seq, $hMatch1Start, $hMatch1Stop);
-	my $viralSeq1 = substr($seq, $vMatchStart, $vMatchStop);
-	my @ambigCoords1 = sort { $a <=> $b } ($hMatch1Stop, $vMatchStart);
-	my $ambigSeq1 = substr($seq, $ambigCoords1[0], $ambigCoords1[1]);
+	## host sequence is only those bases that must come from the host - excluding any overlapped bases
+	## similarly, viral sequence is only those bases that must come from the virus/vector
+	## ambiguous bases 
 	
-	my $hostSeq2 = substr($seq, $hMatch2Start, $hMatch2Stop);
-	my $viralSeq2 = substr($seq, $vMatchStart, $vMatchStop);
-	my @ambigCoords2 = sort { $a <=> $b } ($hMatch2Start, $vMatchStop);
-	my $ambigSeq2 = substr($seq, $ambigCoords2[0], $ambigCoords2[1]);	
+	my ($hostSeq1, $ambigSeq1, $viralSeq, $ambigSeq2, $hostSeq2);	
+	
+	#first host sequence and ambiguous sequence
+	if ($overlap1 eq 'overlap') {
+		$hostSeq1 = substr($seq, $hMatch1Start - 1, $hMatch1Stop - $hMatch1Start + 1 - $ambig1);
+		$ambigSeq1 = substr($seq, $hMatch1Stop - $ambig1, $ambig1);
+	}
+	else {
+		$hostSeq1 = substr($seq, $hMatch1Start - 1, $hMatch1Stop - $hMatch1Start + 1);
+		$ambigSeq1 = substr($seq, $hMatch1Stop, $ambig1);
+	}
+	
+	#viral sequence
+	if (($overlap1 eq 'overlap') & ($overlap2 eq 'overlap')) { #both sites have overlaps
+		$viralSeq = substr($seq, $vMatchStart - 1 + $ambig1, $vMatchStop - $vMatchStart + 1 - $ambig1 - $ambig2 );
+	}
+	elsif ($overlap1 eq 'overlap') { #left site has overlap but not right
+		$viralSeq = substr($seq, $vMatchStart - 1 + $ambig1, $vMatchStop - $vMatchStart + 1 - $ambig1);
+	}
+	elsif ($overlap2 eq 'overlap') { #right site has overlap but not left
+		$viralSeq = substr($seq, $vMatchStart - 1, $vMatchStop - $vMatchStart + 1 - $ambig2);
+	}
+	else { #neither sites have overlaps
+		$viralSeq = substr($seq, $vMatchStart - 1, $vMatchStop - $vMatchStart + 1);
+	}
+	
+	#second host sequence and ambiguous sequence
+	if ($overlap2 eq 'overlap') {
+		$hostSeq2 = substr($seq, $hMatch2Start - 1 + $ambig2, $hMatch2Stop - $hMatch2Start + 1 - $ambig2);
+		$ambigSeq2 = substr($seq, $hMatch2Start - 1, $ambig2);
+	}
+	else {
+		$hostSeq2 = substr($seq, $hMatch2Start - 1, $hMatch2Stop - $hMatch2Start + 1);
+		$ambigSeq2 = substr($seq, $hMatch2Start - 1 - $ambig2, $ambig2);
+	}
 	
 	#calculate total edit distance
 	my $totalNM1 = $vNM + $hNM;
 	my $totalNM2 = $vNM + $hNM;
 	
-	if ($overlap1 eq 'gap') { $totalNM1 += abs($ambig1); }
-	if ($overlap2 eq 'gap') { $totalNM2 += abs($ambig2); }
+	if ($overlap1 eq 'gap') { $totalNM1 += $ambig1; }
+	if ($overlap2 eq 'gap') { $totalNM2 += $ambig2; }
 	
 	#output:
 	## two arrays, one for each integration
 	## hRef, hStart, hStop, vRef, vStart, vStop, noAmbigbases, overlapType, orientation, hostseq, viralseq, ambigSeq, hostSec, viralSec, possible translocation, possible vector rearrangement, host ambiguous, viral ambiguous, readID, seq
 	
-	my $int1Data = join("\t", $hRef, $hg1Start, $hg1Stop, $vRef, $vg1Start, $vg1Stop, abs($ambig1), $overlap1, 'hv', $hostSeq1, $viralSeq1, $ambigSeq1, $hNM, $vNM, $totalNM1, $hRe, $vRe, $hAmbig, $vAmbig, 'short', $ID, $seq);
-	my $int2Data = join("\t", $hRef, $hg2Start, $hg2Stop, $vRef, $vg2Start, $vg2Stop, abs($ambig2), $overlap2, 'vh', $hostSeq2, $viralSeq2, $ambigSeq2, $hNM, $vNM, $totalNM2, $hRe, $vRe, $hAmbig, $vAmbig, 'short', $ID, $seq);
+	my $int1Data = join("\t", $hRef, $hg1Start, $hg1Stop, $vRef, $vg1Start, $vg1Stop, $ambig1, $overlap1, 'hv', $hostSeq1, $viralSeq, $ambigSeq1, $hNM, $vNM, $totalNM1, $hRe, $vRe, $hAmbig, $vAmbig, 'short', $ID, $seq);
+	my $int2Data = join("\t", $hRef, $hg2Start, $hg2Stop, $vRef, $vg2Start, $vg2Stop, $ambig2, $overlap2, 'vh', $hostSeq2, $viralSeq, $ambigSeq2, $hNM, $vNM, $totalNM2, $hRe, $vRe, $hAmbig, $vAmbig, 'short', $ID, $seq);
 	
 	return ($int1Data, $int2Data);
 }
