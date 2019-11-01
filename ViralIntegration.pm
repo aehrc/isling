@@ -3,7 +3,7 @@
 package ViralIntegration;
 use Exporter;
 @ISA = ('Exporter');
-@EXPORT = qw(getEditDist processCIGAR processCIGAR2 extractSeqCoords extractCoords extractSequence gapOrOverlap getCigarParts getGenomicCoords getMatchedRegion getMatchedRegions getSecSup isAmbigLoc isRearrange printOutput printBed printMerged reverseComp reverseCigar);
+@EXPORT = qw(isRearrangeOrInt getEditDist processCIGAR processCIGAR2 extractSeqCoords extractCoords extractSequence gapOrOverlap getCigarParts getGenomicCoords getMatchedRegion getMatchedRegions getSecSup isAmbigLoc isRearrange printOutput printBed printMerged reverseComp reverseCigar);
 
 
 ##### subroutines #####
@@ -342,7 +342,7 @@ sub isRearrange {
 	#sort alignments and check for gaps between start of read, each alignment, and end of read
 	#check if number of bases in gaps is less than $thresh * readlength
 	
-	my ($pCig, $pDir, $pRef, $pPos, $sup, $seq, $thresh) = @_;
+	my ($pCig, $pDir, $pRef, $pPos, $sup, $seq, $thresh, $pNM) = @_;
 	# $pCig is primary alignment of the first reference
 	# $pDir is the direction of the primary alignment 
 	# $sup are the secondary and supplementary alignments
@@ -367,24 +367,23 @@ sub isRearrange {
 	
 	#first do primary alignment
 	@pAligns = getMatchedRegions($pCig, $pDir);
-	foreach my $align (@pAligns) { push(@aligns, join("xxx", $align, $pRef, $pPos, $pDir, $pCig)); }
+	foreach my $align (@pAligns) { push(@aligns, join("xxx", $align, $pRef, $pPos, $pDir, $pCig, $pNM)); }
 	
 	#then do rest of the alignments
 	my @supAligns = split(";", $sup);
 	foreach my $supAlign (@supAligns) {
 	
 		if (($supAlign eq "NA") or ($supAlign eq "")) { next; } #check for no secondary alignments
-		my ($supRef, $supPos, $supSense, $supCig) = (split(",",$supAlign))[0,1,2,3]; #get info about this alignment
+		my ($supRef, $supPos, $supSense, $supCig, $supNM) = (split(",",$supAlign))[0,1,2,3,-1]; #get info about this alignment
 		
 		#need to keep the other alignment info for later output
 		my @curAligns = getMatchedRegions($supCig, $supSense);
-		foreach $align (@curAligns) { push(@aligns, join("xxx", $align, $supRef, $supPos, $supSense, $supCig)); }
+		foreach $align (@curAligns) { push(@aligns, join("xxx", $align, $supRef, $supPos, $supSense, $supCig, $supNM)); }
 		
 	}
 	
 	#sort array
 	my @sorted = sort(zeroPad(@aligns));
-	
 	
 	#remove any nested alignments
 	#these are alignments that are completely encompassed by another alignment 
@@ -458,6 +457,12 @@ sub isRearrange {
 		
 		}
 	}
+	
+	#get total edit distance from all alignments
+	my $NM = $gapBP;
+	for my $align (@sorted) {
+		$NM += (split("xxx", $align))[-1];
+	}
 
 	
 	my $isRearrange; #to store result, "yes" or "no"
@@ -468,8 +473,40 @@ sub isRearrange {
 	
 	#get start and stop 
 	
-	return ($isRearrange, $gapBP, $gaps, @aligns);
+	return ($isRearrange, $gapBP, $gaps, $NM, @aligns);
 	
+	
+}
+
+sub isRearrangeOrInt {
+	#decide if a given read is more likely to result from an integration or a rearrangement
+	#do this by comparing a 'total edit distance'
+	
+	#for integrations, the total edit distance is the sum of the virus and host alignment edit distances, 
+	#plus the number of bases in the gap if there is one
+	
+	#for rearrangements, the total edit distance is the sum of all the edit distances of the alignments used to account for the bases in the read
+	#plus the number of bases unaccounted for 
+	
+	#return 'yes' if the read is more likely a rearrangement
+	#or 'no' if more likely an integration
+	
+	my ($cig, $dir, $ref, $pos, $sec, $sup, $seq, $thresh, $pNM, $intNM) = @_;
+	
+	my ($rearrangeNM, $isRearrange);
+	
+	#if there's no sec or sups just make rearrangeNM the total length of the read
+	if ((join(";", $sup, $sec)) eq "NA;NA") { $rearrangeNM = length($seq); }
+	
+	#otherwise get it from isRearrange
+	else { $rearrangeNM = (isRearrange($cig, $dir, $ref, $pos, (join(";", $sup, $sec)), $seq, $thresh, $pNM))[3];}
+	
+	#decide if read is more likely a rearrangement or integration based on edit distance
+	#if edit distances are the same, err on the side of caution and assign it as a rearrangement
+	if ($intNM < $rearrangeNM) 	{ $isRearrange = "no"; }
+	else						{ $isRearrange = "yes"; }
+	
+	return $isRearrange;
 	
 }
 

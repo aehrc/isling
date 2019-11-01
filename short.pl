@@ -340,14 +340,23 @@ sub analyseShort{
 	if ($overlap2 eq 'overlap') { ($vg2Start, $vg2Stop) = ($vgMatchStop - 1, $vgMatchStop + $ambig2); }
 	else 						{ ($vg2Start, $vg2Stop) = ($vgMatchStop - 1, $vgMatchStop); }
 	
+	#calculate total edit distance
+	my $totalNM1 = $vNM + $hNM;
+	my $totalNM2 = $vNM + $hNM;
+	my $intNM = $vNM + $hNM;
+	
+	if ($overlap1 eq 'gap') { $totalNM1 += $ambig1; $intNM += $ambig1; }
+	if ($overlap2 eq 'gap') { $totalNM2 += $ambig2; $intNM += $ambig2; }
+	
 	#check for ambiguity and rearrangement
 	my $vRe;
 	if ((join(";", $vSup, $vSec)) eq "NA;NA") 	{ $vRe = "no"; }
-	else 										{ $vRe = (isRearrange($vCig, $vDir, $vRef, $vPos, (join(";", $vSup, $vSec)), $seq, $thresh))[0];}
+	else 										{ $vRe = isRearrangeOrInt($vCig, $vDir, $vRef, $vPos, $vSec, $vSup, $seq, $thresh, $vNM, $intNM);}
 
 	my $hRe;
 	if ((join(";", $hSup, $hSec)) eq "NA;NA") 	{ $hRe = "no"; }
-	else 										{ $hRe = (isRearrange($hCig, $hDir, $hRef, $hPos, (join(";", $hSup, $hSec)), $seq, $thresh))[0];}
+	else 										{ $hRe = isRearrangeOrInt($hCig, $hDir, $hRef, $hPos, $hSec, $hSup, $seq, $thresh, $hNM, $intNM);}
+	
 	
 	#check to see if location of human alignment is ambiguous: multiple equivalent alignments accounting for human part of read
 	my $hAmbig;
@@ -399,13 +408,6 @@ sub analyseShort{
 		$hostSeq2 = substr($seq, $hMatch2Start - 1, $hMatch2Stop - $hMatch2Start + 1);
 		$ambigSeq2 = substr($seq, $hMatch2Start - 1 - $ambig2, $ambig2);
 	}
-	
-	#calculate total edit distance
-	my $totalNM1 = $vNM + $hNM;
-	my $totalNM2 = $vNM + $hNM;
-	
-	if ($overlap1 eq 'gap') { $totalNM1 += $ambig1; }
-	if ($overlap2 eq 'gap') { $totalNM2 += $ambig2; }
 	
 	#output:
 	## two arrays, one for each integration

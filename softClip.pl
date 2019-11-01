@@ -251,14 +251,18 @@ sub collectIntersect {
 	elsif 	(($hAlig + $vAlig) == ($readlen)) {	$overlaptype = "none";		} #no gap or overlap
 	else 									  {	$overlaptype = "gap";		} #gap
 	
+	#caculate total edit distance - sum of host and virus edit distance, and gap if there is one
+	my $totalNM = $hNM + $vNM;
+	if ($overlaptype eq 'gap') { $totalNM += $overlap; }
+	
 	#check to see is whole read can be accounted for by alignments to the vector
-	my $isVecRearrange;
-	if ((join(";", $vSup, $vSec)) eq "NA;NA") { $isVecRearrange = "no"; }
-	else { $isVecRearrange = (isRearrange($vCig, $vDir, $vRef, $vPos, (join(";", $vSup, $vSec)), $seq, $thresh))[0];}
+	my ($isVecRearrange);
+	#decide if read is more likely a rearrangement or integration based on edit distance
+	#if edit distances are the same, err on the side of caution and assign it as a rearrangement
+	$isVecRearrange = isRearrangeOrInt($vCig, $vDir, $vRef, $vPos, $vSec, $vSup, $seq, $thresh, $vNM, $totalNM);
 
-	my $isHumRearrange;
-	if ((join(";", $hSup, $hSec)) eq "NA;NA") { $isHumRearrange = "no"; }
-	else { $isHumRearrange = (isRearrange($hCig, $hDir, $hRef, $hPos, (join(";", $hSup, $hSec)), $seq, $thresh))[0];}
+	my ($isHumRearrange);
+	$isHumRearrange = isRearrangeOrInt($hCig, $hDir, $hRef, $hPos, $hSec, $hSup, $seq, $thresh, $hNM, $totalNM);
 	
 	#check to see if location of human alignment is ambiguous: multiple equivalent alignments accounting for human part of read
 	my $isHumAmbig;
@@ -302,9 +306,6 @@ sub collectIntersect {
 	my ($hgStart, $hgStop) = extractCoords($hAlig, $overlap, $overlaptype, $hPos, $hOri);
 	my ($vgStart, $vgStop) = extractCoords($vAlig, $overlap, $overlaptype, $hPos, $vOri);
 	
-	#caculate total edit distance - sum of host and virus edit distance, and gap if there is one
-	my $totalNM = $hNM + $vNM;
-	if ($overlaptype eq 'gap') { $totalNM += $overlap; }
 
 	#generate output
 	my $outline = join("\t", ($hRef, $hgStart, $hgStop, $vRef, 

@@ -228,7 +228,7 @@ sub findDiscordant {
 	my $readlen2 = length($seq2);
 	
 	#get reference for virus and human based on which is mapped
-	my ($hRef, $vRef, $hSeq, $vSeq, $hNM, $vNM);
+	my ($hRef, $vRef, $hSeq, $vSeq, $hNM, $vNM, $intNM);
 	if ($hR1map eq "map") { #if human matched R1
 		unless (($readlen1 - $hR1mapBP) < $cutoff) { return; } #check unmapped bases is less than cutoff
 		unless (($readlen2 - $vR2mapBP) < $cutoff) { return; } #check unmapped bases is less than cutoff
@@ -238,6 +238,7 @@ sub findDiscordant {
 		$vRef = $vR2ref;
 		$vSeq = $seq2;
 		$vNM = $vNM2;
+		$intNM = $vNM + $hNM;
 	}
 	else { #if human matched R2
 		unless (($readlen2 - $hR2mapBP) < $cutoff) { return; } #check unmapped bases is less than cutoff
@@ -248,6 +249,7 @@ sub findDiscordant {
 		$vRef = $vR1ref;
 		$vSeq = $seq1; 
 		$vNM = $vNM1;
+		$intNM = $vNM + $hNM;
 	}	
 	
 	#find if junction is human/virus or virus/human
@@ -265,13 +267,11 @@ sub findDiscordant {
 		
 		#check for ambiguities
 		if ((join(";", $vR2sup, $vR2sec)) eq "NA;NA") { $isVecRearrange = "no"; }
-		else { $isVecRearrange = (isRearrange($vR2cig, $vR2ori, $vR2ref, $vR2start, (join(";", $vR2sup, $vR2sec)), $seq2, $thresh))[0];}
-		
+		else { $isVecRearrange = isRearrangeOrInt($vR2cig, $vR2ori, $vR2ref, $vR2start, $vR2sup, $vR2sec, $seq2, $thresh, $vNM, $intNM);}
+
 		if ((join(";", $hR1sec, $hR1sup)) eq "NA;NA") { $isHumRearrange = "no"; }
-		else { $isHumRearrange = (isRearrange($hR1cig, $hR1ori, $hR1ref, $hR1start, (join(";", $hR1sec, $hR1sup)), $seq1, $thresh))[0];}
+		else { $isHumRearrange = isRearrangeOrInt($hR1cig, $hR1ori, $hR1ref, $hR1start, $hR1sup, $hR1sec, $seq1, $thresh, $hNM, $intNM);}
 	 
-		
-	
 		#check to see if location of human alignment is ambiguous: multiple equivalent alignments accounting for human part of read
 		if ($hR1sec eq "NA") { $isHumAmbig = "no";}
 		else { $isHumAmbig = isAmbigLoc($hR1ori, $hR1cig, $hR1sec, 'discordant', $seq1, $tol);}
@@ -291,10 +291,10 @@ sub findDiscordant {
 	
 		#check for ambiguities
 		if ((join(";", $vR1sup, $vR1sec)) eq "NA;NA") { $isVecRearrange = "no"; }
-		else { $isVecRearrange = (isRearrange($vR1cig, $vR1ori, $vR1ref, $vR1start, (join(";", $vR1sup, $vR1sec)), $seq1, $thresh))[0];}
+		else { $isVecRearrange = isRearrangeOrInt($vR1cig, $vR1ori, $vR1ref, $vR1start, $vR1sup, $vR1sec, $seq1, $thresh, $vNM, $intNM);}
 		
 		if ((join(";", $hR2sup, $hR2sec)) eq "NA;NA") { $isHumRearrange = "no"; }
-		else { $isHumRearrange = (isRearrange($hR2cig, $hR2ori, $hR2ref, $hR2start, (join(";", $hR2sup, $hR2sec)), $seq2, $thresh))[0];}
+		else { $isHumRearrange = isRearrangeOrInt($hR2cig, $hR2ori, $hR2ref, $hR2start, $hR2sup, $hR2sec, $seq2, $thresh, $hNM, $intNM);}
 	 	
 		#check to see if location of human alignment is ambiguous: multiple equivalent alignments accounting for human part of read
 		if ($hR2sec eq "NA") { $isHumAmbig = "no";}
@@ -304,7 +304,9 @@ sub findDiscordant {
 		if ($vR1sec eq "NA") { $isVirAmbig = "no";}
 		else { $isVirAmbig = isAmbigLoc($vR1ori, $vR1cig, $vR1sec, 'discordant', $seq1, $tol);}
 	}
-		return($hRef, $hIntStart, $hIntStop, $vRef, $vIntStart, $vIntStop, '?', 'discordant', $junct, $hSeq, $vSeq, '-', $hNM, $vNM, ($hNM + $vNM), $isHumRearrange, $isVecRearrange, $isVirAmbig, $isHumAmbig, 'discordant');
+		return($hRef, $hIntStart, $hIntStop, $vRef, $vIntStart, $vIntStop, 
+				'?', 'discordant', $junct, $hSeq, $vSeq, '-', $hNM, $vNM, $intNM, 
+				$isHumRearrange, $isVecRearrange, $isVirAmbig, $isHumAmbig, 'discordant');
 
 }
 
@@ -356,17 +358,17 @@ sub getIntPos {
 
 	my ($mapR1cig, $mapR1ori, $mapR1start, $readlen1, $mapR2cig, $mapR2ori, $mapR2start, $readlen2) = @_;
 	#get positions of last mapped base facing in towards junction
-	#
+	# output 0-based coordinates
 	
 	#regardless of whether R1 is mapped in reverse or forward orientation,
 	#the estimate of int site position will always be pos (1-based left-most mapping postion) 
 	#plus the read length
 	my $R1IntStart = $mapR1start + getLastMapped($mapR1cig, $mapR1ori) - 1;
-	my $R1IntStop = $R1IntStart;
+	my $R1IntStop = $R1IntStart + 1 ;
 
 	#similarly, estimate for R2 is always at pos (1-based mapping position)
-	my $R2IntStart = $mapR2start;
-	my $R2IntStop = $R2IntStart;
+	my $R2IntStart = $mapR2start - 1;
+	my $R2IntStop = $R2IntStart + 1;
 
 	return ($R1IntStart, $R1IntStop, $R2IntStart, $R2IntStop);
 
