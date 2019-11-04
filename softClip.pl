@@ -304,7 +304,7 @@ sub collectIntersect {
 	
 	#first get start and stop genomic coordinates of integration
 	my ($hgStart, $hgStop) = extractCoords($hAlig, $overlap, $overlaptype, $hPos, $hOri);
-	my ($vgStart, $vgStop) = extractCoords($vAlig, $overlap, $overlaptype, $hPos, $vOri);
+	my ($vgStart, $vgStop) = extractCoords($vAlig, $overlap, $overlaptype, $vPos, $vOri);
 	
 
 	#generate output
