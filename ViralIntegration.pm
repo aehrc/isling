@@ -373,7 +373,7 @@ sub isRearrange {
 	my @pAligns = getMatchedRegions($pCig, $pDir);
 	
 	#divide $supNM by the number of matched retions in the alignment so that we don't count this edit distance more than once
-	my $pNM /= scalar @pAligns;
+	$pNM /= scalar @pAligns;
 	foreach my $align (@pAligns) { push(@aligns, join("xxx", $align, $pRef, $pPos, $pDir, $pCig, $pNM)); }
 	
 	#then do rest of the alignments
