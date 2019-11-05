@@ -253,6 +253,13 @@ sub collectIntersect {
 	if 		(($hAlig + $vAlig) > ($readlen))  {	$overlaptype = "overlap";	} #overlap
 	elsif 	(($hAlig + $vAlig) == ($readlen)) {	$overlaptype = "none";		} #no gap or overlap
 	else 									  {	$overlaptype = "gap";		} #gap
+
+	#also enforce a cutoff on the number of unambiguously mapped bases
+	#that is, if there is an overlap, the number of mapped bases excluding the overlapped region must still
+	#be more than the cutoff
+	if ($overlaptype eq "gap") {
+		unless ((($vAlig - $overlap) > $cutoff) and (($vAlig - $overlap) > $cutoff)) { return; }		
+	}
 	
 	#caculate total edit distance - sum of host and virus edit distance, and gap if there is one
 	my $totalNM = $hNM + $vNM;

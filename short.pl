@@ -308,6 +308,25 @@ sub analyseShort{
 	
 	#number of inserted bases:
 	my $inserted = $hInsertStop - $hInsertStart + 1;
+
+	#get number of aligned bases for virus, first and second human alignment
+	my ($hMatch1Len, $hMatch2Len, $vMatchLen);
+	$hMatch1Len = $hMatch1Stop - $hMatch1Start + 1; #coords relative to read are 1-based
+	$hMatch2Len = $hMatch2Stop - $hMatch2Start + 1; 
+	$vMatchLen = $vMatchStop - $vMatchStart + 1; 
+	
+	#number of unambiguously aligned bases must be more than cutoff
+	if ($overlap1 eq 'overlap') { unless (($hMatch1Len - $ambig1) > $cutoff) { return; } }
+	if ($overlap2 eq 'overlap') { unless (($hMatch2Len - $ambig2) > $cutoff) { return; } }
+	if (($overlap1 eq 'overlap') and ($overlap2 eq 'overlap')) {
+		unless (($vMatchLen - $ambig1 - $ambig2) > $cutoff) { return; }
+	}
+	elsif ($overlap1 eq 'overlap') {
+		unless (($vMatchLen - $ambig1) > $cutoff) { return; }
+	}
+	elsif ($overlap2 eq 'overlap') {
+		unless (($vMatchLen - $ambig2) > $cutoff) { return; }
+	}
 	
 	#calculate start and stop genomic positions  
 	my ($hg1Start, $hg1Stop, $hg2Start, $hg2Stop, $vg1Start, $vg1Stop, $vg2Start, $vg2Stop);
