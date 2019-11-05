@@ -1,9 +1,12 @@
 #!/usr/bin/perl
 
+use strict;
+use warnings;
+
 package ViralIntegration;
 use Exporter;
-@ISA = ('Exporter');
-@EXPORT = qw(isRearrangeOrInt getEditDist processCIGAR processCIGAR2 extractSeqCoords extractCoords extractSequence gapOrOverlap getCigarParts getGenomicCoords getMatchedRegion getMatchedRegions getSecSup isAmbigLoc isRearrange printOutput printBed printMerged reverseComp reverseCigar);
+our @ISA = ('Exporter');
+our @EXPORT = qw(isRearrangeOrInt getEditDist processCIGAR processCIGAR2 extractSeqCoords extractCoords extractSequence gapOrOverlap getCigarParts getGenomicCoords getMatchedRegion getMatchedRegions getSecSup isAmbigLoc isRearrange printOutput printBed printMerged reverseComp reverseCigar);
 
 
 ##### subroutines #####
@@ -105,12 +108,12 @@ sub getGenomicCoords {
 	
 	for my $i (0..$#numbers) {
 		#if doesn't consume query
-		if (@letters[$i] !~ /[MIS]/) {
-			@rNumbers[$i] = 0;
+		if ($letters[$i] !~ /[MIS]/) {
+			$rNumbers[$i] = 0;
 		}
 		#if doesn't consume reference
-		if (@letters[$i] !~ /[MDN]/) {
-			@gNumbers[$i] = 0;
+		if ($letters[$i] !~ /[MDN]/) {
+			$gNumbers[$i] = 0;
 		}
 	}
 	
@@ -197,14 +200,14 @@ sub getMatchedRegions {
 	
 	#in order to get correct coordinates relative to read (query)
 	#need to remove any cigar operations that don't consume query (D, N, H, P)
-	for my $i (0..$#letters) {
-		if (@letters[$i] =~ /[DNHP]/) {
+	
+	for my $i (reverse(0..$#letters)) {
+		if ($letters[$i] =~ /[DNHP]/) {
 			splice(@letters, $i, 1);
 			splice(@numbers, $i, 1);
 		}
-	
 	}
-	
+
 	#for each match in @letters, get position in read where alignment starts and length of alignment
 	my ($start, $matchedLen, $end, @aligns);
 	for my $i (0..$#letters) { 
@@ -317,6 +320,7 @@ sub isAmbigLoc {
 		my ($secSense, $secCigar) = (split(",",$secAlignment))[2,3]; #get sense and cigar from 
 		
 		#process cigar as appropriate for read type
+		my $secCigar1;
 		if ($type eq 'soft') { ($secCigar1, $dummy) = processCIGAR($secCigar,$seq);}
 		($secCigar, $dummy) = processCIGAR2($secCigar, $tol);
 	
@@ -366,7 +370,7 @@ sub isRearrange {
 	my @aligns; #to store start and end of each alignment
 	
 	#first do primary alignment
-	@pAligns = getMatchedRegions($pCig, $pDir);
+	my @pAligns = getMatchedRegions($pCig, $pDir);
 	foreach my $align (@pAligns) { push(@aligns, join("xxx", $align, $pRef, $pPos, $pDir, $pCig, $pNM)); }
 	
 	#then do rest of the alignments
@@ -378,7 +382,7 @@ sub isRearrange {
 		
 		#need to keep the other alignment info for later output
 		my @curAligns = getMatchedRegions($supCig, $supSense);
-		foreach $align (@curAligns) { push(@aligns, join("xxx", $align, $supRef, $supPos, $supSense, $supCig, $supNM)); }
+		foreach my $align (@curAligns) { push(@aligns, join("xxx", $align, $supRef, $supPos, $supSense, $supCig, $supNM)); }
 		
 	}
 	
@@ -389,44 +393,46 @@ sub isRearrange {
 	#these are alignments that are completely encompassed by another alignment 
 	#ie 001xxx100 and 010xxx020 are nested and 010xxx020 should be removed
 	#also 001xxx009 and 001xxx010 are nested and 001xxx009 should be removed
-	#keep any equivalent alignments - these are pairs with identical start and stop postions
+	#also remove any equivalent alignments - these are alignments with identical start and stop postions
 	
 	#strategy: start at end of array and check if the current alignment and the previous alignment are nested
 	#if so, remove the nested one (which will always be the current alignment, since the list is sorted)
+
 	my $lastKept = $#sorted;
-	my @equivalent = ();
 	for my $i (reverse((1..$#sorted))) {
 		#get current and previous start and end
 		my ($cS, $cE) = (split('xxx', $sorted[$i]))[0,1];
 		my ($pS, $pE) = (split('xxx', $sorted[$i-1]))[0,1];
-		#if two (or more) alignments are equivalent, we don't yet know if they should both/all be removed or not
-		#just keep track of them
+		
+		#if two (or more) alignments are equivalent, remove the one with the smaller edit distance
 		if (($cS == $pS) and ($cE == $pE)) {
-			push(@equivalent, $i);
+			#get edit distances
+			my $cNM = (split('xxx', $sorted[$i]))[-1];
+			my $pNM = (split('xxx', $sorted[$i-1]))[-1];
+			if ($pNM > $cNM) { #if previous is more than current, keep current and delete previous
+				#first move current alignment to the position of the previous alignment, then delete current
+				$sorted[$i-1] = $sorted[$i];
+				splice(@sorted, $i, 1);
+			}
+			else { #otherwise, keep previous and delete current
+				splice(@sorted, $i, 1); 	
+			}
 			next;
 		}
-		#if current alignment and previous alignment are nested
+		#if current alignment and previous alignment are nested, and the current alignment is the nested alignment
 		if ((($cS > $pS) and ($cE < $pE)) or (($cS > $pS) and ($cE == $pE))) { 
-			#if no equivalent alignments
-			if ($#equivalent <= 0) {
-				#just remove the one alignment (the current alignment)
-				splice(@sorted, $i, 1); 
-				}
-			#if there are equivalent alignments
-			else {
-				#remove them all
-				splice(@sorted, $i, ($#equivalent+1));
-			}
+			#just remove the one alignment (the current alignment)
+			splice(@sorted, $i, 1); 
+			next;
 		}
 		#if current alignment and previous alignment are nested, and the previous alignment is the nested alignment
 		#eg current = 001xxx120, previous = 001xxx100
 		if (($cS == $pS) and ($cE > $pE)) {
 			#first move current alignment to the position of the previous alignment, then delete
-			@sorted[$i-1] = @sorted[$i];
+			$sorted[$i-1] = $sorted[$i];
 			splice(@sorted, $i, 1);
 		}
-		#reset equivalent 
-		@equivalent = ();
+
 		
 	}	
 	
@@ -467,7 +473,7 @@ sub isRearrange {
 	
 	my $isRearrange; #to store result, "yes" or "no"
 	
-	if ($gapBP < ($readlen - ($thresh * $readlen)) & ($#sorted > 0)) { $isRearrange = "yes"; }
+	if ($gapBP < ($readlen - ($thresh * $readlen)) and ($#sorted > 0)) { $isRearrange = "yes"; }
 	else { $isRearrange = "no"; }
 	
 	
@@ -666,7 +672,7 @@ sub processCIGAR2 {
 	#that are sandwiched between two M operations
 	my $lastM = $#letters;
 	my $bases;
-	my $combinedbases = 0;
+	my $combinedBases = 0;
 	for my $i (reverse((0..$#letters))) {
 		#check if this element is M
 		if ($letters[$i] =~ /M/) {
@@ -677,27 +683,26 @@ sub processCIGAR2 {
 			
 			#so if there's an S in the operations sandwiched between two M's
 			#just move on
-			
 			my @Sops = grep { $_ =~ /S/ } @letters[$i..$lastM];
 			if( $#Sops >= 0) { $lastM = $i; next; }
 			
 			#check the number of bases between this M and the last M
-			$bases = eval join("+", @numbers[$i+1..$lastM-1]);
-			if ($bases <= $tol) {
-				
-				#combine the elements between the two Ms
-				#need to consider whether to add bases to total or not
-				#only add bases to total if CIGAR operation consumes query ([MI])
-				#otherwise discard bases
-				my $total;
-				for my $j ($i..$lastM) {
-				if ($letters[$j] =~ /[MIS]/) { $total += $numbers[$j]; }
-				}
+			
+			#if there are no elements between $i+1 and $lastM-1, the number of bases is 0
+			$bases = eval join "+", ( @numbers[$i+1..$lastM-1] || (0) ) ;
+			if (($bases <= $tol) && ($lastM != $i)) { 
+					#combine the elements between the two Ms
+					#need to consider whether to add bases to total or not
+					#only add bases to total if CIGAR operation consumes query ([MI])
+					#otherwise discard bases
+					my $total;
+					for my $j ($i..$lastM) {
+						if ($letters[$j] =~ /[MIS]/) { $total += $numbers[$j]; }
+					}
 				#add number of bases to count and cut out of cigar
-				$combinedBases += $letters[$i+1];
+				$combinedBases += $numbers[$i+1..$lastM-1] || 0;
 				splice(@letters, $i+1, $lastM-$i);
 				splice(@numbers, $i, $lastM-$i+1, $total);
-
 			}
 			#reassign $lastM for next step
 			$lastM = $i;
