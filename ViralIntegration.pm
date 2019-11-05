@@ -371,6 +371,9 @@ sub isRearrange {
 	
 	#first do primary alignment
 	my @pAligns = getMatchedRegions($pCig, $pDir);
+	
+	#divide $supNM by the number of matched retions in the alignment so that we don't count this edit distance more than once
+	my $pNM /= scalar @pAligns;
 	foreach my $align (@pAligns) { push(@aligns, join("xxx", $align, $pRef, $pPos, $pDir, $pCig, $pNM)); }
 	
 	#then do rest of the alignments
@@ -382,8 +385,15 @@ sub isRearrange {
 		
 		#need to keep the other alignment info for later output
 		my @curAligns = getMatchedRegions($supCig, $supSense);
-		foreach my $align (@curAligns) { push(@aligns, join("xxx", $align, $supRef, $supPos, $supSense, $supCig, $supNM)); }
 		
+		#divide $supNM by the number of matched retions in the alignment so that we don't count this edit distance more than once
+		$supNM /= scalar @curAligns;
+		
+		foreach my $align (@curAligns) { 
+			#if this is the first matched region from the alignment, use the edit distance for the whole alignment
+			#otherwise use an edit distance
+			push(@aligns, join("xxx", $align, $supRef, $supPos, $supSense, $supCig, $supNM)); 
+		}
 	}
 	
 	#sort array
