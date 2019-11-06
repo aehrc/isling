@@ -787,7 +787,7 @@ sub zeroPad {
 		
 		#check if number of digits in $start and $end is more than $longest
 		if (length($start) > $longest) { $longest = length($start); }
-		elsif (length($end) > $longest) { $longest = length($end); }
+		if (length($end) > $longest) { $longest = length($end); }
 		
 	}
 	
@@ -801,7 +801,7 @@ sub zeroPad {
 		$start = "0" x ($longest - length($start)) . $start;
 		
 		$end = "0" x ($longest - length($end)) . $end;
-		
+		$DB::single=1;
 		push(@padded, join('xxx', $start, $end, @other));
 	}
 	
