@@ -44,11 +44,10 @@ localrules: all, convert
 rule all:
 	input: 
 		expand("../../out/{dset}/host_juncts/{samp}.{host}.bwa.{virus}-juncts0NM.bam", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES, samp=SAMPLES),
-		expand("../../out/{dset}/host_variants/{dset}.{host}.bwa.{virus}-juncts.freebayes.vcf", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES), 
-		expand("../../out/{dset}/host_variants/{dset}.{host}.bwa.{virus}-juncts.pileup.vcf", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES, samp=SAMPLES),
+		expand("../../out/{dset}/host_variants/{dset}.{host}.bwa.{virus}-juncts.pileup.filtered.vcf", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES, samp=SAMPLES),
 		expand("../../out/{dset}/virus_juncts/{samp}.{virus}.bwa.{host}-juncts0NM.bam", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES, samp=SAMPLES),
-		expand("../../out/{dset}/virus_variants/{dset}.{virus}.bwa.{host}-juncts.pileup.vcf", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES, samp=SAMPLES),
-		expand("../../out/{dset}/virus_variants/{dset}.{virus}.bwa.{host}-juncts.freebayes.vcf", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES, samp=SAMPLES),
+		expand("../../out/{dset}/virus_variants/{dset}.{virus}.bwa.{host}-juncts.pileup.filtered.vcf", zip, dset=DATASETS, host=HOSTS, virus=VIRUSES, samp=SAMPLES),
+
 
 #### convert bam to sam ####
 rule convert:
@@ -141,7 +140,8 @@ rule pileup_host:
 	input:
 		sams = pileup_input_host
 	output:
-		vcf = "../../out/{dset}/host_variants/{dset}.{host}.bwa.{virus}-juncts.pileup.vcf"
+		pileup = "../../out/{dset}/host_variants/{dset}.{host}.bwa.{virus}-juncts.pileup.vcf",
+		vcf = "../../out/{dset}/host_variants/{dset}.{host}.bwa.{virus}-juncts.called.vcf"
 	conda:
 		"../envs/bcftools.yml"
 	params:
@@ -150,27 +150,10 @@ rule pileup_host:
 	threads: 5
 	shell:
 		"""
-		bcftools mpileup -f {params.ref} -R {params.regions} {input} > {output.vcf}
+		bcftools mpileup --annotate FORMAT/AD -f {params.ref} -R {params.regions} {input} > {output.pileup}
+		bcftools call -mv  --ploidy 1 -Ov -o {output.vcf} < {output.pileup}
 		"""
 		
-rule call_host:
-	input:
-		sams = pileup_input_host
-	output:
-		vcf = "../../out/{dset}/host_variants/{dset}.{host}.bwa.{virus}-juncts.freebayes.vcf"
-	conda:
-		"../envs/bcftools.yml"
-	params:
-		regions = lambda wildcards: "../../data/references/" + config[wildcards.dset]["regions"],
-		ref = lambda wildcards: "../../data/references/" + config[wildcards.dset]["host"] + ".fa"
-	threads: 5
-	shell:
-		"""
-		bcftools mpileup --max-depth 2000 -f {params.ref} -R {params.regions} {input} | bcftools call -mv --ploidy 1 -Ov -o {output.vcf}
-		"""
-
-
-
 def pileup_input_virus(wildcards):
 	samples = set_samples[wildcards.dset]
 	samples = [f"../../out/{wildcards.dset}/virus_juncts/{sample}.{wildcards.virus}.bwa.{wildcards.host}-juncts.bam" for sample in samples]
@@ -180,22 +163,9 @@ rule pileup_virus:
 	input:
 		sams = pileup_input_virus
 	output:
-		vcf = "../../out/{dset}/virus_variants/{dset}.{virus}.bwa.{host}-juncts.pileup.vcf"
-	conda:
-		"../envs/bcftools.yml"
-	params:
-		ref = lambda wildcards: "../../data/references/" + config[wildcards.dset]["virus"] + ".fa"
-	threads: 5
-	shell:
-		"""
-		bcftools mpileup --max-depth 2000 -f {params.ref} {input} > {output.vcf}
-		"""
+		pileup = "../../out/{dset}/virus_variants/{dset}.{virus}.bwa.{host}-juncts.pileup.vcf",
+		vcf = "../../out/{dset}/virus_variants/{dset}.{virus}.bwa.{host}-juncts.called.vcf"
 		
-rule call_virus:
-	input:
-		sams = pileup_input_virus
-	output:
-		vcf = "../../out/{dset}/virus_variants/{dset}.{virus}.bwa.{host}-juncts.freebayes.vcf"
 	conda:
 		"../envs/bcftools.yml"
 	params:
@@ -203,5 +173,20 @@ rule call_virus:
 	threads: 5
 	shell:
 		"""
-		bcftools mpileup --max-depth 2000 -f {params.ref} {input} | bcftools call -mv -Ov --ploidy 1 -o {output.vcf}
+		bcftools mpileup --annotate FORMAT/AD --max-depth 10000 -f {params.ref} {input} > {output.pileup}
+		bcftools call -mv -Ov --ploidy 1 -o {output.vcf} < {output.pileup}
 		"""
+
+rule filter:
+	input:
+		called = "../../out/{dset}/{type}_variants/{name}.called.vcf",
+		pileup = "../../out/{dset}/{type}_variants/{name}.pileup.vcf"
+
+	output:
+		filtered = "../../out/{dset}/{type}_variants/{name}.pileup.filtered.vcf"
+	shell:
+		"""
+		awk -F  '\t' 'NR==FNR {{id[$2]; next;}} $2 in id' {input.called} {input.pileup} > {output.filtered}
+		"""
+
+
