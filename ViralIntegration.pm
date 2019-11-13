@@ -352,14 +352,11 @@ sub isRearrange {
 	# $sup are the secondary and supplementary alignments
 	# $thresh is the fraction of the read that must be accounted for by alignments to be considered a rearrangement
 	
-	
-	
 	#get location in read of matched regions and their lengths
 	#make array of start of matched regions and their lengths in format startxxxend
 	#need to take into account direction of read - convert everything to forward orientation
 	#need to zeropad start and length so that each have the same number of digits, for sorting later
 	my $readlen = length($seq);
-
 	
 	#note - currently considering all alignments together regardless of their reference: consider changing to check only that alignments to a sigle reference account for the whole read
 	#for vector/virus we would want to do this because probably don't have different viruses recombining?
