@@ -48,7 +48,7 @@ rule all:
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),		
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),
-#		"../out/summary/count_mapped.xlsx",
+		"../out/summary/count_mapped.txt",
 		"../out/summary/num_sites.xlsx"
 		
 		
@@ -292,7 +292,7 @@ rule run_int_scripts:
 		hPaired = "../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.{virus}Mappedreads.sam",
 		hSing = "../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.sam",
 		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam",
-		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam",
+		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam",
 		hShort = "../out/{dset}/host_aligned/{samp}.{host}.bwaShort.{virus}Mappedreads.sam",
 		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.sam"
 
@@ -352,9 +352,9 @@ rule refseq:
 rule count_mapped:
 	input:
 		expand("../out/{dset}/host_aligned_bam/{samp}.{host}.bwa.{virus}Mappedreads.bam", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES),
-		expand("../out/{dset}/virus_aligned_bam/{samp}.{virus}.bwa.mapped.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES),
+		expand("../out/{dset}/virus_aligned_bam/{samp}.{virus}.bwa.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES),
 		expand("../out/{dset}/host_aligned_bam/{samp}.{host}.bwaPaired.{virus}Mappedreads.bam", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus=VIRUSES),
-		expand("../out/{dset}/virus_aligned_bam/{samp}.{virus}.bwaPaired.mapped.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES)
+		expand("../out/{dset}/virus_aligned_bam/{samp}.{virus}.bwaPaired.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES)
 	output:
 		"../out/summary/count_mapped.txt"
 	conda: 

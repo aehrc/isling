@@ -129,6 +129,7 @@ sub getGenomicCoords {
 		#if forward, need to sum from start of array to $i
 		if (($sense eq 'f') or ($sense eq '+')) {
 			#rStart for this position is 1 + (sum of @numbers up to but not including this position)
+			
 			$rStart = 1 + eval join("+", @rNumbers[0..($i-1)]);
 			#rStop for this position is (sum of @numbers up to and including this position)
 			$rStop = eval join("+", @rNumbers[0..$i]);
@@ -137,6 +138,7 @@ sub getGenomicCoords {
 		else {
 			#rStart is 1+ sum from next element to end of array
 			$rStart = 1 + eval join("+", @rNumbers[$i+1..$#rNumbers]);
+			
 			#rStop is sum from this element to end of array
 			$rStop = eval join("+", @rNumbers[$i..$#rNumbers]);
 			#gStart is 
@@ -153,6 +155,7 @@ sub getGenomicCoords {
 			else {
 				$gStart = $pos + eval join("+", @gNumbers[0..$i]);
 				$gStop = $pos - 1 + eval join("+", @gNumbers[0..($i-1)]);
+				
 			}
 			return  ($gStart, $gStop) ;
 			
@@ -798,7 +801,7 @@ sub zeroPad {
 		$start = "0" x ($longest - length($start)) . $start;
 		
 		$end = "0" x ($longest - length($end)) . $end;
-		$DB::single=1;
+
 		push(@padded, join('xxx', $start, $end, @other));
 	}
 	
