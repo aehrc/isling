@@ -9,6 +9,8 @@ use lib '.';
 use ViralIntegration;
 use Getopt::Long;
 
+
+
 my $cutoff = 20; # each alignment must contain this number of aligned bases and this number of soft-clipped bases 
 my $thresh = 0.95; #default amount of read that must be covered by alignments for rearrangement
 my $tol = 3; #when processing CIGARS, combine any IDPN elements between M regions with this number of bases or less
@@ -20,6 +22,8 @@ my $merged;
 my $verbose;
 
 my $help;
+
+
 
 GetOptions('cutoff=i' => \$cutoff,
 		   'thresh=f' => \$thresh,
