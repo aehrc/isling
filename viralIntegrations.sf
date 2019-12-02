@@ -48,7 +48,7 @@ rule all:
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),		
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),
-#		"../out/summary/count_mapped.xlsx",
+		"../out/summary/count_mapped.txt",
 		"../out/summary/num_sites.xlsx"
 		
 		
@@ -86,8 +86,8 @@ rule dedup:
 		r1 = "../out/reads/{dset}/{samp}_1.fastq.gz",
 		r2 = "../out/reads/{dset}/{samp}_2.fastq.gz"	
 	output:
-		R1_clumped = "../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
-		R2_clumped = "../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
+		R1_clumped = temp("../out/{dset}/dedup_reads/{samp}.1.fastq.gz"),
+		R2_clumped = temp("../out/{dset}/dedup_reads/{samp}.2.fastq.gz")
 	conda:
 		"envs/bbmap.yml"
 	shell:
@@ -100,10 +100,10 @@ rule seqPrep:
 		r1 = "../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
 		r2 = "../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
 	output:
-		merged = "../out/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz",
-		proc_r1 = "../out/{dset}/merged_reads/{samp}.SeqPrep_1.fastq.gz",
-		proc_r2 = "../out/{dset}/merged_reads/{samp}.SeqPrep_2.fastq.gz",
-		all = "../out/{dset}/merged_reads/{samp}.all.fastq.gz"
+		merged = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz"),
+		proc_r1 = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_1.fastq.gz"),
+		proc_r2 = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_2.fastq.gz"),
+		all = temp("../out/{dset}/merged_reads/{samp}.all.fastq.gz")
 	conda:	
 		"envs/seqprep.yml"
 	params:
@@ -120,9 +120,9 @@ rule combine:
 		r1 = "../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
 		r2 = "../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
 	output:
-		proc_r1 = "../out/{dset}/processed_reads/{samp}.1.fastq.gz",
-		proc_r2 = "../out/{dset}/processed_reads/{samp}.2.fastq.gz",
-		all = "../out/{dset}/processed_reads/{samp}.all.fastq.gz"
+		proc_r1 = temp("../out/{dset}/processed_reads/{samp}.1.fastq.gz"),
+		proc_r2 = temp("../out/{dset}/processed_reads/{samp}.2.fastq.gz"),
+		all = temp("../out/{dset}/processed_reads/{samp}.all.fastq.gz")
 	shell:
 		"""
 		cp {input.r1} {output.proc_r1}
@@ -292,7 +292,7 @@ rule run_int_scripts:
 		hPaired = "../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.{virus}Mappedreads.sam",
 		hSing = "../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.sam",
 		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam",
-		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam",
+		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam",
 		hShort = "../out/{dset}/host_aligned/{samp}.{host}.bwaShort.{virus}Mappedreads.sam",
 		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.sam"
 
@@ -352,9 +352,9 @@ rule refseq:
 rule count_mapped:
 	input:
 		expand("../out/{dset}/host_aligned_bam/{samp}.{host}.bwa.{virus}Mappedreads.bam", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES),
-		expand("../out/{dset}/virus_aligned_bam/{samp}.{virus}.bwa.mapped.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES),
+		expand("../out/{dset}/virus_aligned_bam/{samp}.{virus}.bwa.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES),
 		expand("../out/{dset}/host_aligned_bam/{samp}.{host}.bwaPaired.{virus}Mappedreads.bam", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus=VIRUSES),
-		expand("../out/{dset}/virus_aligned_bam/{samp}.{virus}.bwaPaired.mapped.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES)
+		expand("../out/{dset}/virus_aligned_bam/{samp}.{virus}.bwaPaired.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES)
 	output:
 		"../out/summary/count_mapped.txt"
 	conda: 
