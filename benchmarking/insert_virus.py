@@ -7,8 +7,8 @@
 ## n non-sequential (with a gap in between) portions of viral genome, rearranged (with possibility that some are reversed)
 
 #at each insertion type, overlaps possible are gap, overlap, none
-## if gap, insert small number of random bases between host and virus
-## if overlap, take small (<5) number of bases and look for homology, do insertion there
+## if gap, insert small number of random bases between host and virus - this feature is not implemented yet
+## if overlap, take small (<5) number of bases and look for homology, do insertion there - this feature is not implemented yet
 ## if none, there is a 'clean' junction between virus and host
 
 # reports parameters of integrations:
@@ -18,6 +18,8 @@
 	#overlaps/gaps at each junction
 # reports all integration sites relative to the host genome, independent of other integrations
 # so if there are two integrations on the same chromosome, both positions in host genome will be relative to reference
+
+# intergrations are stored internally though the Integration class
 
 
 ###import libraries
@@ -63,7 +65,10 @@ def main(argv):
 	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion]
 	#junction_types = ['gap', 'overlap', 'clean']
 	
+	#list to store integration objects
 	host_ints = []
+	#dictionary to  store sequences with integrations
+	host_fasta = {key:value for key, value in zip(host.keys(), host.values())}
 	
 	#open output file for writing
 	handle = open(args.locs, "w+")
@@ -81,16 +86,19 @@ def main(argv):
 							])
 	handle.write(header)
 	
-	print(host)
-	host_ints, host = insertion_types[0](host, virus, host_ints, handle, sep=args.sep)
-	print(host)
-	host_ints, host = insertion_types[1](host, virus, host_ints, handle, sep=args.sep)
-	host_ints, host = insertion_types[2](host, virus, host_ints, handle, sep=args.sep)
-	host_ints, host = insertion_types[3](host, virus, host_ints, handle, sep=args.sep)
+	print(host_fasta)
+	host_ints, host_fasta = insertWholeVirus(host_fasta, virus, host_ints, handle)
+	host_ints, host_fasta = insertWholeVirus(host_fasta, virus, host_ints, handle)s
+	print(host_fasta)
 	
+	#print(host_fasta)
+	#host_ints, host_fasta = insertion_types[0](host_fasta, virus, host_ints, handle, sep=args.sep)
+	#host_ints, host_fasta = insertion_types[1](host_fasta, virus, host_ints, handle, sep=args.sep)
+	#host_ints, host_fasta = insertion_types[2](host_fasta, virus, host_ints, handle, sep=args.sep)
+	#host_ints, host_fasta = insertion_types[3](host_fasta, virus, host_ints, handle, sep=args.sep)
+	#print(host_fasta)
 	handle.close()
 	
-	print(host)
 
 def insertWholeVirus(host, viruses, int_list, filehandle, sep=5):
 	"""Inserts whole viral genome into host genome"""
@@ -111,10 +119,10 @@ def insertWholeVirus(host, viruses, int_list, filehandle, sep=5):
 			break
 		#if we've made a lot of attempts, give up
 		elif attempts > max_attempts:
-			return None
+			return int_list, host
 	
 	#do integration
-	host = currentInt.doIntegration(host)
+	host = currentInt.doIntegration(host, int_list)
 	
 	#write to output file
 	currentInt.writeIntegration(filehandle)
@@ -143,10 +151,10 @@ def insertViralPortion(host, viruses, int_list, filehandle, sep=5):
 			break
 		#if we've made a lot of attempts, give up
 		elif attempts > max_attempts:
-			return None
+			return int_list, host
 			
 	#do integration
-	host = currentInt.doIntegration(host)
+	host = currentInt.doIntegration(host, int_list)
 	
 	#write to output file
 	currentInt.writeIntegration(filehandle)
@@ -175,10 +183,10 @@ def insertWholeRearrange(host, viruses, int_list, filehandle, sep=5):
 			break
 		#if we've made a lot of attempts, give up
 		elif attempts > max_attempts:
-			return None
+			return int_list, host
 			
 	#do integration
-	host = currentInt.doIntegration(host)
+	host = currentInt.doIntegration(host, int_list)
 	
 	#write to output file
 	currentInt.writeIntegration(filehandle)
@@ -207,7 +215,7 @@ def insertWithDeletion(host, viruses, int_list, filehandle, sep=5):
 			break
 		#if we've made a lot of attempts, give up
 		elif attempts > max_attempts:
-			return None
+			return int_list, host
 	
 	#do integration
 	host = currentInt.doIntegration(host)
@@ -322,7 +330,7 @@ class Integration:
 		self.chunk.delete(n)
 		self.fragments -= 1
 		
-	def doIntegration(self, host):
+	def doIntegration(self, host, int_list):
 		"""
 		Inserts viral DNA (self.bases) at position self.hPos in host[self.chr]
 		"""
@@ -331,14 +339,21 @@ class Integration:
 		if self.fragments < 1:
 			print("Add fragment before doing integration!")
 			return
+			
+		#need to account for previous integrations when inserting bases
+		#get the number of bases previously added to this chromosome
+		prevAdded = 0
+		for int in int_list:
+			if (int.chr == self.chr) & (int.hPos < self.hPos):
+				prevAdded += int.numBases
 		
-		#keep track of how many bases added
+		#keep track of how many bases added in this 
 		self.numBases = self.overlaps[0] + self.overlaps[1] + len(self.chunk.bases)
 		
 		#get start and stop cooordinates for integration
 		# todo - allow for gaps and overlaps
-		intStart = self.hPos + self.overlaps[0]
-		intStop = self.hPos +self.overlaps[1]
+		intStart = self.hPos + self.overlaps[0] + prevAdded
+		intStop = self.hPos +self.overlaps[1] + prevAdded
 
 		#if self.overlap 
 		host[self.chr] = host[self.chr][:intStart] + \
@@ -346,6 +361,20 @@ class Integration:
 		 				host[self.chr][intStop:]
 		 				
 		return host
+		
+	def getOrisCoordsBases(self):
+		"""
+		return a lists of orientations, coordinates and bases for printing or writing to file
+		"""
+		if self.fragments > 0:
+			pieces = self.chunk.pieces.keys()
+			oris = [self.chunk.pieces[i]["ori"] for i in pieces]
+			coords = [self.chunk.pieces[i]["coords"] for i in pieces]
+			bases = [self.chunk.pieces[i]["bases"].seq for i in pieces]
+	
+			return oris, coords, bases
+		else:
+			return
 	
 	def writeIntegration(self, filehandle):
 		#write information about the current integration to an output file
@@ -356,7 +385,7 @@ class Integration:
 			return
 			
 		#get list of oris, breakpoints, bases
-		(oris, coords, bases) = getOrisCoordsBases(self)
+		(oris, coords, bases) = self.getOrisCoordsBases()
 		#construct lines to write for current integration
 		line = "\t".join([self.chr, 
 							str(self.hPos), 
@@ -412,20 +441,6 @@ class Integration:
 		#get types depending on overlaps
 		self.types = ["none" if bp == 0 else "gap" if bp > 0 else "overlap" for bp in overlapBPs]
 		
-def getOrisCoordsBases(self):
-	"""
-	return a lists of oris, coordinates and bases for printing or writing to file
-	"""
-	
-	if self.fragments > 0:
-		pieces = self.chunk.pieces.keys()
-		oris = [self.chunk.pieces[i]["ori"] for i in pieces]
-		coords = [self.chunk.pieces[i]["coords"] for i in pieces]
-		bases = [self.chunk.pieces[i]["bases"].seq for i in pieces]
-	
-		return oris, coords, bases
-	else:
-		return
 			
 	def __str__(self):
 		if self.fragments == 0:
