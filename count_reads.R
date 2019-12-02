@@ -16,11 +16,43 @@ aligns <- read_tsv("../out/summary/count_mapped.txt")
 #add extra columns
 aligns <- aligns %>% 
   mutate(total = mapped + unmapped) %>%
-  mutate(sample_short = str_match(aligns$sample, "^([[:alnum:]-_]+)\\.[[:alnum:]-_]+\\.[:alpha:]+\\.[[:alnum:]-_]+\\.bam")[,2]) %>% 
-  mutate(aligned_to = str_match(aligns$sample, "^[[:alnum:]-_]+\\.([[:alnum:]-_]+)\\.[:alpha:]+\\.[[:alnum:]-_]+\\.bam")[,2]) %>% 
-  mutate(align_type = str_match(aligns$sample, "^[[:alnum:]-_]+\\.[[:alnum:]-_]+\\.([:alpha:]+)\\.[[:alnum:]-_]+\\.bam")[,2])
+  mutate(sample_short = str_extract(sample, "^[[:alnum:]\\-_]+(?=\\.)")) %>% 
+  mutate(aligned_to = str_match(sample, "^[[:alnum:]\\-_]+\\.([[:alnum:]\\-_]+?)\\.")[,2]) %>% 
+  mutate(align_type =  str_match(sample, "^[[:alnum:]\\-_]+?\\.[[:alnum:]\\-_]+?\\.([[:alpha:]\\-_]+?)\\.")[,2]) %>% 
+  select(-total) #total column is incorrect
+
+# add column for if alignment is viral or not == doesn't contain "Mappedreads"
+#also for junction reads == contain "juncts"
+aligns <- aligns %>% 
+  mutate(viralAlign = !str_detect(sample, "Mappedreads")) %>% 
+  mutate(junctAlign = str_detect(sample, "juncts"))
 
 write_xlsx(aligns, path = paste0(data_path, "summary/count_mapped.xlsx"))
+
+#calculate total reads for each sample - 
+#this is the number of mapped and unmapped reads for the viral alignment
+#because when doing host alignment only used reads that were mapped to the virus
+
+juncts <- aligns %>% 
+  filter(junctAlign)
+
+aligns <- aligns %>% 
+  filter(!junctAlign)
+
+#this only works for the virus alignments
+aligns <- aligns %>% 
+  mutate(total = case_when(
+    viralAlign ~ mapped + unmapped,
+    TRUE ~ as.integer(0)
+  ))
+
+#calculate the fraction of the total reads aligned to the virus/vector
+aligns %>% 
+  mutate(frac_aligned = mapped / total) %>% 
+  filter(viralAlign) %>% 
+  filter(align_type == "bwa") %>% 
+  select(dataset, sample, aligned_to, mapped, unmapped, frac_aligned) %>% 
+  write_xlsx(path = paste0(data_path, "summary/frac-mapped-to-virus.xlsx"))
 
 #make plot of mapped reads
 dsets <- unique(aligns$dataset)
