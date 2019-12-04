@@ -70,5 +70,10 @@ gunzip Macaca_fascicularis.Macaca_fascicularis_5.0.97.gff3.gz
 #sed s/^/chr/g Macaca_fascicularis.Macaca_fascicularis_5.0.97.gff3 | sed 's/^chr##/##/g' > Macaca_fascicularis_5.0.97.gff
 mv Macaca_fascicularis.Macaca_fascicularis_5.0.97.gff3 Macaca_fascicularis_5.0.97.gff
 
-
+## to compare against sunando's results, use MacFas5 from genbank
+wget ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank/vertebrate_mammalian/Macaca_fascicularis/latest_assembly_versions/GCA_000364345.1_Macaca_fascicularis_5.0/GCA_000364345.1_Macaca_fascicularis_5.0_genomic.fna.gz
+gunzip GCA_000364345.1_Macaca_fascicularis_5.0_genomic.fna.gz
+mv GCA_000364345.1_Macaca_fascicularis_5.0_genomic.fna macFas5_genbank.fa
+wget ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank/vertebrate_mammalian/Macaca_fascicularis/latest_assembly_versions/GCA_000364345.1_Macaca_fascicularis_5.0/GCA_000364345.1_Macaca_fascicularis_5.0_genomic.gff.gz
+gunzip GCA_000364345.1_Macaca_fascicularis_5.0_genomic.gff.gz
 

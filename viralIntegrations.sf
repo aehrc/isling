@@ -77,8 +77,8 @@ rule copy:
 		r2_out = temp("../out/reads/{dset}/{samp}_2.fastq.gz")
 	shell:
 		"""
-		cp {input.r1} {output.r1_out}
-		cp {input.r2} {output.r2_out}
+		cp "{input.r1}" "{output.r1_out}"
+		cp "{input.r2}" "{output.r2_out}"
 		"""
 
 rule dedup:
@@ -92,7 +92,7 @@ rule dedup:
 		"envs/bbmap.yml"
 	shell:
 		"""
-		clumpify.sh -Xmx10g in={input.r1} in2={input.r2} out={output.R1_clumped} out2={output.R2_clumped} dedupe subs=0
+		clumpify.sh -Xmx10g in="{input.r1}" in2="{input.r2}" out="{output.R1_clumped}" out2="{output.R2_clumped}" dedupe subs=0
 		"""
 
 rule seqPrep:

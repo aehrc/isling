@@ -58,22 +58,39 @@ Claus identified two possible issues that might be occuring.  The first relates 
 
 ## Location ambiguity
 
-To identify reads where a location of the integration can't be unambigouosly defined, look for alignments where the CIGAR for the primary alignment is the same as the CIGAR for any of the secondary alignemnts.  Note that this approach disregards mismatches, which are appear as matched in the CIGAR.
+To identify reads where a location of the integration can't be unambigouosly defined, look for alignments where the CIGAR for the primary alignment is the same as the CIGAR for any of the secondary alignemnts.  Note that this approach disregards mismatches, which are appear as mapped in the CIGAR.
 
 ## Possible rearrangements
 
-Identify possible rearrangements (either vector rearrangements or host translocations) as reads where multiple alignments to one genome span most of the read.  Currently if 95% of bases in read are accounted for by any number of alignments from one genome, that read is flagged as a possible 
+ For the clincal OTC vector datasets, we see a lot of intergration in regions of the host genome that are contained in the vector.  The clinical vector contains the hAAT (SERPINA1) promoter and the OTC enhancer, and there were a lot of apparent integrations in these regions in the host genome.  However, a lot of these reads which were indicated to be integrations could also be completely accounted for by alignments to the vector genome, indicating that they could also be vector rearrangments.  Translocations are also possible, where the read is accounted for by multiple alingments to the host genome.
+
+At first, identified possible rearrangements (either vector rearrangements or host translocations) as reads where multiple alignments to one genome span most of the read.  A first attempt at this check was to see if 95% of bases in read were accounted for by any number of alignments from one genome, that read is flagged as a possible rearrangement
+
+However, this led to some rearrangments being missed - an analysis of the variants in these regions, particularly in the FRG and macaque datasets, indicated that there are very few, if any, true integrations in these regions.  I therefore changed this check to consider two explanations for every read that might be an integration:
+ - The read is an integration, composed of viral and host portions
+ - The read is a vector rearragement (or a host translocation), composed of multiple alignments to only one reference genome
+For each possible explanation, I calculate an 'edit distance', which is defined as the sum of the edit distances for the individual alingments, and the number of bases in any gaps between those alignments.  The edit distance for each of these explanations is then compared, and the explanation with the smaller edit distance is output.  In the case of a tie, vector rearrangement is output to err on the side of caution.
 
 ### Variants
 
 It would be good to distinguish between vector rearrangements and insertions in the regions where the vector and the human genome are homologous (hAAT \[SERPINA1\] promoter, OTC enhancer).  Can do this by looking for variants between vector and human genome in this region: there are a few in the hAAT promoter.  Interrograte this by extracting only the junction fragments from the alignment.  Made a seperate snakefile to do this, in folder `SNPs`.
 
-First pull out reads called as integrations by the pipeline
+First pull out reads called as integrations by the pipeline.  Specify regions (usually SERPINA1 promoter and OTC enhancer) in which to call variants and do pileup.  Output vcfs with variants and a pileup.
+
+
+### Alignment paramters
+
+The pipeline uses bwa-mem for alignment.  The settings are more or less default, except that the mismatch penalty has been lowered from 4 to 2.  I think this might be leading to fewer intergration sites, because sub-optimal alignments are scored higher than better ones that might lead to missing some integration sites.
+
+One example of this is read M01996:226:000000000-CFBJG:1:2107:24838:18761 in sample 22 of the london macaque data.  This read is not indicated to be an integration site. CIGAR in chr1 is 97M159H (supplementary alignment, reverse), POS is 120875219, main alignment is Chr7 CIGAR 101S31M8I48M2I66M (reverse).  Viral alignment is forward 156M100S.  Two primary alignments don't give integration because clipped part is on the same side of the read, but secondary host alignment with viral primary could be integration. Host coordinates of matched region would be chr1:12075122-120875219 - this is 297 bp from Sunando's site.
+
+In general, optimising the alingment might be difficult because a) we don't really know what a true positive in this datset is and b) optimising parameters might lead to overfitting.
+
 
 
 ## To do
 
- - Check errors in `discordant.pl`
+
  - Fix bug in `softClip.pl` where sometimes can't get host/viral sequences from the read
  - Improve check for vector rearrangement - still a lot of integrations in SERPINA1/OTC that aren't marked as possible vector rearrangements
  - Annotate integrations - genes/promoters/etc that they appear in
@@ -81,7 +98,7 @@ First pull out reads called as integrations by the pipeline
  - Try out structural variation tools as another approach
  - Improved visualisations
  
- # Changes from original pipeline
+# Changes from original pipeline
 
  - Added feature to check for ambiguity in host and virus alignment (ie check for secondary alignments equivalent to the primary one)
  - Added feature to check for possible viral rearrangements or host translocations. If there is one alignment that accounts for the whole read, it's not a possible rearrangement. Otherwise grab all primary, secondary and supplementary alignments and check to see if they can span the whole read collectivley.  If there is a set of alignments that can account for the whole read collectivley, it's a possible vector rearrangement. If there are gaps between adjacent alignments, count the number of bases in those gaps.  If the coverage of the read by alignments is \>95%, it's a possible vector rearrangement, otherwise it's not.
