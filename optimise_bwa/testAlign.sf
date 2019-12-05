@@ -1,0 +1,367 @@
+#### python modules ####
+
+import glob
+import os
+
+
+#### CONFIG FILE ####
+#which datasets are to be aligned to which hosts and viruses are specified in dsets.yaml
+#also whether or not to try to merge R1 and R2
+#also adapter sequences for merging
+configfile: "../../proj-spcfc/test_bwa_config.yml"
+
+references_path = "../../data/references/"
+
+#make four lists, with each entry in each list corresponding to one desired output file
+
+DATASETS = []
+SAMPLES = []
+HOSTS = []
+VIRUSES = []
+REFSEQ = []
+#also make dictionary MERGE, with key dataset_sample and value True or False
+MERGE = {}
+MISMATCHES = []
+
+for dataset in config['datasets'].keys():
+	#get files in directory and strip off "_1.fastq.gz"
+	samples = [os.path.basename(f)[:-11] for f in glob.glob("../../data/reads/{}/*_1.fastq.gz".format(dataset))]
+	samples = samples + [os.path.basename(f)[:-12] for f in glob.glob("../../data/reads/{}/*_R1.fastq.gz".format(dataset))]
+	for sample in samples:
+		for mismatch in config["mismatch-penalty"].split(","):
+			DATASETS.append(dataset)
+			SAMPLES.append(sample)
+			HOSTS.append(config['datasets'][dataset]["host"])
+			VIRUSES.append(config['datasets'][dataset]["virus"])
+			REFSEQ.append(config['datasets'][dataset]["refseq"][:-4])
+			MERGE["{}_{}".format(dataset, sample)] = config['datasets'][dataset]["merge"]
+			MISMATCHES.append(mismatch)
+
+
+#### local rules ####
+localrules: all, rename, copy
+
+wildcard_constraints:
+    mismatch="\d"
+
+#### target files ####
+rule all:
+	input: 
+		expand("../../out/{dset}/ints_testmismatch/{samp}.{host}.{virus}.mismatch{mismatch}.txt", zip, dset = DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES, mismatch=MISMATCHES)
+	
+
+#### merging and dedup ###
+
+rule rename:
+	input:
+		r1 = "../../data/reads/{dset}/{samp}_R1.fastq.gz",
+		r2 = "../../data/reads/{dset}/{samp}_R2.fastq.gz"
+	output:
+		r1_out = temp("../../out/reads/{dset}/{samp}_1.fastq.gz"),
+		r2_out = temp("../../out/reads/{dset}/{samp}_2.fastq.gz")
+	shell:
+		"""
+		cp {input.r1} {output.r1_out}
+		cp {input.r2} {output.r2_out}
+		"""
+
+rule copy:
+	input:
+		r1 = "../../data/reads/{dset}/{samp}_1.fastq.gz",
+		r2 = "../../data/reads/{dset}/{samp}_2.fastq.gz"
+	output:
+		r1_out = temp("../../out/reads/{dset}/{samp}_1.fastq.gz"),
+		r2_out = temp("../../out/reads/{dset}/{samp}_2.fastq.gz")
+	shell:
+		"""
+		cp "{input.r1}" "{output.r1_out}"
+		cp "{input.r2}" "{output.r2_out}"
+		"""
+
+rule dedup:
+	input:
+		r1 = "../../out/reads/{dset}/{samp}_1.fastq.gz",
+		r2 = "../../out/reads/{dset}/{samp}_2.fastq.gz"	
+	output:
+		R1_clumped = temp("../../out/{dset}/dedup_reads/{samp}.1.fastq.gz"),
+		R2_clumped = temp("../../out/{dset}/dedup_reads/{samp}.2.fastq.gz")
+	conda:
+		"envs/bbmap.yml"
+	shell:
+		"""
+		clumpify.sh -Xmx10g in="{input.r1}" in2="{input.r2}" out="{output.R1_clumped}" out2="{output.R2_clumped}" dedupe subs=0
+		"""
+
+rule seqPrep:
+	input:
+		r1 = "../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
+		r2 = "../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
+	output:
+		merged = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz"),
+		proc_r1 = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_1.fastq.gz"),
+		proc_r2 = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_2.fastq.gz"),
+		all = temp("../out/{dset}/merged_reads/{samp}.all.fastq.gz")
+	conda:	
+		"../envs/seqprep.yml"
+	params:
+		A = lambda wildcards: config[wildcards.dset]["read1-adapt"],
+		B = lambda wildcards: config[wildcards.dset]["read2-adapt"]
+	shell:
+		"""
+		SeqPrep -A {params.A} -B {params.B} -f {input.r1} -r {input.r2} -1 {output.proc_r1} -2 {output.proc_r2} -s {output.merged}
+		cat {output.proc_r1} {output.proc_r2} {output.merged} > {output.all}
+		"""
+
+rule combine:
+	input:
+		r1 = "../../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
+		r2 = "../../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
+	output:
+		proc_r1 = temp("../../out/{dset}/processed_reads/{samp}.1.fastq.gz"),
+		proc_r2 = temp("../../out/{dset}/processed_reads/{samp}.2.fastq.gz"),
+		all = temp("../../out/{dset}/processed_reads/{samp}.all.fastq.gz")
+	shell:
+		"""
+		cp {input.r1} {output.proc_r1}
+		cp {input.r2} {output.proc_r2}
+		cat {input.r1} {input.r2} > {output.all}
+		"""
+#functions for if we did seqPrep or not
+
+def get_all(wildcards):
+	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
+		folder = "merged_reads"
+	else:
+		folder = "processed_reads"
+	return "../../out/{}/{}/{}.all.fastq.gz".format(wildcards.dset, folder, wildcards.samp)
+
+def get_r1(wildcards):
+	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
+		typeRead = "SeqPrep_1"
+		folder = "merged_reads"
+	else:
+		typeRead = "1"	
+		folder = "processed_reads"
+	return "../../out/{}/{}/{}.{}.fastq.gz".format(wildcards.dset, folder, wildcards.samp, typeRead)
+
+def get_r2(wildcards):
+	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
+		typeRead = "SeqPrep_2"
+		folder = "merged_reads"
+	else:
+		typeRead = "2"	
+		folder = "processed_reads"
+	return "../../out/{}/{}/{}.{}.fastq.gz".format(wildcards.dset, folder, wildcards.samp, typeRead)
+
+
+#### alignments ####
+
+rule index:
+	input:
+		"../../data/references/{genome}.fa"
+	output:
+		"../../data/references/{genome}.ann",
+		"../../data/references/{genome}.amb",
+		"../../data/references/{genome}.bwt",
+		"../../data/references/{genome}.pac",
+		"../../data/references/{genome}.sa"
+	conda: 
+		"../envs/bwa.yml"
+	params:
+		prefix = lambda wildcards: references_path + wildcards.genome
+	shell:
+		"bwa index -p {params.prefix} {input}"
+
+rule align_bwa_virus:
+	input:
+		ann = "../../data/references/{virus}.ann",
+		amb = "../../data/references/{virus}.amb",
+		bwt = "../../data/references/{virus}.bwt",
+		pac = "../../data/references/{virus}.pac",
+		sa = "../../data/references/{virus}.sa",
+		all = get_all,
+		r1 = get_r1,
+		r2 = get_r2
+	output:
+		vPaired = temp("../../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mismatch{mismatch}.sam"),
+		vSing = temp("../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mismatch{mismatch}.sam"),
+	params:
+		index = lambda wildcards: references_path + wildcards.virus
+	conda: 
+		"../envs/bwa.yml"
+	threads: 5
+	shell:	
+		"""
+		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.r1} --read2 {input.r2} --output {output.vPaired} --threshold 10 --hflag 200 --mismatch {wildcards.mismatch}
+		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.all} --output {output.vSing} --threshold 10 --hflag 200 --mismatch {wildcards.mismatch}
+		"""
+
+rule extract_vAligned:
+	input:
+		vPaired = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mismatch{mismatch}.sam",
+		vSing = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mismatch{mismatch}.sam",
+	output:
+		svSam = temp("../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mismatch{mismatch}.mapped.sam"),
+		pvBam_readMap_mateUnmap = temp("../../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mismatch{mismatch}.mapped1.bam"),
+		pvBam_readUnmap_mateMap = temp("../../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mismatch{mismatch}.mapped2.bam"),
+		pvBam = temp("../../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mismatch{mismatch}.mapped.bam"),
+		pvSam = temp("../../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mismatch{mismatch}.mapped.sam")
+	conda:
+		"../envs/bwa.yml"
+	shell:
+		"""
+		samtools view -h -F 0x4 -F 0x800 -o {output.svSam} {input.vSing} 
+		samtools view -hb -F 0x4 -f 0x8 -F 0x800 -o {output.pvBam_readMap_mateUnmap} {input.vPaired}
+		samtools view -hb -f 0x4 -F 0x8 -F 0x800 -o {output.pvBam_readUnmap_mateMap} {input.vPaired}
+		samtools merge {output.pvBam} {output.pvBam_readMap_mateUnmap} {output.pvBam_readUnmap_mateMap}
+		samtools view -h -o {output.pvSam} {output.pvBam}
+		"""
+
+rule extract_vAligedtoFastq:
+	input: 
+		svSam = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mismatch{mismatch}.mapped.sam",
+		pvSam = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mismatch{mismatch}.mapped.sam",
+	output:
+		svFastq = temp("../../out/{dset}/reads/{samp}.bwa.mismatch{mismatch}.mappedTo{virus}.fastq.gz"),
+		pvFastq1 = temp("../../out/{dset}/reads/{samp}.bwaPaired.mismatch{mismatch}.mappedTo{virus}_1.fastq.gz"),
+		pvFastq2 = temp("../../out/{dset}/reads/{samp}.bwaPaired.mismatch{mismatch}.mappedTo{virus}_2.fastq.gz")
+	conda:
+		"../envs/picard.yml"
+	shell:
+		"""
+		picard SamToFastq I={input.svSam} FASTQ={output.svFastq}
+		picard SamToFastq I={input.pvSam} FASTQ={output.pvFastq1} SECOND_END_FASTQ={output.pvFastq2}
+		"""
+
+rule align_bwa_host:
+	input:	
+		ann = "../../data/references/{host}.ann",
+		amb = "../../data/references/{host}.amb",
+		bwt = "../../data/references/{host}.bwt",
+		pac = "../../data/references/{host}.pac",
+		sa = "../../data/references/{host}.sa",
+		all = "../../out/{dset}/reads/{samp}.bwa.mismatch{mismatch}.mappedTo{virus}.fastq.gz",
+		r1 = "../../out/{dset}/reads/{samp}.bwaPaired.mismatch{mismatch}.mappedTo{virus}_1.fastq.gz",
+		r2 = "../../out/{dset}/reads/{samp}.bwaPaired.mismatch{mismatch}.mappedTo{virus}_2.fastq.gz"
+
+	output:
+		hPaired = temp("../../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.mismatch{mismatch}.{virus}Mappedreads.sam"),
+		hSing = temp("../../out/{dset}/host_aligned/{samp}.{host}.bwa.mismatch{mismatch}.{virus}Mappedreads.sam"),
+	
+	conda: 
+		"../envs/bwa.yml"
+	params:
+		index = lambda wildcards: references_path + wildcards.host
+	threads: 5
+	shell:		
+		"""
+		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.r1} --read2 {input.r2} --output {output.hPaired} --threshold 10 --hflag 200 --mismatch {wildcards.mismatch}
+		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.all} --output {output.hSing} --threshold 10 --hflag 200 --mismatch {wildcards.mismatch}
+		"""
+rule convert:
+	input:
+		"../../out/{dset}/{host_virus}/{name}.sam"
+	output:
+		bam = "../../out/{dset}/{host_virus}/{name}.bam",
+		bai = "../../out/{dset}/{host_virus}/{name}.bam.bai"
+	conda: 
+		"../envs/bwa.yml"	
+	shell:
+		"""
+		samtools view -bhS {input} | samtools sort - -o {output.bam}
+		samtools index {output.bam}
+		"""
+
+#### perl scripts ####
+
+rule run_int_scripts:
+	input:
+		hPaired = "../../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.mismatch{mismatch}.{virus}Mappedreads.sam",
+		hSing = "../../out/{dset}/host_aligned/{samp}.{host}.bwa.mismatch{mismatch}.{virus}Mappedreads.sam",
+		vPaired = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mismatch{mismatch}.mapped.sam",
+		vSing = "../../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mismatch{mismatch}.sam",
+
+	output:
+		allInt = "../../out/{dset}/ints_testmismatch/{samp}.{host}.{virus}.mismatch{mismatch}.txt",
+
+		soft = temp("../../out/{dset}/ints/{samp}.{host}.{virus}.soft.mismatch{mismatch}.txt"),
+		discord = temp("../../out/{dset}/ints/{samp}.{host}.{virus}.discordant.mismatch{mismatch}.txt"),
+
+
+		allIntTemp = temp("../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.mismatch{mismatch}.txt.tmp"),
+
+
+	shell:
+		"""
+		perl -I. ./softClip.pl --viral {input.vSing} --human {input.hSing} --output {output.soft} 
+		perl -I. ./discordant.pl --viral {input.vPaired} --human {input.hPaired} --output {output.discord}
+		sed -e '2,${{/Chr/d' -e '}}' {output.soft} {output.discord}  > {output.allInt}
+		sed -i 's\chr\ \g' {output.allInt}
+		sort -n -k1,1 -k2,2n {output.allInt} > {output.allIntTemp}
+		cp {output.allIntTemp} {output.allInt}
+		"""
+
+rule merge_bed:
+	input:
+		bed = "../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.bed"
+	output:
+		merge = "../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed"
+	conda:
+		"../envs/bedtools.yml"
+	shell:	
+		"bedtools merge -c 5,4 -o count,distinct -i {input.bed} > {output.merge}"
+
+rule refseq:
+	input:
+		merge = "../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed",
+		ref = "../../data/references/{refseq}.gff"
+	output:
+		genes = "../../out/{dset}/ints/{samp}.{host}.{virus}.{refseq}.merged.bed"
+	wildcard_constraints:
+		samp = "[\w\d_]+",
+		host = "[\w\d-]+",
+		virus = "[\w\d-]+"
+	conda:
+		"../envs/bedtools.yml"
+	shell:
+		"bedtools intersect -loj -a {input.merge} -b {input.ref} > {output.genes}"
+	
+#### visualization ####
+
+rule count_mapped:
+	input:
+		expand("../../out/{dset}/host_aligned_bam/{samp}.{host}.bwa.{virus}Mappedreads.bam", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES),
+		expand("../../out/{dset}/virus_aligned_bam/{samp}.{virus}.bwa.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES),
+		expand("../../out/{dset}/host_aligned_bam/{samp}.{host}.bwaPaired.{virus}Mappedreads.bam", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus=VIRUSES),
+		expand("../../out/{dset}/virus_aligned_bam/{samp}.{virus}.bwaPaired.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES)
+	output:
+		"../../out/summary/count_mapped.txt"
+	conda: 
+		"../envs/bwa.yml"
+	shell:
+		"./count_mapped.sh"
+
+#rule plot_mapped:
+#	input:
+#		"../../out/summary/count_mapped.txt"
+#	output:
+#		"../../out/summary/count_mapped.xlsx"
+#	conda:
+#		"../envs/rscripts.yml"
+#	script:
+#		"count_reads.R"
+	
+rule summarise:
+	input:
+		expand("../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES),
+		expand("../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES)
+
+	output:
+		"../../out/summary/num_sites.xlsx"
+	conda:
+		"../envs/rscripts.yml"
+	script:
+		"summarise_ints.R"
+
+
+
