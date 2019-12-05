@@ -86,26 +86,27 @@ rule dedup:
 		R1_clumped = temp("../../out/{dset}/dedup_reads/{samp}.1.fastq.gz"),
 		R2_clumped = temp("../../out/{dset}/dedup_reads/{samp}.2.fastq.gz")
 	conda:
-		"envs/bbmap.yml"
+		"../envs/bbmap.yml"
 	shell:
 		"""
 		clumpify.sh -Xmx10g in="{input.r1}" in2="{input.r2}" out="{output.R1_clumped}" out2="{output.R2_clumped}" dedupe subs=0
+		wait
 		"""
 
 rule seqPrep:
 	input:
-		r1 = "../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
-		r2 = "../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
+		r1 = "../../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
+		r2 = "../../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
 	output:
-		merged = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz"),
-		proc_r1 = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_1.fastq.gz"),
-		proc_r2 = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_2.fastq.gz"),
-		all = temp("../out/{dset}/merged_reads/{samp}.all.fastq.gz")
+		merged = temp("../../out/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz"),
+		proc_r1 = temp("../../out/{dset}/merged_reads/{samp}.SeqPrep_1.fastq.gz"),
+		proc_r2 = temp("../../out/{dset}/merged_reads/{samp}.SeqPrep_2.fastq.gz"),
+		all = temp("../../out/{dset}/merged_reads/{samp}.all.fastq.gz")
 	conda:	
 		"../envs/seqprep.yml"
 	params:
-		A = lambda wildcards: config[wildcards.dset]["read1-adapt"],
-		B = lambda wildcards: config[wildcards.dset]["read2-adapt"]
+		A = lambda wildcards: config['datasets'][wildcards.dset]["read1-adapt"],
+		B = lambda wildcards: config['datasets'][wildcards.dset]["read2-adapt"]
 	shell:
 		"""
 		SeqPrep -A {params.A} -B {params.B} -f {input.r1} -r {input.r2} -1 {output.proc_r1} -2 {output.proc_r2} -s {output.merged}
