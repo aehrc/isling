@@ -264,11 +264,10 @@ class Integration:
 		#negative overlap means overlap (ie need to find where host and virus align)
 		#positive overlap means gap (ie inserted bases that come from neither host nor virus)
 		#zero overlap means clean junction
-		#integration cannot not have negative overlap at both ends - can be changed later 
-		print("NEW PICK")
+		#integration cannot not have negative overlap at both ends - can be changed later** 
+
 		while True: 
 			self.overlaps = (np.random.randint(-10,10),np.random.randint(-10,10))
-			print(str(self.overlaps)) 
 			if self.overlaps[0]<0 and self.overlaps[1]<0: 
 				continue
 			else: 
@@ -353,10 +352,32 @@ class Integration:
 		if self.overlaps[1]>0: #gap on right 
 			gap = self.createGap(self.overlaps[1])
 			self.chunk.bases = self.chunk.bases+gap
-		return 
+		return
+		
+	def overlapPoint(self,left_site,right_site):
+		#if no homologous region is found we skip the integration 
+		if left_site ==-1 and right_site == 1: 
+			self.chunk.bases.seq = "" 
+		
+		#if no homologous region found on left
+		elif left_site ==-1: 
+			overlap_point = right_site 
+			
+		#if no homologous region found on right 
+		elif right_site ==-1: 
+			overlap_point = left_site 
+			
+		#if both sides have homology 
+		else: 
+			if abs(left_site-int_site)<abs(right_site-int_site): 
+				overlap_point = left_site
+			else: 
+				overlap_point = right_site
+	
+		return overlap_point  
 
 	def createLeftOverlap(self,host,previousInt):
- 
+ 		
 		viral_chunk = self.chunk.bases
 		int_site = self.hPos + self.prevAdded
 
@@ -388,16 +409,15 @@ class Integration:
 				right_seq = host[self.chr][right_search:]
 			else:
 				right_site = right_search
-				
-		#if left_search ==-1 and right_search ==-1: 
-		 #this is where we need to handle chunks without homologous region 
-		 #create new function for this 
+	
 		
 		#find the homologous region closest to the integration point 
-		if abs(left_site-int_site)<abs(right_site-int_site):
-			overlap_point = left_site
-		else: 
-			overlap_point = right_site
+		#if abs(left_site-int_site)<abs(right_site-int_site):
+		#	overlap_point = left_site
+		#else: 
+		#	overlap_point = right_site
+		
+		overlap_point = self.overlapPoint(left_site,right_site) 
 
 		#find points for the integration 
 		int_start = overlap_point
@@ -431,7 +451,6 @@ class Integration:
 		right_spot = int_site+(start_rseq-len(right_seq))			
 		while right_site<0:
 			right_search = right_seq.find(r_overlap)
-			
 			if right_search == -1: 
 				break 
 			right_search += right_spot
@@ -439,19 +458,21 @@ class Integration:
 				right_seq = host[self.chr][right_search:]
 			else: 
 				right_site = right_search
-			
+		
+		overlap_point = self.overlapPoint(left_site,right_site)
+		
 		#find homologous region closest to the integration point 
-		if abs(left_site-int_site)<abs(right_site-int_site): 
-			overlap_point = left_site
-		else: 
-			overlap_point = right_site
+		#if abs(left_site-int_site)<abs(right_site-int_site): 
+		#	overlap_point = left_site
+		#else: 
+			#overlap_point = right_site
 		
 		#find new points for the integration 
 		int_stop = overlap_point-self.overlaps[1]
 		int_start = overlap_point
 
-		return int_start,int_stop  
-
+		return int_start,int_stop 
+	 
 			
 	def doIntegration(self, host, int_list):
 		"""
