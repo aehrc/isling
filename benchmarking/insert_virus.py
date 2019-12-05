@@ -59,7 +59,7 @@ def main(argv):
 		raise OSError("Could not open virus fasta")
 	
 	#set random seed
-	np.random.seed(1000)
+	np.random.seed(500)
 
 	#types of insertions
 	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion]
@@ -265,15 +265,15 @@ class Integration:
 		#positive overlap means gap (ie inserted bases that come from neither host nor virus)
 		#zero overlap means clean junction
 		#integration cannot not have negative overlap at both ends - can be changed later 
-		
+		print("NEW PICK")
 		while True: 
 			self.overlaps = (np.random.randint(-10,10),np.random.randint(-10,10))
 			print(str(self.overlaps)) 
 			if self.overlaps[0]<0 and self.overlaps[1]<0: 
-				print("choose again")
+				continue
 			else: 
-				break		
-
+				break 
+				 
 	def addFragment(self, viruses, part = "rand"):
 		"""
 		add a viral fragment to this integration
@@ -337,12 +337,127 @@ class Integration:
 		self.chunk = ViralChunk(viruses, part)
 		self.chunk.delete(n)
 		self.fragments -= 1
+
+
+	def createGap(self,size):
+		dna = ["a","g","c","t"]
+		random_bases = ""
+		for i in range(size):
+			random_bases+=np.random.choice(dna)
+		return random_bases
+
+	def gapAdjust(self):
+		if self.overlaps[0]>0: #gap on left 
+			gap = self.createGap(self.overlaps[0])
+			self.chunk.bases = gap+self.chunk.bases
+		if self.overlaps[1]>0: #gap on right 
+			gap = self.createGap(self.overlaps[1])
+			self.chunk.bases = self.chunk.bases+gap
+		return 
+
+	def createLeftOverlap(self,host,previousInt):
+ 
+		viral_chunk = self.chunk.bases
+		int_site = self.hPos + self.prevAdded
+
+		l_overlap = str(viral_chunk[:-self.overlaps[0]].seq) #sequence left of the integration site 
+		left_site = -1
+		right_site = -1
+				
+		#find homologous region on the left side 
+		left_seq = host[self.chr][:int_site].seq
+
+		while left_site <0: 
+			left_search = left_seq.rfind(l_overlap)
+			if left_search == -1:
+				break 
+			if left_search in previousInt: #check homology is not from a previous integration
+				left_seq = host[self.chr][:left_search]
+			else:
+				left_site= left_search 
+				
+		#find homologous region on the right side 
+		right_seq = host[self.chr][int_site+self.overlaps[0]:].seq
+		right_seqLen = len(right_seq)			
+		while right_site >-1: #goes until no more sequence   
+			right_search = right_seq.find(l_overlap)
+			if right_search == -1:
+				break 
+			right_search += right_seqLen +(right_seqLen - len(right_seq))
+			if right_search in previousInt: #check homology is not from a previous integration
+				right_seq = host[self.chr][right_search:]
+			else:
+				right_site = right_search
+				
+		#if left_search ==-1 and right_search ==-1: 
+		 #this is where we need to handle chunks without homologous region 
+		 #create new function for this 
 		
+		#find the homologous region closest to the integration point 
+		if abs(left_site-int_site)<abs(right_site-int_site):
+			overlap_point = left_site
+		else: 
+			overlap_point = right_site
+
+		#find points for the integration 
+		int_start = overlap_point
+		int_stop =  overlap_point - self.overlaps[0]
+
+		return int_start,int_stop 
+
+	def createRightOverlap(self,host,previousInt):  
+		viral_chunk = self.chunk.bases
+		int_site = self.hPos+self.prevAdded
+		
+		r_overlap = str(viral_chunk[len(viral_chunk)+self.overlaps[1]:].seq) #sequence right of the integration site 
+		left_site = -1
+		right_site = -1
+	
+		#find homologous region on the left side 
+		left_seq = host[self.chr][:int_site].seq
+
+		while left_site<0:
+			left_search = left_seq.rfind(r_overlap)
+			if left_search == -1:
+				break 
+			if left_search in previousInt: # check homology is not from a previous integration
+				left_seq = host[self.chr][:left_search]	
+			else: 
+				left_site=left_search
+
+		#find homologous region on the right side 
+		right_seq = host[self.chr][int_site:].seq
+		start_rseq = len(right_seq)
+		right_spot = int_site+(start_rseq-len(right_seq))			
+		while right_site<0:
+			right_search = right_seq.find(r_overlap)
+			
+			if right_search == -1: 
+				break 
+			right_search += right_spot
+			if right_search in previousInt: #check homology is not from a previous integration
+				right_seq = host[self.chr][right_search:]
+			else: 
+				right_site = right_search
+			
+		#find homologous region closest to the integration point 
+		if abs(left_site-int_site)<abs(right_site-int_site): 
+			overlap_point = left_site
+		else: 
+			overlap_point = right_site
+		
+		#find new points for the integration 
+		int_stop = overlap_point-self.overlaps[1]
+		int_start = overlap_point
+
+		return int_start,int_stop  
+
+			
 	def doIntegration(self, host, int_list):
 		"""
 		Inserts viral DNA (self.bases) at position self.hPos in host[self.chr]
 		"""
-		
+		#print(self.chunk.bases)
 		#check there is already a fragment
 		if self.fragments < 1:
 			print("Add fragment before doing integration!")
@@ -357,112 +472,27 @@ class Integration:
 			if (int.chr == self.chr) & (int.hPos < self.hPos):
 				prevAdded += int.numBases
 				previousInt = [int+prevAdded for int in previousInt]
-
+	
 		#keep track of how many bases added in this integration 
 		self.numBases = self.overlaps[0] + self.overlaps[1] + len(self.chunk.bases)
-		
+
 		int_site = self.hPos+prevAdded #adjust for previously inserted bases
+		self.prevAdded = prevAdded 
 		
 		#use for inserting viral_chunk
 		int_start = self.hPos + prevAdded
 		int_stop = self.hPos + prevAdded  
 
+		#adjust seqences with gaps by adding random sequence
+		self.gapAdjust()
 
-		#adust seqences with gaps by adding random sequence
-		#simulates error in DNA repair mechanisms 		
-		for i in range(len(self.chunk.pieces)): 
-			if self.overlaps[0]>0: #gap on left 
-				gap = create_gap(self.overlaps[0]) #make gap
-				self.chunk.bases = gap + self.chunk.bases
-			if self.overlaps[1]>0: #gap on right 
-				gap = create_gap(self.overlaps[1]) #make gap
-				self.chunk.bases = self.chunk.bases +gap
+		#adjust sequences with left overlap 
+		if self.overlaps[0]<0:
+			(int_start,int_stop) = self.createLeftOverlap(host,previousInt)  		
+		if self.overlaps[1]<0:
+			(int_start,int_stop) = self.createRightOverlap(host,previousInt)
+	
 
-
-		#adjust sequences with overlap
-		viral_chunk = self.chunk.pieces[0].get('bases').seq
-
-		#correct overlap occuring on the left 
-		if self.overlaps[0]<0: #correct overlap on the left
-			l_overlap = viral_chunk[:-self.overlaps[0]]
-			left_site = -1
-			right_site = -1
-			
-			#find homologous region on left side 			
-			
-			left_seq = host[self.chr][:int_site].seq
-			while left_site <0: 
-				left_search = left_seq.rfind(l_overlap)
-				if left_search in previousInt: #check homology is not from a previous integration
-					left_seq = host[self.chr][:left_search]
-				else:
-					left_site= left_search
-
-			#repeat for right side 
-				right_seq = host[self.chr][int_site+self.overlaps[0]:].seq
-				right_seqLen = len(right_seq)			
-			while right_site >-1: #goes until no more sequence   
-				right_search = right_seq.find(l_overlap)
-				right_search += right_seqLen +(right_seqLen - len(right_seq))
-				if right_search in previousInt: #check homology is not from a previous integration
-					right_seq = host[self.chr][right_search:]
-				elif len(right_seq)<2:
-					break #todo - fix this later 
-					#if there are no homologous regions, we don't have an integration
-				else:
-					right_site = right_search
-
-			#find whether left or right homologous region is closer to hPos
-			#overlap_point is the region of homology closest to hPos 
-			if abs(left_site-int_site)<abs(right_site-int_site):
-				overlap_point = left_site
-			else: 
-				overlap_point = right_site
-			int_start = overlap_point
-			int_stop =  overlap_point - self.overlaps[0]
-
-		#correct overlap occuring on the right 
-		if self.overlaps[1]<0: #correct overlap on the right
-			r_overlap = viral_chunk[len(viral_chunk)+self.overlaps[1]:]
-			left_site = -1
-			right_site = -1
-			print(viral_chunk)
-			print(r_overlap)
-
-			#find homologous region on the left side 
-			left_seq = host[self.chr][:int_site].seq			
-			while left_site<0:
-				left_search = left_seq.rfind(r_overlap)
-				if left_search in previousInt: # check homology is not from a previous integration
-					left_seq = host[self.chr][:left_search]
-				else: 
-					left_site=left_search
-			#repeat for the right side 
-			right_seq = host[self.chr][int_site:].seq
-			start_rseq = len(right_seq)
-			right_spot = int_site+(start_rseq-len(right_seq))			
-			while right_site<0:
-				right_search = right_seq.find(r_overlap)
-				right_search += right_spot
-				if right_search in previousInt: #check homology is not from a previous integration
-					right_seq = host[self.chr][right_search:]
-				elif len(right_seq)<2:
-					break #sort this out - we want integrations to be skipped if they don't have homology
-				else: 
-
-					right_site = right_search
-			#find whether left or right homologous region is closer to hPos
-			#overlap_point is the region of homology closest to hPos
-			if abs(left_site-int_site)<abs(right_site-int_site): 
-				overlap_point = left_site
-			else: 
-				overlap_point = right_site
-			
-
-			int_stop = overlap_point-self.overlaps[1]
-			int_start = overlap_point
-
-		#if self.overlap ==0
 		host[self.chr] = host[self.chr][:int_start] + \
 		 				"".join(self.chunk.bases) + \
 		 				host[self.chr][int_stop:]
@@ -709,12 +739,6 @@ class ViralChunk:
 		#return the number of deleted fragments
 		return 1
 
-def create_gap(size):
-	dna = ["a","g","c","t"]
-	random_bases = ""
-	for i in range(size):
-		random_bases+=np.random.choice(dna)
-	return random_bases	
 
 if __name__ == "__main__":
 	main(sys.argv[1:])
