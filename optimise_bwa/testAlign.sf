@@ -193,8 +193,8 @@ rule align_bwa_virus:
 	threads: 5
 	shell:	
 		"""
-		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.r1} --read2 {input.r2} --output {output.vPaired} --threshold 10 --hflag 200 --mismatch {wildcards.mismatch}
-		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.all} --output {output.vSing} --threshold 10 --hflag 200 --mismatch {wildcards.mismatch}
+		python ../alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.r1} --read2 {input.r2} --output {output.vPaired} --threshold 10 --hflag 200 --mismatch {wildcards.mismatch}
+		python ../alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.all} --output {output.vSing} --threshold 10 --hflag 200 --mismatch {wildcards.mismatch}
 		"""
 
 rule extract_vAligned:
@@ -256,8 +256,8 @@ rule align_bwa_host:
 	threads: 5
 	shell:		
 		"""
-		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.r1} --read2 {input.r2} --output {output.hPaired} --threshold 10 --hflag 200 --mismatch {wildcards.mismatch}
-		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.all} --output {output.hSing} --threshold 10 --hflag 200 --mismatch {wildcards.mismatch}
+		python ../alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.r1} --read2 {input.r2} --output {output.hPaired} --threshold 10 --hflag 200 --mismatch {wildcards.mismatch}
+		python ../alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.all} --output {output.hSing} --threshold 10 --hflag 200 --mismatch {wildcards.mismatch}
 		"""
 rule convert:
 	input:
@@ -285,84 +285,23 @@ rule run_int_scripts:
 	output:
 		allInt = "../../out/{dset}/ints_testmismatch/{samp}.{host}.{virus}.mismatch{mismatch}.txt",
 
-		soft = temp("../../out/{dset}/ints/{samp}.{host}.{virus}.soft.mismatch{mismatch}.txt"),
-		discord = temp("../../out/{dset}/ints/{samp}.{host}.{virus}.discordant.mismatch{mismatch}.txt"),
+		soft = temp("../../out/{dset}/ints_testmismatch/{samp}.{host}.{virus}.soft.mismatch{mismatch}.txt"),
+		discord = temp("../../out/{dset}/ints_testmismatch/{samp}.{host}.{virus}.discordant.mismatch{mismatch}.txt"),
 
 
-		allIntTemp = temp("../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.mismatch{mismatch}.txt.tmp"),
+		allIntTemp = temp("../../out/{dset}/ints_testmismatch/{samp}.{host}.{virus}.integrations.mismatch{mismatch}.txt.tmp"),
 
 
 	shell:
 		"""
-		perl -I. ./softClip.pl --viral {input.vSing} --human {input.hSing} --output {output.soft} 
-		perl -I. ./discordant.pl --viral {input.vPaired} --human {input.hPaired} --output {output.discord}
+		perl -I.. ../softClip.pl --viral {input.vSing} --human {input.hSing} --output {output.soft} 
+		perl -I.. ../discordant.pl --viral {input.vPaired} --human {input.hPaired} --output {output.discord}
 		sed -e '2,${{/Chr/d' -e '}}' {output.soft} {output.discord}  > {output.allInt}
 		sed -i 's\chr\ \g' {output.allInt}
 		sort -n -k1,1 -k2,2n {output.allInt} > {output.allIntTemp}
 		cp {output.allIntTemp} {output.allInt}
 		"""
 
-rule merge_bed:
-	input:
-		bed = "../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.bed"
-	output:
-		merge = "../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed"
-	conda:
-		"../envs/bedtools.yml"
-	shell:	
-		"bedtools merge -c 5,4 -o count,distinct -i {input.bed} > {output.merge}"
-
-rule refseq:
-	input:
-		merge = "../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed",
-		ref = "../../data/references/{refseq}.gff"
-	output:
-		genes = "../../out/{dset}/ints/{samp}.{host}.{virus}.{refseq}.merged.bed"
-	wildcard_constraints:
-		samp = "[\w\d_]+",
-		host = "[\w\d-]+",
-		virus = "[\w\d-]+"
-	conda:
-		"../envs/bedtools.yml"
-	shell:
-		"bedtools intersect -loj -a {input.merge} -b {input.ref} > {output.genes}"
 	
-#### visualization ####
-
-rule count_mapped:
-	input:
-		expand("../../out/{dset}/host_aligned_bam/{samp}.{host}.bwa.{virus}Mappedreads.bam", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES),
-		expand("../../out/{dset}/virus_aligned_bam/{samp}.{virus}.bwa.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES),
-		expand("../../out/{dset}/host_aligned_bam/{samp}.{host}.bwaPaired.{virus}Mappedreads.bam", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus=VIRUSES),
-		expand("../../out/{dset}/virus_aligned_bam/{samp}.{virus}.bwaPaired.bam", zip, dset = DATASETS, samp = SAMPLES, virus = VIRUSES)
-	output:
-		"../../out/summary/count_mapped.txt"
-	conda: 
-		"../envs/bwa.yml"
-	shell:
-		"./count_mapped.sh"
-
-#rule plot_mapped:
-#	input:
-#		"../../out/summary/count_mapped.txt"
-#	output:
-#		"../../out/summary/count_mapped.xlsx"
-#	conda:
-#		"../envs/rscripts.yml"
-#	script:
-#		"count_reads.R"
-	
-rule summarise:
-	input:
-		expand("../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES),
-		expand("../../out/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES)
-
-	output:
-		"../../out/summary/num_sites.xlsx"
-	conda:
-		"../envs/rscripts.yml"
-	script:
-		"summarise_ints.R"
-
 
 
