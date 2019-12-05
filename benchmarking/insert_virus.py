@@ -72,9 +72,10 @@ def main(argv):
 	host_fasta = {key:value for key, value in zip(host.keys(), host.values())}
 	
 	#open output file for writing
-	handle = open(args.locs, "w+")python3 insert_virus.py --host varied_host.fa --virus test_virus.fa --ints ints.fa --locs locs.txt
+	handle = open(args.locs, "w+")
 	header = "\t".join(["hChr",
 						"hPos",
+						"inserted",
 						"num_fragments",
 						"virus",
 						"oris",
@@ -100,8 +101,8 @@ def main(argv):
 	
 	#print(host_fasta)
 	host_ints, host_fasta = insertion_types[0](host_fasta, virus, host_ints, handle, sep=args.sep)
-	host_ints, host_fasta = insertion_types[1](host_fasta, virus, host_ints, handle, sep=args.sep)
-	host_ints, host_fasta = insertion_types[2](host_fasta, virus, host_ints, handle, sep=args.sep)
+	#host_ints, host_fasta = insertion_types[1](host_fasta, virus, host_ints, handle, sep=args.sep)
+	#host_ints, host_fasta = insertion_types[2](host_fasta, virus, host_ints, handle, sep=args.sep)
 	#host_ints, host_fasta = insertion_types[3](host_fasta, virus, host_ints, handle, sep=args.sep)
 	#print(host_fasta)
 	handle.close()
@@ -283,11 +284,11 @@ class Integration:
 				continue
 			else: 
 				break 
-				
+		
 		#record the type of junction for saving to file later
 		self.junction = (self.convertJunction(self.overlaps[0]),
 				self.convertJunction(self.overlaps[1]))
-				 
+ 		 
 	def addFragment(self, viruses, part = "rand"):
 		"""
 		add a viral fragment to this integration
@@ -379,9 +380,11 @@ class Integration:
 		"""
 		Finds point where there is homology between the human and viral sequences 
 		"""
+		overlap_point = 0
 		#if no homologous region is found we skip the integration 
-		if left_site ==-1 and right_site == 1: 
-			self.chunk.bases.seq = "" 
+		if left_site ==-1 and right_site == -1: 
+			self.chunk.bases = ""
+			self.inserted = False 
 		
 		#if no homologous region found on left
 		elif left_site ==-1: 
@@ -397,7 +400,6 @@ class Integration:
 				overlap_point = left_site
 			else: 
 				overlap_point = right_site
-	
 		return overlap_point  
 
 	def createLeftOverlap(self,host,previousInt):
@@ -506,6 +508,9 @@ class Integration:
 			return
 			
 		
+		#allows us to print whether or not the integration was successful 
+		self.inserted = True 
+		
 		#need to account for previous integrations when inserting bases
 		#get the number of bases previously added to this chromosome
 		prevAdded = 0
@@ -535,10 +540,12 @@ class Integration:
 		if self.overlaps[1]<0:
 			(int_start,int_stop) = self.createRightOverlap(host,previousInt)
 	
-
+		print("LENGTH BEFORE INTEGRATION: "+str(len(host[self.chr])))
+		
 		host[self.chr] = host[self.chr][:int_start] + \
 		 				"".join(self.chunk.bases) + \
 		 				host[self.chr][int_stop:]
+		print("LENGTH AFTER INTEGRATION: "+str(len(host[self.chr])))
 		return host
 
 	def getOrisCoordsBases(self):
@@ -557,7 +564,7 @@ class Integration:
 	
 	def writeIntegration(self, filehandle):
 		#write information about the current integration to an output file
-		#pass in an open filehandle for writing
+		#pass in an open filehandle for writingfg
 		
 		if self.fragments == 0:
 			print("No fragments yet to write")
@@ -567,7 +574,8 @@ class Integration:
 		(oris, coords, bases) = self.getOrisCoordsBases()
 		#construct lines to write for current integration
 		line = "\t".join([self.chr, 
-							str(self.hPos), 
+							str(self.hPos),
+							str(self.inserted), 
 							str(self.fragments), 
 							self.chunk.virus,
 							"/".join(oris),
