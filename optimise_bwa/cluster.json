@@ -7,7 +7,7 @@
 		"ntasks-per-node" : "1",
 		"nodes" : "1",
 		"cpus-per-task" : "1",
-		"output" : "../slogs/{rule}.{wildcards}.log"
+		"output" : "../../slogs/{rule}.{wildcards}.log"
 	},
 	"dedup":
 	{	
