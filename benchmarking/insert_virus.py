@@ -93,14 +93,14 @@ def main(argv):
 	
 	#TODO CREATE LOOP TO INTEGRATE VIRUS TO HOST GENOME 
 	#print(host_fasta)
-	#host_ints, host_fasta = insertWholeVirus(host_fasta, virus, host_ints, handle)
-	#host_ints, host_fasta = insertViralPortion(host_fasta, virus, host_ints, handle)
-	#host_ints, host_fasta = insertWholeRearrange(host_fasta, virus, host_ints, handle)
+	host_ints, host_fasta = insertWholeVirus(host_fasta, virus, host_ints, handle)
+	host_ints, host_fasta = insertViralPortion(host_fasta, virus, host_ints, handle)
+	host_ints, host_fasta = insertWholeRearrange(host_fasta, virus, host_ints, handle)
 	#host_ints, host_fasta = insertWithDeletion(host_fasta, virus, host_ints, handle)
 	print(host_fasta)
 	
 	#print(host_fasta)
-	host_ints, host_fasta = insertion_types[0](host_fasta, virus, host_ints, handle, sep=args.sep)
+	#host_ints, host_fasta = insertion_types[0](host_fasta, virus, host_ints, handle, sep=args.sep)
 	#host_ints, host_fasta = insertion_types[1](host_fasta, virus, host_ints, handle, sep=args.sep)
 	#host_ints, host_fasta = insertion_types[2](host_fasta, virus, host_ints, handle, sep=args.sep)
 	#host_ints, host_fasta = insertion_types[3](host_fasta, virus, host_ints, handle, sep=args.sep)
@@ -414,6 +414,7 @@ class Integration:
 		l_overlap = str(viral_chunk[:-self.overlaps[0]].seq) #sequence left of the integration site 
 		left_site = -1
 		right_site = -1
+		dont_integrate = self.dontIntegrate(previousInt)
 				
 		#find homologous region on the left side 
 		left_seq = host[self.chr][:int_site].seq
@@ -422,7 +423,7 @@ class Integration:
 			left_search = left_seq.rfind(l_overlap)
 			if left_search == -1:
 				break 
-			if left_search in previousInt: #check homology is not from a previous integration
+			if left_search in dont_integrate: #check homology is not from a previous integration
 				left_seq = host[self.chr][:left_search]
 			else:
 				left_site= left_search 
@@ -435,7 +436,7 @@ class Integration:
 			if right_search == -1:
 				break 
 			right_search += right_seqLen +(right_seqLen - len(right_seq))
-			if right_search in previousInt: #check homology is not from a previous integration
+			if right_search in dont_integrate: #check homology is not from a previous integration
 				right_seq = host[self.chr][right_search:]
 			else:
 				right_site = right_search
@@ -455,6 +456,7 @@ class Integration:
 		""" 
 		viral_chunk = self.chunk.bases
 		int_site = self.hPos+self.prevAdded
+		dont_integrate = self.dontIntegrate(previousInt)
 		
 		r_overlap = str(viral_chunk[len(viral_chunk)+self.overlaps[1]:].seq) #sequence right of the integration site 
 		left_site = -1
@@ -467,7 +469,7 @@ class Integration:
 			left_search = left_seq.rfind(r_overlap)
 			if left_search == -1:
 				break 
-			if left_search in previousInt: # check homology is not from a previous integration
+			if left_search in dont_integrate: # check homology is not from a previous integration
 				left_seq = host[self.chr][:left_search]	
 			else: 
 				left_site=left_search
@@ -481,7 +483,7 @@ class Integration:
 			if right_search == -1: 
 				break 
 			right_search += right_spot
-			if right_search in previousInt: #check homology is not from a previous integration
+			if right_search in dont_integrate: #check homology is not from a previous integration
 				right_seq = host[self.chr][right_search:]
 			else: 
 				right_site = right_search
@@ -495,7 +497,21 @@ class Integration:
 			int_stop = overlap_point-self.overlaps[1]
 
 		return int_start,int_stop 
-	 
+		
+	def dontIntegrate(self,previousInt): 
+		"""
+		Creates list of intgration sites close to previously integrated sequences 
+		"""
+		dont_integrate = []
+		
+		#sets range for how close new integrations cannot be. Can be adjusted 
+		int_dist = 5
+		
+		for i in previousInt: 
+			for j in range(int_dist*(-1),int_dist):
+				dont_integrate.append(i+j)
+		
+		return dont_integrate 
 			
 	def doIntegration(self, host, int_list):
 		"""
@@ -520,13 +536,13 @@ class Integration:
 			if (int.chr == self.chr) & (int.hPos < self.hPos):
 				prevAdded += int.numBases
 				previousInt = [int+prevAdded for int in previousInt]
-	
+
 		#keep track of how many bases added in this integration 
 		self.numBases = self.overlaps[0] + self.overlaps[1] + len(self.chunk.bases)
 
 		int_site = self.hPos+prevAdded #adjust for previously inserted bases
 		self.prevAdded = prevAdded 
-		
+
 		#use for inserting viral_chunk
 		int_start = self.hPos + prevAdded
 		int_stop = self.hPos + prevAdded  
@@ -539,13 +555,10 @@ class Integration:
 			(int_start,int_stop) = self.createLeftOverlap(host,previousInt)  		
 		if self.overlaps[1]<0:
 			(int_start,int_stop) = self.createRightOverlap(host,previousInt)
-	
-		print("LENGTH BEFORE INTEGRATION: "+str(len(host[self.chr])))
 		
 		host[self.chr] = host[self.chr][:int_start] + \
 		 				"".join(self.chunk.bases) + \
 		 				host[self.chr][int_stop:]
-		print("LENGTH AFTER INTEGRATION: "+str(len(host[self.chr])))
 		return host
 
 	def getOrisCoordsBases(self):
