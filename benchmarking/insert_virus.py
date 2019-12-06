@@ -64,7 +64,6 @@ def main(argv):
 
 	#types of insertions
 	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion]
-	#junction_types = ['gap', 'overlap', 'clean']
 	
 	#list to store integration objects
 	host_ints = []
@@ -90,27 +89,39 @@ def main(argv):
 							])
 	handle.write(header)
 	
-	
 	#TODO CREATE LOOP TO INTEGRATE VIRUS TO HOST GENOME 
-	#print(host_fasta)
+	print(host_fasta)
 	host_ints, host_fasta = insertWholeVirus(host_fasta, virus, host_ints, handle)
 	host_ints, host_fasta = insertViralPortion(host_fasta, virus, host_ints, handle)
 	host_ints, host_fasta = insertWholeRearrange(host_fasta, virus, host_ints, handle)
-	#host_ints, host_fasta = insertWithDeletion(host_fasta, virus, host_ints, handle)
-	print(host_fasta)
-	
+	host_ints, host_fasta = insertWithDeletion(host_fasta, virus, host_ints, handle)
 	#print(host_fasta)
+	
+	print(host_fasta)
 	#host_ints, host_fasta = insertion_types[0](host_fasta, virus, host_ints, handle, sep=args.sep)
 	#host_ints, host_fasta = insertion_types[1](host_fasta, virus, host_ints, handle, sep=args.sep)
 	#host_ints, host_fasta = insertion_types[2](host_fasta, virus, host_ints, handle, sep=args.sep)
 	#host_ints, host_fasta = insertion_types[3](host_fasta, virus, host_ints, handle, sep=args.sep)
-	#print(host_fasta)
+	print(host_fasta)
 	handle.close()
+	
+	
+	#### PERFORM INTEGRATION #####
+	
+	#intialise the required number of integrations 
+	int_num = 50
+	
+	print("NUMBER OF INTEGRATIONS TO INSERT: "+str(int_num))
+	
+	#MAKE A LOOP HERE TO PERFROM INSERTIONS 
+	#GENERATE RANDOM NUMBERS BETWEEN 0 AND 3 AND PUT THESE INTO INSERTION TYPES 
+	
 	
 	#save integrated host sequence 
 	with open('integrated_host.fa', 'w') as handle: 
     		SeqIO.write(host_fasta.values(), handle, 'fasta')
     		handle.close()
+
 
 def insertWholeVirus(host, viruses, int_list, filehandle, sep=5):
 	"""Inserts whole viral genome into host genome"""
@@ -152,7 +163,7 @@ def insertViralPortion(host, viruses, int_list, filehandle, sep=5):
 	#make sure that new integration is not within args.sep bases of any current integrations
 	attempts = 0
 	while True:
-		#get one viral chunkfg
+		#get one viral chunk
 		
 		currentInt = Integration(host)
 		currentInt.addFragment(viruses, part = "rand")
@@ -239,6 +250,11 @@ def insertWithDeletion(host, viruses, int_list, filehandle, sep=5):
 	int_list.append(currentInt)
 	
 	return int_list, host
+	
+def insertEpisome(host,viruses, int_list, filehandle): 
+	""" Adds viral episome to fasta file to simulate viral episomes in host"""
+	
+	host_fasta.update({"episome"+str(i):viruses.get('virus')})
 	
 def checkFastaExists(file):
 	#check file exists
@@ -498,6 +514,7 @@ class Integration:
 
 		return int_start,int_stop 
 		
+		
 	def dontIntegrate(self,previousInt): 
 		"""
 		Creates list of intgration sites close to previously integrated sequences 
@@ -512,6 +529,7 @@ class Integration:
 				dont_integrate.append(i+j)
 		
 		return dont_integrate 
+		
 			
 	def doIntegration(self, host, int_list):
 		"""
@@ -577,7 +595,7 @@ class Integration:
 	
 	def writeIntegration(self, filehandle):
 		#write information about the current integration to an output file
-		#pass in an open filehandle for writingfg
+		#pass in an open filehandle for writing
 		
 		if self.fragments == 0:
 			print("No fragments yet to write")
@@ -603,7 +621,6 @@ class Integration:
 							
 				
 		filehandle.write(line)
-		#match format to output of pipeline
 			
 		
 	def convertJunction(self,value):
@@ -712,6 +729,7 @@ class ViralChunk:
 		self.isSplit = False #has chunk been split?
 		self.isRearranged = False #has chunk been rearranged?
 		self.deletion = False #does this chunk have a deletion
+		
 		
 	def split(self, n):
 		#split a part of a virus into n random parts
