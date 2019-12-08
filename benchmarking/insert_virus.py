@@ -89,18 +89,36 @@ def main(argv):
 							])
 	handle.write(header)
 	
-		#### PERFORM INTEGRATION #####
+	#### PERFORM INTEGRATION #####
 	
 	#intialise the required number of integrations 
-	int_num = 1000000
+	int_num = 1000
 	
-	print("NUMBER OF INTEGRATIONS TO INSERT: "+str(int_num))
+	#intialise how many episomal sequences included in the outputted fasta file 
+	epi_num = 5 
+	
+	#intialise after how many intergrations the number of integrations performed is reported to the user 
+	int_report = 100 
 	
 	
+	print("\nNUMBER OF INTEGRATIONS TO INSERT: "+str(int_num))
+	
+	#integration loop 
 	for i in range(0,int_num):
 		rand_int =  np.random.randint(0,4)
-		print("NUMBER OF ITERATIONS: "+str(i))
 		host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, sep=args.sep)
+		if i % int_report == 0 and i != 0: 
+			print(str(i) +" integrations complete...")
+			
+	print("\nNUMBER OF EPISOMES: "+str(epi_num))
+	
+	#adds viral sequences as 'episomes'  
+	for i in range(0,epi_num): 
+		#host_fasta.append(virus.get('virus'))
+		host_fasta['virus'] = virus.get('virus')
+	
+			
+	print("\n***INTEGRATIONS COMPLETE***")
 	print(host_fasta)
 	handle.close()
 	
@@ -108,6 +126,9 @@ def main(argv):
 	with open('integrated_host.fa', 'w') as handle: 
     		SeqIO.write(host_fasta.values(), handle, 'fasta')
     		handle.close()
+    		
+    		print("\nIntegrated host saved as 'integrated_host.fa'")
+    		print("Details of integrations saved as 'locs.txt'")
 
 
 def insertWholeVirus(host, viruses, int_list, filehandle, sep=5):
@@ -237,11 +258,6 @@ def insertWithDeletion(host, viruses, int_list, filehandle, sep=5):
 	int_list.append(currentInt)
 	
 	return int_list, host
-	
-def insertEpisome(host,viruses, int_list, filehandle): 
-	""" Adds viral episome to fasta file to simulate viral episomes in host"""
-	
-	host_fasta.update({"episome"+str(i):viruses.get('virus')})
 	
 def checkFastaExists(file):
 	#check file exists
