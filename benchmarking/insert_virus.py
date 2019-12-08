@@ -89,33 +89,20 @@ def main(argv):
 							])
 	handle.write(header)
 	
-	#TODO CREATE LOOP TO INTEGRATE VIRUS TO HOST GENOME 
-	print(host_fasta)
-	host_ints, host_fasta = insertWholeVirus(host_fasta, virus, host_ints, handle)
-	host_ints, host_fasta = insertViralPortion(host_fasta, virus, host_ints, handle)
-	host_ints, host_fasta = insertWholeRearrange(host_fasta, virus, host_ints, handle)
-	host_ints, host_fasta = insertWithDeletion(host_fasta, virus, host_ints, handle)
-	#print(host_fasta)
-	
-	print(host_fasta)
-	#host_ints, host_fasta = insertion_types[0](host_fasta, virus, host_ints, handle, sep=args.sep)
-	#host_ints, host_fasta = insertion_types[1](host_fasta, virus, host_ints, handle, sep=args.sep)
-	#host_ints, host_fasta = insertion_types[2](host_fasta, virus, host_ints, handle, sep=args.sep)
-	#host_ints, host_fasta = insertion_types[3](host_fasta, virus, host_ints, handle, sep=args.sep)
-	print(host_fasta)
-	handle.close()
-	
-	
-	#### PERFORM INTEGRATION #####
+		#### PERFORM INTEGRATION #####
 	
 	#intialise the required number of integrations 
-	int_num = 50
+	int_num = 1000000
 	
 	print("NUMBER OF INTEGRATIONS TO INSERT: "+str(int_num))
 	
-	#MAKE A LOOP HERE TO PERFROM INSERTIONS 
-	#GENERATE RANDOM NUMBERS BETWEEN 0 AND 3 AND PUT THESE INTO INSERTION TYPES 
 	
+	for i in range(0,int_num):
+		rand_int =  np.random.randint(0,4)
+		print("NUMBER OF ITERATIONS: "+str(i))
+		host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, sep=args.sep)
+	print(host_fasta)
+	handle.close()
 	
 	#save integrated host sequence 
 	with open('integrated_host.fa', 'w') as handle: 
@@ -412,7 +399,7 @@ class Integration:
 			
 		#if both sides have homology 
 		else: 
-			if abs(left_site-int_site)<abs(right_site-int_site): 
+			if abs(left_site-self.int_site)<abs(right_site-self.int_site): 
 				overlap_point = left_site
 			else: 
 				overlap_point = right_site
@@ -436,7 +423,7 @@ class Integration:
 		left_seq = host[self.chr][:int_site].seq
 
 		while left_site <0: 
-			left_search = left_seq.rfind(l_overlap)
+			left_search = str(left_seq).rfind(l_overlap)
 			if left_search == -1:
 				break 
 			if left_search in dont_integrate: #check homology is not from a previous integration
@@ -448,7 +435,7 @@ class Integration:
 		right_seq = host[self.chr][int_site+self.overlaps[0]:].seq
 		right_seqLen = len(right_seq)			
 		while right_site >-1: #goes until no more sequence   
-			right_search = right_seq.find(l_overlap)
+			right_search = str(right_seq).find(l_overlap)
 			if right_search == -1:
 				break 
 			right_search += right_seqLen +(right_seqLen - len(right_seq))
@@ -482,7 +469,7 @@ class Integration:
 		left_seq = host[self.chr][:int_site].seq
 
 		while left_site<0:
-			left_search = left_seq.rfind(r_overlap)
+			left_search = str(left_seq).rfind(r_overlap)
 			if left_search == -1:
 				break 
 			if left_search in dont_integrate: # check homology is not from a previous integration
@@ -495,7 +482,7 @@ class Integration:
 		start_rseq = len(right_seq)
 		right_spot = int_site+(start_rseq-len(right_seq))			
 		while right_site<0:
-			right_search = right_seq.find(r_overlap)
+			right_search = str(right_seq).find(r_overlap)
 			if right_search == -1: 
 				break 
 			right_search += right_spot
@@ -558,7 +545,7 @@ class Integration:
 		#keep track of how many bases added in this integration 
 		self.numBases = self.overlaps[0] + self.overlaps[1] + len(self.chunk.bases)
 
-		int_site = self.hPos+prevAdded #adjust for previously inserted bases
+		#int_site = self.hPos+prevAdded #adjust for previously inserted bases
 		self.prevAdded = prevAdded 
 
 		#use for inserting viral_chunk
@@ -568,9 +555,15 @@ class Integration:
 		#adjust seqences with gaps by adding random sequence
 		self.gapAdjust()
 
-		#adjust sequences with left overlap 
+		#adjust sequences with overlap
+		#adjust the position 
+		self.int_site = self.hPos+prevAdded #adjust for previously inserted bases 
+		
+		#adjust left overlap 
 		if self.overlaps[0]<0:
-			(int_start,int_stop) = self.createLeftOverlap(host,previousInt)  		
+			(int_start,int_stop) = self.createLeftOverlap(host,previousInt)
+			 
+		#adjust sequences with right overlap  		
 		if self.overlaps[1]<0:
 			(int_start,int_stop) = self.createRightOverlap(host,previousInt)
 		
@@ -703,10 +696,13 @@ class ViralChunk:
 	
 		#get virus to integrate
 		self.virus = np.random.choice(list(viruses.keys()))
-		
+
 		#if we want a random chunk of virus
 		if part == "rand":		
-			self.start = np.random.randint(0, len(viruses[self.virus].seq))
+			while True: 
+				self.start = np.random.randint(0, len(viruses[self.virus].seq))
+				if self.start+1 != len(viruses[self.virus].seq):
+					break 
 			self.stop = np.random.randint(self.start+1, len(viruses[self.virus].seq))
 		#if we want the whole virus
 		else:
