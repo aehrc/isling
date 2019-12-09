@@ -713,13 +713,24 @@ class ViralChunk:
 		#get virus to integrate
 		self.virus = np.random.choice(list(viruses.keys()))
 
+		#set minimum size for a chunk of virus
+		#don't want the size too small (ie only a few base pairs)  
+		min_chunk = 50 
+		
 		#if we want a random chunk of virus
 		if part == "rand":		
 			while True: 
 				self.start = np.random.randint(0, len(viruses[self.virus].seq))
 				if self.start+1 != len(viruses[self.virus].seq):
-					break 
+					break
+					
+			#ensure size of viral chunk is greater than the minimum size 
+			while True: 
 			self.stop = np.random.randint(self.start+1, len(viruses[self.virus].seq))
+				if self.stop-self.start>min_chunk:
+					break
+					
+				
 		#if we want the whole virus
 		else:
 			self.start = 0
