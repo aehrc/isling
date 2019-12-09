@@ -123,12 +123,12 @@ def main(argv):
 	handle.close()
 	
 	#save integrated host sequence 
-	with open('integrated_host.fa', 'w') as handle: 
+	with open(args.ints, 'w') as handle: 
     		SeqIO.write(host_fasta.values(), handle, 'fasta')
     		handle.close()
     		
-    		print("\nIntegrated host saved as 'integrated_host.fa'")
-    		print("Details of integrations saved as 'locs.txt'")
+    		print("\nIntegrated host saved as "+str(args.ints))
+    		print("Details of integrations saved as "+str(args.locs))
 
 
 def insertWholeVirus(host, viruses, int_list, filehandle, sep=5):
@@ -313,7 +313,7 @@ class Integration:
 		add a viral fragment to this integration
 		"""
 		
-		#check there isn't alreafbdy a fragment
+		#check there isn't alreafbdy a fragmentfg
 		if self.fragments > 0:
 			print("Fragment has already been added!")
 			return
