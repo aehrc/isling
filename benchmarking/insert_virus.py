@@ -117,9 +117,7 @@ def main(argv):
 
 	for i in range(0,epi_num): 
 		#host_fasta.append(virus.get('virus'))
-		print('DONE')
 		host_fasta['episome '+str(i)] = virus.get(virus_key[0])
-		print('DONE 2')
 			
 	print("\n***INTEGRATIONS COMPLETE***")
 	print(host_fasta)
