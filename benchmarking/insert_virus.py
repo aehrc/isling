@@ -95,10 +95,10 @@ def main(argv):
 	int_num = 1000
 	
 	#intialise how many episomal sequences included in the outputted fasta file 
-	epi_num = 5 
+	epi_num = 5
 	
 	#intialise after how many intergrations the number of integrations performed is reported to the user 
-	int_report = 100 
+	int_report = 100
 	
 	
 	print("\nNUMBER OF INTEGRATIONS TO INSERT: "+str(int_num))
@@ -113,10 +113,13 @@ def main(argv):
 	print("\nNUMBER OF EPISOMES: "+str(epi_num))
 	
 	#adds viral sequences as 'episomes'  
+	virus_key = list(virus.keys())
+
 	for i in range(0,epi_num): 
 		#host_fasta.append(virus.get('virus'))
-		host_fasta['virus'] = virus.get('virus')
-	
+		print('DONE')
+		host_fasta['episome '+str(i)] = virus.get(virus_key[0])
+		print('DONE 2')
 			
 	print("\n***INTEGRATIONS COMPLETE***")
 	print(host_fasta)
@@ -126,7 +129,6 @@ def main(argv):
 	with open(args.ints, 'w') as handle: 
     		SeqIO.write(host_fasta.values(), handle, 'fasta')
     		handle.close()
-    		
     		print("\nIntegrated host saved as "+str(args.ints))
     		print("Details of integrations saved as "+str(args.locs))
 
