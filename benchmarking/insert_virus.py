@@ -726,7 +726,7 @@ class ViralChunk:
 					
 			#ensure size of viral chunk is greater than the minimum size 
 			while True: 
-			self.stop = np.random.randint(self.start+1, len(viruses[self.virus].seq))
+				self.stop = np.random.randint(self.start+1, len(viruses[self.virus].seq))
 				if self.stop-self.start>min_chunk:
 					break
 					
