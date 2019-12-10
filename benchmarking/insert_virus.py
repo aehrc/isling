@@ -887,12 +887,16 @@ class Statistics:
 					previousInt[j] = previousInt[j]+int_list[i].numBases		
 		return previousInt
 		
-	#def adjustedStartStop(sef,int_list): 
-	#	"""TODO similar to above"""
-
+	def adjustedStartStop(sef,int_list): 
+		"""Makes a list of the coordinates of the viral integrations adjusted with insertions added"""
 		
-	
-				
+		intCoords = [(int.start,int.stop) for int in int_list]
+		for i in range(1,len(intCoords)):
+			for j in range(0,i):
+				if int_list[i].hPos < int_list[j].hPos: 
+					intCoords[j] = intCoords[j]+int_list[i].numBases 
+					
+		return intCoords		
 
 if __name__ == "__main__":
 	main(sys.argv[1:])
