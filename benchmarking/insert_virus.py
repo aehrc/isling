@@ -25,6 +25,7 @@
 ###import libraries
 from Bio import SeqIO
 from Bio.Alphabet.IUPAC import unambiguous_dna
+import pandas as pd
 import argparse
 import sys
 import os
@@ -92,7 +93,7 @@ def main(argv):
 	#### PERFORM INTEGRATION #####
 	
 	#intialise the required number of integrations 
-	int_num = 15
+	int_num = 2
 	
 	#intialise how many episomal sequences included in the outputted fasta file 
 	epi_num = 5
@@ -123,12 +124,17 @@ def main(argv):
 	print(host_fasta)
 	handle.close()
 	
+	#save statistics on the integration 
+	stats = Statistics.saveStats(host_ints)
+	stats.to_csv("host_insertions.csv",sep = '\t') 
+	
 	#save integrated host sequence 
 	with open(args.ints, 'w') as handle: 
     		SeqIO.write(host_fasta.values(), handle, 'fasta')
     		handle.close()
     		print("\nIntegrated host saved as "+str(args.ints))
-    		print("Details of integrations saved as "+str(args.locs))
+    		print("Details of sequences integrated saved as "+str(args.locs))
+    		print("Details of where intgrations lie in host sequence saved as "+"host_insertions.csv")
 
 
 def insertWholeVirus(host, viruses, int_list, filehandle, sep=5):
@@ -421,7 +427,7 @@ class Integration:
 				overlap_point = right_site
 		return overlap_point  
 
-	def createLeftOverlap(self,host,previousInt):
+	def createLeftOverlap(self,host,int_list):
 		"""
 		Handles overlaps on the left of a viral chunk. Left and right are treated as different functions as different operations must be performed. 
 		Works by finding closest regions of homology on left side of the randomly selected integration point. It checks if the homologous region is caused by an existing integration and concatenates the search range and attempts to find a homologous region again if the homology was caused by an existing integration. This is repeated for the right side of te integration point. The region closest to randomly selected integration point is then used to insert the viral chunk. 
@@ -432,7 +438,7 @@ class Integration:
 		l_overlap = str(viral_chunk[:-self.overlaps[0]].seq) #sequence left of the integration site 
 		left_site = -1
 		right_site = -1
-		dont_integrate = self.dontIntegrate(previousInt)
+		dont_integrate = self.dontIntegrate(int_list)
 				
 		#find homologous region on the left side 
 		left_seq = host[self.chr][:self.hPos].seq
@@ -468,12 +474,12 @@ class Integration:
 			int_start =  overlap_point + self.overlaps[0] #TODO recheck this 
 		return int_start,int_stop 
 		
-	def createRightOverlap(self,host,previousInt): 
+	def createRightOverlap(self,host,int_list): 
 		"""
 		Handles overlaps on the right of a viral chunk. Same as above with operations applicable to right end 
 		""" 
 		viral_chunk = self.chunk.bases
-		dont_integrate = self.dontIntegrate(previousInt)
+		dont_integrate = self.dontIntegrate(int_list)
 		
 		r_overlap = str(viral_chunk[len(viral_chunk)+self.overlaps[1]:].seq) #sequence right of the integration site 
 		left_site = -1
@@ -516,19 +522,19 @@ class Integration:
 		return int_start,int_stop 
 		
 		
-	def dontIntegrate(self,previousInt): 
+	def dontIntegrate(self,int_list): 
 		"""
-		Creates list of intgration sites close to previously integrated sequences 
+		Creates list of sites involved in viral integrations so that new integrations do not use these sites 
 		"""
+		#should this actually use the adjusted integration start and stops 
 		dont_integrate = []
 		
-		#sets range for how close new integrations cannot be. Can be adjusted 
-		int_dist = 5
-		
-		for i in previousInt: 
-			for j in range(int_dist*(-1),int_dist):
-				dont_integrate.append(i+j)
-		
+		stop_start = Statistics.adjustedStopStart(self,int_list)
+		for i in range(len(stop_start)):
+			c1, c2 = stop_start[i]
+			for j in range(c1,c2+1): 
+				dont_integrate.append(j) 
+			
 		return dont_integrate
 		
 		
@@ -568,18 +574,19 @@ class Integration:
 
 		#adjust left overlap 
 		if self.overlaps[0]<0:
-			(int_start,int_stop) = self.createLeftOverlap(host,previousInt)
+			(int_start,int_stop) = self.createLeftOverlap(host,int_list)
 			 
 		#adjust sequences with right overlap  		
 		if self.overlaps[1]<0:
-			(int_start,int_stop) = self.createRightOverlap(host,previousInt)
+			(int_start,int_stop) = self.createRightOverlap(host,int_list)
 		
 		host[self.chr] = host[self.chr][:int_start] + \
 		 				"".join(self.chunk.bases) + \
 		 				host[self.chr][int_stop:]
 		
 		#set the starting and stopping points of the performed integration 
-		self.setStopStart(int_start,int_stop)  				
+		self.setStopStart(int_start,int_stop) 
+		 				
 		return host
 
 
@@ -887,16 +894,39 @@ class Statistics:
 					previousInt[j] = previousInt[j]+int_list[i].numBases		
 		return previousInt
 		
-	def adjustedStartStop(sef,int_list): 
+	def adjustedStopStart(self,int_list): 
 		"""Makes a list of the coordinates of the viral integrations adjusted with insertions added"""
 		
 		intCoords = [(int.start,int.stop) for int in int_list]
 		for i in range(1,len(intCoords)):
 			for j in range(0,i):
 				if int_list[i].hPos < int_list[j].hPos: 
-					intCoords[j] = intCoords[j]+int_list[i].numBases 
+					#intCoords[j] = intCoords[j]+int_list[i].numBases
+					 new_coord1 = intCoords[j][0]+int_list[i].numBases
+					 new_coord2 = intCoords[j][1]+int_list[i].numBases
+					 intCoords[j] = (new_coord1,new_coord2) 
 					
-		return intCoords		
+		return intCoords
+		
+	def saveStats(int_list):
+		"""Save a csv file with the coordinates of the adjusted insertions so when we create artifical reads we can predict which reads contain viral DNA""" 
+		num_ints = len(int_list) 
+		
+		int_sites = Statistics.intList(int_list[1-num_ints],int_list)
+		int_coords = Statistics.adjustedStopStart(int_list[1-num_ints],int_list) 
+		
+		int_start = []
+		int_stop = []
+		
+		for i in range(0,num_ints): 
+			c1,c2 = int_coords[i]
+			int_start.append(c1)
+			int_stop.append(c2)
+		
+		stats_df = pd.DataFrame({"Integration sites":int_sites,"Start point":int_start,"Stop point": int_stop}) 
+		
+		return stats_df 
+		 
 
 if __name__ == "__main__":
 	main(sys.argv[1:])
