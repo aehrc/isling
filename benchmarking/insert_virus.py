@@ -465,7 +465,7 @@ class Integration:
 
 		if left_site != -1 and right_site != -1: 
 		#only if an integration occurs does the overlapping region get removed 
-			int_stop =  overlap_point - self.overlaps[0]
+			int_start =  overlap_point + self.overlaps[0] #TODO recheck this 
 		return int_start,int_stop 
 		
 	def createRightOverlap(self,host,previousInt): 
@@ -531,6 +531,7 @@ class Integration:
 		
 		return dont_integrate
 		
+		
 			
 	def doIntegration(self, host, int_list):
 		"""
@@ -576,7 +577,9 @@ class Integration:
 		host[self.chr] = host[self.chr][:int_start] + \
 		 				"".join(self.chunk.bases) + \
 		 				host[self.chr][int_stop:]
-		 				
+		
+		#set the starting and stopping points of the performed integration 
+		self.setStopStart(int_start,int_stop)  				
 		return host
 
 
@@ -635,9 +638,29 @@ class Integration:
 			type = "gap"
 		elif value <0: 
 			type = "overlap" 
-		return type  	
-	
-	
+		return type 
+		
+	def setStopStart(self,int_start,int_stop): 
+		""" provides coordinates of where viral DNA starts and ends"""
+
+		
+		if self.overlaps[0]>0: #ie there is a gap 
+			self.start = int_start+self.overlaps[0]
+		elif self.overlaps[0]<0: #ie there is an overlap
+			self.start = int_start-self.overlaps[0]
+		else: 
+			self.start = int_start 
+			
+		if self.overlaps[1]>0: #ie there is a gap
+			self.stop = int_stop-self.overlaps[1]
+		elif self.overlaps[1]<0: #ie there is an overlap 
+			self.stop = int_stop+self.overlaps[1]
+		else: 
+			self.stop = int_stop 
+			
+		self.stop = self.stop+len(self.chunk.bases) 
+
+		
 	def getStartStop(self):
 		"""
 		return starts and stops of each end of viral integration, 
@@ -863,6 +886,10 @@ class Statistics:
 				if int_list[i].hPos < int_list[j].hPos:
 					previousInt[j] = previousInt[j]+int_list[i].numBases		
 		return previousInt
+		
+	#def adjustedStartStop(sef,int_list): 
+	#	"""TODO similar to above"""
+
 		
 	
 				
