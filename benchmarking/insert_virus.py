@@ -92,7 +92,7 @@ def main(argv):
 	#### PERFORM INTEGRATION #####
 	
 	#intialise the required number of integrations 
-	int_num = 1000
+	int_num = 15
 	
 	#intialise how many episomal sequences included in the outputted fasta file 
 	epi_num = 5
@@ -415,7 +415,7 @@ class Integration:
 			
 		#if both sides have homology 
 		else: 
-			if abs(left_site-self.int_site)<abs(right_site-self.int_site): 
+			if abs(left_site-self.hPos)<abs(right_site-self.hPos): 
 				overlap_point = left_site
 			else: 
 				overlap_point = right_site
@@ -428,7 +428,6 @@ class Integration:
 		"""
  		
 		viral_chunk = self.chunk.bases
-		int_site = self.hPos + self.prevAdded
 
 		l_overlap = str(viral_chunk[:-self.overlaps[0]].seq) #sequence left of the integration site 
 		left_site = -1
@@ -436,7 +435,7 @@ class Integration:
 		dont_integrate = self.dontIntegrate(previousInt)
 				
 		#find homologous region on the left side 
-		left_seq = host[self.chr][:int_site].seq
+		left_seq = host[self.chr][:self.hPos].seq
 
 		while left_site <0: 
 			left_search = str(left_seq).rfind(l_overlap)
@@ -448,7 +447,7 @@ class Integration:
 				left_site= left_search 
 				
 		#find homologous region on the right side 
-		right_seq = host[self.chr][int_site+self.overlaps[0]:].seq
+		right_seq = host[self.chr][self.hPos+self.overlaps[0]:].seq
 		right_seqLen = len(right_seq)			
 		while right_site >-1: #goes until no more sequence   
 			right_search = str(right_seq).find(l_overlap)
@@ -474,7 +473,6 @@ class Integration:
 		Handles overlaps on the right of a viral chunk. Same as above with operations applicable to right end 
 		""" 
 		viral_chunk = self.chunk.bases
-		int_site = self.hPos+self.prevAdded
 		dont_integrate = self.dontIntegrate(previousInt)
 		
 		r_overlap = str(viral_chunk[len(viral_chunk)+self.overlaps[1]:].seq) #sequence right of the integration site 
@@ -482,7 +480,7 @@ class Integration:
 		right_site = -1
 	
 		#find homologous region on the left side 
-		left_seq = host[self.chr][:int_site].seq
+		left_seq = host[self.chr][:self.hPos].seq
 
 		while left_site<0:
 			left_search = str(left_seq).rfind(r_overlap)
@@ -494,9 +492,9 @@ class Integration:
 				left_site=left_search
 
 		#find homologous region on the right side 
-		right_seq = host[self.chr][int_site:].seq
+		right_seq = host[self.chr][self.hPos:].seq
 		start_rseq = len(right_seq)
-		right_spot = int_site+(start_rseq-len(right_seq))			
+		right_spot = self.hPos+(start_rseq-len(right_seq))			
 		while right_site<0:
 			right_search = str(right_seq).find(r_overlap)
 			if right_search == -1: 
@@ -531,50 +529,42 @@ class Integration:
 			for j in range(int_dist*(-1),int_dist):
 				dont_integrate.append(i+j)
 		
-		return dont_integrate 
+		return dont_integrate
 		
 			
 	def doIntegration(self, host, int_list):
 		"""
 		Inserts viral DNA (self.bases) at position self.hPos in host[self.chr]
 		"""
-		#print(self.chunk.bases)
 		#check there is already a fragment
 		if self.fragments < 1:
 			print("Add fragment before doing integration!")
 			return
 			
-		
 		#allows us to print whether or not the integration was successful 
 		self.inserted = True 
 		
 		#need to account for previous integrations when inserting bases
 		#get the number of bases previously added to this chromosome
 		prevAdded = 0
-		previousInt = []
 		for int in int_list:
-			previousInt.append(int.hPos)
 			if (int.chr == self.chr) & (int.hPos < self.hPos):
 				prevAdded += int.numBases
-				previousInt = [int+prevAdded for int in previousInt]
 
 		#keep track of how many bases added in this integration 
 		self.numBases = self.overlaps[0] + self.overlaps[1] + len(self.chunk.bases)
 
-		#int_site = self.hPos+prevAdded #adjust for previously inserted bases
-		self.prevAdded = prevAdded 
-
 		#use for inserting viral_chunk
-		int_start = self.hPos + prevAdded
-		int_stop = self.hPos + prevAdded  
+		int_start = self.hPos 
+		int_stop = self.hPos 
 
 		#adjust seqences with gaps by adding random sequence
 		self.gapAdjust()
 
 		#adjust sequences with overlap
-		#adjust the position 
-		self.int_site = self.hPos+prevAdded #adjust for previously inserted bases 
-		
+		#list previous integrations 
+		previousInt = Statistics.intList(self,int_list)
+
 		#adjust left overlap 
 		if self.overlaps[0]<0:
 			(int_start,int_stop) = self.createLeftOverlap(host,previousInt)
@@ -586,7 +576,9 @@ class Integration:
 		host[self.chr] = host[self.chr][:int_start] + \
 		 				"".join(self.chunk.bases) + \
 		 				host[self.chr][int_stop:]
+		 				
 		return host
+
 
 	def getOrisCoordsBases(self):
 		"""
@@ -681,11 +673,7 @@ class Integration:
 	
 		#orientations are always human-virus and virus-human
 		self.oris = ["hv", "vh"]
-	
-		#get types depending on overlaps
-		self.types = ["none" if bp == 0 else "gap" if bp > 0 else "overlap" for bp in overlapBPs]
-		
-			
+				
 	def __str__(self):
 		if self.fragments == 0:
 			return f"Integration on chromosome {self.chr}, position {self.hPos}"
@@ -783,7 +771,6 @@ class ViralChunk:
 		else:
 			bases_orig = self.pieces[0]["bases"].reverse_complement()
 		self.pieces = {} #clear dict to re-add pieces
-		
 		bases = []
 		#split bases into pieces according to breakpoints
 		for i in range(n):
@@ -859,8 +846,26 @@ class ViralChunk:
 		del self.pieces[key_del]
 		
 		#return the number of deleted fragments
-		return 1
+		return 
 
+class Statistics:
+	"""
+	Class of functions which give information on the integrations performed 
+	
+	"""
+	
+	def intList(self,int_list):
+		"""Makes list of the sites of previously preformed integrations and adjusts for the bases added due to integration"""
+		
+		previousInt = [int.hPos for int in int_list]
+		for i in range(1,len(previousInt)):
+			for j in range(0,i):
+				if int_list[i].hPos < int_list[j].hPos:
+					previousInt[j] = previousInt[j]+int_list[i].numBases		
+		return previousInt
+		
+	
+				
 
 if __name__ == "__main__":
 	main(sys.argv[1:])
