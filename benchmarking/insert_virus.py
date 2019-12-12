@@ -64,7 +64,7 @@ def main(argv):
 		raise OSError("Could not open virus fasta")
 	
 	#set random seed
-	np.random.seed(500)
+	np.random.seed(501)
 
 	#types of insertions
 	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion]
@@ -112,7 +112,7 @@ def main(argv):
 	int_report = 10
 	
 	
-	print("\nNUMBER OF INTEGRATIONS TO INSERT: "+str(int_num))
+	print("\nNUMBER OF INTEGRATIONS TO INSERT: "+str(host_ints))
 	
 	#integration loop 
 	for i in range(0,int_num):
@@ -120,7 +120,8 @@ def main(argv):
 		host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, min_len, sep)
 		if i % int_report == 0 and i != 0: 
 			print(str(i) +" integrations complete...")
-			
+	
+	print("NUMBER OF INTEGRATIONS DONE: "+str(len(host_ints)))		
 	print("\nNUMBER OF EPISOMES: "+str(epi_num))
 	
 	#adds viral sequences as 'episomes'  
@@ -170,13 +171,16 @@ def insertWholeVirus(host, viruses, int_list, filehandle, min_len, sep):
 			return int_list, host
 	
 	#do integration
-	host = currentInt.doIntegration(host, int_list)
+	host, status = currentInt.doIntegration(host, int_list)
 	
-	#write to output file
-	currentInt.writeIntegration(filehandle)
+	#only save if integration was successful 
+	if status == True:
 	
-	#append to int_list
-	int_list.append(currentInt)
+		#write to output file
+		currentInt.writeIntegration(filehandle)
+	
+		#append to int_list
+		int_list.append(currentInt)
 	
 	return int_list, host
 
@@ -203,13 +207,16 @@ def insertViralPortion(host, viruses, int_list, filehandle, min_len,sep):
 			return int_list, host
 			
 	#do integration
-	host = currentInt.doIntegration(host, int_list)
+	host, status  = currentInt.doIntegration(host, int_list)
 	
-	#write to output file
-	currentInt.writeIntegration(filehandle)
+	#only save if integration was successful 
+	if status == True: 
+		
+		#write to output file
+		currentInt.writeIntegration(filehandle)
 	
-	#append to int_list
-	int_list.append(currentInt)
+		#append to int_list
+		int_list.append(currentInt)
 	
 	return int_list, host
 
@@ -235,13 +242,16 @@ def insertWholeRearrange(host, viruses, int_list, filehandle, min_len,sep):
 			return int_list, host
 			
 	#do integration
-	host = currentInt.doIntegration(host, int_list)
+	host, status  = currentInt.doIntegration(host, int_list)
 	
-	#write to output file
-	currentInt.writeIntegration(filehandle)
+	#only save if integration was successful 
+	if status == True: 
 	
-	#append to int_list
-	int_list.append(currentInt)
+		#write to output file
+		currentInt.writeIntegration(filehandle)
+	
+		#append to int_list
+		int_list.append(currentInt)
 	
 	return int_list, host
 
@@ -265,13 +275,16 @@ def insertWithDeletion(host, viruses, int_list, filehandle, min_len,sep):
 			return int_list, host
 	
 	#do integration
-	host = currentInt.doIntegration(host,int_list)
+	host, status = currentInt.doIntegration(host,int_list)
 	
-	#write to output file
-	currentInt.writeIntegration(filehandle)
+	#only save if integration was successful 
+	if status == True:
+		
+		#write to output file
+		currentInt.writeIntegration(filehandle)
 	
-	#append to int_list
-	int_list.append(currentInt)
+		#append to int_list
+		int_list.append(currentInt)
 	
 	return int_list, host
 	
@@ -314,7 +327,7 @@ class Integration:
 		#integration cannot not have negative overlap at both ends - can be changed later** 
 
 		while True: 
-			self.overlaps = (np.random.randint(-10,10),np.random.randint(-10,10))
+			self.overlaps = (np.random.randint(-1,10),np.random.randint(-1,10))
 			if self.overlaps[0]<0 and self.overlaps[1]<0: 
 				continue
 			else: 
@@ -550,6 +563,9 @@ class Integration:
 		"""
 		Inserts viral DNA (self.bases) at position self.hPos in host[self.chr]
 		"""
+		#start by assuming that integration will be successful 
+		status = True
+		
 		#check there is already a fragment
 		if self.fragments < 1:
 			print("Add fragment before doing integration!")
@@ -585,15 +601,18 @@ class Integration:
 		#adjust sequences with right overlap  		
 		if self.overlaps[1]<0:
 			(int_start,int_stop) = self.createRightOverlap(host,int_list)
-		
+			
+		#If integration cannot be performed we stop 
+		if int_stop == 0 and int_start == 0: 
+			status = False
+				
 		host[self.chr] = host[self.chr][:int_start] + \
 		 				"".join(self.chunk.bases) + \
 		 				host[self.chr][int_stop:]
 		
 		#set the starting and stopping points of the performed integration 
 		self.setStopStart(int_start,int_stop) 
-		 				
-		return host
+		return host, status 
 
 
 	def getOrisCoordsBases(self):
@@ -851,8 +870,7 @@ class Statistics:
 	"""
 	
 	def intList(self,int_list):
-		"""Makes list of the sites of previously preformed integrations and adjusts for the bases added due to integration"""
-		
+		"""Makes list of the sites of previously preformed integrations and adjusts for the bases added due to integration"""	
 		previousInt = [int.hPos for int in int_list]
 		for i in range(1,len(previousInt)):
 			for j in range(0,i):
@@ -862,7 +880,7 @@ class Statistics:
 		
 	def adjustedStopStart(self,int_list): 
 		"""Makes a list of the coordinates of the viral integrations adjusted with insertions added"""
-		
+			
 		intCoords = [(int.hstart,int.hstop) for int in int_list]
 		for i in range(1,len(intCoords)):
 			for j in range(0,i):
@@ -875,20 +893,28 @@ class Statistics:
 		
 	def saveStats(int_list):
 		"""Save a csv file with the coordinates of the adjusted insertions so when we create artifical reads we can predict which reads contain viral DNA""" 
+		
+		
 		num_ints = len(int_list) 
+		stats_df = pd.DataFrame()
 		
-		int_sites = Statistics.intList(int_list[1-num_ints],int_list)
-		int_coords = Statistics.adjustedStopStart(int_list[1-num_ints],int_list) 
 		
-		int_start = []
-		int_stop = []
+		#can only save stats if integrations have been performed 
+		if num_ints != 0 :
+			int_sites = Statistics.intList(int_list[1-num_ints],int_list)
+			int_coords = Statistics.adjustedStopStart(int_list[1-num_ints],int_list) 
 		
-		for i in range(0,num_ints): 
-			c1,c2 = int_coords[i]
-			int_start.append(c1)
-			int_stop.append(c2)
+			int_start = []
+			int_stop = []
 		
-		stats_df = pd.DataFrame({"Integration sites":int_sites,"Start point":int_start,"Stop point": int_stop}) 
+			for i in range(0,num_ints): 
+				c1,c2 = int_coords[i]
+				int_start.append(c1)
+				int_stop.append(c2)
+		
+			stats_df = pd.DataFrame({"Integration sites":int_sites,"Start point":int_start,"Stop point": int_stop}) 
+		else:
+			print("NO SUCCESSFUL INTEGRATIONS WERE PERFORMED")
 		
 		return stats_df 
 		 

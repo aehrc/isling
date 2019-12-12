@@ -27,26 +27,20 @@ def main(argv):
 	#read in host integration locations
 	int_file = pd.read_csv(args.host_ints,header=0,sep='\t')
 
-
-	#print("DOING TASKS")
 	num_reads = numReads(read_file) 
-	#print('TASK ONE')
 	int_coord = intCoords(int_file)
-	#print('TASK TWO')
 	sam_file = args.sam
 	read_id, read_coord = processReads(sam_file,num_reads) 
-	#print('TASK THREE')
 	overlap_status, overlap_len = findOverlaps(read_coord,int_coord)
 	
 	#save the file 
 	results = pd.DataFrame({"read_id":read_id,"contains_virus":overlap_status,"virus_length":overlap_len})
-	with open(args.host_ints, 'w') as handle: 
+	with open(args.save, 'w') as handle: 
 		results.to_csv(handle,sep='\t') 
-	
-	#results.to_csv("read_integrations.csv",sep='\t')
-
-	
-	
+		
+	print("COMPLETE")
+	print("Saved to "+str(args.save))
+		
 def numReads(sam_file): 
 	"""Finds number of reads in the .sam file"""
 	df = pd.read_csv(sam_file,header=None) 
@@ -67,9 +61,11 @@ def findOverlaps(read_coord,int_coord):
 		overlap = 0
 		status = False
 		for j in range(len(int_coord)):
-			status = checkOverlap(read_coord[i],int_coord[j])
-			if status == True:
-				overlap = overlapLength(read_coord[i],int_coord[j])
+			check_overlap = checkOverlap(read_coord[i],int_coord[j])
+			if check_overlap == True:
+				status = check_overlap
+				#important if a read has more than one read (rare but possible) 
+				overlap = overlap + overlapLength(read_coord[i],int_coord[j])
 				break
 		overlap_status.append(status)
 		overlap_len.append(overlap)
@@ -96,7 +92,6 @@ def processReads(sam_file,num_inserts):
 
 	#list of insert coordinates in the original fasta sequence
 	read_coord = []
-	print("NUM INSERTS "+str(num_inserts))
 	for i in range(0,num_inserts):
 		if i%500000==0 and i!=0:
 			print(str(i)+" READS PROCESSED") 
@@ -117,23 +112,25 @@ def checkOverlap(coordA,coordB):
 		status = True 
 	return status 
 
-def overlapLength(coordA,coordB):
+def overlapLength(coordA,coordB): #this is bad fix this up 
 	"""Tells us the length of the overlap betweeen coordA and coordB"""
 	A1, A2 = coordA
 	B1, B2 = coordB
-	overlap = 0
-	#isolate where overlaps occur
-	if A2>B1 and A1<B1:
-        	#if overlap is at the left end of B
-		if A1<B1: 
-			overlap = A2-B1
-		#if overlap is at the right end of B
-		if A2>B2: 
-			overlap = B2-A1
-		#if overlap is within B 
-		else: 
-			overlap = A2-A1
+	
+	#find the lower point of A2 and B2 
+	upper = min(B2, A2) 
+	
+	#find the upper point of A1 and B1 
+	lower = max(B1, A1) 
+	
+	overlap = upper-lower 
+	if overlap<0: 
+		print("coordinate a (read): "+str(coordA))
+		print("coordinate b (integration): "+str(coordB))# for debugging remove later 
+		raise OSError("Attempting to find length of overlap between regions which do not overlap")
+
 	return overlap
+	
 	
 if __name__ == "__main__":
 	main(sys.argv[1:]) 	
