@@ -101,6 +101,9 @@ def main(argv):
 	#intialise the minimum chunk size 
 	min_len = int(args.min_len) 
 	
+	#intialise the separation from other integrations 
+	sep = int(args.sep) 
+	
 	#print("Min length "+str(min_len))
 	#intialise how many episomal sequences included in the outputted fasta file 
 	epi_num = 5
@@ -114,7 +117,7 @@ def main(argv):
 	#integration loop 
 	for i in range(0,int_num):
 		rand_int =  np.random.randint(0,4)
-		host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, min_len, sep=args.sep)
+		host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, min_len, sep)
 		if i % int_report == 0 and i != 0: 
 			print(str(i) +" integrations complete...")
 			
@@ -146,7 +149,7 @@ def main(argv):
     		print("Details of where intgrations lie in host sequence saved as "+"host_insertions.csv")
 
 
-def insertWholeVirus(host, viruses, int_list, filehandle, min_len, sep=5):
+def insertWholeVirus(host, viruses, int_list, filehandle, min_len, sep):
 	"""Inserts whole viral genome into host genome"""
 	
 	#get positions of all current integrations
@@ -177,7 +180,7 @@ def insertWholeVirus(host, viruses, int_list, filehandle, min_len, sep=5):
 	
 	return int_list, host
 
-def insertViralPortion(host, viruses, int_list, filehandle, min_len,sep=5):
+def insertViralPortion(host, viruses, int_list, filehandle, min_len,sep):
 	"""Inserts portion of viral DNA into host genome"""
 	
 	#get positions of all current integrations
@@ -210,7 +213,7 @@ def insertViralPortion(host, viruses, int_list, filehandle, min_len,sep=5):
 	
 	return int_list, host
 
-def insertWholeRearrange(host, viruses, int_list, filehandle, min_len,sep=5):
+def insertWholeRearrange(host, viruses, int_list, filehandle, min_len,sep):
 	""" Inserts a single portion of viral DNA with n rearrangements """
 	
 	#get positions of all current integrations
@@ -242,7 +245,7 @@ def insertWholeRearrange(host, viruses, int_list, filehandle, min_len,sep=5):
 	
 	return int_list, host
 
-def insertWithDeletion(host, viruses, int_list, filehandle, min_len,sep=5):
+def insertWithDeletion(host, viruses, int_list, filehandle, min_len,sep):
 	""" Inserts n portions of viral DNA into host genome"""
 	#get positions of all current integrations
 	currentPos = [int.hPos for int in int_list]
@@ -316,7 +319,6 @@ class Integration:
 				continue
 			else: 
 				break 
-		print(str(self.overlaps)) #debugging remove 
 		#record the type of junction for saving to file later
 		self.junction = (self.convertJunction(self.overlaps[0]),
 				self.convertJunction(self.overlaps[1]))
@@ -700,7 +702,6 @@ class ViralChunk:
 
 		#set minimum size for a chunk of virus
 		#don't want the size too small (ie only a few base pairs)  
-		print(str(min_len))
 		min_chunk = min_len
 		
 		if min_chunk>len(viruses[self.virus].seq):
