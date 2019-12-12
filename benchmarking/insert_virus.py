@@ -42,7 +42,9 @@ def main(argv):
 	parser.add_argument('--host', help='host fasta file', required = True)
 	parser.add_argument('--virus', help = 'virus fasta file', required = True)
 	parser.add_argument('--ints', help = 'output fasta file', required = True)
-	parser.add_argument('--locs', help = 'output csv with integration locations', required = True)
+	parser.add_argument('--locs', help = 'output text with viral integrations', required = True)
+	parser.add_argument('--ints_host', help = 'output csv with integration locations in host genome', required = True)
+	parser.add_argument('--int_num', help = 'number of integrations to be carried out', required=True)
 	parser.add_argument('--fasta', help = 'output fasta of integrated host genome', required = False)
 	parser.add_argument('--sep', help = 'integrations must be seperated by this many bases', required=False, default=5)
 	parser.add_argument('--min_len', help = 'minimum length of integerations', required=False, default=5)
@@ -93,13 +95,13 @@ def main(argv):
 	#### PERFORM INTEGRATION #####
 	
 	#intialise the required number of integrations 
-	int_num = 2
+	int_num = int(args.int_num)
 	
 	#intialise how many episomal sequences included in the outputted fasta file 
 	epi_num = 5
 	
 	#intialise after how many intergrations the number of integrations performed is reported to the user 
-	int_report = 100
+	int_report = 10
 	
 	
 	print("\nNUMBER OF INTEGRATIONS TO INSERT: "+str(int_num))
@@ -126,7 +128,9 @@ def main(argv):
 	
 	#save statistics on the integration 
 	stats = Statistics.saveStats(host_ints)
-	stats.to_csv("host_insertions.csv",sep = '\t') 
+	with open(args.ints_host, 'w') as handle:
+		stats.to_csv(handle,sep='\t')
+	#stats.to_csv("host_insertions.csv",sep = '\t') 
 	
 	#save integrated host sequence 
 	with open(args.ints, 'w') as handle: 
@@ -235,7 +239,6 @@ def insertWholeRearrange(host, viruses, int_list, filehandle, sep=5):
 
 def insertWithDeletion(host, viruses, int_list, filehandle, sep=5):
 	""" Inserts n portions of viral DNA into host genome"""
-	
 	#get positions of all current integrations
 	currentPos = [int.hPos for int in int_list]
 	
@@ -246,7 +249,6 @@ def insertWithDeletion(host, viruses, int_list, filehandle, sep=5):
 		currentInt = Integration(host)
 		currentInt.addDeletion(viruses, part = "whole")
 		attempts += 1
-		
 		#check that all integrations are args.sep away from new integration
 		if all([ abs(currentInt.hPos-i) > sep for i in currentPos ]):
 			break
@@ -309,7 +311,7 @@ class Integration:
 				continue
 			else: 
 				break 
-		
+		print(str(self.overlaps)) #debugging remove 
 		#record the type of junction for saving to file later
 		self.junction = (self.convertJunction(self.overlaps[0]),
 				self.convertJunction(self.overlaps[1]))
@@ -357,7 +359,7 @@ class Integration:
 		add a fragment with a deletion in the middle
 		always split into >3 pieces and delete the middle
 		"""
-		
+		print("At addDeletion")
 		#check there isn't already a fragment
 		if self.fragments > 0:
 			print("Fragment has already been added!")
@@ -377,7 +379,6 @@ class Integration:
 		self.chunk = ViralChunk(viruses, part)
 		self.chunk.delete(n)
 		self.fragments -= 1
-
 
 	def createGap(self,size):
 		"""
@@ -564,10 +565,9 @@ class Integration:
 		#use for inserting viral_chunk
 		int_start = self.hPos 
 		int_stop = self.hPos 
-
+		
 		#adjust seqences with gaps by adding random sequence
 		self.gapAdjust()
-
 		#adjust sequences with overlap
 		#list previous integrations 
 		previousInt = Statistics.intList(self,int_list)
@@ -648,62 +648,25 @@ class Integration:
 		return type 
 		
 	def setStopStart(self,int_start,int_stop): 
-		""" provides coordinates of where viral DNA starts and ends"""
+		""" provides coordinates of where viral DNA starts and ends. hstart and hstop denote human genome"""
 
-		
 		if self.overlaps[0]>0: #ie there is a gap 
-			self.start = int_start+self.overlaps[0]
+			self.hstart = int_start+self.overlaps[0]
 		elif self.overlaps[0]<0: #ie there is an overlap
-			self.start = int_start-self.overlaps[0]
+			self.hstart = int_start-self.overlaps[0]
 		else: 
-			self.start = int_start 
+			self.hstart = int_start 
 			
 		if self.overlaps[1]>0: #ie there is a gap
-			self.stop = int_stop-self.overlaps[1]
+			self.hstop = int_stop-self.overlaps[1]
 		elif self.overlaps[1]<0: #ie there is an overlap 
-			self.stop = int_stop+self.overlaps[1]
+			self.hstop = int_stop+self.overlaps[1]
 		else: 
-			self.stop = int_stop 
+			self.hstop = int_stop 
 			
-		self.stop = self.stop+len(self.chunk.bases) 
+		self.hstop = self.hstop+len(self.chunk.bases) 
 
 		
-	def getStartStop(self):
-		"""
-		return starts and stops of each end of viral integration, 
-		accounting for any gaps or overlaps
-		two integration site for each integrated bit of virus
-		"""
-		
-		#human coordinates - 0-based
-		self.hStarts = [self.hPos, self.hPos+self.overlaps[1]]
-		self.hStops = [self.hPos+1+self.overlaps[0], self.hPos+1]
-		
-		self.vStarts = []
-		self.vStops = []
-		#viral coordinates depend on orientation
-		if self.oris[0] == "f":
-			self.vStarts.append(self.vParts[0][0])
-		
-		
-		#vStart and stop are relative to virus
-		#so if forward, vStart is first site relative to host
-		#otherwise is second
-	
-		if ori == "f":
-			coords1 = [pos, pos+overlapBPs[0]+1].sort()
-			coords2 = [pos, pos+overlapBPs[1]+1].sort()
-		else:
-			coords1 = [pos, pos+overlapBPs[0]+1].sort()
-			coords2 = [pos, pos+overlapBPs[1]+1].sort()
-	
-		#rearrange starts and stops for output
-		self.starts = (coords1[0], coords2[0])
-		self.stops = (coords1[1], coords2[1])
-	
-		#orientations are always human-virus and virus-human
-		self.oris = ["hv", "vh"]
-				
 	def __str__(self):
 		if self.fragments == 0:
 			return f"Integration on chromosome {self.chr}, position {self.hPos}"
@@ -733,17 +696,11 @@ class ViralChunk:
 
 		#set minimum size for a chunk of virus
 		#don't want the size too small (ie only a few base pairs)  
-		min_chunk = 50 
-		
+		min_chunk = 10 ### 50 is a good number here - change this after debugging 
 		#if we want a random chunk of virus
 		if part == "rand":		
 			while True: 
-				self.start = np.random.randint(0, len(viruses[self.virus].seq))
-				if self.start+1 != len(viruses[self.virus].seq):
-					break
-					
-			#ensure size of viral chunk is greater than the minimum size 
-			while True: 
+				self.start = np.random.randint(0, len(viruses[self.virus].seq)-1)
 				self.stop = np.random.randint(self.start+1, len(viruses[self.virus].seq))
 				if self.stop-self.start>min_chunk:
 					break
@@ -897,11 +854,10 @@ class Statistics:
 	def adjustedStopStart(self,int_list): 
 		"""Makes a list of the coordinates of the viral integrations adjusted with insertions added"""
 		
-		intCoords = [(int.start,int.stop) for int in int_list]
+		intCoords = [(int.hstart,int.hstop) for int in int_list]
 		for i in range(1,len(intCoords)):
 			for j in range(0,i):
 				if int_list[i].hPos < int_list[j].hPos: 
-					#intCoords[j] = intCoords[j]+int_list[i].numBases
 					 new_coord1 = intCoords[j][0]+int_list[i].numBases
 					 new_coord2 = intCoords[j][1]+int_list[i].numBases
 					 intCoords[j] = (new_coord1,new_coord2) 

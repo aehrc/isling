@@ -26,23 +26,25 @@ def main(argv):
 	
 	#read in host integration locations
 	int_file = pd.read_csv(args.host_ints,header=0,sep='\t')
-	
-	print("DOING TASKS")
+
+
+	#print("DOING TASKS")
 	num_reads = numReads(read_file) 
-	print('TASK ONE')
+	#print('TASK ONE')
 	int_coord = intCoords(int_file)
-	print('TASK TWO')
-	read_id, read_coord = processReads(in_sam,num_reads) 
-	print('TASK THREE')
+	#print('TASK TWO')
+	sam_file = args.sam
+	read_id, read_coord = processReads(sam_file,num_reads) 
+	#print('TASK THREE')
 	overlap_status, overlap_len = findOverlaps(read_coord,int_coord)
 	
 	#save the file 
 	results = pd.DataFrame({"read_id":read_id,"contains_virus":overlap_status,"virus_length":overlap_len})
-	#handle = open(args.locs,"w+")
-	#handle.write("HI")
-	print(results[0:3])
-	results.to_csv("read_integrations.csv",sep='\t')
-	#print("THING SAVING TO "+args.locs)
+	with open(args.host_ints, 'w') as handle: 
+		results.to_csv(handle,sep='\t') 
+	
+	#results.to_csv("read_integrations.csv",sep='\t')
+
 	
 	
 def numReads(sam_file): 
@@ -84,16 +86,20 @@ def intCoords(int_file):
 		int_coord.append((c1,c2))
 	return int_coord
 	
-def processReads(in_sam,num_inserts):
+def processReads(sam_file,num_inserts):
 	"""Creates a list of the read IDs and their alignment coordinates""" 
 
+	read_file = open(sam_file,'r')
+	in_sam = Reader(read_file) 
 	#list of insert IDs
 	read_id = []
 
 	#list of insert coordinates in the original fasta sequence
 	read_coord = []
 	print("NUM INSERTS "+str(num_inserts))
-	for i in range(0,5): 
+	for i in range(0,num_inserts):
+		if i%500000==0 and i!=0:
+			print(str(i)+" READS PROCESSED") 
 		x = next(in_sam)
 		y = next(in_sam)
 		read_id.append(x.qname)
