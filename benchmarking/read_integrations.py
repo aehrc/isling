@@ -30,16 +30,17 @@ def main(argv):
 	num_reads = numReads(read_file) 
 	int_coord = intCoords(int_file)
 	sam_file = args.sam
-	read_id, left_read, right_read = processReads(sam_file,num_reads) 
-	left_status, right_status, int_type, left_viral, right_viral = findOverlaps(left_read, right_read, int_coord)
+	fragment_id, first_read, second_read = processReads(sam_file,num_reads) 
+	first_type, second_type, first_len, second_len = analyseRead(first_read,second_read, int_coord) 
 	
 	#save the file 
-	results = pd.DataFrame({"read_id":read_id,"left_read_virus":left_status,"right_read_virus":right_status,"integration_type":int_type,"viral_bases_left":left_viral, "viral_bases_right":right_viral})
+	results = pd.DataFrame({"fragment_id":fragment_id,"left_read":first_type,"right_read":second_type,"left_read_amount":first_len,"right_read_amount":second_len,})
 	with open(args.save, 'w') as handle: 
 		results.to_csv(handle,sep='\t') 
 		
 	print("COMPLETE")
 	print("Saved to "+str(args.save))
+	
 		
 def numReads(sam_file): 
 	"""Finds number of reads in the .sam file"""
@@ -48,108 +49,112 @@ def numReads(sam_file):
 	num_inserts = int(num_reads/2)
 	return num_inserts 
 	
-def findOverlaps(left_read,right_read, int_coord): #try remaking this entire function 
+	
+def analyseRead(first_read,second_read, int_coord):  
 	"""Creates a list of whether a read overlaps (True/False) and a list of the length of the corresponding overlap
 	takes lists of the coordinates of the reads and the locations of the viral DNA in the host"""
-	#list of overlap statuses 
-	overlap_status = []
-
-	#list of overlap lengths 
-	overlap_len = []
 	
-	for i in range(len(read_coord)):
-		overlap = 0
-		status = False
+	#lists of the types of the reads  
+	first_type = []
+	second_type = []
+	
+
+	#lists for the amount of viral DNA in each read
+	first_len = []
+	second_len = []
+	
+	
+	#loop to iterate through the reads. len(first_read) used though could have used len(second_read) 
+	for i in range(len(first_read)):
+		#count number of bases which overlap 
+		overlap_len1 = []
+		overlap_len2 = []
+		
+		#keep record of which overlaps occur
+		overlap_type1 = []
+		overlap_type2 = []
+		
 		for j in range(len(int_coord)):
-			check_left = checkOverlap(left_read[i],int_coord[j])
-			if check_left == True:
-				overlap 
 			
+			#compare the ith left read with the jth integration 
+			c_type = checkOverlap(first_read[i],int_coord[j])			
+			if c_type != "": 
+				#store information on the type of integration 
+				overlap_type1.append(c_type) 
+				
+				#save information on the amount of viral DNA in the read from the integration 
+				overlap = overlapLength(first_read[i],int_coord[j])
+				overlap_len1.append(overlap) 
 			
-			check_right = checkOverlap(right_read[i], int_coord[j]) 
-			if check_left == True or check_right == True:
-				status = check_overlap
-				#important if a read has more than one read (rare but possible) 
-				overlap = overlap + overlapLength(read_coord[i],int_coord[j])
+			#compare the ith right read with the jth integration 
+			c_type = checkOverlap(second_read[i], int_coord[j]) 
+			if c_type != "": 
+				#store information on the type of integration 
+				overlap_type2.append(c_type) 
 				
-		overlap_status.append(status)
-		overlap_len.append(overlap)
+				#save information on the amount of viral DNA in the read from the integration 
+				overlap = overlapLength(second_read[i], int_coord[j]) 
+				overlap_len2.append(overlap) 
 		
-	return overlap_status, overlap_len
-	
-def findOverlaps(left_read, right_read, int_coord): 
-	"""finds whether a read contains viral DNA (True/False) and the amount of viral DNA in the read (bp)"""
-	#list of overlap statuses 
-	left_int = []
-	right_int = []
-	
-	#list of the amount of viral DNA in each read 
-	left_viral = []
-	right_viral = []
-	
-	#list of read types
-	int_type = []
-	
-	for i in range(len(left_read)): 
-		check_left = False
-		check_right = False 
-		l_coord = (-1,-1)
-		r_coord = (-1,-1)
-		l_overlap = 0 
-		r_overlap = 0 
-		for j in range(len(int_coord)):
+		#find the types of the read 
+		type1 = readType(overlap_type1)
+		type2 = readType(overlap_type2) 
 		
-			#check left read for viral DNA 
-			c_left = checkOverlap(left_read[i],int_coord[j])
-			if c_left == True: 
-				check_left = True
-				l_coord = j #the integetation which causes overlap on the left
-				 
-				#if overlaps find the length of said overlap 
-				l_overlap = overlapLength(left_read[i], int_coord[j]) 
-				
-			#check right read for viral DNA
-			c_right = checkOverlap(right_read[i], int_coord[j])
-			if c_right == True: 
-				check_right = True
-				r_coord = j #the integration which causes overlap on the right 
-				
-				#if overlaps find the length of said overlap 
-				r_overlap = overlapLength(right_read[i],int_coord[j])
-				
-
-		left_int.append(check_left)
-		right_int.append(check_right) 	
-		read_type = readType(check_left, l_coord, check_right, r_coord)
-		int_type.append(read_type)
-		left_viral.append(l_overlap)
-		right_viral.append(r_overlap)
+		#save these read types 
+		first_type.append(type1) 
+		second_type.append(type2)
 		
-	return left_int, right_int, int_type, left_viral, right_viral 
-		   
-
-			
-def readType(check_left, l_coord, check_right, r_coord):
-	"""Finds the type of overlap ie - chimeric, split end end or all viral""" 
-	type = ""
-	
-	#check if read is chimeric 
-	if check_left == True and check_right == False or check_left == False and check_right == True: 
-		type = "chimeric"
+		#find the amount of viral DNA in each read 
+		len1 = viralQuantity(overlap_type1, overlap_len1)
+		len2 = viralQuantity(overlap_type2, overlap_len2) 
 		
-	elif check_left == True and check_right == True: 
-		#if viral DNA spans the read
-		if l_coord == r_coord: 
-			type = "all viral DNA"
-		#consider two different viral integrations at both ends 
-		#this is unlikely but we consder for completeness 
-		else: 
-			type = "split ends"   
+		#save the amount of viral DNA in each read 
+		first_len.append(len1)
+		second_len.append(len2) 		
+		
+	return first_type, second_type, first_len, second_len 
 	
-	elif check_left == False and check_right == False: 
-		type = "no viral DNA"
 	
-	return type
+def readType(overlap_type): 
+	"""Identifies the type of a read: chimeric, split, viral or host.Uses one of the overlap_type lists (overlap_type1 or overlap_type2. Returns type as a string""" 
+	
+	#intialise string
+	read_type = ""
+	
+	#handle reads which are all viral DNA 
+	if "all" in overlap_type: 
+		read_type = "viral" 
+	
+	#handle chimeric reads 
+	elif "left" in overlap_type and "right" not in overlap_type or "right" in overlap_type and "left" not in overlap_type: 
+		read_type = "chimeric" 
+		
+	#handle split reads 
+	#these are rare but we include them for completeness 
+	elif "left" in overlap_type and "right" in overlap_type: 
+		read_type = "split" 
+		
+	#hanlde reads without viral DNA 
+	else: 
+		read_type = "host" 
+		
+	return read_type
+	
+def viralQuantity(overlap_type, overlap_len): 
+	"""function which finds the amount of viral DNA in a read""" 
+	
+	#intalise amount of viral DNA 
+	viral_q = 0
+	
+	#handle reads which span an integration
+	if "all" in overlap_type: 
+		viral_q = max(overlap_len) 
+	
+	#handle chimeric or split end reads 
+	else: 
+		viral_q = sum(overlap_len) 
+		
+	return viral_q		   
 		
 def intCoords(int_file): 
 	"""Finds the location of viral DNA in the host sequence""" 
@@ -167,11 +172,11 @@ def processReads(sam_file,num_inserts):
 	read_file = open(sam_file,'r')
 	in_sam = Reader(read_file) 
 	#list of insert IDs
-	read_id = []
+	fragment_id = []
 
 	#list of insert coordinates in the original fasta sequence
-	left_read = []
-	right_read = []
+	first_read = []
+	second_read = []
 	for i in range(0,num_inserts):
 		if i%500000==0 and i!=0:
 			print(str(i)+" READS PROCESSED") 
@@ -179,23 +184,36 @@ def processReads(sam_file,num_inserts):
 		y = next(in_sam)
 		
 		#save the ID of the read 
-		read_id.append(x.qname)
+		fragment_id.append(x.qname)
 		
 		#save the coordinates of the read 
-		left_read.append((x.pos-1,x.pos+x.tlen-1))
-		right_read.append((y.pos-1,y.pos+y.tlen-1))
+		first_read.append((x.pos-1,x.pos+x.tlen-1))
+		second_read.append((y.pos-1,y.pos+y.tlen-1))
 		
-	return read_id, left_read, right_read
+	return fragment_id, first_read, second_read
 	
-
-def checkOverlap(coordA,coordB):
-	"""Tells us whether coordA overlaps with coordB"""
-	status = False 
+ 
+	
+def checkOverlap(coordA, coordB): 
+	""" Function which tells us whether coordA (start of read, end of read) overlaps coordB (start of integration, end of integrations). Returns string which says which type of integrations occured""" 
+	
+	#intialise output string
+	overlap_type = "" 
+	
+	#get coordinates 
 	A1, A2 = coordA
 	B1, B2 = coordB 
-	if A2>B1 and A1<B1:
-		status = True 
-	return status 
+	
+	if A1 <= B1 and A2 >= B1:
+		overlap_type = "left" 	
+		if A2 >= B2: 
+			overlap_type = "all"
+	elif A1 <= B2 and A2>=B2:
+		overlap_type = "right" 
+		
+	return overlap_type 
+		 
+		
 
 def overlapLength(coordA,coordB): 
 	"""Tells us the length of the overlap betweeen coordA and coordB"""
