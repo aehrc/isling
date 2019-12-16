@@ -146,7 +146,7 @@ def main(argv):
     		handle.close()
     		print("\nIntegrated host saved as "+str(args.ints))
     		print("Details of sequences integrated saved as "+str(args.locs))
-    		print("Details of where intgrations lie in host sequence saved as "+"host_insertions.csv")
+    		print("Details of where intgrations lie in host sequence saved as "+str(args.ints_host))
 
 
 def insertWholeVirus(host, viruses, int_list, filehandle, min_len, sep):
@@ -249,7 +249,7 @@ def insertWholeRearrange(host, viruses, int_list, filehandle, min_len,sep):
 	#only save if integration was successful 
 	if status == True: 
 	
-		#write to output filepython3 insert_virus.py --host lower_chr20.fna --virus AAV_vector.fa --ints ints.fa --locs locs.txt --ints_host host_integrations.csv --int_num 500 
+		#write to output file
 		currentInt.writeIntegration(filehandle)
 	
 		#append to int_list
@@ -289,6 +289,15 @@ def insertWithDeletion(host, viruses, int_list, filehandle, min_len,sep):
 		int_list.append(currentInt)
 	
 	return int_list, host
+
+
+#def insertRearrangePortion: TODO 
+	#takes a portion of the rearranged virus 
+	#just need to take wholeRearrange function and change 'whole' to 'part'  
+
+#def insertDeletionPortion: TODO
+	#takes a portion of the 
+
 	
 def checkFastaExists(file):
 	#check file exists
@@ -343,7 +352,7 @@ class Integration:
 		add a viral fragment to this integration
 		"""
 		
-		#check there isn't alreafbdy a fragmentfg
+		#check there isn't alreafbdy a fragment
 		if self.fragments > 0:
 			print("Fragment has already been added!")
 			return
@@ -353,7 +362,9 @@ class Integration:
 		
 		#get viral chunk
 		self.chunk = ViralChunk(viruses, min_len, part)
-
+	
+	#def addFragmentRearrange()
+		
 	def addRearrange(self, viruses, min_len, part = "rand"):
 		"""
 		add a rearranged fragment
@@ -532,7 +543,6 @@ class Integration:
 				right_seq = host[self.chr][right_search:]
 			else: 
 				right_site = right_search
-		
 		overlap_point = self.overlapPoint(left_site,right_site)
 		int_start = overlap_point
 		int_stop = overlap_point
