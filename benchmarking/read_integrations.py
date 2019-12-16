@@ -124,7 +124,11 @@ def readType(overlap_type):
 	#handle reads which are all viral DNA 
 	if "all" in overlap_type: 
 		read_type = "viral" 
-	
+
+	#handle short reads - where there is viral DNA in the middle of a read 	
+	elif "short" in overlap_type: 
+		read_type = "short" 
+
 	#handle chimeric reads 
 	elif "left" in overlap_type and "right" not in overlap_type or "right" in overlap_type and "left" not in overlap_type: 
 		read_type = "chimeric" 
@@ -141,16 +145,18 @@ def readType(overlap_type):
 	return read_type
 	
 def viralQuantity(overlap_type, overlap_len): 
-	"""function which finds the amount of viral DNA in a read""" 
+	"""function which finds the amount of viral DNA (bp) in a read""" 
 	
 	#intalise amount of viral DNA 
 	viral_q = 0
 	
 	#handle reads which span an integration
 	if "all" in overlap_type: 
-		viral_q = max(overlap_len) 
-	
-	#handle chimeric or split end reads 
+		viral_q = max(overlap_len) 		
+ 		
+	#handle chimeric, split end or short reads
+	#it is possible (though extremely unlikely) a read could be short and have split ends 
+	#don't consider this in the other function as short read is more important than split ends but consider for when we calculate the number of viral bp in  a read 
 	else: 
 		viral_q = sum(overlap_len) 
 		
@@ -209,7 +215,9 @@ def checkOverlap(coordA, coordB):
 		if A2 >= B2: 
 			overlap_type = "all"
 	elif A1 <= B2 and A2>=B2:
-		overlap_type = "right" 
+		overlap_type = "right"
+	elif A1 > B1 and A2 < B2: 
+		overlap_type = "short"  
 		
 	return overlap_type 
 		 
