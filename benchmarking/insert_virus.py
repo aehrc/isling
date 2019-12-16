@@ -139,7 +139,6 @@ def main(argv):
 	stats = Statistics.saveStats(host_ints)
 	with open(args.ints_host, 'w') as handle:
 		stats.to_csv(handle,sep='\t')
-	#stats.to_csv("host_insertions.csv",sep = '\t') 
 	
 	#save integrated host sequence 
 	with open(args.ints, 'w') as handle: 
@@ -154,9 +153,11 @@ def insertWholeVirus(host, viruses, int_list, filehandle, min_len, sep):
 	"""Inserts whole viral genome into host genome"""
 	
 	#get positions of all current integrations
-	currentPos = [int.hPos for int in int_list]
+	currentPos = Statistics.integratedIndices(int_list)
+
 	#make sure that new integration is not within args.sep bases of any current integrations
 	attempts = 0
+
 	while True:
 		#get one viral chunk
 		currentInt = Integration(host)
@@ -188,7 +189,8 @@ def insertViralPortion(host, viruses, int_list, filehandle, min_len,sep):
 	"""Inserts portion of viral DNA into host genome"""
 	
 	#get positions of all current integrations
-	currentPos = [int.hPos for int in int_list]
+	currentPos = Statistics.integratedIndices(int_list)
+	
 	
 	#make sure that new integration is not within args.sep bases of any current integrations
 	attempts = 0
@@ -224,7 +226,7 @@ def insertWholeRearrange(host, viruses, int_list, filehandle, min_len,sep):
 	""" Inserts a single portion of viral DNA with n rearrangements """
 	
 	#get positions of all current integrations
-	currentPos = [int.hPos for int in int_list]
+	currentPos = Statistics.integratedIndices(int_list)
 	
 	#make sure that new integration is not within args.sep bases of any current integrations
 	attempts = 0
@@ -247,7 +249,7 @@ def insertWholeRearrange(host, viruses, int_list, filehandle, min_len,sep):
 	#only save if integration was successful 
 	if status == True: 
 	
-		#write to output file
+		#write to output filepython3 insert_virus.py --host lower_chr20.fna --virus AAV_vector.fa --ints ints.fa --locs locs.txt --ints_host host_integrations.csv --int_num 500 
 		currentInt.writeIntegration(filehandle)
 	
 		#append to int_list
@@ -257,9 +259,9 @@ def insertWholeRearrange(host, viruses, int_list, filehandle, min_len,sep):
 
 def insertWithDeletion(host, viruses, int_list, filehandle, min_len,sep):
 	""" Inserts n portions of viral DNA into host genome"""
-	#get positions of all current integrations
-	currentPos = [int.hPos for int in int_list]
-	
+	#get positions of all current integrations 
+	currentPos = Statistics.integratedIndices(int_list)
+
 	#make sure that new integration is not within args.sep bases of any current integrations
 	attempts = 0
 	while True:
@@ -632,7 +634,7 @@ class Integration:
 	def writeIntegration(self, filehandle):
 		#write information about the current integration to an output file
 		#pass in an open filehandle for writing
-		
+
 		if self.fragments == 0:
 			print("No fragments yet to write")
 			return
@@ -890,6 +892,25 @@ class Statistics:
 					 intCoords[j] = (new_coord1,new_coord2) 
 					
 		return intCoords
+
+	def integratedIndices(int_list): 
+		"""Creates a lisit of sequence indexes which are of viral origin""" 
+		#create list of viral coordinates 		
+		viral_idx = []
+
+		#number of integrations which have been performed
+		num_ints = len(int_list)  
+
+		#get start and stop coordinates 
+		if num_ints != 0: 
+			int_coords = Statistics.adjustedStopStart(int_list[1-num_ints],int_list)
+			
+			for i in range(0,num_ints): 
+				c1, c2 = int_coords[i]
+				for j in range(c1,c2+1): 
+					viral_idx.append(j) 
+		return viral_idx 
+		
 		
 	def saveStats(int_list):
 		"""Save a csv file with the coordinates of the adjusted insertions so when we create artifical reads we can predict which reads contain viral DNA""" 
