@@ -36,7 +36,7 @@ max_attempts = 5 #maximum number of times to try to place an integration site
 
 ### main
 def main(argv):
-
+	print("STARTING") 
 	#get arguments
 	parser = argparse.ArgumentParser(description='simulate viral insertions')
 	parser.add_argument('--host', help='host fasta file', required = True)
@@ -109,10 +109,10 @@ def main(argv):
 	epi_num = 5
 	
 	#intialise after how many intergrations the number of integrations performed is reported to the user 
-	int_report = 10
+	int_report = 50
 	
 	
-	print("\nNUMBER OF INTEGRATIONS TO INSERT: "+str(host_ints))
+	print("\nNUMBER OF INTEGRATIONS TO INSERT: "+str(int_num))
 	
 	#integration loop 
 	for i in range(0,int_num):
