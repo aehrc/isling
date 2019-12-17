@@ -128,13 +128,16 @@ def main(argv):
 	print("\nNUMBER OF EPISOMES: "+str(epi_num))
 	
 	for i in range(0,epi_num): 
+		rand_int = np.random.randint(0,2)		
 		currentEpi = Episome(virus)
 		name = "episome "+str(i)
-		host_fasta = currentEpi.insertWhole(host_fasta,name)  
+			
+		#types of episomes 
+		episome_types = [currentEpi.insertWhole, currentEpi.insertPortion] 
+		host_fasta = episome_types[rand_int](host_fasta,name)  
 			
 	print("\n***INTEGRATIONS COMPLETE***")
 	print(host_fasta)
-	#print(host_fasta.get('host').id) TODO remove 
 	handle.close()
 	
 
@@ -588,7 +591,7 @@ class Integration:
 
 		if left_site != -1 and right_site != -1: 
 		#only if an integration occurs does the overlapping region get removed 
-			int_start =  overlap_point + self.overlaps[0] #TODO recheck this 
+			int_start =  overlap_point + self.overlaps[0] 
 		return int_start,int_stop 
 		
 	def createRightOverlap(self,host,int_list): 
@@ -596,7 +599,6 @@ class Integration:
 		Handles overlaps on the right of a viral chunk. Same as above with operations applicable to right end 
 		""" 
 		viral_chunk = self.chunk.bases
-		print(viral_chunk)
 		dont_integrate = self.dontIntegrate(int_list)
 		
 		r_overlap = str(viral_chunk[len(viral_chunk)+self.overlaps[1]:]) #sequence right of the integration site 
@@ -1057,7 +1059,7 @@ class Episome:
 		new_seq = after_cut + before_cut 
 		self.seq = new_seq 
 	
-	def insertWhole(self, host,name): #TODO
+	def insertWhole(self, host, name):
 		"""Adds a viral sequence to the output fasta file without modification"""
 		
 		entry = SeqRecord(Seq(str(self.seq)), id = name, name = name, description = name) 
@@ -1065,11 +1067,64 @@ class Episome:
 		
 		return host 
 
-	#def insertPortion(): TODO
+	def insertPortion(self, host, name): 
+		"""Adds a portion of the viral sequence to the output fasta file""" 
 
-	#def insertRerrange(): TODO
+		self.portion()
+		
+		#add episome to fasta dictionary 
+		entry = SeqRecord(Seq(str(self.seq)), id = name, name = name, description = name) 
+		host[name] = entry 
+		return host 
 
-	#def insertDeletion(): 
+	def insertWholeRerrange(self,host, name): 
+		"""Adds a rearranged viral sequece to the output fasta file""" 
+		#need to split it then rearrange the split 
+		return host 
+
+	def split(self):
+		"""Splits viral episomal sequence into portions""" 
+		
+		#get the number of fragments by drawing from a poisson distribution 
+		while True:
+			n = int(np.random.poisson(1.5))
+			if n > 1:
+				break
+		self.fragments = n
+
+		#check that the sequence length is at least n 
+		if len(str(self.seq)) < n: 
+			print("Not enough bases to split") 
+
+		
+		
+		
+
+	
+		
+		
+
+	def portion(self):
+		"""Takes a portion of a viral sequence for use as an episome""" 
+		#specify a minimum size for a portion of episome 
+		min_chunk = 5 #TODO ask Suzanne what an appropriate value is 
+
+		#generate starting and stopping points for episome portion 
+		while True:
+			self.start = np.random.randint(0,len(str(self.seq))-1)
+			self.stop = np.random.randint(self.start+1, len(str(self.seq)))
+			if self.stop - self.start > min_chunk: 
+				break 
+
+		#update the episome sequence		
+		new_seq = self.seq[self.start:self.stop]
+		self.seq = new_seq
+
+	def rearrange(self): 
+		#get an order for the fragments 
+		 
+		
+	#def insertDeletion(): #TODO  
 		 
 
 if __name__ == "__main__":
