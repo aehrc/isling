@@ -25,6 +25,8 @@
 ###import libraries
 from Bio import SeqIO
 from Bio.Alphabet.IUPAC import unambiguous_dna
+from Bio.Seq import Seq 
+from Bio.SeqRecord import SeqRecord
 import pandas as pd
 import argparse
 import sys
@@ -44,10 +46,11 @@ def main(argv):
 	parser.add_argument('--ints', help = 'output fasta file', required = True)
 	parser.add_argument('--locs', help = 'output text with viral integrations', required = True)
 	parser.add_argument('--ints_host', help = 'output csv with integration locations in host genome', required = True)
-	parser.add_argument('--int_num', help = 'number of integrations to be carried out', required=True)
+	parser.add_argument('--int_num', help = 'number of integrations to be carried out', required=False, default=0)
 	parser.add_argument('--fasta', help = 'output fasta of integrated host genome', required = False)
 	parser.add_argument('--sep', help = 'integrations must be seperated by this many bases', required=False, default=5)
 	parser.add_argument('--min_len', help = 'minimum length of integerations', required=False, default=50)
+	parser.add_argument('--epi_num', help = 'number of episomes', required=False, default=0)
 	args = parser.parse_args()
 	
 
@@ -106,7 +109,7 @@ def main(argv):
 	
 	#print("Min length "+str(min_len))
 	#intialise how many episomal sequences included in the outputted fasta file 
-	epi_num = 5
+	epi_num = int(args.epi_num) 
 	
 	#intialise after how many intergrations the number of integrations performed is reported to the user 
 	int_report = 50
@@ -116,9 +119,7 @@ def main(argv):
 	
 	#integration loop 
 	for i in range(0,int_num):
-		#rand_int =  np.random.randint(0,len(insertion_types))
-		rand_int =  np.random.randint(4,6) #TODO remove these two lines 
-		print(insertion_types[rand_int])
+		rand_int =  np.random.randint(0,len(insertion_types))
 		host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, min_len, sep)  
 		if i % int_report == 0 and i != 0: 
 			print(str(i) +" integrations complete...")
@@ -126,17 +127,17 @@ def main(argv):
 	print("NUMBER OF INTEGRATIONS DONE: "+str(len(host_ints)))		
 	print("\nNUMBER OF EPISOMES: "+str(epi_num))
 	
-	#adds viral sequences as 'episomes'  
-	virus_key = list(virus.keys())
-
+	
 	for i in range(0,epi_num): 
-		#host_fasta.append(virus.get('virus'))
-		host_fasta['episome '+str(i)] = virus.get(virus_key[0])
+		currentEpi = Episome(virus)
+		host_fasta = currentEpi.insertWhole(host_fasta,"virrrrus")  
 			
 	print("\n***INTEGRATIONS COMPLETE***")
 	print(host_fasta)
+	#print(host_fasta.get('host').id) TODO remove 
 	handle.close()
 	
+
 	#save statistics on the integration 
 	stats = Statistics.saveStats(host_ints)
 	with open(args.ints_host, 'w') as handle:
@@ -362,7 +363,7 @@ def insertPortionDeletion(host, viruses, int_list, filehandle, min_len,sep):
 	
 	return int_list, host
 
-	
+
 def checkFastaExists(file):
 	#check file exists
 	exists = os.path.isfile(file)
@@ -1032,6 +1033,43 @@ class Statistics:
 			print("NO SUCCESSFUL INTEGRATIONS WERE PERFORMED")
 		
 		return stats_df 
+
+class Episome: 
+	"""Class of functions used to create episomes to add to the resulting fasta file""" 
+
+	#create an episome 
+	def __init__(self,viruses):
+		"""creates an Episome object""" 
+
+		#get virus to integrate
+		self.virus = np.random.choice(list(viruses.keys()))
+
+		#get the sequence of the virus 
+		self.seq = viruses[self.virus].seq 
+
+		#as the episome is circular it can be cut at any point to create a linear segment for sequencing 
+		#randomly select the point at which the episome is 'cut' 
+		self.cutP = np.random.choice((0,len(self.seq))) 
+
+		#to simulate a random cut, move the DNA ahead of cutP to the end of the sequence 
+		before_cut = self.seq[:self.cutP]
+		after_cut = self.seq[self.cutP:]
+		new_seq = after_cut + before_cut 
+		self.seq = new_seq 
+	
+	def insertWhole(self, host,name): #TODO
+		"""Adds a viral sequence to the output fasta file without modification"""
+		
+		entry = SeqRecord(Seq(str(self.seq)), id = name, name = name, description = name) 
+		host[name] = entry  
+		
+		return host 
+
+	#def insertPortion(): TODO
+
+	#def insertRerrange(): TODO
+
+	#def insertDeletion(): 
 		 
 
 if __name__ == "__main__":
