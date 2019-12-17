@@ -386,6 +386,13 @@ class Integration:
 		#add a rearranged fragment
 		self.chunk = ViralChunk(viruses, min_len, part)
 		self.chunk.rearrange(n)
+
+		#change the bases of the viral chunk to the rearranged fragment 
+		new_chunk = ""
+		for i in range(0,n): 
+			portion = self.chunk.pieces.get(i).get('bases').seq
+			new_chunk = new_chunk+portion
+		self.chunk.bases = new_chunk
 	
 	def addDeletion(self, viruses, min_len,part = "rand"):
 		"""
