@@ -67,7 +67,7 @@ def main(argv):
 		raise OSError("Could not open virus fasta")
 	
 	#set random seed
-	np.random.seed(501)
+	np.random.seed(500)
 
 	#types of insertions
 	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
@@ -127,10 +127,10 @@ def main(argv):
 	print("NUMBER OF INTEGRATIONS DONE: "+str(len(host_ints)))		
 	print("\nNUMBER OF EPISOMES: "+str(epi_num))
 	
-	
 	for i in range(0,epi_num): 
 		currentEpi = Episome(virus)
-		host_fasta = currentEpi.insertWhole(host_fasta,"virrrrus")  
+		name = "episome "+str(i)
+		host_fasta = currentEpi.insertWhole(host_fasta,name)  
 			
 	print("\n***INTEGRATIONS COMPLETE***")
 	print(host_fasta)
@@ -1049,7 +1049,7 @@ class Episome:
 
 		#as the episome is circular it can be cut at any point to create a linear segment for sequencing 
 		#randomly select the point at which the episome is 'cut' 
-		self.cutP = np.random.choice((0,len(self.seq))) 
+		self.cutP = np.random.randint(0,len(self.seq)) 
 
 		#to simulate a random cut, move the DNA ahead of cutP to the end of the sequence 
 		before_cut = self.seq[:self.cutP]
