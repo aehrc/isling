@@ -67,7 +67,7 @@ def main(argv):
 	np.random.seed(501)
 
 	#types of insertions
-	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion]
+	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
 	
 	#list to store integration objects
 	host_ints = []
@@ -116,8 +116,10 @@ def main(argv):
 	
 	#integration loop 
 	for i in range(0,int_num):
-		rand_int =  np.random.randint(0,4)
-		host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, min_len, sep)
+		#rand_int =  np.random.randint(0,len(insertion_types))
+		rand_int =  np.random.randint(4,6) #TODO remove these two lines 
+		print(insertion_types[rand_int])
+		host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, min_len, sep)  
 		if i % int_report == 0 and i != 0: 
 			print(str(i) +" integrations complete...")
 	
@@ -290,13 +292,75 @@ def insertWithDeletion(host, viruses, int_list, filehandle, min_len,sep):
 	
 	return int_list, host
 
+def insertPortionRearrange(host, viruses, int_list, filehandle, min_len,sep): 
+	"""Rearranges a portion of virus""" 
 
-#def insertRearrangePortion: TODO 
-	#takes a portion of the rearranged virus 
-	#just need to take wholeRearrange function and change 'whole' to 'part'  
+	#get positions of all current integrations
+	currentPos = Statistics.integratedIndices(int_list)
+	
+	#make sure that new integration is not within args.sep bases of any current integrations
+	attempts = 0
+	while True:
+		#get one viral chunk
+		currentInt = Integration(host)
+		currentInt.addRearrange(viruses, min_len, part = "rand")
+		attempts += 1
+		
+		#check that all integrations are args.sep away from new integration
+		if all([ abs(currentInt.hPos-i) > sep for i in currentPos ]):
+			break
+		#if we've made a lot of attempts, give up
+		elif attempts > max_attempts:
+			return int_list, host
+			
+	#do integration
+	host, status  = currentInt.doIntegration(host, int_list)
+	
+	#only save if integration was successful 
+	if status == True: 
+	
+		#write to output file
+		currentInt.writeIntegration(filehandle)
 
-#def insertDeletionPortion: TODO
-	#takes a portion of the 
+	
+		#append to int_list
+		int_list.append(currentInt)
+	
+	return int_list, host
+
+def insertPortionDeletion(host, viruses, int_list, filehandle, min_len,sep):
+	"""Takes a segment of the virus and then deletes a segment from it and inserts the resulting portion. This have the potentional to be short - useful for simulating short reads later""" 
+
+	#get positions of all current integrations 
+	currentPos = Statistics.integratedIndices(int_list)
+
+	#make sure that new integration is not within args.sep bases of any current integrations
+	attempts = 0
+	while True:
+		#get one viral chunk
+		currentInt = Integration(host)
+		currentInt.addDeletion(viruses, min_len,part = "rand")
+		attempts += 1
+		#check that all integrations are args.sep away from new integration
+		if all([ abs(currentInt.hPos-i) > sep for i in currentPos ]):
+			break
+		#if we've made a lot of attempts, give up
+		elif attempts > max_attempts:
+			return int_list, host
+	
+	#do integration
+	host, status = currentInt.doIntegration(host,int_list)
+	
+	#only save if integration was successful 
+	if status == True:
+		
+		#write to output file
+		currentInt.writeIntegration(filehandle)
+	
+		#append to int_list
+		int_list.append(currentInt)
+	
+	return int_list, host
 
 	
 def checkFastaExists(file):
@@ -419,6 +483,18 @@ class Integration:
 		self.chunk.delete(n)
 		self.fragments -= 1
 
+		#create new chunk using the set of fragments
+		new_chunk = ""
+
+		#get the keys of the fragments after the deletion 
+		frag_keys = self.chunk.pieces.keys()
+
+		for i in frag_keys:
+			portion = self.chunk.pieces.get(i).get('bases').seq
+			new_chunk = new_chunk + portion 
+			
+		self.chunk.bases = new_chunk
+
 	def createGap(self,size):
 		"""
 		Creates stretch of random DNA of length 'size' to insert as a gap 
@@ -475,7 +551,7 @@ class Integration:
  		
 		viral_chunk = self.chunk.bases
 
-		l_overlap = str(viral_chunk[:-self.overlaps[0]].seq) #sequence left of the integration site 
+		l_overlap = str(viral_chunk[:-self.overlaps[0]]) #sequence left of the integration site 
 		left_site = -1
 		right_site = -1
 		dont_integrate = self.dontIntegrate(int_list)
@@ -519,9 +595,10 @@ class Integration:
 		Handles overlaps on the right of a viral chunk. Same as above with operations applicable to right end 
 		""" 
 		viral_chunk = self.chunk.bases
+		print(viral_chunk)
 		dont_integrate = self.dontIntegrate(int_list)
 		
-		r_overlap = str(viral_chunk[len(viral_chunk)+self.overlaps[1]:].seq) #sequence right of the integration site 
+		r_overlap = str(viral_chunk[len(viral_chunk)+self.overlaps[1]:]) #sequence right of the integration site 
 		left_site = -1
 		right_site = -1
 	
