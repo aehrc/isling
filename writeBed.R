@@ -49,15 +49,6 @@ df <- df %>%
 
 #get 'clean' integrations':
 
-#change names of datasets
-df <- df %>% 
-  mutate(dataset = case_when(
-    str_detect(dataset, "FRG_OTC") ~ "FRG1",
-    str_detect(dataset, "AGRF_CAGRF21377_CNW6N") ~ "FRG2",
-    str_detect(dataset, "macaque") ~ "macaque",
-    TRUE ~ dataset
-  ))
-
 #defne regions to annotate for each host
 hosts <- c("macFas5", "macFas5", "hg38", "hg38")
 feats <- c("OTC", "SERPINA1", "OTC", "SERPINA1")
@@ -104,6 +95,7 @@ for (i in unique(clean$dataset)) {
   for (j in unique(data_filt$sample)) {
     clean %>%
 	filter(sample == j) %>%
+        mutate(Chr = ifelse(Chr == "MT", "M", Chr)) %>%
 	mutate(Chr = paste0("chr", Chr)) %>%
 	select(Chr, IntStart, IntStop, ReadID) %>%
 	filter(str_detect(Chr, chroms)) %>%
