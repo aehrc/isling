@@ -1011,6 +1011,8 @@ class Statistics:
 		num_ints = len(int_list) 
 		stats_df = pd.DataFrame()
 		
+		#include hPos - is unique to each integration and allows subsequent identification of what occured 
+		previousInt = [int.hPos for int in int_list]
 		
 		#can only save stats if integrations have been performed 
 		if num_ints != 0 :
@@ -1025,7 +1027,7 @@ class Statistics:
 				int_start.append(c1)
 				int_stop.append(c2)
 		
-			stats_df = pd.DataFrame({"Integration sites":int_sites,"Start point":int_start,"Stop point": int_stop}) 
+			stats_df = pd.DataFrame({"Integration sites":int_sites,"Start point":int_start,"Stop point": int_stop, "hPos":previousInt}) 
 		else:
 			print("NO SUCCESSFUL INTEGRATIONS WERE PERFORMED")
 		
