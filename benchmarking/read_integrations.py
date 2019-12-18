@@ -19,9 +19,10 @@ def main(argv):
 	parser.add_argument('--sam', help = 'sam file describing simulated reads', required = True)
 	parser.add_argument('--host_ints', help = 'csv file describing the location of viral DNA in the human host', required = True)
 	parser.add_argument('--save', help = 'csv file to save the output', required = True)
+	parser.add_argument('--viral_only', help = 'csv file to save only information for viral reads', required = True) 
 	args = parser.parse_args() 
 	
-	#read in sam file
+	#read in sam fileffg
 	read_file = open(args.sam,'r')
 	in_sam = Reader(read_file) 
 	
@@ -43,14 +44,20 @@ def main(argv):
 	#assess for the type of read and the amount of viral DNA (bp) in each read 
 	first_type, second_type, first_len, second_len = analyseRead(first_read,second_read, int_coord) 
 	
-	#save the file 
+	#save the entire file 
 	results = pd.DataFrame({"fragment_id":fragment_id,"left_read":first_type,"right_read":second_type,"left_read_amount":first_len,"right_read_amount":second_len,
 "left_read_coor":first_read,"right_read_coor":second_read})
 	with open(args.save, 'w') as handle: 
 		results.to_csv(handle,sep='\t') 
+	
+	#create a file which saves information only for reads which contain viral DNA 
+	viral_only = getViralReads(results)
+	with open(args.viral_only, 'w') as handle: 
+		viral_only.to_csv(handle, sep='\t') 
 		
 	print("COMPLETE")
-	print("Saved to "+str(args.save))
+	print("Information on ALL reads saved to: "+str(args.save))
+	print("Information on VIRAL reads saved to: "+str(args.viral_only))
 	
 		
 def numReads(sam_file): 
@@ -256,6 +263,20 @@ def overlapLength(coordA,coordB):
 		raise OSError("Attempting to find length of overlap between regions which do not overlap")
 
 	return overlap
+
+def getViralReads(results): 
+	"""function which creates a dataframe containing only reads which contain viral DNA"""
+
+	#create a list for the reads which contain viral DNA 
+	viral_reads = pd.DataFrame( columns =  ["fragment_id","left_read","right_read","left_read_amount","right_read_amount","left_read_coor","right_read_coor"])
+
+	for i in range(len(results)):
+		row = results.loc[i]
+		if row['left_read'] != 'host' or row['right_read'] != 'host': 			
+			viral_reads = viral_reads.append(row) 	
+	print("Number of viral reads: "+str(len(viral_reads))) 
+	return viral_reads
+
 	
 	
 if __name__ == "__main__":
