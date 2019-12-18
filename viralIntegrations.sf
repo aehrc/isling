@@ -252,18 +252,19 @@ rule dedup:
 		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.sam"
 	output:
 		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwaPaired.sam",
-
+		vPairedMetrics = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwaPaired.metrics.txt"
 		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwa.sam",
-		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwaShort.sam"
+		vSingMetrics = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwa.metrics.txt",
+		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwaShort.sam",
+		vShortMetrics = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwaShort.metrics.txt"
 	conda:
 		"envs/picard.yml"
 	shell:
 		"""
-		picard MarkDuplicates I={input.vPaired} O={output.vPaired}
-		picard MarkDuplicates I={input.vSing} O={output.vSing}
-		picard MarkDuplicates I={input.vShort} O={output.vShort} 
+		picard MarkDuplicates I={input.vPaired} O={output.vPaired} M={output.vPairedMetrics} REMOVE_DUPLICATES=True
+		picard MarkDuplicates I={input.vSing} O={output.vSing} M={output.vSingMetrics} REMOVE_DUPLICATES=True
+		picard MarkDuplicates I={input.vShort} O={output.vShort} M={output.vShortMetrics} REMOVE_DUPLICATES=True
 		"""
-	
 
 rule extract_vAligned:
 	input:
