@@ -251,11 +251,11 @@ rule dedup:
 		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam",
 		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.sam"
 	output:
-		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwaPaired.sam",
-		vPairedMetrics = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwaPaired.metrics.txt"
-		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwa.sam",
+		vPaired = temp("../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwaPaired.sam"),
+		vPairedMetrics = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwaPaired.metrics.txt",
+		vSing = temp("../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwa.sam"),
 		vSingMetrics = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwa.metrics.txt",
-		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwaShort.sam",
+		vShort = temp( "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwaShort.sam"),
 		vShortMetrics = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwaShort.metrics.txt"
 	conda:
 		"envs/picard.yml"
