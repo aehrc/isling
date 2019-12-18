@@ -128,13 +128,13 @@ def main(argv):
 	print("\nNUMBER OF EPISOMES: "+str(epi_num))
 	
 	for i in range(0,epi_num): 
-		rand_int = np.random.randint(0,2)		
-		currentEpi = Episome(virus)
-		name = "episome "+str(i)
+		rand_int = np.random.randint(0,2)	
+		name = "episome "+str(i+1)
+		host_fasta = Episome.insertWholeDeletion(virus, min_len, host_fasta, name) 
 			
 		#types of episomes 
-		episome_types = [currentEpi.insertWhole, currentEpi.insertPortion] 
-		host_fasta = episome_types[rand_int](host_fasta,name)  
+		#episome_types = [currentEpi.insertWhole, currentEpi.insertPortion] 
+		#host_fasta = episome_types[rand_int](host_fasta,name)  
 			
 	print("\n***INTEGRATIONS COMPLETE***")
 	print(host_fasta)
@@ -814,10 +814,9 @@ class ViralChunk:
 	
 	#make viral chunk
 	def __init__(self, viruses, min_len, part = "rand"):
-	
+
 		#get virus to integrate
 		self.virus = np.random.choice(list(viruses.keys()))
-
 		#set minimum size for a chunk of virus
 		#don't want the size too small (ie only a few base pairs)  
 		min_chunk = min_len
@@ -831,30 +830,25 @@ class ViralChunk:
 				self.start = np.random.randint(0, len(viruses[self.virus].seq)-1)
 				self.stop = np.random.randint(self.start+1, len(viruses[self.virus].seq))
 				if self.stop-self.start>min_chunk:
-					break
-							
+					break					
 		#if we want the whole virus
 		else:
 			self.start = 0
 			self.stop = len(viruses[self.virus].seq)
-	
-		#forward or reverse?
 		if np.random.uniform() > 0.5:
 			self.ori = "f" #define orientation
 			self.bases = viruses[self.virus][self.start:self.stop] #get bases to insert
 		else:
 			self.ori = "r" #define orientation
-			self.bases = viruses[self.virus][self.start:self.stop].reverse_complement() #get bases to insert
-
+			self.bases = viruses[self.virus][self.start:self.stop].reverse_complement() #get bases to insert remove this one
+		print(self.bases)
 		#construct dictionary with keys 'bases', 'ori' and 'coords'
 		#use to keep track of order if 
 		self.pieces = {0:{"bases":self.bases, "ori":self.ori, "coords":(self.start, self.stop)}}
-
 		#store information about rearrangements
 		self.isSplit = False #has chunk been split?
 		self.isRearranged = False #has chunk been rearranged?
 		self.deletion = False #does this chunk have a deletion
-		
 		
 	def split(self, n):
 		#split a part of a virus into n random parts
@@ -1039,93 +1033,206 @@ class Statistics:
 class Episome: 
 	"""Class of functions used to create episomes to add to the resulting fasta file""" 
 
-	#create an episome 
-	def __init__(self,viruses):
-		"""creates an Episome object""" 
-
-		#get virus to integrate
-		self.virus = np.random.choice(list(viruses.keys()))
-
-		#get the sequence of the virus 
-		self.seq = viruses[self.virus].seq 
-
-		#as the episome is circular it can be cut at any point to create a linear segment for sequencing 
-		#randomly select the point at which the episome is 'cut' 
-		self.cutP = np.random.randint(0,len(self.seq)) 
-
-		#to simulate a random cut, move the DNA ahead of cutP to the end of the sequence 
-		before_cut = self.seq[:self.cutP]
-		after_cut = self.seq[self.cutP:]
-		new_seq = after_cut + before_cut 
-		self.seq = new_seq 
 	
-	def insertWhole(self, host, name):
+	def insertWhole(viruses, min_len, host, name):
 		"""Adds a viral sequence to the output fasta file without modification"""
+		#get a chunk of virus 
+		chunk = ViralChunk(viruses, min_len, 'whole')
 		
-		entry = SeqRecord(Seq(str(self.seq)), id = name, name = name, description = name) 
+		#as the episome is circular it can be cut at any point 
+		#randomly select the point at which the episome is 'cut' 
+		cutP = np.random.randint(0,len(chunk.bases)) 
+
+		#rejoin episome
+		before_cut = chunk.bases[:cutP]
+		after_cut = chunk.bases[cutP:]
+		new_seq = after_cut + before_cut
+		chunk.bases = new_seq
+		
+		#add episome to the host dictionary 
+		entry = SeqRecord(Seq(str(chunk.bases.seq)), id = name, name = name, description = "") 
 		host[name] = entry  
 		
 		return host 
 
-	def insertPortion(self, host, name): 
+	def insertPortion(viruses, min_len, host, name): 
 		"""Adds a portion of the viral sequence to the output fasta file""" 
+		#get a chunk of virus 
+		chunk = ViralChunk(viruses, min_len, 'rand')
 
-		self.portion()
+		#as the episome is circular it can be cut at any point 
+		#randomly select the point at which the episome is 'cut' 
+		cutP = np.random.randint(0,len(chunk.bases)) 
+
+		#rejoin episome  
+		before_cut = chunk.bases[:cutP]
+		after_cut = chunk.bases[cutP:]
+		new_seq = after_cut + before_cut
+		chunk.bases = new_seq
 		
-		#add episome to fasta dictionary 
-		entry = SeqRecord(Seq(str(self.seq)), id = name, name = name, description = name) 
-		host[name] = entry 
+		#add episome to the host dictionary 
+		entry = SeqRecord(Seq(str(chunk.bases.seq)), id = name, name = name, description = "") 
+		host[name] = entry  
+		
 		return host 
 
-	def insertWholeRerrange(self,host, name): 
+	def insertWholeRearrange(viruses, min_len, host, name): 
 		"""Adds a rearranged viral sequece to the output fasta file""" 
-		#need to split it then rearrange the split 
-		return host 
+		#need to split it then rearrange the split
 
-	def split(self):
-		"""Splits viral episomal sequence into portions""" 
-		
-		#get the number of fragments by drawing from a poisson distribution 
+		#get a chunk of virus 
+		chunk = ViralChunk(viruses, min_len, 'whole')
+
+		#as the episome is circular it can be cut at any point 
+		#randomly select the point at which the episome is 'cut' 
+		cutP = np.random.randint(0,len(chunk.bases)) 
+
+		#get number of fragments to rearrange into episome
+		#draw from a poisson distribution with lambda = 1.5
 		while True:
 			n = int(np.random.poisson(1.5))
 			if n > 1:
 				break
-		self.fragments = n
 
-		#check that the sequence length is at least n 
-		if len(str(self.seq)) < n: 
-			print("Not enough bases to split") 
+		chunk.rearrange(n) 
 
-		
-		
-		
+		#change the bases of the viral chunk to the rearranged fragment 
+		new_chunk = ""
+		for i in range(0,n): 
+			portion = chunk.pieces.get(i).get('bases').seq
+			new_chunk = new_chunk+portion
+		chunk.bases = new_chunk
 
-	
+		#rejoin episome  
+		before_cut = chunk.bases[:cutP]
+		after_cut = chunk.bases[cutP:]
+		new_seq = after_cut + before_cut
+		chunk.bases = new_seq
 		
-		
+		#add episome to the host dictionary 
+		entry = SeqRecord(Seq(str(chunk.bases)), id = name, name = name, description = "") 
+		host[name] = entry 
+ 
+		return host
 
-	def portion(self):
-		"""Takes a portion of a viral sequence for use as an episome""" 
-		#specify a minimum size for a portion of episome 
-		min_chunk = 5 #TODO ask Suzanne what an appropriate value is 
+	def insertPortionRearrange(viruses, min_len, host, name):
+		"""Adds a portion of a rearranged viral sequence to the output fasta file""" 
 
-		#generate starting and stopping points for episome portion 
+		#get a chunk of virus 
+		chunk = ViralChunk(viruses, min_len, 'rand')
+
+		#as the episome is circular it can be cut at any point 
+		#randomly select the point at which the episome is 'cut' 
+		cutP = np.random.randint(0,len(chunk.bases)) 
+
+		#get number of fragments to rearrange into episome
+		#draw from a poisson distribution with lambda = 1.5
 		while True:
-			self.start = np.random.randint(0,len(str(self.seq))-1)
-			self.stop = np.random.randint(self.start+1, len(str(self.seq)))
-			if self.stop - self.start > min_chunk: 
-				break 
+			n = int(np.random.poisson(1.5))
+			if n > 1:
+				break
 
-		#update the episome sequence		
-		new_seq = self.seq[self.start:self.stop]
-		self.seq = new_seq
+		chunk.rearrange(n) 
 
-	def rearrange(self): 
+		#change the bases of the viral chunk to the rearranged fragment 
+		new_chunk = ""
+		for i in range(0,n): 
+			portion = chunk.pieces.get(i).get('bases').seq
+			new_chunk = new_chunk+portion
+		chunk.bases = new_chunk
+
+		#rejoin episome  
+		before_cut = chunk.bases[:cutP]
+		after_cut = chunk.bases[cutP:]
+		new_seq = after_cut + before_cut
+		chunk.bases = new_seq
+		
+		#add episome to the host dictionary 
+		entry = SeqRecord(Seq(str(chunk.bases)), id = name, name = name, description = "") 
+		host[name] = entry 
+ 
+		return host
+
+	def insertWholeDeletion(viruses, min_len, host, name):
+		"""Inserts a whole viral sequence with deletion to the output fasta file""" 
 		#get an order for the fragments 
 		 
+		#get a chunk of virus 
+		chunk = ViralChunk(viruses, min_len, 'whole')
+
+		#randomly select the point at which the episome is 'cut' 
+		cutP = np.random.randint(0,len(chunk.bases))
+
+		#get number of fragments to rearrange into
+		#draw from a poisson distribution with lambda = 2
+		#make sure n > 3
+		while True:
+			n = int(np.random.poisson(2))
+			if n > 3:
+				break
+		chunk.delete(n)
+		new_chunk = ""
+
+		#get the keys of the fragments after the deletion 
+		frag_keys = chunk.pieces.keys()
+
+		for i in frag_keys:
+			portion = chunk.pieces.get(i).get('bases').seq
+			new_chunk = new_chunk + portion 
+			
+		chunk.bases = new_chunk
+
+		#rejoin episome  
+		before_cut = chunk.bases[:cutP]
+		after_cut = chunk.bases[cutP:]
+		new_seq = after_cut + before_cut
+		chunk.bases = new_seq
 		
-	#def insertDeletion(): #TODO  
-		 
+		#add episome to the host dictionary 
+		entry = SeqRecord(Seq(str(chunk.bases)), id = name, name = name, description = "") 
+		host[name] = entry 
+ 
+		return host 
+
+		
+	def insertPortionDeletion():   
+		 """Adds a portion of viral sequence to the output fasta file""" 
+		#get a chunk of virus 
+		chunk = ViralChunk(viruses, min_len, 'rand')
+
+		#randomly select the point at which the episome is 'cut' 
+		cutP = np.random.randint(0,len(chunk.bases))
+
+		#get number of fragments to rearrange into
+		#draw from a poisson distribution with lambda = 2
+		#make sure n > 3
+		while True:
+			n = int(np.random.poisson(2))
+			if n > 3:
+				break
+		chunk.delete(n)
+		new_chunk = ""
+
+		#get the keys of the fragments after the deletion 
+		frag_keys = chunk.pieces.keys()
+
+		for i in frag_keys:
+			portion = chunk.pieces.get(i).get('bases').seq
+			new_chunk = new_chunk + portion 
+			
+		chunk.bases = new_chunk
+
+		#rejoin episome  
+		before_cut = chunk.bases[:cutP]
+		after_cut = chunk.bases[cutP:]
+		new_seq = after_cut + before_cut
+		chunk.bases = new_seq
+		
+		#add episome to the host dictionary 
+		entry = SeqRecord(Seq(str(chunk.bases)), id = name, name = name, description = "") 
+		host[name] = entry 
+ 
+		return host
 
 if __name__ == "__main__":
 	main(sys.argv[1:])
