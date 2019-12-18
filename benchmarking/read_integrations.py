@@ -1,6 +1,7 @@
 ### combines data from simiulated reads and integrated host sequence to output which reads contain viral DNA ###
 ## uses .sam file outputted from reads simulated using ART https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3278762/
 ## uses file output from insert_virus.py which lists the location of viral DNA in the human .fasta
+## when using 'coordinates' we consider (start point, end point) of either the viral integration in the host genome or the reads when aligned 
 
 
 #import libraries 
@@ -27,14 +28,24 @@ def main(argv):
 	#read in host integration locations
 	int_file = pd.read_csv(args.host_ints,header=0,sep='\t')
 
-	num_reads = numReads(read_file) 
+	#find the number of fragments 
+	num_reads = numReads(read_file)
+
+	#get the coordinates of each integration 
 	int_coord = intCoords(int_file)
+	
+	#read in sam file to process reads 
 	sam_file = args.sam
+
+	#process reads to obtain the ID of each fragment and the coordinates of the corresponding reads 
 	fragment_id, first_read, second_read = processReads(sam_file,num_reads) 
+
+	#assess for the type of read and the amount of viral DNA (bp) in each read 
 	first_type, second_type, first_len, second_len = analyseRead(first_read,second_read, int_coord) 
 	
 	#save the file 
-	results = pd.DataFrame({"fragment_id":fragment_id,"left_read":first_type,"right_read":second_type,"left_read_amount":first_len,"right_read_amount":second_len,})
+	results = pd.DataFrame({"fragment_id":fragment_id,"left_read":first_type,"right_read":second_type,"left_read_amount":first_len,"right_read_amount":second_len,
+"left_read_coor":first_read,"right_read_coor":second_read})
 	with open(args.save, 'w') as handle: 
 		results.to_csv(handle,sep='\t') 
 		
@@ -44,6 +55,7 @@ def main(argv):
 		
 def numReads(sam_file): 
 	"""Finds number of reads in the .sam file"""
+
 	df = pd.read_csv(sam_file,header=None) 
 	num_reads = len(df[~df[0].str.contains('@')])
 	num_inserts = int(num_reads/2)
@@ -193,9 +205,10 @@ def processReads(sam_file,num_inserts):
 		fragment_id.append(x.qname)
 		
 		#save the coordinates of the read 
-		first_read.append((x.pos-1,x.pos+x.tlen-1))
-		second_read.append((y.pos-1,y.pos+y.tlen-1))
-		
+		first_read.append((x.pos-1,x.pos+len(x.seq)))
+		second_read.append((y.pos-1,y.pos+len(y.seq)))
+		#print("COORD A: "+str(first_read))	
+		#print("COORD B: "+str(second_read)) #coordinates apear in the wrong orientation 
 	return fragment_id, first_read, second_read
 	
  
@@ -216,7 +229,7 @@ def checkOverlap(coordA, coordB):
 			overlap_type = "all"
 	elif A1 <= B2 and A2>=B2:
 		overlap_type = "right"
-	elif A1 > B1 and A2 < B2: 
+	if A1 < B1 and A2 > B2: 
 		overlap_type = "short"  
 		
 	return overlap_type 
@@ -225,6 +238,8 @@ def checkOverlap(coordA, coordB):
 
 def overlapLength(coordA,coordB): 
 	"""Tells us the length of the overlap betweeen coordA and coordB"""
+	#debugging remove later 	
+
 	A1, A2 = coordA
 	B1, B2 = coordB
 	

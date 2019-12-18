@@ -71,6 +71,9 @@ def main(argv):
 
 	#types of insertions
 	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
+
+	#types of episomes 
+	episome_types = [Episome.insertWhole, Episome.insertPortion, Episome.insertWholeRearrange, Episome.insertPortionRearrange, Episome.insertWholeDeletion, Episome.insertPortionDeletion] 
 	
 	#list to store integration objects
 	host_ints = []
@@ -127,14 +130,12 @@ def main(argv):
 	print("NUMBER OF INTEGRATIONS DONE: "+str(len(host_ints)))		
 	print("\nNUMBER OF EPISOMES: "+str(epi_num))
 	
+	
 	for i in range(0,epi_num): 
 		rand_int = np.random.randint(0,2)	
 		name = "episome "+str(i+1)
-		host_fasta = Episome.insertWholeDeletion(virus, min_len, host_fasta, name) 
-			
-		#types of episomes 
-		#episome_types = [currentEpi.insertWhole, currentEpi.insertPortion] 
-		#host_fasta = episome_types[rand_int](host_fasta,name)  
+		#host_fasta = Episome.insertWholeDeletion(virus, min_len, host_fasta, name) #TODO remove 
+		host_fasta = episome_types[rand_int](virus, min_len, host_fasta, name)  
 			
 	print("\n***INTEGRATIONS COMPLETE***")
 	print(host_fasta)
@@ -1192,11 +1193,12 @@ class Episome:
 		entry = SeqRecord(Seq(str(chunk.bases)), id = name, name = name, description = "") 
 		host[name] = entry 
  
-		return host 
+		return host
 
-		
-	def insertPortionDeletion():   
-		 """Adds a portion of viral sequence to the output fasta file""" 
+	def insertPortionDeletion(viruses, min_len, host, name):
+		"""Inserts a whole viral sequence with deletion to the output fasta file""" 
+		#get an order for the fragments 
+		 
 		#get a chunk of virus 
 		chunk = ViralChunk(viruses, min_len, 'rand')
 
@@ -1232,7 +1234,8 @@ class Episome:
 		entry = SeqRecord(Seq(str(chunk.bases)), id = name, name = name, description = "") 
 		host[name] = entry 
  
-		return host
+		return host 
+ 
 
 if __name__ == "__main__":
 	main(sys.argv[1:])
