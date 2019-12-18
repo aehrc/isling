@@ -1,3 +1,60 @@
+#### pipeline for detecting viral integrations in NGS data ####
+
+# the pipeline detecets viral integrations into a host genome in short reads by 
+# identifying chimeric reads, discordant read pairs, and short insertions of virus 
+# flanked by host sequence on both sides
+
+# the pipeline relies on a particular directory structure:
+ 
+# parent_folder/
+# ├── data
+# │   ├── metadata
+# │   ├── reads
+# │   │   └── dataset1
+# │   │       ├── sample1_1.fastq.gz
+# │   │       ├── sample2_2.fastq.gz
+# │   │       ├── sample2_1.fastq.gz
+# │   │       └── sample2_2.fastq.gz
+# │   └── references
+# │       ├── host.fa
+# │       └── virus.fa
+# ├── intvi_pipeline 
+# │   ├── all pipeline files from git repo
+# └── proj-spcfc
+#     └── dsets.yaml
+#
+# the folder data contains all the data necessary to run the pipeline
+# within the data folder, reads should be organised into folders representing
+# datasets, with gzipped paired fastq files for each sample named as above
+# references should be placed in data/references.  A yaml file in proj-spcfc
+# specifies which references are to be used with which datasets
+# the pipline lives in the intvi_pipeline folder which should be cloned
+# from the git repo
+
+# the steps in the pipeline are as follows:
+# 1. preprocessing
+#   - rename all files for consistency (files may either be named "<sample>_1.fastq.gz" or "<sample>_R1.fastq.gz")
+#   - either merge R1 and R2 using seqprep, or don't do merging 
+#     and just concatenate R1 and R2, as specified in the dsets.yaml config file
+# 2. alignments
+#   - align all the reads to the virus
+#   - remove duplicates
+#   - extract only the alinged reads to a fastq
+#   - align these reads to the host
+# 3. perl scripts
+#   - run perl scripts with alignment sam  files as inputs to detect integrations
+# 4. postprocessing
+#   - run R script to generate ouput xlsx files for each dataset, summary graphs
+#   - merge bed files for each dataset
+#   - intersect with refseq
+#   - output files for visualzation in UCSC browser
+#  
+# the primary output of the pipeline is the xlsx files for each datasets which
+# contain the details of the detected integrations.
+
+
+
+
 #### python modules ####
 
 import glob
@@ -81,24 +138,11 @@ rule copy:
 		cp "{input.r2}" "{output.r2_out}"
 		"""
 
-rule dedup:
-	input:
-		r1 = "../out/reads/{dset}/{samp}_1.fastq.gz",
-		r2 = "../out/reads/{dset}/{samp}_2.fastq.gz"	
-	output:
-		R1_clumped = temp("../out/{dset}/dedup_reads/{samp}.1.fastq.gz"),
-		R2_clumped = temp("../out/{dset}/dedup_reads/{samp}.2.fastq.gz")
-	conda:
-		"envs/bbmap.yml"
-	shell:
-		"""
-		clumpify.sh -Xmx10g in="{input.r1}" in2="{input.r2}" out="{output.R1_clumped}" out2="{output.R2_clumped}" dedupe subs=0
-		"""
 
 rule seqPrep:
 	input:
-		r1 = "../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
-		r2 = "../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
+		r1 = "../out/reads/{dset}/{samp}_1.fastq.gz",
+		r2 = "../out/reads/{dset}/{samp}_2.fastq.gz"
 	output:
 		merged = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz"),
 		proc_r1 = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_1.fastq.gz"),
@@ -117,8 +161,8 @@ rule seqPrep:
 
 rule combine:
 	input:
-		r1 = "../out/{dset}/dedup_reads/{samp}.1.fastq.gz",
-		r2 = "../out/{dset}/dedup_reads/{samp}.2.fastq.gz"
+		r1 = "../out/reads/{dset}/{samp}_1.fastq.gz",
+		r2 = "../out/reads/{dset}/{samp}_2.fastq.gz"
 	output:
 		proc_r1 = temp("../out/{dset}/processed_reads/{samp}.1.fastq.gz"),
 		proc_r2 = temp("../out/{dset}/processed_reads/{samp}.2.fastq.gz"),
@@ -201,11 +245,32 @@ rule align_bwa_virus:
 		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.all} --output {output.vShort} --threshold 10 --hflag 200 --insert 0
 		"""
 
-rule extract_vAligned:
+rule dedup:
 	input:
 		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam",
 		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam",
 		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.sam"
+	output:
+		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwaPaired.sam",
+
+		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwa.sam",
+		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwaShort.sam"
+	conda:
+		"envs/picard.yml"
+	shell:
+		"""
+		picard MarkDuplicates I={input.vPaired} O={output.vPaired}
+		picard MarkDuplicates I={input.vSing} O={output.vSing}
+		picard MarkDuplicates I={input.vShort} O={output.vShort} 
+		"""
+	
+
+rule extract_vAligned:
+	input:
+		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwaPaired.sam",
+		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwa.sam",
+		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwaShort.sam"
+
 	output:
 		svSam = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam"),
 		shortvSam = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.mapped.sam"),
