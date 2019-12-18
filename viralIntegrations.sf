@@ -245,18 +245,36 @@ rule align_bwa_virus:
 		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.all} --output {output.vShort} --threshold 10 --hflag 200 --insert 0
 		"""
 
-rule dedup:
+rule sort:
 	input:
 		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam",
 		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam",
 		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.sam"
 	output:
-		vPaired = temp("../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwaPaired.sam"),
-		vPairedMetrics = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwaPaired.metrics.txt",
-		vSing = temp("../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwa.sam"),
-		vSingMetrics = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwa.metrics.txt",
-		vShort = temp( "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwaShort.sam"),
-		vShortMetrics = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwaShort.metrics.txt"
+		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sorted.sam",
+		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sorted.sam",
+		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.sorted.sam"
+	conda:
+		"envs/bwa.yml"
+	shell:
+		"""
+		samtools sort {input.vPaired} > {output.vPaired}
+		samtools sort {input.vSing} > {output.vSing}
+		samtools sort {input.vShort} > {output.vShort} 
+		"""
+
+rule dedup:
+	input:
+		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sorted.sam",
+		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sorted.sam",
+		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.sorted.sam"
+	output:	
+		vPaired = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.dedup.sam"),
+		vPairedMetrics = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.dedupMetrics.txt",		
+		vSing = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.dedup.sam"),
+		vSingMetrics = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.dedupMetrics.txt",
+		vShort = temp( "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.dedup.sam"),
+		vShortMetrics = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.dedupMetrics.txt"
 	conda:
 		"envs/picard.yml"
 	shell:
@@ -268,15 +286,16 @@ rule dedup:
 
 rule extract_vAligned:
 	input:
-		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwaPaired.sam",
-		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwa.sam",
-		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.dedup.bwaShort.sam"
+		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.dedup.sam",
+		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.dedup.sam",
+		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.dedup.sam"
 
 	output:
 		svSam = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam"),
 		shortvSam = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.mapped.sam"),
 		pvBam_readMap_mateUnmap = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped1.bam"),
 		pvBam_readUnmap_mateMap = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped2.bam"),
+		pvBam_bothMapped = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped3.bam"),
 		pvBam = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.bam"),
 		pvSam = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam")
 	conda:
@@ -287,7 +306,8 @@ rule extract_vAligned:
 		samtools view -h -F 0x4 -F 0x800 -o {output.shortvSam} {input.vShort} 
 		samtools view -hb -F 0x4 -f 0x8 -F 0x800 -o {output.pvBam_readMap_mateUnmap} {input.vPaired}
 		samtools view -hb -f 0x4 -F 0x8 -F 0x800 -o {output.pvBam_readUnmap_mateMap} {input.vPaired}
-		samtools merge {output.pvBam} {output.pvBam_readMap_mateUnmap} {output.pvBam_readUnmap_mateMap}
+		samtools view -hb -F 0x4 -F 0x8 -F 0x800 -o {output.pvBam_bothMapped} {input.vPaired}
+		samtools merge {output.pvBam} {output.pvBam_readMap_mateUnmap} {output.pvBam_bothMapped} {output.pvBam_readUnmap_mateMap}
 		samtools view -h -o {output.pvSam} {output.pvBam}
 		"""
 
@@ -357,10 +377,10 @@ rule run_int_scripts:
 	input:
 		hPaired = "../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.{virus}Mappedreads.sam",
 		hSing = "../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.sam",
-		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam",
-		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam",
 		hShort = "../out/{dset}/host_aligned/{samp}.{host}.bwaShort.{virus}Mappedreads.sam",
-		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.sam"
+		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.dedup.sam",
+		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.dedup.sam",
+		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.dedup.sam",
 
 	output:
 		allInt = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
