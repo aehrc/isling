@@ -4,6 +4,6 @@ channels:
   - r
   - defaults
 dependencies:
-  - seqprep=1.3.2=ha92aebf_3
+  - seqprep=1.3
 
 

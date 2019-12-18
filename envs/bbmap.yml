@@ -6,7 +6,5 @@ channels:
   - conda-forge
 dependencies:
   - bbmap=38.57
-  - libgcc-ng=9.1
-  - openjdk=8.0
 
 
