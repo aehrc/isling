@@ -4,6 +4,7 @@
 import pandas as pd 
 import argparse
 import sys
+import numpy as np
 
 ###main 
 def main(argv): 
@@ -12,15 +13,11 @@ def main(argv):
 	parser = argparse.ArgumentParser(description='compares viral integrations identified by pipeline with known viral integrations')
 	parser.add_argument('--pipeline', help='output file from pipeline', required = True) 
 	parser.add_argument('--ints', help='integrations applied file', required = True)
-	parser.add_argument('--host_ints', help='file listing regions with viral DNA', required = True)
 	parser.add_argument('--read_ints', help='file with files containing information on reads containing viral DNA', required = False) #TODO change this to a requirement 
 	args = parser.parse_args()  
 	
 	#read in integration file 
 	ints = pd.read_csv(args.ints, header =0, sep='\t') 
-
-	#read in file listing regions with viral DNA 
-	host_ints = pd.read_csv(args.host_ints,header=0,sep='\t')
 
 	#read in file listing which reads contain viral DNA 
 	read_ints = pd.read_csv(args.read_ints, header=0, sep='\t') #TODO uncomment once batch for file has finnished
@@ -32,7 +29,20 @@ def main(argv):
 	correct_reads, missed_reads = listSuccess(true_vreads, pred_vreads)
 	getStats(pred_vreads,true_vreads,correct_reads)
 	
-	
+	#filter out ambiguous reads 
+	filt_pipe = filterAmbiguous(pipe_ints)
+
+	#try again after filtering 
+	true_vreads, pred_vreads = listIDs(read_ints,filt_pipe)
+	correct_reads, missed_reads = listSuccess(true_vreads, pred_vreads)
+	print("Stats after filtering...")
+	getStats(pred_vreads,true_vreads,correct_reads)
+
+	#create a df of the missed reads
+	missed_df = readDataFrame(missed_reads, read_ints) #look at whats up with these ones we missed 
+	missed_hPos = findMissed(missed_df)
+	evaluateMissed(missed_hPos,ints) 
+
 	#print("columns in pipeline file" +pipe_ints.columns.to_series()) 
 	#print("columns in reads file" +read_ints.columns.to_series()) 
 	#compare the number of entries in each of the files 
@@ -42,8 +52,6 @@ def main(argv):
 	#print("Number of entries in pipe_ints file: "+str(len(pipe_ints)))
 
 	
-
-
 def listIDs(read_ints,pipe_ints): 
 	"""Function which makes lists of the IDs of the viral reads and the predicted viral reads""" 
 	#create a list of the IDs of the known viral reads 	
@@ -72,7 +80,6 @@ def listSuccess(true_vreads, pred_vreads):
 
 	return correct_reads, missed_reads
 
-
 def getStats(pred_vreads,true_vreads,correct_reads): 
 	"""Function which identifies the accuracy which reads containing viral DNA are identified""" 
 
@@ -98,21 +105,122 @@ def getStats(pred_vreads,true_vreads,correct_reads):
 	#% predictions missed by pipline
 	#"What percentage of integrated reads does our pipeline miss"   
 	#predMiss = (len(missed_reads)/allReads) 
-	predMiss = ((allReads-len(correct_reads))/allReads) #compare TODO
+	predMiss = ((allReads-len(correct_reads))/allReads)*100 
 	print("% OF READS READS MISSED BY THE PIPELINE: "+str(int(predMiss))+"%")  
-
 	return predAcc, predHit, falsePred, predMiss 
 
-def findReadType(): 
-	"""Function which identifies the accuracy which the type of read is identified by the pipeline""" 
-		
 
-def findStartStop(): 
-	"""Function which identifies the accuracy which the start and stop points are identified by the pipeline""" 
+def filterAmbiguous(pipe_ints): 
+	"""Filters out integrated reads which are ambiguous for the host or viral sequence""" 
+	#list of the indexes of ambiguous reads 
+	ambiguous_idx = []
+
+	for i in range(len(pipe_ints)): 
+		if pipe_ints['HostPossibleAmbiguous'][i] == 'yes' or pipe_ints['ViralPossibleAmbiguous'][i] == 'yes': 
+			ambiguous_idx.append(i) 
+			
+	#drop the ambiguous rows 	
+	filt_pipe = pipe_ints.drop(pipe_ints.index[ambiguous_idx])
+
+	#reindex fil_pipe for ease of use later 
+	filt_pipe = filt_pipe.reset_index(drop=True) 
+
+	#report the % remaining after filtering 
+	filt_per = (len(filt_pipe)/len(pipe_ints))*100 
+	print(str(int(filt_per))+"% of integrations remaining after filtering reads ambiguous for host or vector") 
+ 
+	return filt_pipe
+
+def readDataFrame(read_list, read_ints): 
+	"""Creates a dataframe of a subset of the missed reads using a list of read IDs""" 
+	#create a list of the indexes to be included in the new dataframe 
+	new_idx = []
+	
+	read_ints = read_ints.set_index('fragment_id') 
+	
+	#create df with only the entries in read_list
+	new_df = read_ints.loc[read_list]
+
+	#reset index on the new dataframe 
+	new_df['fragment_id'] = new_df.index 
+	new_df = new_df.reset_index(drop=True)
+	del new_df['Unnamed: 0']
+
+	return new_df
+
+def findMissed(missed_df): 
+	"""Looks up the integrations missed by the pipeline enabling subsequent determination of what kind of reads we missed""" 
+
+	missed_column = missed_df['hPos'] 
+
+	#list of integration missed by pipeline
+	missed_hPos = []
+ 
+	for i in range(len(missed_column)): 	
+		values = str(missed_column[i][1:-1])
+		values = values.split(", ")
+		values = list(map(int,values))
+		for value in values:
+			#ensure that the same hPos value is not added more than once  
+			if value not in missed_hPos:
+				missed_hPos.append(value) 
+	return missed_hPos 
+	 
+def evaluateMissed(missed_hPos,ints):
+	"""Attempt to find out why the integrations were missed by the pipeline"""
+	#drop the columns from ints we do not care about to make it less cumbersome
+	ints = ints.drop(['hChr', 'virus'], axis=1) 
+
+	#create a dictionary of properities of each of the integrations
+	hPos_dict = ints.set_index('hPos').to_dict()
+ 
+	#check out the different properities to see if we can find any particular issues 
+	rearrange = [hPos_dict.get('rearrangement').get(missed) for missed in missed_hPos]
+	deletion = [hPos_dict.get('deletion').get(missed) for missed in missed_hPos]
+	num_fragments = [hPos_dict.get('num_fragments').get(missed) for missed in missed_hPos]
+
+	#get statistics on the different properties 
+	assessRearrange(rearrange) 
+	assessDeletion(deletion)
+	assessFragments(num_fragments)  
+
+	#TODO modify read_integrations code to say what type of overlap is present in each read 
+	left_junction = [hPos_dict.get('leftJunction').get(missed) for missed in missed_hPos]
+	right_junction = [hPos_dict.get('rightJunction').get(missed) for missed in missed_hPos]
+
+	#TODO look at the length of the integration (short integrations may be more likely to be missed)
+	#actual length of integration or just the part in the read  
+ 	
+def assessRearrange(rearrange): 
+	"""Tells us how likely it is that rearrangees are the cause of misses""" 
+
+	#find the number of missed integrations which have been rearranged 
+	rearr_true = rearrange.count(True) 
+
+	missed_rearr = (rearr_true/len(rearrange))*100 
+	
+	print(str(missed_rearr)+"% of the integrations missed were rearraged")   
+
+def assessDeletion(deletion): 
+	"""Tells us how likely it is that deletions ar ethe cause of misses""" 
+	
+	#find the number of missed integrations which had deletions
+	del_true = deletion.count(True) 
+
+	missed_rearr = (del_true/len(deletion))*100
+
+	print(str(del)+"% of the integrations missed were rearranged")
+
+def assessFragments(num_fragments): 
+	"""Tells us what number of fragments the missed integrations were divided into""" 
+	min_frag = min(num_fragments) 
+	max_frag = max(num_fragments)
 
 
-
-
+	for i in range(min_frag, max_frag+1):
+		count = num_fragments.count(i)
+		frag_freq = (count/len(num_fragments))*100 
+		print(str(frag_freq)+"% of missed integrations were broken into "+str(i)+" fragments"
 
 if __name__ == "__main__":
 	main(sys.argv[1:])
