@@ -48,7 +48,7 @@ rule all:
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),		
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),
-		"../out/summary/num_sites.xlsx",
+		expand("../out/summary/{dset}.combined.xlsx", dset = DATASETS),
 #		expand("../out/summary/ucsc_bed/{dset}.clean.bed", dset = DATASETS)
 		
 		
