@@ -1013,6 +1013,10 @@ class Statistics:
 		
 		#include hPos - is unique to each integration and allows subsequent identification of what occured 
 		previousInt = [int.hPos for int in int_list]
+
+		#include our junction types - used later to find what type of overlaps are in chimeric reads 
+		left_overlap = [int.junction[0] for int in int_list]
+		right_overlap = [int.junction[1] for int in int_list]  
 		
 		#can only save stats if integrations have been performed 
 		if num_ints != 0 :
@@ -1027,7 +1031,7 @@ class Statistics:
 				int_start.append(c1)
 				int_stop.append(c2)
 		
-			stats_df = pd.DataFrame({"Integration sites":int_sites,"Start point":int_start,"Stop point": int_stop, "hPos":previousInt}) 
+			stats_df = pd.DataFrame({"Integration sites":int_sites,"Start point":int_start,"Stop point": int_stop, "hPos":previousInt, "leftJunction":left_overlap, "rightJunction":right_overlap}) 
 		else:
 			print("NO SUCCESSFUL INTEGRATIONS WERE PERFORMED")
 		

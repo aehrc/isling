@@ -39,7 +39,7 @@ def main(argv):
 	getStats(pred_vreads,true_vreads,correct_reads)
 
 	#create a df of the missed reads
-	missed_df = readDataFrame(missed_reads, read_ints) #look at whats up with these ones we missed 
+	missed_df = readDataFrame(missed_reads,read_ints) #look at whats up with these ones we missed 
 	missed_hPos = findMissed(missed_df)
 	evaluateMissed(missed_hPos,ints) 
 
@@ -182,7 +182,7 @@ def evaluateMissed(missed_hPos,ints):
 	#get statistics on the different properties 
 	assessRearrange(rearrange) 
 	assessDeletion(deletion)
-	assessFragments(num_fragments)  
+	assessFragments(num_fragments)  #TODO compare these to total amount which were deletions etc. 
 
 	#TODO modify read_integrations code to say what type of overlap is present in each read 
 	left_junction = [hPos_dict.get('leftJunction').get(missed) for missed in missed_hPos]
@@ -199,7 +199,7 @@ def assessRearrange(rearrange):
 
 	missed_rearr = (rearr_true/len(rearrange))*100 
 	
-	print(str(missed_rearr)+"% of the integrations missed were rearraged")   
+	print("\n" + str(missed_rearr)+"% of the integrations missed were rearraged\n")   
 
 def assessDeletion(deletion): 
 	"""Tells us how likely it is that deletions ar ethe cause of misses""" 
@@ -207,9 +207,9 @@ def assessDeletion(deletion):
 	#find the number of missed integrations which had deletions
 	del_true = deletion.count(True) 
 
-	missed_rearr = (del_true/len(deletion))*100
+	missed_del = (del_true/len(deletion))*100
 
-	print(str(del)+"% of the integrations missed were rearranged")
+	print(str(missed_del)+"% of the integrations missed had deletions\n")
 
 def assessFragments(num_fragments): 
 	"""Tells us what number of fragments the missed integrations were divided into""" 
@@ -220,7 +220,7 @@ def assessFragments(num_fragments):
 	for i in range(min_frag, max_frag+1):
 		count = num_fragments.count(i)
 		frag_freq = (count/len(num_fragments))*100 
-		print(str(frag_freq)+"% of missed integrations were broken into "+str(i)+" fragments"
+		print(str(frag_freq)+"% of missed integrations were broken into "+str(i)+" fragments")
 
 if __name__ == "__main__":
 	main(sys.argv[1:])
