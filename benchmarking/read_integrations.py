@@ -34,6 +34,12 @@ def main(argv):
 
 	#get the coordinates of each integration 
 	int_coord = intCoords(int_file)
+
+	#get the hPos of each integration - we use this later as an identifer
+	int_hPos = intHpos(int_file) 
+
+	#get the types of junctions for each integration
+	int_leftj, int_rightj = intJunction(int_file)
 	
 	#read in sam file to process reads 
 	sam_file = args.sam
@@ -42,11 +48,11 @@ def main(argv):
 	fragment_id, first_read, second_read = processReads(sam_file,num_reads) 
 
 	#assess for the type of read and the amount of viral DNA (bp) in each read 
-	first_type, second_type, first_len, second_len = analyseRead(first_read,second_read, int_coord) 
+	first_type, second_type, first_len, second_len, read_hPos, first_junc, second_junc  = analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_rightj) 
 	
 	#save the entire file 
 	results = pd.DataFrame({"fragment_id":fragment_id,"left_read":first_type,"right_read":second_type,"left_read_amount":first_len,"right_read_amount":second_len,
-"left_read_coor":first_read,"right_read_coor":second_read})
+"left_read_coor":first_read,"right_read_coor":second_read, "hPos": read_hPos, "left_junc":first_junc, "right_junc":second_junc})
 	with open(args.save, 'w') as handle: 
 		results.to_csv(handle,sep='\t') 
 	
@@ -69,7 +75,7 @@ def numReads(sam_file):
 	return num_inserts 
 	
 	
-def analyseRead(first_read,second_read, int_coord):  
+def analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_rightj):  
 	"""Creates a list of whether a read overlaps (True/False) and a list of the length of the corresponding overlap
 	takes lists of the coordinates of the reads and the locations of the viral DNA in the host"""
 	
@@ -82,6 +88,12 @@ def analyseRead(first_read,second_read, int_coord):
 	first_len = []
 	second_len = []
 	
+	#list of the integrations in each read - denoted as hPos 
+	read_hPos = []
+
+	#list the junction types in each read
+	first_junc = []
+	second_junc = [] 
 	
 	#loop to iterate through the reads. len(first_read) used though could have used len(second_read) 
 	for i in range(len(first_read)):
@@ -92,6 +104,13 @@ def analyseRead(first_read,second_read, int_coord):
 		#keep record of which overlaps occur
 		overlap_type1 = []
 		overlap_type2 = []
+
+		#list the integrations in the read 
+		int_list = []
+
+		#list the junction types 
+		junction_1 = ""
+		junction_2 = ""
 		
 		for j in range(len(int_coord)):
 			
@@ -104,6 +123,13 @@ def analyseRead(first_read,second_read, int_coord):
 				#save information on the amount of viral DNA in the read from the integration 
 				overlap = overlapLength(first_read[i],int_coord[j])
 				overlap_len1.append(overlap) 
+
+				#Store the hPos of the integration in the read 
+				int_list.append(int_hPos[j])
+
+				#Store the junction type
+				if junction_1 != "none":
+					junction_1 = readJunction(j, c_type ,int_leftj, int_rightj)   
 			
 			#compare the ith right read with the jth integration 
 			c_type = checkOverlap(second_read[i], int_coord[j]) 
@@ -113,7 +139,14 @@ def analyseRead(first_read,second_read, int_coord):
 				
 				#save information on the amount of viral DNA in the read from the integration 
 				overlap = overlapLength(second_read[i], int_coord[j]) 
-				overlap_len2.append(overlap) 
+				overlap_len2.append(overlap)
+
+				#Store the hPos of the integration in the read 
+				int_list.append(int_hPos[j])
+
+				#Store the junction type
+				if junction_2 != "none": 				
+					junction_2 = readJunction(j, c_type ,int_leftj, int_rightj)  
 		
 		#find the types of the read 
 		type1 = readType(overlap_type1)
@@ -129,9 +162,16 @@ def analyseRead(first_read,second_read, int_coord):
 		
 		#save the amount of viral DNA in each read 
 		first_len.append(len1)
-		second_len.append(len2) 		
+		second_len.append(len2)
+
+		#save the integrations (hPos) in each read 
+		read_hPos.append(int_list) #exists as a list of lists
+
+		#save the junction types of each read
+		first_junc.append(junction_1)
+		second_junc.append(junction_2) 	
 		
-	return first_type, second_type, first_len, second_len 
+	return first_type, second_type, first_len, second_len, read_hPos, first_junc, second_junc 
 	
 	
 def readType(overlap_type): 
@@ -190,6 +230,52 @@ def intCoords(int_file):
 		c2 = int_file["Stop point"][i]
 		int_coord.append((c1,c2))
 	return int_coord
+
+def intHpos(int_file): 
+	"""finds the hPos of the host integration allowing subsequent identification""" 
+
+	#list of hPos values for each integration in int_coord[]
+	int_hPos = []
+
+	for i in range(len(int_file)): 
+		hPos = int_file['hPos'][i]
+		int_hPos.append(hPos) 
+
+	return int_hPos
+
+def intJunction(int_file):
+	"""finds the left and right junction types for each integration""" 
+	
+	#list of the junctions 
+	int_leftj = []
+	int_rightj = []
+
+	for i in range(len(int_file)):
+		#get junctions  
+		leftj = int_file['leftJunction'][i]
+		rightj = int_file['rightJunction'][i]
+		#save the junctions
+		int_leftj.append(leftj) 
+		int_rightj.append(rightj)
+
+	return int_leftj, int_rightj
+
+def readJunction(index, overlap_type, int_leftj, int_rightj): 
+	"""finds the type of junction in a read""" 
+
+	junction = "" 
+	#if viral DNA is on the right we care about the left junction
+	if overlap_type == "right":
+		junction = int_leftj[index]  	
+
+	#if viral DNA is on the left we care about the right junction 
+	if overlap_type == "left":
+		junction = int_rightj[index] 
+
+	else: 
+		junction = "none" 
+
+	return junction  
 	
 def processReads(sam_file,num_inserts):
 	"""Creates a list of the read IDs and their alignment coordinates""" 
@@ -230,14 +316,15 @@ def checkOverlap(coordA, coordB):
 	A1, A2 = coordA
 	B1, B2 = coordB 
 	
-	if A1 <= B1 and A2 >= B1:
-		overlap_type = "left" 	
-		if A2 >= B2: 
-			overlap_type = "all"
-	elif A1 <= B2 and A2>=B2:
-		overlap_type = "right"
-	if A1 < B1 and A2 > B2: 
+
+	if B1<=A1 and B2>=A2: 
+		overlap_type = "all" 
+	elif A1 < B1 and A2 > B2: 	 
 		overlap_type = "short"  
+	elif A1 < B1 and B1 <= A2:
+		overlap_type = "right" 	#virus is on the right end of the read 
+	elif B2 < A2 and B2 >= A1:
+		overlap_type = "left"
 		
 	return overlap_type 
 		 
@@ -277,7 +364,6 @@ def getViralReads(results):
 	print("Number of viral reads: "+str(len(viral_reads))) 
 	return viral_reads
 
-	
 	
 if __name__ == "__main__":
 	main(sys.argv[1:]) 	
