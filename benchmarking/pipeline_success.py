@@ -16,11 +16,15 @@ def main(argv):
 	parser.add_argument('--read_ints', help='file with files containing information on reads containing viral DNA', required = False) #TODO change this to a requirement 
 	args = parser.parse_args()  
 	
+	print("Starting") 
 	#read in integration file 
 	ints = pd.read_csv(args.ints, header =0, sep='\t') 
 
 	#read in file listing which reads contain viral DNA 
 	read_ints = pd.read_csv(args.read_ints, header=0, sep='\t') #TODO uncomment once batch for file has finnished
+
+	#filter our file to leave only chimeric reads 
+	read_ints = filterChimeric(read_ints) 
 
 	#read in file lising the integrations detected by the pipeline 
 	pipe_ints = pd.read_csv(args.pipeline, header = 0, sep = '\t')
@@ -41,7 +45,10 @@ def main(argv):
 	#create a df of the missed reads
 	missed_df = readDataFrame(missed_reads,read_ints) #look at whats up with these ones we missed 
 	missed_hPos = findMissed(missed_df)
-	evaluateMissed(missed_hPos,ints) 
+	evaluateMissed(missed_hPos,ints)
+
+	#get the actual types of junctions 
+	assessOverlap(read_ints, missed_reads)  
 
 	#print("columns in pipeline file" +pipe_ints.columns.to_series()) 
 	#print("columns in reads file" +read_ints.columns.to_series()) 
@@ -131,6 +138,23 @@ def filterAmbiguous(pipe_ints):
  
 	return filt_pipe
 
+def filterChimeric(reads_ints): 
+	"""Process of filtering the entire dataframe was inefficient, aim to filter differently""" 
+	#list of the indexes of the reads which are not chimeric
+	nonchimeric_idx = []
+
+	for i in range(len(reads_ints)): 
+		if reads_ints['left_read'][i] == 'viral' and reads_ints['right_read'][i] == 'viral': 
+			nonchimeric_idx.append(i) 
+
+	#drop the nonchimeric rows 
+	filt_reads = reads_ints.drop(reads_ints.index[nonchimeric_idx])
+
+	#reindex the filtered reads
+	filt_reads = filt_reads.reset_index(drop=True) 
+
+	return filt_reads 
+
 def readDataFrame(read_list, read_ints): 
 	"""Creates a dataframe of a subset of the missed reads using a list of read IDs""" 
 	#create a list of the indexes to be included in the new dataframe 
@@ -184,10 +208,6 @@ def evaluateMissed(missed_hPos,ints):
 	assessDeletion(deletion)
 	assessFragments(num_fragments)  #TODO compare these to total amount which were deletions etc. 
 
-	#TODO modify read_integrations code to say what type of overlap is present in each read 
-	left_junction = [hPos_dict.get('leftJunction').get(missed) for missed in missed_hPos]
-	right_junction = [hPos_dict.get('rightJunction').get(missed) for missed in missed_hPos]
-
 	#TODO look at the length of the integration (short integrations may be more likely to be missed)
 	#actual length of integration or just the part in the read  
  	
@@ -221,6 +241,96 @@ def assessFragments(num_fragments):
 		count = num_fragments.count(i)
 		frag_freq = (count/len(num_fragments))*100 
 		print(str(frag_freq)+"% of missed integrations were broken into "+str(i)+" fragments")
+
+
+def getOverlap(read_ints):
+	"""Tells us what type of junctions the filter/filtered reads had (from the true file not the pipeline)
+Inormation corresponds to read ID""" 
+	#get the requried columns 
+	left_read= read_ints['left_read'].values
+	right_read = read_ints['right_read'].values
+	left_junc = read_ints['left_junc'].values
+	right_junc = read_ints['right_junc'].values
+	int_ID = read_ints['fragment_id'] 
+
+	#column which says the type of overlaps 
+	overlap_type = []
+
+	for i in range(len(read_ints)):
+		if left_read[i] == "viral" and right_read[i] == 'host' or right_read[i] == 'viral' and left_read[i] == 'host': 
+			overlap_type.append("discordant")
+		elif left_read[i] == 'chimeric' and right_read[i] == 'host': 
+			overlap_type.append(right_junc[i])
+		elif left_read[i] == 'chimeric' and right_read[i] == 'viral': 
+			overlap_type.append(left_junc[i]) 
+		elif left_read[i] == 'host' and right_read[i] == 'chimeric':
+			overlap_type.append(left_junc[i])
+		elif left_read[i] == 'viral' and right_read[i] == 'chimeric': 
+			overlap_type.append(right_junc[i])
+		elif left_read[i] == 'short' or right_read[i] == 'short': 
+			overlap_type.append("SHORT READ") #TODO think about whatto do with this 
+
+	#make into a dictionary - easy to make comparison 
+	overlap_dict = dict(zip(int_ID, overlap_type)) 
+
+	return overlap_dict 
+	
+
+def assessOverlap(read_ints, missed_reads): 
+	"""Looks at what type of overlap the reads missed by the pipeline have. Takes a dataframe of all of the reads and a list of the IDs of the missed reads""" 
+	#dictionary of overlap types for each read 
+	overlap_dict = getOverlap(read_ints)
+	
+	#column of the overlap of the missed_reads
+	overlap = [overlap_dict.get(missed) for missed in missed_reads] 
+	
+	#find the instances of the gap types 
+	gap = overlap.count('gap')
+	overlap_ = overlap.count('overlap')
+	none = overlap.count('none') #clean 
+	other = overlap.count('nan') 
+
+	#print the instances of each 
+	gapFreq = (gap/len(missed_reads))*100 
+	print(str(gapFreq)+"\n% of missed reads had a gap") 
+	overlapFreq = (overlap_/len(missed_reads))*100
+	print(str(overlapFreq)+"% of missed reads had an overlap") 
+	cleanFreq = (none/len(missed_reads))*100
+	print(str(cleanFreq)+"% of missed reads had clean junctions") 
+	otherFreq =(other/len(missed_reads))*100
+	print(str(otherFreq)+"%of missed reads had a junction other than those above") 
+	
+
+def compareOverlap(read_ints, pipe_ints): 
+	"""Compares whether the pipeline has correctly predicted the gap type of the read. Takes list of predicted"""
+
+	#get the IDs of the pipeline reads
+	pipe_reads = pipe_ints['ReadID'].values 
+
+	#get the overlap type of the pipeline reads
+	pipe_overlap = pip_ints['Type'].values
+ 
+	#create a dictionary of the overlap types for each read 
+	overlap_dict = getOverlap(read_ints)
+	
+	#get the known overlap type 
+	actual_overlap = [overlap_dict.get(pipeline) for pipeline in pipe_reads] 
+	#TODO handle reads in pipeline but don't actually contain viral DNA 
+
+	#make comparisons between pipeline overlaps and known overlaps 
+	correct = 0 #counter for the number of correct estimations 
+	for i in range(len(pipe_reads)): 
+		if pipe_overlaps[i] == actual_overlap[i]: 
+			correct = correct +1 
+
+	#caluclate the accuracy of the pipeline to find the type of junction
+	accuracy = (correct/len(pipe_reads))*100 
+	print("Pipeline predicted the type of junction correctly "+str(accuracy)+"% of the time:") 
+
+	#we also want to know which ones we got wrong 
+#find the distribtuion of rearrangements and deletions so that these can be compared - plot using seaborn? 
+
+
 
 if __name__ == "__main__":
 	main(sys.argv[1:])
