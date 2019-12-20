@@ -47,8 +47,11 @@ def main(argv):
 	missed_hPos = findMissed(missed_df)
 	evaluateMissed(missed_hPos,ints)
 
+	#analyse length 
+	assessLength(read_ints, missed_reads)
+
 	#get the actual types of junctions 
-	assessOverlap(read_ints, missed_reads)  
+	#assessOverlap(read_ints, missed_reads)  
 
 	#print("columns in pipeline file" +pipe_ints.columns.to_series()) 
 	#print("columns in reads file" +read_ints.columns.to_series()) 
@@ -155,6 +158,7 @@ def filterChimeric(reads_ints):
 
 	return filt_reads 
 
+
 def readDataFrame(read_list, read_ints): 
 	"""Creates a dataframe of a subset of the missed reads using a list of read IDs""" 
 	#create a list of the indexes to be included in the new dataframe 
@@ -251,7 +255,7 @@ Inormation corresponds to read ID"""
 	right_read = read_ints['right_read'].values
 	left_junc = read_ints['left_junc'].values
 	right_junc = read_ints['right_junc'].values
-	int_ID = read_ints['fragment_id'] 
+	int_ID = read_ints['fragment_id'].values
 
 	#column which says the type of overlaps 
 	overlap_type = []
@@ -275,6 +279,28 @@ Inormation corresponds to read ID"""
 
 	return overlap_dict 
 	
+def assessLength(read_ints, missed_reads): 
+	"""Compare the number of viral base pairs in the missed reads and in all reads"""
+	#get the required columns
+	int_ID = read_ints['fragment_id'].values
+	first_len = read_ints['left_read_amount'].values
+	second_len = read_ints['right_read_amount'].values
+	print("ASSIGNMENT DONE")
+ 
+	#column for the viral length
+	viral_len = [max(first_len[i],second_len[i]) for i in range(len(first_len))]
+	
+	#create a dictionay
+	len_dict = dict(zip(int_ID, viral_len)) 
+
+	print(len_dict) 
+	#get the lengths for missed reads 
+	missed_len = [len_dict.get(missed) for missed in missed_reads] 
+	
+	
+
+
+#TODO plot distibutions!!! - use seaborn - look up how to save this 
 
 def assessOverlap(read_ints, missed_reads): 
 	"""Looks at what type of overlap the reads missed by the pipeline have. Takes a dataframe of all of the reads and a list of the IDs of the missed reads""" 
@@ -299,6 +325,8 @@ def assessOverlap(read_ints, missed_reads):
 	print(str(cleanFreq)+"% of missed reads had clean junctions") 
 	otherFreq =(other/len(missed_reads))*100
 	print(str(otherFreq)+"%of missed reads had a junction other than those above") 
+
+
 	
 
 def compareOverlap(read_ints, pipe_ints): 
