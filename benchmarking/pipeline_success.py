@@ -18,7 +18,7 @@ def main(argv):
 	parser = argparse.ArgumentParser(description='compares viral integrations identified by pipeline with known viral integrations')
 	parser.add_argument('--pipeline', help='output file from pipeline', required = True) 
 	parser.add_argument('--ints', help='integrations applied file', required = True)
-	parser.add_argument('--read_ints', help='file with files containing information on reads containing viral DNA', required = True)  
+	parser.add_argument('--read_ints', help='file with files containing information on reads containing viral DNA', required = True)
 	args = parser.parse_args()  
 	
 	print("Starting") 
@@ -57,7 +57,7 @@ def main(argv):
 	#get the reads that we correctly identified so that we can look for commonalities
 	#missed_df = readDataFrame(correct_reads, read_ints) 
 	 
-	assessMissedInts(missed_hPos, ints)
+	assessMissedLength(missed_hPos, ints)
 
 	#get the actual types of junctions 
 	#assessOverlap(read_ints, missed_reads)  
@@ -76,13 +76,13 @@ def listIDs(read_ints,pipe_ints):
 	#create a list of the IDs of the known viral reads 	
 	true_vreads = []
 	for i in range(len(read_ints)):
-		if read_ints.loc[i]['fragment_id'] not in true_vreads:  #TODO check if makes results better else remove 
+		if read_ints.loc[i]['fragment_id'] not in true_vreads:  
 			true_vreads.append(read_ints.loc[i]['fragment_id'])  
 		
 	#create a list of the IDS of the predicted viral reads 
 	pred_vreads = []
 	for i in range(len(pipe_ints)):
-		if pipe_ints.loc[i]['ReadID'] not in pred_vreads: #TODO check otherwise remove 
+		if pipe_ints.loc[i]['ReadID'] not in pred_vreads:  
 			pred_vreads.append(pipe_ints.loc[i]['ReadID']) 
 
 	return true_vreads, pred_vreads
@@ -190,7 +190,7 @@ def filterLength(read_ints, min_len):
 
 	#report the filtering  
 	rem = (len(filt_reads)/len(read_ints))*100
-	print("After filtering out reads with less than " +str(min_len) +",\n base pair of viral DNA, "+ str(rem)+"% of reads remain.") 
+	print("After filtering out reads with less than " +str(min_len) +", base pairs of viral DNA, "+ str(rem)+"% of reads remain.") 
 
 	return filt_reads
 
@@ -216,8 +216,6 @@ def filterFalse(ints):
 
 def readDataFrame(read_list, read_ints): 
 	"""Creates a dataframe of a subset of  reads using a list of read IDs""" 
-	#create a list of the indexes to be included in the new dataframe 
-	new_idx = []
 	
 	read_ints = read_ints.set_index('fragment_id') 
 	
@@ -233,7 +231,6 @@ def readDataFrame(read_list, read_ints):
 
 
 def findMissed(read_ints, correct_reads): 
-
 
 	"""Looks up the integrations missed by the pipeline enabling subsequent determination of what kind of reads we missed""" 
 
@@ -276,12 +273,10 @@ def findMissed(read_ints, correct_reads):
 	for hPos in detectable_hPos: 
 		if hPos not in pipeline_hPos: 
 			missed_hPos.append(hPos) 
-
-
 	return missed_hPos 
 	 
 def evaluateMissed(missed_hPos,ints):
-	"""Attempt to find out why the integrations were missed by the pipeline""" 
+	"""Attempt to find out why the integrations were completely missed by the pipeline""" 
 	#create a dictionary of properities of each of the integrations
 	hPos_dict = ints.set_index('hPos').to_dict()
  
@@ -295,11 +290,7 @@ def evaluateMissed(missed_hPos,ints):
 	assessDeletion(deletion)
 	assessFragments(num_fragments)  #TODO compare these to total amount which were deletions etc. 
 
-	#report what percentage of the integrations we found 
-	missed_int = (len(missed_hPos)/len(ints))*100 
-	print('\nThe percentage of integrations missed was '+str(missed_int)+"%") 
-
-def assessMissedInts(missed_hPos, ints): 
+def assessMissedLength(missed_hPos, ints): 
 	"""Look at the properities of the integrations which were not detected by the pipeline""" 
 	#make dictionary of integrations  
 	hPos_dict = ints.set_index('hPos').to_dict()
@@ -316,20 +307,22 @@ def assessMissedInts(missed_hPos, ints):
 	hPos_length = dict(zip(ints['hPos'],all_lengths)) 
 	
 	#save distribution of all integration lengths  #TODO consider the number of fragments here 
-	ax = sns.distplot(all_lengths, bins=20)
-	ax.set_title("Histogram of the length of all integrations") 
-	ax.set(xlabel='length of integration', ylabel = 'Density')  
-	fig = ax.get_figure()
-	fig.savefig("integration_lengths.pdf")
+	plt.pyplot.figure(0) 	
+	plt.pyplot.hist(all_lengths,bins = 'auto') 
+	plt.pyplot.title("Histogram of the length of all integrations") 
+	plt.pyplot.xlabel('length of integration')
+	plt.pyplot.ylabel('Density')  
+	plt.pyplot.savefig("integration_lengths.pdf")
 	print("Distribution of all integrations saved to integration_lengths.pdf") 
 
 	#save distribution of the missed integration lengths
 	missed_ints = [hPos_length.get(missed_int) for missed_int in missed_hPos] 
-	ax = sns.distplot(missed_ints, bins=20)
-	ax.set_title("Histogram of the length of missed integrations") 
-	ax.set(xlabel='length of integration', ylabel = 'Density')  
-	fig = ax.get_figure()
-	fig.savefig("missed_integration_lengths.pdf")
+	plt.pyplot.figure(1) 
+	plt.pyplot.hist(missed_ints, bins='auto')
+	plt.pyplot.title("Histogram of the length of missed integrations") 
+	plt.pyplot.xlabel('length of integration')
+	plt.pyplot.ylabel('Density')  
+	plt.pyplot.savefig("missed_integration_lengths.pdf")
 	print("Distribution of all integrations saved to missed_integration_lengths.pdf")
 	
 def assessRearrange(rearrange): 
@@ -396,7 +389,7 @@ Inormation corresponds to read ID"""
 
 	return overlap_dict 
 	
-def assessLength(read_ints, missed_reads): 
+def assessLength(read_ints, missed_reads): #TODO this is questionable remove 
 	"""Compare the number of viral base pairs in the missed reads and in alfg
 l reads"""
 	#get the required columns
@@ -446,8 +439,6 @@ def assessOverlap(read_ints, missed_reads):
 	print(str(cleanFreq)+"% of missed reads had clean junctions") 
 	otherFreq =(other/len(missed_reads))*100
 	print(str(otherFreq)+"%of missed reads had a junction other than those above") 
-	
-
 	
 
 def compareOverlap(read_ints, pipe_ints): 
