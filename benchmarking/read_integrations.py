@@ -148,11 +148,7 @@ def analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_righ
 				overlap_len1.append(overlap) 
 
 				#Store the hPos of the integration in the read 
-				int_list.append(int_hPos[j])
-
-				#Store the junction type
-				if junction_1 != "none":
-					junction_1 = readJunction(j, c_type ,int_leftj, int_rightj)   
+				int_list.append(int_hPos[j])  
 			
 			#compare the ith right read with the jth integration 
 			c_type = checkOverlap(second_read[i], int_coord[j]) 
@@ -165,11 +161,7 @@ def analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_righ
 				overlap_len2.append(overlap)
 
 				#Store the hPos of the integration in the read 
-				int_list.append(int_hPos[j])
-
-				#Store the junction type
-				if junction_2 != "none": 				
-					junction_2 = readJunction(j, c_type ,int_leftj, int_rightj)  
+				int_list.append(int_hPos[j]) 
 		
 		#find the types of the read 
 		type1 = readType(overlap_type1)
@@ -191,8 +183,14 @@ def analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_righ
 		read_hPos.append(int_list) #exists as a list of lists
 
 		#save the junction types of each read
+		junction_1 = readJunction(j, overlap_type1 ,int_leftj, int_rightj)
+		junction_2 = readJunction(j, overlap_type2 ,int_leftj, int_rightj) 
 		first_junc.append(junction_1)
-		second_junc.append(junction_2) 	
+		second_junc.append(junction_2)
+
+		#report how many reads have been analysed 
+		if i % 100000 == 0: 
+			print(str(i)+" reads analysed...",flush = True) 	
 		
 	return first_type, second_type, first_len, second_len, read_hPos, first_junc, second_junc 
 	
@@ -220,7 +218,7 @@ def readType(overlap_type):
 	elif "left" in overlap_type and "right" in overlap_type: 
 		read_type = "split" 
 		
-	#hanlde reads without viral DNA 
+	#handle reads without viral DNA 
 	else: 
 		read_type = "host" 
 		
@@ -286,19 +284,32 @@ def intJunction(int_file):
 def readJunction(index, overlap_type, int_leftj, int_rightj): 
 	"""finds the type of junction in a read""" 
 
-	junction = "" 
-	#if viral DNA is on the right we care about the left junction
-	if overlap_type == "right":
-		junction = int_leftj[index]  	
-
-	#if viral DNA is on the left we care about the right junction 
-	if overlap_type == "left":
-		junction = int_rightj[index] 
-
-	else: 
+	#if entire stretch is viral DNA there is no junction
+	if "all" in overlap_type: 
 		junction = "none" 
 
-	return junction  
+	#if a read is a short read it has two junctions which is complicated 
+	if "short" in overlap_type: 
+		junction = "other" 
+	
+	#if viral DNA is on the right we care about the left junction
+	elif "right" in overlap_type and "left" not in overlap_type: 
+		junction = int_leftj[index]
+
+	#if viral DNA is on the left we care about the right junction 
+	elif "left" in overlap_type and "right" not in overlap_type: 
+		junction =  int_rightj[index]
+
+	#it is complicated to handle split reads as there is more than one junction  
+	elif "left" in overlap_type and "right" in overlap_type: 
+		junction = "other"
+
+	#otherwise we assume that we have host DNA only in the fragment 
+	else: 
+		junction = ""
+
+	return junction
+
 	
 def processReads(sam_file,num_inserts):
 	"""Creates a list of the read IDs and their alignment coordinates""" 
@@ -361,8 +372,6 @@ def overlapLength(coordA,coordB):
 	overlap = min(B2, A2)-max(B1, A1) 
 
 	if overlap<0: 
-		print("coordinate a (read): "+str(coordA))
-		print("coordinate b (integration): "+str(coordB))# for debugging remove later 
 		raise OSError("Attempting to find length of overlap between regions which do not overlap")
 	return overlap
 
