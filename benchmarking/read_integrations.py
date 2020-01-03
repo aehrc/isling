@@ -15,63 +15,42 @@ import time #remove after debugging - used to optimise code TODO
 ### main
 def main(argv):
 
-	print("STARTING", flush=True)
+	print("STARTING...", flush=True)
 
 	#get arguments 
-	start_time = time.time()
 	parser = argparse.ArgumentParser(description='determine reads which contain viral DNA')
 	parser.add_argument('--sam', help = 'sam file describing simulated reads', required = True)
 	parser.add_argument('--host_ints', help = 'csv file describing the location of viral DNA in the human host', required = True)
 	parser.add_argument('--save', help = 'csv file to save the output', required = True)
 	parser.add_argument('--viral_only', help = 'csv file to save only information for viral reads', required = True) 
 	args = parser.parse_args()
-	now = time.time()
-	print("Time taken to parse arguments "+format(now-start_time),flush=True) 
 	
 	#read in sam file
 	read_file = open(args.sam,'r')
 	in_sam = Reader(read_file)
-	now = time.time() 
-	print("Time taken to read in sam file "+format(now-start_time),flush=True)
 	
 	#read in host integration locations
-	start_time = time.time()
-	#read in as chunks as the file may be very large - TODO optimise this 
+	#read in as chunks as the file may be very large  
 	chunks = pd.read_csv(args.host_ints,header=0,sep='\t', chunksize = 50000)
 	int_file = pd.concat(chunks)  
-	now = time.time() 
-	print("Time taken to read in host integrations "+format(now-start_time),flush=True)
-
 
 	#find the number of fragments 
-	start_time = time.time()
+	start_time = time.time() #TODO this could be optimise if it takes a long time 
 	num_reads = numReads(read_file)
 	now = time.time() 
 	print("Time taken to find the number of fragments "+format(now-start_time),flush=True)
 
 	#get the coordinates of each integration
-	start_time = time.time() 
 	int_coord = intCoords(int_file)
-	now = time.time() 
-	print("Time taken to find coordinates of each integration "+format(now-start_time),flush=True)
 
 	#get the hPos of each integration - we use this later as an identifer
-	start_time = time.time() 
 	int_hPos = intHpos(int_file)
-	now = time.time() 
-	print("Time taken to find hPos of each integration "+format(now-start_time),flush=True) 
 
 	#get the types of junctions for each integration
-	start_time = time.time()
-	int_leftj, int_rightj = intJunction(int_file)
-	now = time.time() 
-	print("Time taken to find the type of junction for each integration "+format(now-start_time),flush=True) 
+	int_leftj, int_rightj = intJunction(int_file) 
 	
 	#read in sam file to process reads 
-	start_time = time.time()
 	sam_file = args.sam
-	now = time.time() 
-	print("Time taken to read in sam file "+format(now-start_time),flush=True) 
 
 	#process reads to obtain the ID of each fragment and the coordinates of the corresponding reads
 	start_time = time.time()
@@ -353,9 +332,6 @@ def processReads(sam_file,num_inserts):
 def checkOverlap(coordA, coordB): 
 	""" Function which tells us whether coordA (start of read, end of read) overlaps coordB (start of integration, end of integrations). Returns string which says which type of integrations occured""" 
 	
-	#intialise output string
-	overlap_type = "" 
-	
 	#get coordinates 
 	A1, A2 = coordA
 	B1, B2 = coordB 
@@ -369,6 +345,8 @@ def checkOverlap(coordA, coordB):
 		overlap_type = "right" 	#virus is on the right end of the read 
 	elif B2 < A2 and B2 >= A1:
 		overlap_type = "left"
+	else:
+		overlap_type = ""
 		
 	return overlap_type 
 		 		
@@ -379,14 +357,9 @@ def overlapLength(coordA,coordB):
 
 	A1, A2 = coordA
 	B1, B2 = coordB
-	
-	#find the lower point of A2 and B2 
-	upper = min(B2, A2) 
-	
-	#find the upper point of A1 and B1 
-	lower = max(B1, A1) 
-	
-	overlap = upper-lower #subtract 1 to allow for difference resulting from coordinate system 
+
+	overlap = min(B2, A2)-max(B1, A1) 
+
 	if overlap<0: 
 		print("coordinate a (read): "+str(coordA))
 		print("coordinate b (integration): "+str(coordB))# for debugging remove later 
