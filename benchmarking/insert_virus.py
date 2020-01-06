@@ -66,7 +66,7 @@ def main(argv):
 		raise OSError("Could not open virus fasta")
 	
 	#set random seed
-	np.random.seed(500)
+	np.random.seed(63)
 
 	#types of insertions
 	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
@@ -117,10 +117,12 @@ def main(argv):
 	
 	
 	print("\nNUMBER OF INTEGRATIONS TO INSERT: "+str(int_num))
+	print("All integrations performed as whole rearranges") #TODO update this to reflect changes as we go 
 	
 	#integration loop 
 	for i in range(0,int_num):
-		rand_int =  np.random.randint(0,len(insertion_types))
+		#rand_int =  np.random.randint(0,len(insertion_types))
+		rand_int = 0 
 		host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, min_len, sep)  
 		if i % int_report == 0 and i != 0: 
 			print(str(i) +" integrations complete...")
@@ -132,7 +134,6 @@ def main(argv):
 	for i in range(0,epi_num): 
 		rand_int = np.random.randint(0,2)	
 		name = "episome "+str(i+1)
-		#host_fasta = Episome.insertWholeDeletion(virus, min_len, host_fasta, name) #TODO remove 
 		host_fasta = episome_types[rand_int](virus, min_len, host_fasta, name)  
 			
 	print("\n***INTEGRATIONS COMPLETE***")
@@ -177,7 +178,7 @@ def insertWholeVirus(host, viruses, int_list, filehandle, min_len, sep):
 			return int_list, host
 	
 	#do integration
-	host, status = currentInt.doIntegration(host, int_list)
+	host, status = currentInt.doIntegration(host, int_list,filehandle)
 	
 	#only save if integration was successful 
 	if status == True:
@@ -214,7 +215,7 @@ def insertViralPortion(host, viruses, int_list, filehandle, min_len,sep):
 			return int_list, host
 			
 	#do integration
-	host, status  = currentInt.doIntegration(host, int_list)
+	host, status  = currentInt.doIntegration(host, int_list,filhandle)
 	
 	#only save if integration was successful 
 	if status == True: 
@@ -249,7 +250,7 @@ def insertWholeRearrange(host, viruses, int_list, filehandle, min_len,sep):
 			return int_list, host
 			
 	#do integration
-	host, status  = currentInt.doIntegration(host, int_list)
+	host, status  = currentInt.doIntegration(host, int_list,filehandle)
 	
 	#only save if integration was successful 
 	if status == True: 
@@ -282,7 +283,7 @@ def insertWithDeletion(host, viruses, int_list, filehandle, min_len,sep):
 			return int_list, host
 	
 	#do integration
-	host, status = currentInt.doIntegration(host,int_list)
+	host, status = currentInt.doIntegration(host,int_list,filehandle)
 	
 	#only save if integration was successful 
 	if status == True:
@@ -317,7 +318,7 @@ def insertPortionRearrange(host, viruses, int_list, filehandle, min_len,sep):
 			return int_list, host
 			
 	#do integration
-	host, status  = currentInt.doIntegration(host, int_list)
+	host, status  = currentInt.doIntegration(host, int_list,filehandle)
 	
 	#only save if integration was successful 
 	if status == True: 
@@ -352,7 +353,7 @@ def insertPortionDeletion(host, viruses, int_list, filehandle, min_len,sep):
 			return int_list, host
 	
 	#do integration
-	host, status = currentInt.doIntegration(host,int_list)
+	host, status = currentInt.doIntegration(host,int_list,filehandle)
 	
 	#only save if integration was successful 
 	if status == True:
@@ -405,14 +406,18 @@ class Integration:
 		#integration cannot not have negative overlap at both ends - can be changed later** 
 
 		while True: 
-			self.overlaps = (np.random.randint(-1,10),np.random.randint(-1,10))
+			self.overlaps = (np.random.randint(-10,10),np.random.randint(-10,10))
 			if self.overlaps[0]<0 and self.overlaps[1]<0: 
 				continue
 			else: 
 				break 
+		
 		#record the type of junction for saving to file later
 		self.junction = (self.convertJunction(self.overlaps[0]),
 				self.convertJunction(self.overlaps[1]))
+
+		#used when an integration with an overlap is intgrated at a location other than hPos 
+		self.newpoint = -1 
  		 
 	def addFragment(self, viruses, min_len, part = "rand"):
 		"""
@@ -520,7 +525,7 @@ class Integration:
 			self.chunk.bases = self.chunk.bases+gap
 		return
 		
-	def overlapPoint(self,left_site,right_site):
+	def overlapPoint(self,left_site,right_site,filehandle):
 		"""
 		Finds point where there is homology between the human and viral sequences 
 		"""
@@ -529,6 +534,7 @@ class Integration:
 		if left_site ==-1 and right_site == -1: 
 			self.chunk.bases = ""
 			self.inserted = False 
+			self.writeIntegration(filehandle)
 		
 		#if no homologous region found on left
 		elif left_site ==-1: 
@@ -544,9 +550,14 @@ class Integration:
 				overlap_point = left_site
 			else: 
 				overlap_point = right_site
+
+		#store the overlap point
+		if self.inserted == True: 
+			self.newpoint = overlap_point #TODO use to update the stored statistics 
+
 		return overlap_point  
 
-	def createLeftOverlap(self,host,int_list):
+	def createLeftOverlap(self,host,int_list,filehandle):
 		"""
 		Handles overlaps on the left of a viral chunk. Left and right are treated as different functions as different operations must be performed. 
 		Works by finding closest regions of homology on left side of the randomly selected integration point. It checks if the homologous region is caused by an existing integration and concatenates the search range and attempts to find a homologous region again if the homology was caused by an existing integration. This is repeated for the right side of te integration point. The region closest to randomly selected integration point is then used to insert the viral chunk. 
@@ -584,7 +595,7 @@ class Integration:
 			else:
 				right_site = right_search
 		
-		overlap_point = self.overlapPoint(left_site,right_site)
+		overlap_point = self.overlapPoint(left_site,right_site,filehandle)
 		int_start = overlap_point
 		int_stop = overlap_point 
 
@@ -593,7 +604,7 @@ class Integration:
 			int_start =  overlap_point + self.overlaps[0] 
 		return int_start,int_stop 
 		
-	def createRightOverlap(self,host,int_list): 
+	def createRightOverlap(self,host,int_list,filehandle): 
 		"""
 		Handles overlaps on the right of a viral chunk. Same as above with operations applicable to right end 
 		""" 
@@ -629,7 +640,7 @@ class Integration:
 				right_seq = host[self.chr][right_search:]
 			else: 
 				right_site = right_search
-		overlap_point = self.overlapPoint(left_site,right_site)
+		overlap_point = self.overlapPoint(left_site,right_site,filehandle)
 		int_start = overlap_point
 		int_stop = overlap_point
 		 
@@ -657,7 +668,7 @@ class Integration:
 		
 		
 			
-	def doIntegration(self, host, int_list):
+	def doIntegration(self, host, int_list,filehandle):
 		"""
 		Inserts viral DNA (self.bases) at position self.hPos in host[self.chr]
 		"""
@@ -694,11 +705,11 @@ class Integration:
 
 		#adjust left overlap 
 		if self.overlaps[0]<0:
-			(int_start,int_stop) = self.createLeftOverlap(host,int_list)
+			(int_start,int_stop) = self.createLeftOverlap(host,int_list,filehandle)
 			 
 		#adjust sequences with right overlap  		
 		if self.overlaps[1]<0:
-			(int_start,int_stop) = self.createRightOverlap(host,int_list)
+			(int_start,int_stop) = self.createRightOverlap(host,int_list,filehandle)
 			
 		#If integration cannot be performed we stop 
 		if int_stop == 0 and int_start == 0: 
@@ -710,6 +721,7 @@ class Integration:
 		
 		#set the starting and stopping points of the performed integration 
 		self.setStopStart(int_start,int_stop) 
+		
 		return host, status 
 
 
@@ -974,12 +986,42 @@ class Statistics:
 			
 		intCoords = [(int.hstart,int.hstop) for int in int_list]
 		for i in range(1,len(intCoords)):
+
+				#consider if an integration site was moved due to an overlap 
+			if int_list[i].newpoint > -1: 
+				i_int = int_list[i].newpoint
+			else: 
+				i_site = int_list[i].hPos
+		
+
 			for j in range(0,i):
-				if int_list[i].hPos < int_list[j].hPos: 
-					 new_coord1 = intCoords[j][0]+int_list[i].numBases
-					 new_coord2 = intCoords[j][1]+int_list[i].numBases
-					 intCoords[j] = (new_coord1,new_coord2) 
-					
+				#consider if an integration site was moved due to an overlap 
+				if int_list[j].newpoint > -1: 
+					j_site = int_list[j].newpoint
+				else: 
+					j_site = int_list[j].hPos
+ 
+
+
+				if i_site < j_site:
+					#if an integration has an overlap we don't want the indexing to be adjusted for these bases 
+					if int_list[i].overlaps[0] < 0 or  int_list[i].overlaps[1] < 0:
+						#handle overlap on left 
+						if int_list[i].overlaps[0]<0: 
+							shift = abs(int_list[i].overlaps[0])
+						#handle overlap on the right 
+						else: 
+							shift = abs(int_list[i].overlaps[1]) 
+	
+						new_coord1 = intCoords[j][0]+int_list[i].numBases + shift 
+						new_coord2 = intCoords[j][1]+int_list[i].numBases + shift
+						intCoords[j] = (new_coord1,new_coord2)
+						
+					else: 
+						new_coord1 = intCoords[j][0]+int_list[i].numBases
+						new_coord2 = intCoords[j][1]+int_list[i].numBases
+						intCoords[j] = (new_coord1,new_coord2)
+ 				
 		return intCoords
 
 	def integratedIndices(int_list): 
@@ -1017,7 +1059,7 @@ class Statistics:
 
 		#include the amount of junction - used later
 		left_bases = [int.overlaps[0] for int in int_list]
-		right_bases = [int.overlaps[0] for int in int_list]  
+		right_bases = [int.overlaps[1] for int in int_list]  
 		#take absolute value of the number of base pairs in each list. Does not matter whether bases are homoloous or gaps - they aren't viral and shouldn't be included as part of the integration
 		left_bases = [abs(bases) for bases in left_bases]
 		right_bases = [abs(bases) for bases in right_bases] 
@@ -1026,7 +1068,7 @@ class Statistics:
 		if num_ints != 0 :
 			int_sites = Statistics.intList(int_list[1-num_ints],int_list)
 			int_coords = Statistics.adjustedStopStart(int_list[1-num_ints],int_list) 
-		
+	
 			int_start = []
 			int_stop = []
 		
