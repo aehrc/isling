@@ -30,20 +30,21 @@ def main(argv):
 	#read in file listing which reads contain viral DNA 
 	read_ints = pd.read_csv(args.read_ints, header=0, sep='\t') 
 	#filter our file to leave only chimeric reads 
-	read_ints = filterChimeric(read_ints)
+	read_ints = removeViral(read_ints)
 
 	#filter our file to remove short reads 
 	read_ints = filterLength(read_ints,20)  
 
-	#read in file lising the integrations detected by the pipeline 
+	#read in file listing the integrations detected by the pipeline 
 	pipe_ints = pd.read_csv(args.pipeline, header = 0, sep = '\t')
 
 	#filter out ambiguous reads 
 	filt_pipe = filterAmbiguous(pipe_ints)
  
 	true_vreads, pred_vreads = listIDs(read_ints,filt_pipe)
+	print("DONE") #debuggig 
 	correct_reads, missed_reads, false_reads = listSuccess(true_vreads, pred_vreads)
-	print("Stats after filtering...")
+	print("\nStats after filtering...")
 	getStats(pred_vreads,true_vreads,correct_reads)
 
 	#create a df of the missed reads
@@ -61,7 +62,8 @@ def main(argv):
 
 	read_ints.to_csv("filtered_set.csv",sep = '\t') 
 
-	false_df = pipelineDataFrame(false_reads,pipe_ints) 
+	false_df = pipelineDataFrame(false_reads,pipe_ints)
+	#save a file with the false reads to analyse them later  
 	false_df.to_csv("false_reads.csv",sep='\t') 
 	#get the actual types of junctions 
 	#assessOverlap(read_ints, missed_reads)  
@@ -72,13 +74,16 @@ def listIDs(read_ints,pipe_ints):
 	#create a list of the IDS of all viral reads 	
 	true_vreads = []
 	for i in range(len(read_ints)):
+		if i %10000 == 0: 
+			print(str(i)+" reads processed...") 
 		if read_ints.loc[i]['fragment_id'] not in true_vreads:  
 			true_vreads.append(read_ints.loc[i]['fragment_id'])
-		 
 		
 	#create a list of the IDS of the reads detected by the pipeline  
 	pred_vreads = []
 	for i in range(len(pipe_ints)):
+		if i%10000 == 0: 
+			print(str(i)+" reads processed...") 
 		if pipe_ints.loc[i]['ReadID'] not in pred_vreads:  
 			pred_vreads.append(pipe_ints.loc[i]['ReadID']) 
 
@@ -113,23 +118,23 @@ def getStats(pred_vreads,true_vreads,correct_reads):
 	#%accuracy of reads identified as containing viral DNA actually containing viral DNA
 	#"what chance is there that the predicted read is actually viral"
 	predAcc = (len(correct_reads)/totalPred)*100
-	print("% OF PIPELINE VIRAL READS CONTAINING VIRAL DNA: "+str(int(predAcc))+"%")
+	print("% OF PIPELINE VIRAL READS CONTAINING VIRAL DNA: {:.2f}%".format(predAcc))
 
 	#% of integrations which were correctly predicted
 	#"How good were we at making predictions"  
 	predHit = (len(correct_reads)/allReads)*100
-	print("% OF VIRAL READS IDENTIFIED BY PIPELINE: "+str(int(predHit))+"%")
+	print("% OF VIRAL READS IDENTIFIED BY PIPELINE: {:.2f}%".format(predHit))
 
 	#% of predicitions which were incorrect 
 	#"What chance is there that the predicted read is not viral"  
 	falsePred = ((totalPred-len(correct_reads))/totalPred)*100
-	print("% OF READS FALSELY IDENTIFIED TO CONTAIN VIRAL DNA: "+str(int(falsePred))+"%")  
+	print("% OF READS FALSELY IDENTIFIED TO CONTAIN VIRAL DNA: {:.2f}%".format(falsePred))  
 
 	#% predictions missed by pipline
 	#"What percentage of integrated reads does our pipeline miss"   
 	#predMiss = (len(missed_reads)/allReads) 
 	predMiss = ((allReads-len(correct_reads))/allReads)*100 
-	print("% OF READS READS MISSED BY THE PIPELINE: "+str(int(predMiss))+"%")  
+	print("% OF READS MISSED BY THE PIPELINE: {:.2f}%".format(predMiss))  
 	return predAcc, predHit, falsePred, predMiss 
 
 
@@ -150,12 +155,12 @@ def filterAmbiguous(pipe_ints):
 
 	#report the % remaining after filtering 
 	filt_per = (len(filt_pipe)/len(pipe_ints))*100 
-	print(str(int(filt_per))+"% of integrations remaining after filtering reads ambiguous for host or vector") 
+	print("{:.2f}% of integrations remaining after filtering reads ambiguous for host or vector".format(filt_per)) 
  
 	return filt_pipe
 
-def filterChimeric(read_ints): 
-	"""Process of filtering the entire dataframe was inefficient, aim to filter differently""" 
+def removeViral(read_ints): 
+	"""Filters out reads which do not contain any host DNA. These reads are not detected by the pipeline""" 
 	#list of the indexes of the reads which are not chimeric
 	nonchimeric_idx = []
 
@@ -164,7 +169,7 @@ def filterChimeric(read_ints):
 			nonchimeric_idx.append(i) 
 			
 	#drop the nonchimeric rows 
-	filt_reads = read_ints.drop(read_ints.index[nonchimeric_idx])
+	filt_reads = read_ints.drop(read_ints.index[nonchimeric_idx])  
 
 	#reindex the filtered reads
 	filt_reads = filt_reads.reset_index(drop=True) 
@@ -192,7 +197,7 @@ def filterLength(read_ints, min_len):
 
 	#report the filtering  
 	rem = (len(filt_reads)/len(read_ints))*100
-	print("After filtering out reads with less than " +str(min_len) +", base pairs of viral DNA, "+ str(rem)+"% of reads remain.") 
+	print("\nAfter filtering out reads with less than "+str(min_len)+" base pairs of viral DNA, {:.2f} % of reads remain.".format(rem)) 
 
 	return filt_reads
 
@@ -212,7 +217,7 @@ def filterFalse(ints):
 	filt_ints = ints.drop(ints.index[false_idx]) 
 
 	#reindex the filtered reads
-	filt_ints = filt_ints.reset_index(drop=True) 
+	filt_ints = filt_ints.reset_index(drop=True)
 
 	return filt_ints 
 
@@ -260,8 +265,7 @@ def findMissed(read_ints, correct_reads):
 		for value in values:
 			if value not in detectable_hPos:  
 				detectable_hPos.append(value) 
-	print('Max number of integrations detectable from reads: '+str(len(detectable_hPos))) 
-	#TODO look at which ones were not detected - potentially can be improved by increasing the coverage
+	print('\nMax number of integrations detectable from reads: '+str(len(detectable_hPos))) 
 
 	#look at how many of these integrations we cover with our results from the pipeline 
 	#make a dataframe of the correct reads 
@@ -282,7 +286,7 @@ def findMissed(read_ints, correct_reads):
 
 	acc = (len(pipeline_hPos)/len(detectable_hPos))*100
 
-	print("Of the integrations which were present in the reads, "+str(acc)+"% could be detected") 
+	print("Of the integrations which were present in the reads, {:.2f}% could be detected".format(acc)) 
    
 	#create a column of the missed integrations so we can evaluate them
 	missed_hPos =  []
@@ -307,16 +311,17 @@ def evaluateMissed(missed_hPos,ints):
 
 	#get statistics on the different properties 
 	#get statisitics on rearangements 
-	print("\n"+str(percentTrue(all_rearrange))+"% of the total integrations were rearranged") 
-	print(str(percentTrue(miss_rearrange))+"% of the integrations not detected by the pipeline were rearraged")
+	print("\n{:.2f}% of the total integrations were rearranged".format(percentTrue(all_rearrange)))
+	print("{:.2f}% of the integrations not detected by the pipeline were rearraged".format(percentTrue(miss_rearrange)))
 	#get statistics on deletions 
-	print("\n"+str(percentTrue(all_deletion))+"% of the total integrations had deletions")
-	print(str(percentTrue(miss_deletion))+"% of the integrations not detected by the pipeline had deletions\n")
+	print("\n{:.2f}% of the total integrations had deletions".format(percentTrue(all_deletion)))
+	print("{:.2f}% of the integrations not detected by the pipeline had deletions\n".format(percentTrue(miss_deletion)))
 	#get the statistics on the number of fragments use to separate the fragments 
 	print("For all of the integrations...") 
 	assessFragments(all_num_fragments)
 	print("\nFor integrations missed by the pipeline...") 
-	assessFragments(miss_num_fragments)   #TODO compare these to total amount which were deletions etc. 
+	assessFragments(miss_num_fragments)   
+
 
 def assessMissedLength(missed_hPos, ints): 
 	"""Look at the properities of the integrations which were not detected by the pipeline""" 
@@ -331,22 +336,24 @@ def assessMissedLength(missed_hPos, ints):
 		seq = hPos_dict.get('vBases')[hPos_keys[i]]  
 		length = len(seq) 
 		all_lengths.append(length)
- 
+	 
 	hPos_length = dict(zip(ints['hPos'],all_lengths)) 
 	
-	#save distribution of all integration lengths  #TODO consider the number of fragments here 
-	plt.pyplot.figure(0) 	
-	plt.pyplot.hist(all_lengths,bins = 'auto') 
+	#save distribution of all integration lengths   
+	"""plt.pyplot.figure(0)
+	weights_all = np.ones_like(all_lengths)/float(len(all_lengths)) 	
+	plt.pyplot.hist(all_lengths, weights = weights_all) 
 	plt.pyplot.title("Histogram of the length of all integrations") 
 	plt.pyplot.xlabel('length of integration')
 	plt.pyplot.ylabel('Density')  
 	plt.pyplot.savefig("integration_lengths.pdf")
 	print("Distribution of all integrations saved to integration_lengths.pdf") 
-
+"""
 	#save distribution of the missed integration lengths
-	missed_ints = [hPos_length.get(missed_int) for missed_int in missed_hPos] 
-	plt.pyplot.figure(1) 
-	plt.pyplot.hist(missed_ints, bins='auto')
+	missed_ints = [hPos_length.get(missed_int) for missed_int in missed_hPos]
+	weights_missed = np.ones_like(missed_ints)/float(len(missed_ints)) 
+	plt.pyplot.figure(1)  
+	plt.pyplot.hist(missed_ints, weights = weights_missed)
 	plt.pyplot.title("Histogram of the length of missed integrations") 
 	plt.pyplot.xlabel('length of integration')
 	plt.pyplot.ylabel('Density')  
@@ -372,7 +379,7 @@ def assessFragments(num_fragments):
 	for i in range(min_frag, max_frag+1):
 		count = num_fragments.count(i)
 		frag_freq = (count/len(num_fragments))*100 
-		print(str(frag_freq)+"% of integrations were broken into "+str(i)+" fragments")
+		print("{:.2f}% of integrations were broken into ".format(frag_freq)+str(i)+" fragments")
 
 
 def getOverlap(read_ints):

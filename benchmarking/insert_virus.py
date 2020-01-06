@@ -32,13 +32,12 @@ import argparse
 import sys
 import os
 import numpy as np
-
+print("STARTING") 
 ###
 max_attempts = 5 #maximum number of times to try to place an integration site
 
 ### main
 def main(argv):
-	print("STARTING") 
 	#get arguments
 	parser = argparse.ArgumentParser(description='simulate viral insertions')
 	parser.add_argument('--host', help='host fasta file', required = True)
@@ -110,7 +109,6 @@ def main(argv):
 	#intialise the separation from other integrations 
 	sep = int(args.sep) 
 	
-	#print("Min length "+str(min_len))
 	#intialise how many episomal sequences included in the outputted fasta file 
 	epi_num = int(args.epi_num) 
 	
@@ -842,7 +840,6 @@ class ViralChunk:
 		else:
 			self.ori = "r" #define orientation
 			self.bases = viruses[self.virus][self.start:self.stop].reverse_complement() #get bases to insert remove this one
-		print(self.bases)
 		#construct dictionary with keys 'bases', 'ori' and 'coords'
 		#use to keep track of order if 
 		self.pieces = {0:{"bases":self.bases, "ori":self.ori, "coords":(self.start, self.stop)}}
@@ -1014,9 +1011,16 @@ class Statistics:
 		#include hPos - is unique to each integration and allows subsequent identification of what occured 
 		previousInt = [int.hPos for int in int_list]
 
-		#include our junction types - used later to find what type of overlaps are in chimeric reads 
+		#include our junction types - used later to find what type of junction are present 
 		left_overlap = [int.junction[0] for int in int_list]
-		right_overlap = [int.junction[1] for int in int_list]  
+		right_overlap = [int.junction[1] for int in int_list]
+
+		#include the amount of junction - used later
+		left_bases = [int.overlaps[0] for int in int_list]
+		right_bases = [int.overlaps[0] for int in int_list]  
+		#take absolute value of the number of base pairs in each list. Does not matter whether bases are homoloous or gaps - they aren't viral and shouldn't be included as part of the integration
+		left_bases = [abs(bases) for bases in left_bases]
+		right_bases = [abs(bases) for bases in right_bases] 
 		
 		#can only save stats if integrations have been performed 
 		if num_ints != 0 :
@@ -1031,7 +1035,7 @@ class Statistics:
 				int_start.append(c1)
 				int_stop.append(c2)
 		
-			stats_df = pd.DataFrame({"Integration sites":int_sites,"Start point":int_start,"Stop point": int_stop, "hPos":previousInt, "leftJunction":left_overlap, "rightJunction":right_overlap}) 
+			stats_df = pd.DataFrame({"Integration sites":int_sites,"Start point":int_start,"Stop point": int_stop, "hPos":previousInt, "leftJunction":left_overlap, "rightJunction":right_overlap, "leftJunctionBases": left_bases, "rightJunctionBases": right_bases}) 
 		else:
 			print("NO SUCCESSFUL INTEGRATIONS WERE PERFORMED")
 		
