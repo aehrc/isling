@@ -122,7 +122,7 @@ def main(argv):
 	#integration loop 
 	for i in range(0,int_num):
 		#rand_int =  np.random.randint(0,len(insertion_types))
-		rand_int = 0 
+		rand_int = 0
 		host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, min_len, sep)  
 		if i % int_report == 0 and i != 0: 
 			print(str(i) +" integrations complete...")
@@ -215,7 +215,7 @@ def insertViralPortion(host, viruses, int_list, filehandle, min_len,sep):
 			return int_list, host
 			
 	#do integration
-	host, status  = currentInt.doIntegration(host, int_list,filhandle)
+	host, status  = currentInt.doIntegration(host, int_list,filehandle)
 	
 	#only save if integration was successful 
 	if status == True: 
@@ -260,7 +260,7 @@ def insertWholeRearrange(host, viruses, int_list, filehandle, min_len,sep):
 	
 		#append to int_list
 		int_list.append(currentInt)
-	
+
 	return int_list, host
 
 def insertWithDeletion(host, viruses, int_list, filehandle, min_len,sep):
@@ -363,6 +363,7 @@ def insertPortionDeletion(host, viruses, int_list, filehandle, min_len,sep):
 	
 		#append to int_list
 		int_list.append(currentInt)
+	
 	
 	return int_list, host
 
@@ -553,8 +554,7 @@ class Integration:
 
 		#store the overlap point
 		if self.inserted == True: 
-			self.newpoint = overlap_point #TODO use to update the stored statistics 
-
+			self.newpoint = overlap_point 
 		return overlap_point  
 
 	def createLeftOverlap(self,host,int_list,filehandle):
@@ -617,37 +617,41 @@ class Integration:
 	
 		#find homologous region on the left side 
 		left_seq = host[self.chr][:self.hPos].seq
-
+		
 		while left_site<0:
 			left_search = str(left_seq).rfind(r_overlap)
 			if left_search == -1:
 				break 
 			if left_search in dont_integrate: # check homology is not from a previous integration
-				left_seq = host[self.chr][:left_search]	
+				left_seq = left_seq[:left_search]  
 			else: 
 				left_site=left_search
-
+	
 		#find homologous region on the right side 
 		right_seq = host[self.chr][self.hPos:].seq
 		start_rseq = len(right_seq)
-		right_spot = self.hPos+(start_rseq-len(right_seq))			
+		right_spot = self.hPos+(start_rseq-len(right_seq))
+			
 		while right_site<0:
 			right_search = str(right_seq).find(r_overlap)
 			if right_search == -1: 
 				break 
 			right_search += right_spot
 			if right_search in dont_integrate: #check homology is not from a previous integration
-				right_seq = host[self.chr][right_search:]
+				right_seq = host[self.chr][self.hPos:right_search]
 			else: 
 				right_site = right_search
-		overlap_point = self.overlapPoint(left_site,right_site,filehandle)
+				break
+			#right_spot = self.hPos+(start_rseq-len(right_seq)) #TODO remove 
+
+		overlap_point = self.overlapPoint(left_site,right_site,filehandle) 
+
 		int_start = overlap_point
 		int_stop = overlap_point
 		 
 		if left_site != -1 and right_site != -1:
 		#ensures only if there is homology the overlapping region is removed   
 			int_stop = overlap_point-self.overlaps[1]
-
 		return int_start,int_stop 
 		
 		
@@ -985,23 +989,23 @@ class Statistics:
 		"""Makes a list of the coordinates of the viral integrations adjusted with insertions added"""
 			
 		intCoords = [(int.hstart,int.hstop) for int in int_list]
+
 		for i in range(1,len(intCoords)):
 
-				#consider if an integration site was moved due to an overlap 
+			#consider if an integration site was moved due to an overlap 
 			if int_list[i].newpoint > -1: 
-				i_int = int_list[i].newpoint
+				i_site = int_list[i].newpoint
 			else: 
-				i_site = int_list[i].hPos
-		
-
+				i_site = int_list[i].hPos 
+				i_site = intCoords[i][0] 
 			for j in range(0,i):
 				#consider if an integration site was moved due to an overlap 
 				if int_list[j].newpoint > -1: 
 					j_site = int_list[j].newpoint
-				else: 
-					j_site = int_list[j].hPos
- 
-
+				else: 					
+						j_site = int_list[j].hPos
+						j_site = intCoords[j][0] 
+						
 
 				if i_site < j_site:
 					#if an integration has an overlap we don't want the indexing to be adjusted for these bases 
@@ -1012,17 +1016,29 @@ class Statistics:
 						#handle overlap on the right 
 						else: 
 							shift = abs(int_list[i].overlaps[1]) 
-	
-						new_coord1 = intCoords[j][0]+int_list[i].numBases + shift 
-						new_coord2 = intCoords[j][1]+int_list[i].numBases + shift
+
+						#start coordinate of the integration 
+						new_coord1 = intCoords[j][0]+int_list[i].numBases + shift
+						#stop coordinate of the integraton 
+						new_coord2 = intCoords[j][1]+int_list[i].numBases + shift  
 						intCoords[j] = (new_coord1,new_coord2)
+						print("overlap adjust") 
 						
 					else: 
+						#start coordinate of the integration 
 						new_coord1 = intCoords[j][0]+int_list[i].numBases
-						new_coord2 = intCoords[j][1]+int_list[i].numBases
+						#stop coordinate of the integration  
+						new_coord2 = intCoords[j][1]+int_list[i].numBases 
 						intCoords[j] = (new_coord1,new_coord2)
- 				
+
+		#adjust intCoords for differences in indexing
+		for i in range(len(intCoords)): 
+			(c1,c2) = intCoords[i]
+			intCoords[i] = (c1, c2-1) 
+ 		
+			
 		return intCoords
+
 
 	def integratedIndices(int_list): 
 		"""Creates a lisit of sequence indexes which are of viral origin""" 
@@ -1034,8 +1050,8 @@ class Statistics:
 
 		#get start and stop coordinates 
 		if num_ints != 0: 
-			int_coords = Statistics.adjustedStopStart(int_list[1-num_ints],int_list)
-			
+			int_coords = Statistics.adjustedStopStart(int_list[1-num_ints],int_list) 
+
 			for i in range(0,num_ints): 
 				c1, c2 = int_coords[i]
 				for j in range(c1,c2+1): 
@@ -1067,8 +1083,8 @@ class Statistics:
 		#can only save stats if integrations have been performed 
 		if num_ints != 0 :
 			int_sites = Statistics.intList(int_list[1-num_ints],int_list)
-			int_coords = Statistics.adjustedStopStart(int_list[1-num_ints],int_list) 
-	
+			int_coords = Statistics.adjustedStopStart(int_list[1-num_ints],int_list) 	
+
 			int_start = []
 			int_stop = []
 		
