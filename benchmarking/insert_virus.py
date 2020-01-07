@@ -120,8 +120,8 @@ def main(argv):
 	
 	#integration loop 
 	for i in range(0,int_num):
-		#rand_int =  np.random.randint(0,len(insertion_types))
-		rand_int = 0
+		rand_int =  np.random.randint(0,len(insertion_types))
+		#rand_int = 0 #uncomment for testing specific type of integration 
 		host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, min_len, sep)  
 		if i % int_report == 0 and i != 0: 
 			print(str(i) +" integrations complete...")
@@ -613,10 +613,9 @@ class Integration:
 		""" 
 		viral_chunk = self.chunk.bases
 		dont_integrate = self.dontIntegrate(int_list)
-		
+
 		r_overlap = str(viral_chunk[len(viral_chunk)+self.overlaps[1]:].seq) #sequence right of the integration site 
 
-		#print("viral chunk: "+viral_chunk) 
 		left_site = -1
 		right_site = -1
 	
@@ -624,7 +623,6 @@ class Integration:
 		left_seq = host[self.chr][:self.hPos].seq
 		while left_site<0:
 			left_search = left_seq.rfind(str(r_overlap))
-
 			if left_search == -1:
 				break 
 			if left_search in dont_integrate: # check homology is not from a previous integration
@@ -669,11 +667,23 @@ class Integration:
 		dont_integrate = []
 		
 		stop_start = Statistics.adjustedStopStart(self,int_list)
+
 		for i in range(len(stop_start)):
 			c1, c2 = stop_start[i]
+
 			for j in range(c1,c2+1): 
-				dont_integrate.append(j) 
-			
+				dont_integrate.append(j)
+
+			if int_list[i].overlaps[0] < 0:
+				#add bases of left overlaps so any overlapping regions are not reused
+				for k in range(0,abs(int_list[i].overlaps[0])): 
+					dont_integrate.append(c1-k)
+  
+			if int_list[i].overlaps[1] < 0 : 
+				#add bases of right overlaps so any overlapping regions are not reused 
+				for k in range(0,abs(int_list[i].overlaps[1])): 
+					dont_integrate.append(c2+k) 
+
 		return dont_integrate
 		
 		
