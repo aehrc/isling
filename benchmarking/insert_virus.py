@@ -66,7 +66,7 @@ def main(argv):
 		raise OSError("Could not open virus fasta")
 	
 	#set random seed
-	np.random.seed(63)
+	np.random.seed(27)
 
 	#types of insertions
 	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
@@ -122,7 +122,7 @@ def main(argv):
 	#integration loop 
 	for i in range(0,int_num):
 		#rand_int =  np.random.randint(0,len(insertion_types))
-		rand_int = 0
+		rand_int = 2
 		host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, min_len, sep)  
 		if i % int_report == 0 and i != 0: 
 			print(str(i) +" integrations complete...")
@@ -578,7 +578,7 @@ class Integration:
 			if left_search == -1:
 				break 
 			if left_search in dont_integrate: #check homology is not from a previous integration
-				left_seq = host[self.chr][:left_search]
+				left_seq = left_seq[:left_search]  
 			else:
 				left_site= left_search 
 				
@@ -594,7 +594,8 @@ class Integration:
 				right_seq = host[self.chr][right_search:]
 			else:
 				right_site = right_search
-		
+		#print("right site: "+str(right_site)) #debugging remove 
+		#print("left site: "+str(left_site)) #debugging remove 
 		overlap_point = self.overlapPoint(left_site,right_site,filehandle)
 		int_start = overlap_point
 		int_stop = overlap_point 
