@@ -66,7 +66,7 @@ def main(argv):
 		raise OSError("Could not open virus fasta")
 	
 	#set random seed
-	np.random.seed(27)
+	np.random.seed(23)
 
 	#types of insertions
 	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
@@ -117,12 +117,12 @@ def main(argv):
 	
 	
 	print("\nNUMBER OF INTEGRATIONS TO INSERT: "+str(int_num))
-	print("All integrations performed as whole rearranges") #TODO update this to reflect changes as we go 
+	print("All integrations performed as whole") #TODO update this to reflect changes as we go 
 	
 	#integration loop 
 	for i in range(0,int_num):
 		#rand_int =  np.random.randint(0,len(insertion_types))
-		rand_int = 2
+		rand_int = 0
 		host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, min_len, sep)  
 		if i % int_report == 0 and i != 0: 
 			print(str(i) +" integrations complete...")
@@ -412,7 +412,7 @@ class Integration:
 				continue
 			else: 
 				break 
-		
+		self.overlaps = (-3,0) #TODO for debugging remove later 
 		#record the type of junction for saving to file later
 		self.junction = (self.convertJunction(self.overlaps[0]),
 				self.convertJunction(self.overlaps[1]))
@@ -562,10 +562,10 @@ class Integration:
 		Handles overlaps on the left of a viral chunk. Left and right are treated as different functions as different operations must be performed. 
 		Works by finding closest regions of homology on left side of the randomly selected integration point. It checks if the homologous region is caused by an existing integration and concatenates the search range and attempts to find a homologous region again if the homology was caused by an existing integration. This is repeated for the right side of te integration point. The region closest to randomly selected integration point is then used to insert the viral chunk. 
 		"""
- 		
+		print("LEFT OVERLAP") 
 		viral_chunk = self.chunk.bases
 
-		l_overlap = str(viral_chunk[:-self.overlaps[0]]) #sequence left of the integration site 
+		l_overlap = str(viral_chunk[:-self.overlaps[0]].seq) #sequence left of the integration site 
 		left_site = -1
 		right_site = -1
 		dont_integrate = self.dontIntegrate(int_list)
@@ -612,15 +612,17 @@ class Integration:
 		viral_chunk = self.chunk.bases
 		dont_integrate = self.dontIntegrate(int_list)
 		
-		r_overlap = str(viral_chunk[len(viral_chunk)+self.overlaps[1]:]) #sequence right of the integration site 
+		r_overlap = str(viral_chunk[len(viral_chunk)+self.overlaps[1]:].seq) #sequence right of the integration site 
+
+		#print("viral chunk: "+viral_chunk) 
 		left_site = -1
 		right_site = -1
 	
 		#find homologous region on the left side 
 		left_seq = host[self.chr][:self.hPos].seq
-		
 		while left_site<0:
-			left_search = str(left_seq).rfind(r_overlap)
+			left_search = left_seq.rfind(str(r_overlap))
+			print("left search: "+str(left_search)) 
 			if left_search == -1:
 				break 
 			if left_search in dont_integrate: # check homology is not from a previous integration
@@ -634,7 +636,7 @@ class Integration:
 		right_spot = self.hPos+(start_rseq-len(right_seq))
 			
 		while right_site<0:
-			right_search = str(right_seq).find(r_overlap)
+			right_search = str(right_seq).find(r_overlap) 
 			if right_search == -1: 
 				break 
 			right_search += right_spot
@@ -711,14 +713,22 @@ class Integration:
 		#adjust left overlap 
 		if self.overlaps[0]<0:
 			(int_start,int_stop) = self.createLeftOverlap(host,int_list,filehandle)
+			#remove homologous region so there is not double 
+			self.chunk.bases = self.chunk.bases[-self.overlaps[0]:] 
+			int_start = int_start-self.overlaps[0]
+			int_stop = int_start
+			print(self.chunk.bases) 
 			 
 		#adjust sequences with right overlap  		
 		if self.overlaps[1]<0:
 			(int_start,int_stop) = self.createRightOverlap(host,int_list,filehandle)
+			#remove homologous region so there is not double #TODO recheck reports correct coordinates and repeat for left overlap 
+			self.chunk.bases = self.chunk.bases[:len(self.chunk.bases)+self.overlaps[1]] 
 			
 		#If integration cannot be performed we stop 
 		if int_stop == 0 and int_start == 0: 
 			status = False
+		
 				
 		host[self.chr] = host[self.chr][:int_start] + \
 		 				"".join(self.chunk.bases) + \
@@ -793,14 +803,14 @@ class Integration:
 		if self.overlaps[0]>0: #ie there is a gap 
 			self.hstart = int_start+self.overlaps[0]
 		elif self.overlaps[0]<0: #ie there is an overlap
-			self.hstart = int_start-self.overlaps[0]
+			self.hstart = int_start #TODO tidy this bit of code up 
 		else: 
 			self.hstart = int_start 
 			
 		if self.overlaps[1]>0: #ie there is a gap
 			self.hstop = int_stop-self.overlaps[1]
 		elif self.overlaps[1]<0: #ie there is an overlap 
-			self.hstop = int_stop+self.overlaps[1]
+			self.hstop = int_stop
 		else: 
 			self.hstop = int_stop 
 			
@@ -1019,9 +1029,9 @@ class Statistics:
 							shift = abs(int_list[i].overlaps[1]) 
 
 						#start coordinate of the integration 
-						new_coord1 = intCoords[j][0]+int_list[i].numBases + shift
+						new_coord1 = intCoords[j][0]+int_list[i].numBases 
 						#stop coordinate of the integraton 
-						new_coord2 = intCoords[j][1]+int_list[i].numBases + shift  
+						new_coord2 = intCoords[j][1]+int_list[i].numBases   
 						intCoords[j] = (new_coord1,new_coord2)
 						print("overlap adjust") 
 						
