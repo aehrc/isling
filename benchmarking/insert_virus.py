@@ -66,7 +66,7 @@ def main(argv):
 		raise OSError("Could not open virus fasta")
 	
 	#set random seed
-	np.random.seed(27)
+	np.random.seed(4)
 
 	#types of insertions
 	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
@@ -554,6 +554,8 @@ class Integration:
 		#store the overlap point
 		if self.inserted == True: 
 			self.newpoint = overlap_point 
+
+
 		return overlap_point  
 
 	def createLeftOverlap(self,host,int_list,filehandle):
@@ -614,7 +616,7 @@ class Integration:
 		viral_chunk = self.chunk.bases
 		dont_integrate = self.dontIntegrate(int_list)
 
-		r_overlap = str(viral_chunk[len(viral_chunk)+self.overlaps[1]:].seq) #sequence right of the integration site 
+		r_overlap = str(viral_chunk[len(viral_chunk)+self.overlaps[1]:]) #sequence right of the integration site 
 
 		left_site = -1
 		right_site = -1
@@ -645,13 +647,12 @@ class Integration:
 			else: 
 				right_site = right_search
 				break
-			#right_spot = self.hPos+(start_rseq-len(right_seq)) #TODO remove 
 
 		overlap_point = self.overlapPoint(left_site,right_site,filehandle) 
 
 		int_start = overlap_point
 		int_stop = overlap_point
-		 
+ 
 		if left_site != -1 and right_site != -1:
 		#ensures only if there is homology the overlapping region is removed   
 			int_stop = 0
@@ -730,26 +731,26 @@ class Integration:
 			self.chunk.bases = self.chunk.bases[-self.overlaps[0]:]
 			if int_start != 0 and int_stop != 0: 
 				int_start = int_start-self.overlaps[0]
-				int_stop = int_start
+			int_stop = int_start 
 			 
 		#adjust sequences with right overlap  		
 		if self.overlaps[1]<0:
 			(int_start,int_stop) = self.createRightOverlap(host,int_list,filehandle)
 			#remove homologous region so there is not double #TODO recheck reports correct coordinates and repeat for left overlap 
+			int_stop = int_start 
 			self.chunk.bases = self.chunk.bases[:len(self.chunk.bases)+self.overlaps[1]] 
 			
 		#If integration cannot be performed we stop 
 		if int_stop == 0 and int_start == 0: 
 			status = False
 			
-				
 		host[self.chr] = host[self.chr][:int_start] + \
 		 				"".join(self.chunk.bases) + \
 		 				host[self.chr][int_stop:]
 		
 		#set the starting and stopping points of the performed integration 
 		self.setStopStart(int_start,int_stop) 
-		
+
 		return host, status 
 
 
@@ -1014,27 +1015,30 @@ class Statistics:
 			
 		intCoords = [(int.hstart,int.hstop) for int in int_list]
 
-		for i in range(1,len(intCoords)):
+		for i in range(0,len(intCoords)):
 
-			#consider if an integration site was moved due to an overlap 
-			if int_list[i].newpoint > -1: 
-				i_site = int_list[i].newpoint
-			else: 
-				i_site = int_list[i].hPos 
-				i_site = intCoords[i][0] 
+
 			for j in range(0,i):
+
+				#consider if an integration site was moved due to an overlap 
+				if int_list[i].newpoint > -1: 
+					i_site = intCoords[i][0]
+				else: 
+					i_site = intCoords[i][0] 
+
+			
 				#consider if an integration site was moved due to an overlap 
 				if int_list[j].newpoint > -1: 
-					j_site = int_list[j].newpoint
+					j_site = intCoords[j][0] 
 				else: 					
-						j_site = int_list[j].hPos
-						j_site = intCoords[j][0] 
+					j_site = intCoords[j][0] 
 						
 
 				if i_site < j_site:
 					#if an integration has an overlap we don't want the indexing to be adjusted for these bases 
 					if int_list[i].overlaps[0] < 0 or  int_list[i].overlaps[1] < 0:
 						#handle overlap on left 
+
 						if int_list[i].overlaps[0]<0: 
 							shift = abs(int_list[i].overlaps[0])
 						#handle overlap on the right 
@@ -1044,7 +1048,7 @@ class Statistics:
 						#start coordinate of the integration 
 						new_coord1 = intCoords[j][0]+int_list[i].numBases 
 						#stop coordinate of the integraton 
-						new_coord2 = intCoords[j][1]+int_list[i].numBases   
+						new_coord2 = intCoords[j][1]+int_list[i].numBases 
 						intCoords[j] = (new_coord1,new_coord2)
 	 
 						
@@ -1062,6 +1066,8 @@ class Statistics:
  		
 			
 		return intCoords
+
+
 
 
 	def integratedIndices(int_list): 
