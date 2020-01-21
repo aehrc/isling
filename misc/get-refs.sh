@@ -77,3 +77,11 @@ mv GCA_000364345.1_Macaca_fascicularis_5.0_genomic.fna macFas5_genbank.fa
 wget ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank/vertebrate_mammalian/Macaca_fascicularis/latest_assembly_versions/GCA_000364345.1_Macaca_fascicularis_5.0/GCA_000364345.1_Macaca_fascicularis_5.0_genomic.gff.gz
 gunzip GCA_000364345.1_Macaca_fascicularis_5.0_genomic.gff.gz
 
+
+#### to generate a bed file of gaps (streches of N's) in a fasta file:
+# https://www.biostars.org/p/133742/#377084
+
+perl -ne 'chomp;if( />(.*)/){$head = $1; $i=0; next};@a=split("",$_); foreach(@a){$i++; if($_ eq "N" && $s ==0 ){$z=$i-1; print "$head\t$z"; $s =1}elsif($s==1 && $_ ne "N"){$j=$i-1;print "\t$j\n";$s=0}}' ref.fa > ref_gaps.bed
+
+
+

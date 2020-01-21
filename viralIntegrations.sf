@@ -36,7 +36,7 @@ for dataset in config:
 
 
 #### local rules ####
-localrules: all, combine, rename, copy
+localrules: all, combine, rename, copy, ucsc_bed
 
 #### target files ####
 rule all:
@@ -48,7 +48,8 @@ rule all:
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),		
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),
-		"../out/summary/num_sites.xlsx"
+		expand("../out/summary/{dset}.combined.xlsx", dset = DATASETS),
+#		expand("../out/summary/ucsc_bed/{dset}.clean.bed", dset = DATASETS)
 		
 		
 
@@ -382,3 +383,13 @@ rule summarise:
 		"envs/rscripts.yml"
 	script:
 		"summarise_ints.R"
+
+rule ucsc_bed:
+	input:
+		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES)
+	output:
+		expand("../out/summary/ucsc_bed/{dset}.clean.bed", dset = set(DATASETS)),
+	conda:
+		"envs/rscripts.yml"
+	shell:
+		"bash -e format_ucsc.sh"
