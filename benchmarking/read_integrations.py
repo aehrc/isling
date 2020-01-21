@@ -10,6 +10,7 @@ import pandas as pd
 import argparse
 import sys
 import time #remove after debugging - used to optimise code TODO
+import csv
 
 
 ### main
@@ -22,7 +23,8 @@ def main(argv):
 	parser.add_argument('--sam', help = 'sam file describing simulated reads', required = True)
 	parser.add_argument('--host_ints', help = 'csv file describing the location of viral DNA in the human host', required = True)
 	parser.add_argument('--save', help = 'csv file to save the output', required = True)
-	parser.add_argument('--viral_only', help = 'csv file to save only information for viral reads', required = True) 
+	parser.add_argument('--viral_only', help = 'csv file to save only information for viral reads', required = True)
+	parser.add_argument('--filtered', help = 'list of IDs which are not mapped', required = False, default = False) 
 	args = parser.parse_args()
 	
 	#read in sam file
@@ -34,6 +36,14 @@ def main(argv):
 	chunks = pd.read_csv(args.host_ints,header=0,sep='\t', chunksize = 50000)
 	int_file = pd.concat(chunks)  
 
+	#read in the list of filtered read IDs 
+	if args.filtered != False: 
+		id_file = open(args.filtered, 'r')
+		filtered_id = id_file.read().splitlines()
+	else: 
+		filtered_id = []
+
+
 	#find the number of fragments 
 	start_time = time.time() #TODO this could be optimise if it takes a long time 
 	num_reads = numReads(read_file)
@@ -42,19 +52,22 @@ def main(argv):
 
 	#get the coordinates of each integration
 	int_coord = intCoords(int_file)
+	print("Integration coordinates found") 
 
 	#get the hPos of each integration - we use this later as an identifer
 	int_hPos = intHpos(int_file)
+	print("hPos of integrations found") 
 
 	#get the types of junctions for each integration
 	int_leftj, int_rightj = intJunction(int_file) 
+	print("Type of junction for each integration found") 
 	
 	#read in sam file to process reads 
 	sam_file = args.sam
 
 	#process reads to obtain the ID of each fragment and the coordinates of the corresponding reads
 	start_time = time.time()
-	fragment_id, first_read, second_read = processReads(sam_file,num_reads)
+	fragment_id, first_read, second_read = processReads(sam_file,num_reads, filtered_id)
 	now = time.time() 
 	print("Time taken to process reads "+format(now-start_time),flush=True) 
 
@@ -180,7 +193,7 @@ def analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_righ
 		second_len.append(len2)
 
 		#save the integrations (hPos) in each read 
-		read_hPos.append(int_list) #exists as a list of lists
+		read_hPos.append(set(int_list)) #exists as a list of lists
 
 		#save the junction types of each read
 		junction_1 = readJunction(j, overlap_type1 ,int_leftj, int_rightj)
@@ -243,13 +256,17 @@ def viralQuantity(overlap_type, overlap_len):
 	return viral_q		   
 		
 def intCoords(int_file): 
-	"""Finds the location of viral DNA in the host sequence""" 
+	"""Finds the location of viral DNA in the host sequence"""
+	#get the integration coordinates  
 	int_coord = []
 
 	for i in range(len(int_file)):
 		c1 = int_file["Start point"][i]
+		c1 = c1 + int_file["leftJunctionBases"][i] #adjust for junction bases on the left 
 		c2 = int_file["Stop point"][i]
+		c2 = c2 - int_file["rightJunctionBases"][i] #adjust for junction bases on the right 
 		int_coord.append((c1,c2))
+
 	return int_coord
 
 def intHpos(int_file): 
@@ -311,8 +328,9 @@ def readJunction(index, overlap_type, int_leftj, int_rightj):
 	return junction
 
 	
-def processReads(sam_file,num_inserts):
+def processReads(sam_file,num_inserts, filtered_id):
 	"""Creates a list of the read IDs and their alignment coordinates""" 
+
 
 	read_file = open(sam_file,'r')
 	in_sam = Reader(read_file) 
@@ -327,15 +345,28 @@ def processReads(sam_file,num_inserts):
 			print(str(i)+" READS PROCESSED") 
 		x = next(in_sam)
 		y = next(in_sam)
+
+		#get ID of the read being processed
+		this_ID = str(x.qname) 
 		
-		#save the ID of the read 
-		fragment_id.append(x.qname)
+		#only consider the read is mapped 
+		if len(filtered_id) > 0: 
+			if this_ID in filtered_id: 
+				#save the ID of the read 
+				fragment_id.append(x.qname)
 		
-		#save the coordinates of the read 
-		first_read.append((x.pos-1,x.pos+len(x.seq)))
-		second_read.append((y.pos-1,y.pos+len(y.seq)))
-		#print("COORD A: "+str(first_read))	
-		#print("COORD B: "+str(second_read)) #coordinates apear in the wrong orientation 
+				#save the coordinates of the read 
+				first_read.append((x.pos-1,x.pos+len(x.seq)))
+				second_read.append((y.pos-1,y.pos+len(y.seq)))
+		else: 
+			#save the ID of the read 
+			fragment_id.append(x.qname)
+		
+			#save the coordinates of the read 
+			first_read.append((x.pos-1,x.pos+len(x.seq)))
+			second_read.append((y.pos-1,y.pos+len(y.seq)))
+			
+ 
 	return fragment_id, first_read, second_read
 	
  
@@ -392,7 +423,7 @@ def getViralReads(results):
 	print("Number of viral reads: "+str(len(viral_reads)))
 
 	return viral_reads
-
-	
+ 
+		
 if __name__ == "__main__":
 	main(sys.argv[1:]) 	

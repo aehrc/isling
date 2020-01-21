@@ -4,11 +4,13 @@
 ## whole viral genome (possibility for reverse orientation)
 ## portion of viral genome (possibility for reverse orientation)
 ## n sequential portions of viral genome, rearranged (with possibility that some are reversed)
-## n non-sequential (with a gap in between) portions of viral genome, rearranged (with possibility that some are reversed)
+## n non-sequential (with a gap in between) portions of viral genome, rearranged (with possibility that some are reversed) (ie deletion)
+## portion of viral genome divided into n sequential portions of viral genome, rearranged 
+## poriton of viral genome divided into n non-sequential portions of viral genome and rearranged 
 
 #at each insertion type, overlaps possible are gap, overlap, none
 ## if gap, insert small number of random bases between host and virus
-## if overlap, take small (<5) number of bases and look for homology, do insertion there
+## if overlap, take small (<=10) number of bases and look for homology, do insertion there
 ## if none, there is a 'clean' junction between virus and host
 
 # reports parameters of integrations:
@@ -32,7 +34,7 @@ import argparse
 import sys
 import os
 import numpy as np
-print("STARTING") 
+print("STARTING", flush=True) 
 ###
 max_attempts = 5 #maximum number of times to try to place an integration site
 
@@ -66,7 +68,7 @@ def main(argv):
 		raise OSError("Could not open virus fasta")
 	
 	#set random seed
-	np.random.seed(4)
+	np.random.seed(1)
 
 	#types of insertions
 	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
@@ -108,6 +110,7 @@ def main(argv):
 	
 	#intialise the separation from other integrations 
 	sep = int(args.sep) 
+
 	
 	#intialise how many episomal sequences included in the outputted fasta file 
 	epi_num = int(args.epi_num) 
@@ -116,27 +119,28 @@ def main(argv):
 	int_report = 50
 	
 	
-	print("\nNUMBER OF INTEGRATIONS TO INSERT: "+str(int_num))
+	print("\nNUMBER OF INTEGRATIONS TO INSERT: "+str(int_num),flush=True)
 	
 	#integration loop 
-	for i in range(0,int_num):
-		rand_int =  np.random.randint(0,len(insertion_types))
-		#rand_int = 0 #uncomment for testing specific type of integration 
-		host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, min_len, sep)  
-		if i % int_report == 0 and i != 0: 
-			print(str(i) +" integrations complete...")
+	counter = 0 # count number of iterations 
+	while len(host_ints) < int_num: 
+		#rand_int =  np.random.randint(0,len(insertion_types))
+		rand_int = 0 #uncomment for testing specific type of integration TODO  - whole 
+		host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, min_len, sep)
+		counter += 1  
+		if counter % int_report == 0: 
+			print(str(counter) +" integrations complete...", flush = True)
+
 	
-	print("NUMBER OF INTEGRATIONS DONE: "+str(len(host_ints)))		
-	print("\nNUMBER OF EPISOMES: "+str(epi_num))
-	
-	
+	print("NUMBER OF INTEGRATIONS DONE: "+str(len(host_ints)),flush=True)		
 	for i in range(0,epi_num): 
 		rand_int = np.random.randint(0,2)	
 		name = "episome "+str(i+1)
+
 		host_fasta = episome_types[rand_int](virus, min_len, host_fasta, name)  
 			
-	print("\n***INTEGRATIONS COMPLETE***")
-	print(host_fasta)
+	print("\n***INTEGRATIONS COMPLETE***",flush=True)
+	print(host_fasta,flush=True)
 	handle.close()
 	
 
@@ -149,9 +153,9 @@ def main(argv):
 	with open(args.ints, 'w') as handle: 
     		SeqIO.write(host_fasta.values(), handle, 'fasta')
     		handle.close()
-    		print("\nIntegrated host saved as "+str(args.ints))
-    		print("Details of sequences integrated saved as "+str(args.locs))
-    		print("Details of where intgrations lie in host sequence saved as "+str(args.ints_host))
+    		print("\nIntegrated host saved as "+str(args.ints),flush=True)
+    		print("Details of sequences integrated saved as "+str(args.locs),flush=True)
+    		print("Details of where intgrations lie in host sequence saved as "+str(args.ints_host),flush=True)
 
 
 def insertWholeVirus(host, viruses, int_list, filehandle, min_len, sep):
@@ -182,7 +186,7 @@ def insertWholeVirus(host, viruses, int_list, filehandle, min_len, sep):
 	#only save if integration was successful 
 	if status == True:
 	
-		#write to output file
+		#write to output fileh
 		currentInt.writeIntegration(filehandle)
 	
 		#append to int_list
@@ -193,15 +197,14 @@ def insertWholeVirus(host, viruses, int_list, filehandle, min_len, sep):
 def insertViralPortion(host, viruses, int_list, filehandle, min_len,sep):
 	"""Inserts portion of viral DNA into host genome"""
 	
+
 	#get positions of all current integrations
 	currentPos = Statistics.integratedIndices(int_list)
-	
 	
 	#make sure that new integration is not within args.sep bases of any current integrations
 	attempts = 0
 	while True:
-		#get one viral chunk
-		
+		#get one viral chunk 
 		currentInt = Integration(host)
 		currentInt.addFragment(viruses, min_len, part = "rand")
 		attempts += 1
@@ -213,7 +216,7 @@ def insertViralPortion(host, viruses, int_list, filehandle, min_len,sep):
 		elif attempts > max_attempts:
 			return int_list, host
 			
-	#do integration
+	#do integration 
 	host, status  = currentInt.doIntegration(host, int_list,filehandle)
 	
 	#only save if integration was successful 
@@ -405,17 +408,33 @@ class Integration:
 		#zero overlap means clean junction
 		#integration cannot not have negative overlap at both ends - can be changed later** 
 
+		#TODO adjust to reflect the junctions for the experiment - here just gaps 
+		
 		while True: 
-			self.overlaps = (np.random.randint(-10,10),np.random.randint(-10,10))
+			self.overlaps = (np.random.randint(0,10),np.random.randint(0,10))
 			if self.overlaps[0]<0 and self.overlaps[1]<0: 
 				continue
 			else: 
 				break 
+		"""
+		
+		self.overlaps = (0,0) #Uncomment for just clean junctions
 
+		
+		#when producing only overlaps  
+		end = np.random.randint(0,2)
+		if end == 0: 
+			self.overlaps = (np.random.randint(-10,0),0)
+		else: 
+			self.overlaps = (0,np.random.randint(-10,0)) 
+	
+		"""
 		#record the type of junction for saving to file later
 		self.junction = (self.convertJunction(self.overlaps[0]),
 				self.convertJunction(self.overlaps[1]))
 
+		
+		
 		#used when an integration with an overlap is intgrated at a location other than hPos 
 		self.newpoint = -1 
  		 
@@ -424,7 +443,7 @@ class Integration:
 		add a viral fragment to this integration
 		"""
 		
-		#check there isn't alreafbdy a fragment
+		#check there isn't alreafbdy a fragmentfg
 		if self.fragments > 0:
 			print("Fragment has already been added!")
 			return
@@ -566,7 +585,7 @@ class Integration:
 
 		viral_chunk = self.chunk.bases
 
-		l_overlap = str(viral_chunk[:-self.overlaps[0]]) #sequence left of the integration site 
+		l_overlap = str(viral_chunk[:-self.overlaps[0]].seq) #sequence left of the integration site 
 		left_site = -1
 		right_site = -1
 		dont_integrate = self.dontIntegrate(int_list)
@@ -593,7 +612,8 @@ class Integration:
 				break 
 			right_search += right_seqLen +(right_seqLen - len(right_seq))
 			if right_search in dont_integrate: #check homology is not from a previous integration
-				right_seq = host[self.chr][right_search:]
+				#start next search from after the homologous point from the integration was found 	
+				right_seq = host[self.chr][right_search+self.overlaps[0]:]
 			else:
 				right_site = right_search
 	
@@ -616,7 +636,7 @@ class Integration:
 		viral_chunk = self.chunk.bases
 		dont_integrate = self.dontIntegrate(int_list)
 
-		r_overlap = str(viral_chunk[len(viral_chunk)+self.overlaps[1]:]) #sequence right of the integration site 
+		r_overlap = str(viral_chunk[len(viral_chunk)+self.overlaps[1]:].seq) #sequence right of the integration site 
 
 		left_site = -1
 		right_site = -1
@@ -1074,14 +1094,12 @@ class Statistics:
 		"""Creates a lisit of sequence indexes which are of viral origin""" 
 		#create list of viral coordinates 		
 		viral_idx = []
-
+		
 		#number of integrations which have been performed
 		num_ints = len(int_list)  
-
 		#get start and stop coordinates 
 		if num_ints != 0: 
 			int_coords = Statistics.adjustedStopStart(int_list[1-num_ints],int_list) 
-
 			for i in range(0,num_ints): 
 				c1, c2 = int_coords[i]
 				for j in range(c1,c2+1): 

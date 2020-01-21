@@ -15,15 +15,27 @@ def main(argv):
 	parser.add_argument('--bam', help = 'bam file of host aligned reads', required = True)
 	parser.add_argument('--missed_reads', help = 'csv file containing the IDs of the reads which the pipeline failed to identify', required = True)
 	parser.add_argument('--all_reads', help = 'csv file containing all reads', required = False)
-
+	parser.add_argument('--correct_reads', help = 'csv file containing correctly predicted reads', required = False)
 	args = parser.parse_args()
 
 	#bam file 
 	bam_file = args.bam 
 
-	#procsess reads 
-	processReads(bam_file) 
+	#missed integration csv 
+	missed_ints = pd.read_csv(args.missed_reads,header = 0, sep='\t')
+	missed_reads = missed_ints['fragment_id'].tolist()
 
+	#procsess reads 
+	all_bam = processReads(bam_file)
+	print(all_bam.loc["CM000682.2-8815128"])
+	missed_flags = all_bam.loc[missed_reads]
+	missed_flags.to_csv("missed_flags.csv", sep = '\t')  
+	
+	#missed integration csv 
+	correct_ints = pd.read_csv(args.correct_reads,header = 0, sep='\t')
+	correct_reads = correct_ints['fragment_id'].tolist()
+	correct_flags = all_bam.loc[correct_reads]
+	correct_flags.to_csv("correct_flags.csv", sep = '\t')
 	print("DONE")
 
 
@@ -48,7 +60,7 @@ def processReads(bam_file):
 
 	# loop through the bam file entries 
 	for i in range(entries): 
-		
+
 		#report the number of reads processed 
 		if i != 0 and i%100000 == 0: 
 			print(str(i) + " reads processed") 
@@ -56,6 +68,8 @@ def processReads(bam_file):
 		x = next(in_bam) 
 		read_ID.append(x.qname) 
 		read_flag.append(x.flag)
+		print("Seq: "+str(x.seq)) 
+		print("Quality: "+str(x.qual)) 
 		read_pos.append(x.pos -1 )  #-1 to match output from read_integrations.py 
  
 	#make dataframe of IDs and flags 	
@@ -73,10 +87,14 @@ def processReads(bam_file):
  	#create a list of unique IDs 
 	unique_ID = all_bam["ID"].drop_duplicates()
 	unique_ID = unique_ID.reset_index(drop=True) 
+	print("Unique ID's: "+str(len(unique_ID)))
 	all_bam.set_index(["ID"], inplace = True, drop = True)
 
 	return all_bam 
-	
+
+#need to look at the coordinates of the missed reads to look at what the flag was of the missed read 
+
+
 
 if __name__ == "__main__":
 	main(sys.argv[1:]) 
