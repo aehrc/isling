@@ -48,7 +48,7 @@ rule all:
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),		
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),
-		expand("../out/summary/{dset}.combined.xlsx", dset = DATASETS),
+#		expand("../out/summary/{dset}.combined.xlsx", dset = DATASETS),
 #		expand("../out/summary/ucsc_bed/{dset}.clean.bed", dset = DATASETS)
 		
 		
@@ -372,17 +372,17 @@ rule count_mapped:
 #	script:
 #		"count_reads.R"
 	
-rule summarise:
-	input:
-		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES),
-		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES)
-
-	output:
-		"../out/summary/num_sites.xlsx"
-	conda:
-		"envs/rscripts.yml"
-	script:
-		"summarise_ints.R"
+#rule summarise:
+#	input:
+#		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES),
+#		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES)
+#
+#	output:
+#		"../out/summary/num_sites.xlsx"
+#	conda:
+#		"envs/rscripts.yml"
+#	script:
+#		"summarise_ints.R"
 
 rule ucsc_bed:
 	input:
