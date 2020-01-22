@@ -68,7 +68,7 @@ def main(argv):
 		raise OSError("Could not open virus fasta")
 	
 	#set random seed
-	np.random.seed(1)
+	np.random.seed(2)
 
 	#types of insertions
 	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
@@ -415,7 +415,10 @@ class Integration:
 			if self.overlaps[0]<0 and self.overlaps[1]<0: 
 				continue
 			else: 
-				break 
+				break
+		
+		self.overlaps = (0,0) 
+	
 		"""
 		
 		self.overlaps = (0,0) #Uncomment for just clean junctions
@@ -433,8 +436,6 @@ class Integration:
 		self.junction = (self.convertJunction(self.overlaps[0]),
 				self.convertJunction(self.overlaps[1]))
 
-		
-		
 		#used when an integration with an overlap is intgrated at a location other than hPos 
 		self.newpoint = -1 
  		 

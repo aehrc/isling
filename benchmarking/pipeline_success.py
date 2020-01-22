@@ -43,8 +43,6 @@ def main(argv):
 	#read in file listing all reads 
 	all_reads = pd.read_csv(args.all_reads,header = 0, sep = '\t')
 	all_IDs = list(set(all_reads["fragment_id"]))	
-	#with open(args.all_reads,'r') as f:
-	#	all_IDs = f.read().splitlines()
 
 	#read in file listing which reads contain viral DNA 
 	viral_reads = pd.read_csv(args.viral_reads, header=0, sep='\t') 
@@ -68,7 +66,8 @@ def main(argv):
 	print("\nStats after filtering...")
 """ 
 	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads  = listIDs(viral_reads,pipe_ints, all_IDs)
-	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads)
+	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, False)
+
 
 	#look for what ratio of integrations we captured with the detected reads 
 	missed_hPos = findMissed(viral_reads, detected_Vreads)
@@ -144,8 +143,8 @@ def listIDs(viral_reads, pipe_ints, all_IDs):
 
 	return actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads 
 
-def listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads): 
-	"""function which creates a list of the IDs successfully predicted by the pipeline and those missed. actual Vreads is a list of the reads known to be viral and pred_Vreads is a list of the reads predicted by the pipeline to contain viral DNA""" 
+def listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save): 
+	"""function which creates a list of the IDs successfully predicted by the pipeline and those missed. actual Vreads is a list of the reads known to be viral and pred_Vreads is a list of the reads predicted by the pipeline to contain viral DNA. Can save false positives and negatives to file if save == True.""" 
 
 	#find how many of the viral reads were/were not detected by the pipeline
 	detected_Vreads = list(set(actual_Vreads).intersection(pred_Vreads))
@@ -164,6 +163,18 @@ def listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads):
 
 	print("Total number of positive predictions: " + str(pred_pos)) #debugging
 	print("Total number of negative predictions: "+str(pred_neg)) #debugging 
+	
+	if save == True: 
+		#save the false positive reads to file
+		with open('evaluate_pipeline_output/false_positive_IDs.txt', 'w') as f: 
+			for item in detected_NVreads: 
+				f.write("%s\n" % item)
+		#save the false negative reads to file 
+		with open('evaluate_pipeline_output/false_negative_IDs.txt', 'w') as f: 
+			for item in undetected_Vreads: 
+				f.write("%s\n" % item)
+		print("False positive reads saved to 'evaluate_pipeline_output/false_positive_IDs.txt'", flush = True) 
+		print("False negative reads saved to 'evaluate_pipeline_output/false_negative_IDs.txt'", flush = True)
 
 	return detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads
 
@@ -360,7 +371,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	print("\n"+str(len(filter_idx))+" Reads filtered with HostEditDist <="+str(edit_dist),flush = True)
 	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads  = listIDs(viral_reads,filt_pipe, all_IDs)
 	print("Stats after filtering...")
-	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads)
+	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, False)
 	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads, 'HosteditDist')
 	#create dataframe to append stats to 
 	all_stats = pd.DataFrame(stats)
@@ -379,7 +390,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	print("\n"+str(len(filter_idx))+" Reads filtered with ViralEditDist <="+str(edit_dist),flush = True)
 	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads  = listIDs(viral_reads,filt_pipe, all_IDs)
 	print("Stats after filtering...")
-	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads)
+	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, False)
 	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads, 'ViralEditDist')
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
@@ -396,7 +407,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	print("\n"+str(len(filter_idx))+" Reads filtered with NoAmbiguousBases <="+str(max_ambig),flush = True)
 	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads  = listIDs(viral_reads,filt_pipe, all_IDs)
 	print("Stats after filtering...")
-	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads)
+	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, True)
 	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads, 'NoAmbiguousBases')
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
@@ -412,7 +423,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	print("\n"+str(len(filter_idx))+" Discordant reads filtered" ,flush = True)
 	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads  = listIDs(viral_reads,filt_pipe, all_IDs)
 	print("Stats after filtering...")
-	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads)
+	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, False)
 	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads, 'OverlapType')
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
@@ -428,7 +439,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	print("\n"+str(len(filter_idx))+" PossibleVecotorRearrangments filtered" ,flush = True)
 	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads  = listIDs(viral_reads,filt_pipe, all_IDs)
 	print("Stats after filtering...")
-	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads)
+	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, False)
 	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads, 'PossibleVectorRearrangement')
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = False)
@@ -445,7 +456,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	print("\n"+str(len(filter_idx))+" PossibleHostTranslocations filtered" ,flush = True)
 	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads  = listIDs(viral_reads,filt_pipe, all_IDs)
 	print("Stats after filtering...")
-	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads)
+	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, False)
 	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads, 'PossibleHostTranslocation')
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
@@ -454,7 +465,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	print("\nNO FILTER APPLIED") 
 	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads  = listIDs(viral_reads,pipe_ints, all_IDs)
 	print("\nStats after filtering...")
-	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads)
+	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, False)
 	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads, 'NoFilter')
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
