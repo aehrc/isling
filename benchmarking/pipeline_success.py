@@ -42,10 +42,12 @@ def main(argv):
 
 	#read in file listing all reads 
 	all_reads = pd.read_csv(args.all_reads,header = 0, sep = '\t')
-	all_IDs = list(set(all_reads["fragment_id"]))	
+	all_IDs = list(set(all_reads["fragment_id"]))
+	all_IDs = [i.replace('chr', '') for i in all_IDs] 	
 
 	#read in file listing which reads contain viral DNA 
-	viral_reads = pd.read_csv(args.viral_reads, header=0, sep='\t') 
+	viral_reads = pd.read_csv(args.viral_reads, header=0, sep='\t')
+	viral_reads['fragment_id'] = [x.replace("chr","") for x in viral_reads['fragment_id']]
 	#filter our file to leave only chimeric reads 
 	viral_reads = removeViral(viral_reads)
 	#pipeline can only detect a read as being viral if there is at least 20 bases each of host and virus DNA
@@ -53,6 +55,7 @@ def main(argv):
 
 	#read in file listing the integrations detected by the pipeline 
 	pipe_ints = pd.read_csv(args.pipeline, header = 0, sep = '\t')
+	print("Number of reads detected by pipeline: " +str(len(pipe_ints))) 
 	#filter out ambiguous reads 
 	#pipe_ints = filterAmbiguous(pipe_ints)  
 	#filt_pipes = currentFiltering(pipe_ints) 
@@ -60,15 +63,8 @@ def main(argv):
 	#look at the different types of filtering 
 	compareFilters(pipe_ints,viral_reads, all_IDs )
 
-	#No filter 
+
 	"""
-	print("\nNO FILTER APPLIED")
-	print("\nStats after filtering...")
-""" 
-	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads  = listIDs(viral_reads,pipe_ints, all_IDs)
-	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, False)
-
-
 	#look for what ratio of integrations we captured with the detected reads 
 	missed_hPos = findMissed(viral_reads, detected_Vreads)
 
@@ -82,7 +78,7 @@ def main(argv):
 	readLength(missed_df)
 	pipelineMissed(missed_df,viral_reads) 	
 
-	"""
+	
 	
 
 	#filter out possible vector rearrangments #TODO play around with this particularly for chromosomes 14 and X
@@ -117,17 +113,23 @@ def listIDs(viral_reads, pipe_ints, all_IDs):
 	#List all IDs 
 	all_reads = list(set(all_IDs))
 	print("Number of reads: "+str(len(all_reads)), flush = True)
+
+	#list pipeline predictions
+	pipe_IDs =list(set(pipe_ints["ReadID"]))
+	#remove space at the start of the ID
+	pipe_IDs = [i.replace(" ", "") for i in pipe_IDs]  
 	
 	#List actual viral reads 
-	actual_Vreads = list(set(viral_reads['fragment_id'])) 
+	actual_Vreads = list(set(viral_reads['fragment_id']))
+	actual_Vreads = [i.replace("chr","") for i in actual_Vreads] 
 	print("Number of viral reads: "+str(len(actual_Vreads)), flush = True) 
 
 	#List viral reads predicted by the pipeline 
-	pred_Vreads = list(set(pipe_ints['ReadID']).intersection(set(all_reads)))
-	print("Number of viral reads predicted by the pipeline: "+str(len(pred_Vreads)), flush = True) 
-	
+	pred_Vreads = list(set(pipe_IDs).intersection(set(all_reads)))
+	print("Number of viral reads predicted by the pipeline: "+str(len(pred_Vreads)), flush = True)
+
 	#List viral reads appearing in pipeline which are unknown 
-	pred_unk = list(set(pipe_ints['ReadID'])-set(all_reads)) 
+	pred_unk = list(set(pipe_IDs)-set(all_reads)) 
 	print("Reads filtered in processing (ie low quality): "+str(len(pred_unk)), flush = True) 
 
 	#List actual non-viral reads 
@@ -542,17 +544,28 @@ def filterLength(viral_reads, min_len):
 
 	#find the maximum amount of virus (ie 150bp)
 	read_length = max(viral_reads['left_read_amount']) #could alternatively use right read amount 
+	read_length = 151 
+
+	#debugging 
+	print(viral_reads[viral_reads['left_read_amount'] == read_length])
 
 	#look through viral_reads for reads with less than 20 bp of host or viral DNA 
-	for i in range(len(viral_reads)): 
+	for i in range(len(viral_reads)):
+
+ 
 		# if the left read is all viral or all host we care about the right read 
 		if viral_reads['left_read_amount'][i] == read_length or viral_reads['left_read_amount'][i] == 0: 
 			chimeric = viral_reads['right_read_amount'][i]
 
 		# if the right read is all viral or all host we care about the left read
-		if viral_reads['right_read_amount'][i] == read_length or viral_reads['right_read_amount'][i] == 0: 
+		elif viral_reads['right_read_amount'][i] == read_length or viral_reads['right_read_amount'][i] == 0: 
 			chimeric = viral_reads['left_read_amount'][i] 
 		
+		#else we have a read which which has more than one integration in it (split end read) 
+		#TODO debug - why are these happening (integrations bunching together) - issue with intial script 
+		else: 
+			short_idx.append(i)    		
+
 		#filter reads which are outside the range detectable by the pipeline 		
 		if chimeric > read_length - min_read or chimeric < min_read: 
 			short_idx.append(i) 
