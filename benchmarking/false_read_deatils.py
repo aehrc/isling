@@ -58,8 +58,6 @@ def getDetails(bam, false_IDs):
 	#loop through the reads in the bam file 
 	for i in range(num_bam): 
 		x = next(in_bam) 
-		if i <10: 
-			print(x.qname) 
 		if x.qname in false_IDs: 
 			read_id.append(x.qname) 
 			read_seq.append(x.seq)
