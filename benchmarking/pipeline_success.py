@@ -543,8 +543,12 @@ def filterLength(viral_reads, min_len):
 	min_read = min_len
 
 	#find the maximum amount of virus (ie 150bp)
-	read_length = max(viral_reads['left_read_amount']) #could alternatively use right read amount 
-	read_length = 151 
+	left_length = max(viral_reads['left_read_amount'])
+	right_length = max(viral_reads['left_read_amount'])
+	read_length = max(left_length, right_length) #could alternatively use right read amount 
+	#TODO remove this if there are no issues 
+	if read_length > 151: 
+		raise OSError("Max read length is greater than 151 base pairs!\nReturn to insert_virus.py to resolve this issue")
 
 	#debugging 
 	print(viral_reads[viral_reads['left_read_amount'] == read_length])
@@ -560,9 +564,7 @@ def filterLength(viral_reads, min_len):
 		# if the right read is all viral or all host we care about the left read
 		elif viral_reads['right_read_amount'][i] == read_length or viral_reads['right_read_amount'][i] == 0: 
 			chimeric = viral_reads['left_read_amount'][i] 
-		
-		#else we have a read which which has more than one integration in it (split end read) 
-		#TODO debug - why are these happening (integrations bunching together) - issue with intial script 
+		 
 		else: 
 			short_idx.append(i)    		
 
