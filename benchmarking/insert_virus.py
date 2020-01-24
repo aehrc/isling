@@ -68,7 +68,7 @@ def main(argv):
 		raise OSError("Could not open virus fasta")
 	
 	#set random seed
-	np.random.seed(2)
+	np.random.seed(3)
 
 	#types of insertions
 	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
@@ -125,18 +125,18 @@ def main(argv):
 	counter = 0 # count number of iterations 
 	while len(host_ints) < int_num: 
 		#rand_int =  np.random.randint(0,len(insertion_types))
-		rand_int = 0 #uncomment for testing specific type of integration TODO  - whole 
+		rand_int = 3 #uncomment for testing specific type of integration TODO  - portion
 		host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, min_len, sep)
 		counter += 1  
 		if counter % int_report == 0: 
 			print(str(counter) +" integrations complete...", flush = True)
-
+	print("NUMBER OF INTEGRATIONS DONE: "+str(len(host_ints)),flush=True)
 	
-	print("NUMBER OF INTEGRATIONS DONE: "+str(len(host_ints)),flush=True)		
+	#episome loop 	
+	print("\nNUMBER OF EPISOMES: "+str(epi_num))
 	for i in range(0,epi_num): 
 		rand_int = np.random.randint(0,2)	
 		name = "episome "+str(i+1)
-
 		host_fasta = episome_types[rand_int](virus, min_len, host_fasta, name)  
 			
 	print("\n***INTEGRATIONS COMPLETE***",flush=True)
@@ -160,19 +160,18 @@ def main(argv):
 
 def insertWholeVirus(host, viruses, int_list, filehandle, min_len, sep):
 	"""Inserts whole viral genome into host genome"""
-	
+
 	#get positions of all current integrations
 	currentPos = Statistics.integratedIndices(int_list)
 
 	#make sure that new integration is not within args.sep bases of any current integrations
 	attempts = 0
-
+ 
 	while True:
 		#get one viral chunk
 		currentInt = Integration(host)
 		currentInt.addFragment(viruses, min_len, part = "whole")
 		attempts += 1
-		
 		#check that all integrations are sep away from new integration
 		if all([ abs(currentInt.hPos-i) > sep for i in currentPos ]):
 			break
@@ -182,7 +181,6 @@ def insertWholeVirus(host, viruses, int_list, filehandle, min_len, sep):
 	
 	#do integration
 	host, status = currentInt.doIntegration(host, int_list,filehandle)
-	
 	#only save if integration was successful 
 	if status == True:
 	
@@ -409,21 +407,20 @@ class Integration:
 		#integration cannot not have negative overlap at both ends - can be changed later** 
 
 		#TODO adjust to reflect the junctions for the experiment - here just gaps 
-		
+		"""
 		while True: 
 			self.overlaps = (np.random.randint(0,10),np.random.randint(0,10))
+			#self.overlaps = (0,0)
 			if self.overlaps[0]<0 and self.overlaps[1]<0: 
 				continue
 			else: 
 				break
-		
-		self.overlaps = (0,0) 
-	
 		"""
 		
-		self.overlaps = (0,0) #Uncomment for just clean junctions
-
 		
+		self.overlaps = (0,0) #Uncomment for just clean junctions
+		
+		"""
 		#when producing only overlaps  
 		end = np.random.randint(0,2)
 		if end == 0: 
@@ -600,7 +597,7 @@ class Integration:
 			if left_search == -1:
 				break 
 			if left_search in dont_integrate: #check homology is not from a previous integration
-				left_seq = left_seq[:left_search]  
+				left_seq = left_seq[:left_search-self.overlaps[0]]  
 			else:
 				left_site= left_search 
 				
@@ -693,17 +690,17 @@ class Integration:
 		for i in range(len(stop_start)):
 			c1, c2 = stop_start[i]
 
-			for j in range(c1,c2+1): 
+			for j in range(c1,c2): 
 				dont_integrate.append(j)
 
 			if int_list[i].overlaps[0] < 0:
 				#add bases of left overlaps so any overlapping regions are not reused
-				for k in range(0,abs(int_list[i].overlaps[0])): 
+				for k in range(0,abs(int_list[i].overlaps[0])+1): 
 					dont_integrate.append(c1-k)
   
 			if int_list[i].overlaps[1] < 0 : 
 				#add bases of right overlaps so any overlapping regions are not reused 
-				for k in range(0,abs(int_list[i].overlaps[1])): 
+				for k in range(0,abs(int_list[i].overlaps[1])+1): 
 					dont_integrate.append(c2+k) 
 
 		return dont_integrate
@@ -768,6 +765,7 @@ class Integration:
 		host[self.chr] = host[self.chr][:int_start] + \
 		 				"".join(self.chunk.bases) + \
 		 				host[self.chr][int_stop:]
+	
 		
 		#set the starting and stopping points of the performed integration 
 		self.setStopStart(int_start,int_stop) 
