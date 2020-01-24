@@ -31,8 +31,7 @@ def main(argv):
 
 	#save output in terminal to a file 
 	f = open( "evaluate_pipeline_output/output.txt", "w")
-	sys.stdout = f 
-	print("test") 
+	sys.stdout = f  
 	
 	
 	#read in integration file 
@@ -519,11 +518,6 @@ def removeViral(viral_reads):
 		if viral_reads['left_read'][i] == 'viral' and viral_reads['right_read'][i] == 'viral': 
 			nonchimeric_idx.append(i) 
 
-	#TODO potentially remove this - here we more the discordant reads 
-	for i in range(len(viral_reads)): 
-		if viral_reads['left_read'][i] != 'chimeric' and viral_reads['right_read'][i] != 'chimeric': 
-			nonchimeric_idx.append(i) 
-			
 	#drop the nonchimeric rows 
 	filt_reads = viral_reads.drop(viral_reads.index[nonchimeric_idx])  
 
@@ -546,31 +540,33 @@ def filterLength(viral_reads, min_len):
 	left_length = max(viral_reads['left_read_amount'])
 	right_length = max(viral_reads['left_read_amount'])
 	read_length = max(left_length, right_length) #could alternatively use right read amount 
+	print("Read length"+str(read_length)) 
 	#TODO remove this if there are no issues 
-	if read_length > 151: 
-		raise OSError("Max read length is greater than 151 base pairs!\nReturn to insert_virus.py to resolve this issue")
-
-	#debugging 
-	print(viral_reads[viral_reads['left_read_amount'] == read_length])
+	if read_length > 151:
+		read_length = 151 
+		#raise OSError("Max read length is greater than 151 base pairs!\nReturn to insert_virus.py to resolve this issue")
 
 	#look through viral_reads for reads with less than 20 bp of host or viral DNA 
 	for i in range(len(viral_reads)):
+		
+		#integration causes both reads to be chimeric - common in short integrations 
+		if viral_reads['left_read'][i] == 'chimeric' and viral_reads['right_read'][i] == 'chimeric': 
+			if viral_reads['left_read_amount'][i] > read_length - min_read or viral_reads['left_read_amount'][i] < min_read: 
+				if  viral_reads['right_read_amount'][i] > read_length - min_read or viral_reads['right_read_amount'][i] < min_read:
+					short_idx.append(i) 
+		else: 			
+			# if the left read is all viral or all host we care about the right read 
+			if viral_reads['left_read_amount'][i] == read_length or viral_reads['left_read_amount'][i] == 0: 
+				chimeric = viral_reads['right_read_amount'][i]
 
- 
-		# if the left read is all viral or all host we care about the right read 
-		if viral_reads['left_read_amount'][i] == read_length or viral_reads['left_read_amount'][i] == 0: 
-			chimeric = viral_reads['right_read_amount'][i]
+			# if the right read is all viral or all host we care about the left read
+			elif viral_reads['right_read_amount'][i] == read_length or viral_reads['right_read_amount'][i] == 0: 
+				chimeric = viral_reads['left_read_amount'][i]  		
 
-		# if the right read is all viral or all host we care about the left read
-		elif viral_reads['right_read_amount'][i] == read_length or viral_reads['right_read_amount'][i] == 0: 
-			chimeric = viral_reads['left_read_amount'][i] 
-		 
-		else: 
-			short_idx.append(i)    		
-
-		#filter reads which are outside the range detectable by the pipeline 		
-		if chimeric > read_length - min_read or chimeric < min_read: 
-			short_idx.append(i) 
+			#filter reads which are outside the range detectable by the pipeline 		
+			if chimeric > read_length - min_read or chimeric < min_read: 
+				short_idx.append(i) 
+  
 
 	#drop the short rows 
 	filt_reads = viral_reads.drop(viral_reads.index[short_idx]) 
