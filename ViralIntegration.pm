@@ -693,8 +693,11 @@ sub processCIGAR2 {
 			
 			#so if there's an S in the operations sandwiched between two M's
 			#just move on
+			
+			# the only exception to this is for the M operations added to the start and end
+			# of the CIGAR, which have zero length
 			my @Sops = grep { $_ =~ /S/ } @letters[$i..$lastM];
-			if( $#Sops >= 0) { $lastM = $i; next; }
+			if (($#Sops >= 0) and ($numbers[$lastM] > 0) and ($numbers[$i] > 0)) { $lastM = $i; next; }
 			
 			#check the number of bases between this M and the last M
 			
@@ -705,12 +708,18 @@ sub processCIGAR2 {
 					#need to consider whether to add bases to total or not
 					#only add bases to total if CIGAR operation consumes query ([MI])
 					#otherwise discard bases
-					my $total;
+					my $total; # new entry in numbers to replace ones being cut out
 					for my $j ($i..$lastM) {
 						if ($letters[$j] =~ /[MIS]/) { $total += $numbers[$j]; }
-					}
-				#add number of bases to count and cut out of cigar
-				$combinedBases += $numbers[$i+1..$lastM-1] || 0;
+						}
+					# also want to update edit distance
+					# only [SH] operations are not accounted for
+					# so if this is an [SH] operation, count bases to add to edit distance
+					for my $j ($i..$lastM) {
+						if ($letters[$j] =~ /[SH]/) { $combinedBases += $numbers[$j]; }
+						}
+					
+				# cut out of cigar
 				splice(@letters, $i+1, $lastM-$i);
 				splice(@numbers, $i, $lastM-$i+1, $total);
 			}
