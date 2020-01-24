@@ -295,7 +295,7 @@ rule extract_vAligned:
 	output:
 		svSam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam",
 		shortvSam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.mapped.sam",
-		pvBam_readMap_mateUnmap = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped1.bam,
+		pvBam_readMap_mateUnmap = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped1.bam",
 		pvBam_readUnmap_mateMap = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped2.bam",
 		pvBam_bothMapped = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped3.bam",
 		pvBam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.bam",
