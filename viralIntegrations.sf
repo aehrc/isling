@@ -254,10 +254,12 @@ rule sort:
 		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sorted.sam",
 		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sorted.sam",
 		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.sorted.sam"
+
 	conda:
 		"envs/bwa.yml"
 	shell:
 		"""
+
 		samtools sort {input.vPaired} > {output.vPaired}
 		samtools sort {input.vSing} > {output.vSing}
 		samtools sort {input.vShort} > {output.vShort} 
