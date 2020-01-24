@@ -13,7 +13,7 @@ use Getopt::Long;
 
 my $cutoff = 20; # each alignment must contain this number of aligned bases and this number of soft-clipped bases 
 my $thresh = 0.95; #default amount of read that must be covered by alignments for rearrangement
-my $tol = 3; #when processing CIGARS, combine any IDPN elements between M regions with this number of bases or less
+my $tol = 3; #when processing CIGARS, combine any SHp IDPN elements between M regions with this number of bases or less
 my $viral;
 my $human;
 my $output = "integrationSites.txt";
@@ -68,16 +68,18 @@ while (my $vl = <VIRAL>) {
 	if ($parts[1] & 0x800) { next(); } # skip supplementary alignments
 
 	if ($parts[2] eq "*") { next; } # skip unaligned reads
-	if ($parts[5] =~ /(^\d+[SH].*\d+[SH]$)/) { next; } # skip alignments where both ends are clipped
-
-	unless ($parts[5] =~ /^\d+[SH]|\d+[SH]$/) { next; } # at least one end of the read must be clipped in order to be considered
-
-	my ($cig, $addedBases) = processCIGAR($parts[5], $parts[9]); # Process the CIGAR string to account for complex alignments
+	
+	#get cigar
+	my ($cig, $editDist2) = processCIGAR2($parts[5], $tol); # Note that could be a cigar or * if unmapped
+	
+	if ($cig =~ /(^\d+[SH].*\d+[SH]$)/) { next; } # skip alignments where both ends are clipped
+	if ($cig =~ /[INDP]/) { next; } #don't consider any alignments with INDP elements
+	unless ($cig =~ /^\d+[SH]|\d+[SH]$/) { next; } # at least one end of the read must be clipped in order to be considered
 	unless ($cig) { next; } # keep checking to make sure double clipped reads don't sneak through
 	
 	#get supplementary (SA) and secondary (XA) alignments in order to check for possible vector rearrangements
 	my ($vSec, $vSup) = getSecSup($vl);
-	my $editDist = getEditDist($vl) + $addedBases;
+	my $editDist = getEditDist($vl) + $editDist2;
 	
 	# if read is mapped in reverse orientation, reverse-complement the sequence
 	my $seq;
@@ -89,7 +91,7 @@ while (my $vl = <VIRAL>) {
 	my $readID = $parts[0];
 	
 	#get 1-based mapping position:
-	#from SAM format: 1-based leftmost mapping POSition of the firstCIGARoperation that “consumes” a reference
+	#from SAM format: 1-based leftmost mapping POSition of the first CIGAR operation that “consumes” a reference
 	#base (see table below).  The first base in a reference sequence has coordinate 1. POS is set as 0 for
 	#an unmapped read without coordinate.  If POS is 0, no assumptions can be made about RNAME and CIGAR
 	my $pos = $parts[3];
@@ -111,10 +113,7 @@ while (my $hl = <HUMAN>) {
 	if ($parts[1] & 0x800) { next(); } # skip supplementary alignments
 
 	if ($parts[2] eq "*") { next; } # skip unaligned reads
-	unless ($parts[5]) { 
-		next; 
-	}
-	if ($parts[5] =~ /(^\d+[SH].*\d+[SH]$)/) { next; } #skip alignments where both ends are clipped
+	unless ($parts[5]) { next; }
 	
 	unless ($parts[5] =~ /^\d+[SH]|\d+[SH]$/) { next; }
 
@@ -131,14 +130,19 @@ while (my $hl = <HUMAN>) {
 
 	if (exists $viralIntegrations{join("xxx",($parts[0],$seq))}) { # only consider reads that were tagged from the viral alignment, no need to consider excess reads
 		
-		my ($cig, $addedBases) = processCIGAR($parts[5], $parts[9]); # Process the CIGAR string to account for complex alignments
+		#get cigar
+		my ($cig, $editDist2) = processCIGAR2($parts[5], $tol); # Note that could be a cigar or * if unmapped
+		
+		if ($cig =~ /(^\d+[SH].*\d+[SH]$)/) { next; } #skip alignments where both ends are clipped
+		if ($cig =~ /[INDP]/) { next; } #don't consider any alignments with INDP elements
+		
 		unless ($cig) { next; }
 		
 		#get secondary and supplementary alignments from the line
 		my ($hSec, $hSup) = getSecSup($hl);
 		
-		#get the edit distance, and add to it the bases that were removed when processing the CIGAR
-		my $editDist = getEditDist($hl) + $addedBases;
+		#get the edit distance, and add to it the bases that were modified when processing the CIGAR
+		my $editDist = getEditDist($hl) + $editDist2;
 		
 		#get 1-based mapping position
 		my $pos = $parts[3];
@@ -245,6 +249,7 @@ sub collectIntersect {
 	#here check that absolute values of overlap are the same
 	unless (abs($overlap1) == abs($overlap2)) { 
 		print "Impossible overlap found\n";
+		$DB::single = 1;
 		return;
 	}
 	my $overlap = abs($overlap1);
