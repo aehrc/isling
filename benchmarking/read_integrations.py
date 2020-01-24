@@ -33,8 +33,8 @@ def main(argv):
 	
 	#read in host integration locations
 	#read in as chunks as the file may be very large  
-	chunks = pd.read_csv(args.host_ints,header=0,sep='\t', chunksize = 50000)
-	int_file = pd.concat(chunks)  
+	chunks = pd.read_csv(args.host_ints,header=0,sep='\t', chunksize = 50000) 
+	int_file = pd.concat(chunks) 
 
 	#read in the list of filtered read IDs 
 	if args.filtered != False: 
@@ -108,7 +108,7 @@ def numReads(sam_file):
 	num_inserts = int(num_reads/2)
 	return num_inserts 
 	
-	
+		
 def analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_rightj):  
 	"""Creates a list of whether a read overlaps (True/False) and a list of the length of the corresponding overlap
 	takes lists of the coordinates of the reads and the locations of the viral DNA in the host"""
@@ -259,12 +259,12 @@ def intCoords(int_file):
 	"""Finds the location of viral DNA in the host sequence"""
 	#get the integration coordinates  
 	int_coord = []
-
+	#TODO debug - high false positive rate for detecting reads with overlaps 
 	for i in range(len(int_file)):
 		c1 = int_file["Start point"][i]
-		c1 = c1 + int_file["leftJunctionBases"][i] #adjust for junction bases on the left 
+		#c1 = c1 + int_file["leftJunctionBases"][i] #adjust for junction bases on the left 
 		c2 = int_file["Stop point"][i]
-		c2 = c2 - int_file["rightJunctionBases"][i] #adjust for junction bases on the right 
+		#c2 = c2 - int_file["rightJunctionBases"][i] #adjust for junction bases on the right 
 		int_coord.append((c1,c2))
 
 	return int_coord
