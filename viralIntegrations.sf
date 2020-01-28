@@ -138,11 +138,29 @@ rule copy:
 		cp "{input.r2}" "{output.r2_out}"
 		"""
 
-
-rule seqPrep:
+rule dedup:
 	input:
 		r1 = "../out/reads/{dset}/{samp}_1.fastq.gz",
 		r2 = "../out/reads/{dset}/{samp}_2.fastq.gz"
+	output:
+		r1 = "../out/reads/{dset}/{samp}_1.dedup.fastq.gz",
+		r2 = "../out/reads/{dset}/{samp}_2.dedup.fastq.gz"
+	params:
+		temp = lambda wildcards: f"../out/reads/{wildcards.dset}/{wildcards.samp}.temp.fq"
+	conda:
+		"envs/bbmap.yml"
+	shell:
+		"""
+		dedupe.sh -Xmx10g threads=4 in1="{input.r1}" in2="{input.r2}" out="{params.temp}" ac=f
+		reformat.sh -Xmx10g threads=4 in="{params.temp}" out1="{output.r1}" out2="{output.r2}"
+		rm {params.temp}
+		"""
+
+
+rule seqPrep:
+	input:
+		r1 = "../out/reads/{dset}/{samp}_1.dedup.fastq.gz",
+		r2 = "../out/reads/{dset}/{samp}_2.dedup.fastq.gz"
 	output:
 		merged = "../out/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz",
 		proc_r1 = "../out/{dset}/merged_reads/{samp}.SeqPrep_1.fastq.gz",
@@ -245,52 +263,11 @@ rule align_bwa_virus:
 		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.all} --output {output.vShort} --threshold 10 --hflag 200 --insert 0
 		"""
 
-rule sort:
+rule extract_vAligned:
 	input:
 		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam",
 		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam",
 		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.sam"
-	output:
-		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sorted.sam",
-		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sorted.sam",
-		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.sorted.sam"
-
-	conda:
-		"envs/bwa.yml"
-	shell:
-		"""
-
-		samtools sort {input.vPaired} > {output.vPaired}
-		samtools sort {input.vSing} > {output.vSing}
-		samtools sort {input.vShort} > {output.vShort} 
-		"""
-
-rule dedup:
-	input:
-		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sorted.sam",
-		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sorted.sam",
-		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.sorted.sam"
-	output:	
-		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.markdup.sam",
-		vPairedMetrics = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.dedupMetrics.txt",		
-		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.markdup.sam",
-		vSingMetrics = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.dedupMetrics.txt",
-		vShort =  "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.markdup.sam",
-		vShortMetrics = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.dedupMetrics.txt"
-	conda:
-		"envs/picard.yml"
-	shell:
-		"""
-		picard MarkDuplicates I={input.vPaired} O={output.vPaired} M={output.vPairedMetrics}
-		picard MarkDuplicates I={input.vSing} O={output.vSing} M={output.vSingMetrics} 
-		picard MarkDuplicates I={input.vShort} O={output.vShort} M={output.vShortMetrics} 
-		"""
-
-rule extract_vAligned:
-	input:
-		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.markdup.sam",
-		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.markdup.sam",
-		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.markdup.sam"
 
 	output:
 		svSam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam",
@@ -304,11 +281,11 @@ rule extract_vAligned:
 		"envs/bwa.yml"
 	shell:
 		"""
-		samtools view -h -F 0x4 -F 0x800 -F 0x400 -o {output.svSam} {input.vSing} 
-		samtools view -h -F 0x4 -F 0x800 -F 0x400 -o {output.shortvSam} {input.vShort} 
-		samtools view -hb -F 0x4 -f 0x8 -F 0x800 -F 0x400 -o {output.pvBam_readMap_mateUnmap} {input.vPaired}
-		samtools view -hb -f 0x4 -F 0x8 -F 0x800 -F 0x400 -o {output.pvBam_readUnmap_mateMap} {input.vPaired}
-		samtools view -hb -F 0x4 -F 0x8 -F 0x800 -F 0x400 -o {output.pvBam_bothMapped} {input.vPaired}
+		samtools view -h -F 0x4 -F 0x800 -o {output.svSam} {input.vSing} 
+		samtools view -h -F 0x4 -F 0x800 -o {output.shortvSam} {input.vShort} 
+		samtools view -hb -F 0x4 -f 0x8 -F 0x800 -o {output.pvBam_readMap_mateUnmap} {input.vPaired}
+		samtools view -hb -f 0x4 -F 0x8 -F 0x800 -o {output.pvBam_readUnmap_mateMap} {input.vPaired}
+		samtools view -hb -F 0x4 -F 0x8 -F 0x800 -o {output.pvBam_bothMapped} {input.vPaired}
 		samtools merge {output.pvBam} {output.pvBam_readMap_mateUnmap} {output.pvBam_bothMapped} {output.pvBam_readUnmap_mateMap}
 		samtools view -h -o {output.pvSam} {output.pvBam}
 		"""
@@ -380,9 +357,9 @@ rule run_int_scripts:
 		hPaired = "../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.{virus}Mappedreads.sam",
 		hSing = "../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.sam",
 		hShort = "../out/{dset}/host_aligned/{samp}.{host}.bwaShort.{virus}Mappedreads.sam",
-		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.markdup.sam",
-		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.markdup.sam",
-		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.markdup.sam",
+		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam",
+		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam",
+		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.sam",
 
 	output:
 		allInt = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
