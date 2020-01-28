@@ -143,8 +143,8 @@ rule dedup:
 		r1 = "../out/reads/{dset}/{samp}_1.fastq.gz",
 		r2 = "../out/reads/{dset}/{samp}_2.fastq.gz"
 	output:
-		r1 = "../out/reads/{dset}/{samp}_1.dedup.fastq.gz",
-		r2 = "../out/reads/{dset}/{samp}_2.dedup.fastq.gz"
+		r1 = temp("../out/reads/{dset}/{samp}_1.dedup.fastq.gz"),
+		r2 = temp("../out/reads/{dset}/{samp}_2.dedup.fastq.gz")
 	params:
 		temp = lambda wildcards: f"../out/reads/{wildcards.dset}/{wildcards.samp}.temp.fq"
 	conda:
@@ -162,10 +162,10 @@ rule seqPrep:
 		r1 = "../out/reads/{dset}/{samp}_1.dedup.fastq.gz",
 		r2 = "../out/reads/{dset}/{samp}_2.dedup.fastq.gz"
 	output:
-		merged = "../out/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz",
-		proc_r1 = "../out/{dset}/merged_reads/{samp}.SeqPrep_1.fastq.gz",
-		proc_r2 = "../out/{dset}/merged_reads/{samp}.SeqPrep_2.fastq.gz",
-		all = "../out/{dset}/merged_reads/{samp}.all.fastq.gz"
+		merged = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz"),
+		proc_r1 = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_1.fastq.gz"),
+		proc_r2 = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_2.fastq.gz"),
+		all = temp("../out/{dset}/merged_reads/{samp}.all.fastq.gz")
 	conda:	
 		"envs/seqprep.yml"
 	params:
@@ -248,9 +248,9 @@ rule align_bwa_virus:
 		r1 = get_r1,
 		r2 = get_r2
 	output:
-		vPaired = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam",
-		vSing = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam",
-		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.sam"
+		vPaired = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam"),
+		vSing = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam"),
+		vShort = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.sam")
 	params:
 		index = lambda wildcards: references_path + wildcards.virus
 	conda: 
@@ -270,13 +270,13 @@ rule extract_vAligned:
 		vShort = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.sam"
 
 	output:
-		svSam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam",
-		shortvSam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.mapped.sam",
-		pvBam_readMap_mateUnmap = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped1.bam",
-		pvBam_readUnmap_mateMap = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped2.bam",
-		pvBam_bothMapped = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped3.bam",
-		pvBam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.bam",
-		pvSam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam"
+		svSam = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.mapped.sam"),
+		shortvSam = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.mapped.sam"),
+		pvBam_readMap_mateUnmap = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped1.bam"),
+		pvBam_readUnmap_mateMap = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped2.bam"),
+		pvBam_bothMapped = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped3.bam"),
+		pvBam = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.bam"),
+		pvSam = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam")
 	conda:
 		"envs/bwa.yml"
 	shell:
@@ -296,10 +296,10 @@ rule extract_vAligedtoFastq:
 		pvSam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam",
 		shortvSam = "../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.mapped.sam" 
 	output:
-		svFastq = "../out/{dset}/reads/{samp}.bwa.mappedTo{virus}.fastq.gz",
-		shortvFastq = "../out/{dset}/reads/{samp}.bwaShort.mappedTo{virus}.fastq.gz",
-		pvFastq1 = "../out/{dset}/reads/{samp}.bwaPaired.mappedTo{virus}_1.fastq.gz",
-		pvFastq2 = "../out/{dset}/reads/{samp}.bwaPaired.mappedTo{virus}_2.fastq.gz"
+		svFastq = temp("../out/{dset}/reads/{samp}.bwa.mappedTo{virus}.fastq.gz"),
+		shortvFastq = temp("../out/{dset}/reads/{samp}.bwaShort.mappedTo{virus}.fastq.gz"),
+		pvFastq1 = temp("../out/{dset}/reads/{samp}.bwaPaired.mappedTo{virus}_1.fastq.gz"),
+		pvFastq2 = temp("../out/{dset}/reads/{samp}.bwaPaired.mappedTo{virus}_2.fastq.gz")
 	conda:
 		"envs/picard.yml"
 	shell:
@@ -322,9 +322,9 @@ rule align_bwa_host:
 		r2 = "../out/{dset}/reads/{samp}.bwaPaired.mappedTo{virus}_2.fastq.gz"
 
 	output:
-		hPaired = "../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.{virus}Mappedreads.sam",
-		hSing = "../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.sam",
-		hShort = "../out/{dset}/host_aligned/{samp}.{host}.bwaShort.{virus}Mappedreads.sam"
+		hPaired = temp("../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.{virus}Mappedreads.sam"),
+		hSing = temp("../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.sam"),
+		hShort = temp("../out/{dset}/host_aligned/{samp}.{host}.bwaShort.{virus}Mappedreads.sam")
 	conda: 
 		"envs/bwa.yml"
 	params:
