@@ -8,7 +8,7 @@ import re
 
 def build_bwa_args(path, index, read1, read2, output, threshold, match, mismatch, h, threads, insert, delete):
 	#build bwa args
-	bwa_args = [path, "mem", "-t", str(threads), "-A", str(match), "-B", str(mismatch), "-O", "{},{}".format(delete, insert), "-L", "0,0", "-T", str(threshold), "-h", str(h), index, read1]
+	bwa_args = [path, "mem", "-t", str(threads), "-A", str(match), "-B", str(mismatch), "-O", "{},{}".format(delete, insert), "-L", "0,0", "-T", str(threshold), "-h", str(h), "-M", index, read1]
 
 	#check if read1 and 2, or just read1
 	if read2 is not None:
