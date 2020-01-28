@@ -66,12 +66,13 @@ def main(argv):
 		virus = SeqIO.to_dict(SeqIO.parse(args.virus, 'fasta', alphabet=unambiguous_dna))
 	else:
 		raise OSError("Could not open virus fasta")
+ 
 	
 	#set random seed
 	np.random.seed(3)
 
 	#types of insertions
-	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
+	insertion_types = [insertWholeVirus, insertShortVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
 
 	#types of episomes 
 	episome_types = [Episome.insertWhole, Episome.insertPortion, Episome.insertWholeRearrange, Episome.insertPortionRearrange, Episome.insertWholeDeletion, Episome.insertPortionDeletion] 
@@ -125,7 +126,7 @@ def main(argv):
 	counter = 0 # count number of iterations 
 	while len(host_ints) < int_num: 
 		#rand_int =  np.random.randint(0,len(insertion_types))
-		rand_int = 3 #uncomment for testing specific type of integration TODO  - portion
+		rand_int = 1 #uncomment for testing specific type of integration TODO  - portion
 		host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, min_len, sep)
 		counter += 1  
 		if counter % int_report == 0: 
@@ -171,6 +172,40 @@ def insertWholeVirus(host, viruses, int_list, filehandle, min_len, sep):
 		#get one viral chunk
 		currentInt = Integration(host)
 		currentInt.addFragment(viruses, min_len, part = "whole")
+		attempts += 1
+		#check that all integrations are sep away from new integration
+		if all([ abs(currentInt.hPos-i) > sep for i in currentPos ]):
+			break
+		#if we've made a lot of attempts, give up
+		elif attempts > max_attempts:
+			return int_list, host
+	
+	#do integration
+	host, status = currentInt.doIntegration(host, int_list,filehandle)
+	#only save if integration was successful 
+	if status == True:
+	
+		#write to output fileh
+		currentInt.writeIntegration(filehandle)
+	
+		#append to int_list
+		int_list.append(currentInt)
+	
+	return int_list, host
+
+def insertShortVirus(host, viruses, int_list, filehandle, min_len, sep):
+	"""Inserts 100 bp of viral DNA allowing us to later simulate short reads"""
+
+	#get positions of all current integrations
+	currentPos = Statistics.integratedIndices(int_list)
+
+	#make sure that new integration is not within args.sep bases of any current integrations
+	attempts = 0
+ 
+	while True:
+		#get one viral chunk
+		currentInt = Integration(host)
+		currentInt.addFragment(viruses, min_len, part = "short")
 		attempts += 1
 		#check that all integrations are sep away from new integration
 		if all([ abs(currentInt.hPos-i) > sep for i in currentPos ]):
@@ -735,6 +770,7 @@ class Integration:
 		#use for inserting viral_chunk
 		int_start = self.hPos 
 		int_stop = self.hPos 
+
 		
 		#adjust seqences with gaps by adding random sequence
 		self.gapAdjust()
@@ -757,6 +793,7 @@ class Integration:
 			#remove homologous region so there is not double #TODO recheck reports correct coordinates and repeat for left overlap 
 			int_stop = int_start 
 			self.chunk.bases = self.chunk.bases[:len(self.chunk.bases)+self.overlaps[1]] 
+	
 			
 		#If integration cannot be performed we stop 
 		if int_stop == 0 and int_start == 0: 
@@ -889,7 +926,15 @@ class ViralChunk:
 				self.start = np.random.randint(0, len(viruses[self.virus].seq)-1)
 				self.stop = np.random.randint(self.start+1, len(viruses[self.virus].seq))
 				if self.stop-self.start>min_chunk:
-					break					
+					break
+
+		if part == "short": 
+			while True: 
+				self.start = np.random.randint(0, len(viruses[self.virus].seq)-100)
+				self.stop = self.start +100 
+				if self.stop - self.start > min_chunk:
+					break
+								
 		#if we want the whole virus
 		else:
 			self.start = 0
