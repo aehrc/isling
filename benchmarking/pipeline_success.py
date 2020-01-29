@@ -63,10 +63,12 @@ def main(argv):
 	compareFilters(pipe_ints,viral_reads, all_IDs )
 
 
-	"""
-	#look for what ratio of integrations we captured with the detected reads 
+	
+	#look for what ratio of integrations we captured with the detected reads
+	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads = listIDs(viral_reads, pipe_ints, all_IDs)
+	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, False) 
 	missed_hPos = findMissed(viral_reads, detected_Vreads)
-
+	"""
 	#look at which integration caused false positives
 	missed_df = readDataFrame(detected_NVreads,all_reads) # dataframe of false positive reads 
 	#look at the location of false positive reads in the genome 
@@ -540,6 +542,7 @@ def filterLength(viral_reads, min_len):
 	left_length = max(viral_reads['left_read_amount'])
 	right_length = max(viral_reads['left_read_amount'])
 	read_length = max(left_length, right_length) #could alternatively use right read amount 
+	read_length = 151 #TODO this is needed to look at the short reads 
 	print("Read length"+str(read_length)) 
 	#TODO remove this if there are no issues 
 	if read_length > 151:
