@@ -32,6 +32,7 @@ GetOptions('cutoff=i' => \$cutoff,
 		   'output=s' => \$output,
 		   'bed=s'    => \$bed,
 		   'merged=s' => \$merged,
+		   'tol=i'    => \$tol,
 		   'verbose'  => \$verbose,
 		   'help',    => \$help);
 
