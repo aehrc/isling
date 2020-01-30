@@ -71,16 +71,18 @@ while (my $vl = <VIRAL>) {
 	if ($parts[2] eq "*") { next; } # skip unaligned reads
 	
 	#get cigar
-	my ($cig, $editDist2) = processCIGAR2($parts[5], $tol); # Note that could be a cigar or * if unmapped
+	my ($cig1, $editDist2) = processCIGAR2($parts[5], $tol); # Note that could be a cigar or * if unmapped
+	my ($cig, $editDist3) = processCIGAR($cig1, $parts[9]);
 	
+	unless ($cig) { next; } # keep checking to make sure double clipped reads don't sneak through
 	if ($cig =~ /(^\d+[SH].*\d+[SH]$)/) { next; } # skip alignments where both ends are clipped
 	if ($cig =~ /[INDP]/) { next; } #don't consider any alignments with INDP elements
 	unless ($cig =~ /^\d+[SH]|\d+[SH]$/) { next; } # at least one end of the read must be clipped in order to be considered
-	unless ($cig) { next; } # keep checking to make sure double clipped reads don't sneak through
+	
 	
 	#get supplementary (SA) and secondary (XA) alignments in order to check for possible vector rearrangements
 	my ($vSec, $vSup) = getSecSup($vl);
-	my $editDist = getEditDist($vl) + $editDist2;
+	my $editDist = getEditDist($vl) + $editDist2 + $editDist3;
 	
 	# if read is mapped in reverse orientation, reverse-complement the sequence
 	my $seq;
@@ -132,18 +134,18 @@ while (my $hl = <HUMAN>) {
 	if (exists $viralIntegrations{join("xxx",($parts[0],$seq))}) { # only consider reads that were tagged from the viral alignment, no need to consider excess reads
 		
 		#get cigar
-		my ($cig, $editDist2) = processCIGAR2($parts[5], $tol); # Note that could be a cigar or * if unmapped
-		
-		if ($cig =~ /(^\d+[SH].*\d+[SH]$)/) { next; } #skip alignments where both ends are clipped
-		if ($cig =~ /[INDP]/) { next; } #don't consider any alignments with INDP elements
+		my ($cig1, $editDist2) = processCIGAR2($parts[5], $tol); # Note that could be a cigar or * if unmapped
+		my ($cig, $editDist3) = processCIGAR($cig1, $parts[9]);
 		
 		unless ($cig) { next; }
+		if ($cig =~ /(^\d+[SH].*\d+[SH]$)/) { next; } #skip alignments where both ends are clipped
+		if ($cig =~ /[INDP]/) { next; } #don't consider any alignments with INDP elements
 		
 		#get secondary and supplementary alignments from the line
 		my ($hSec, $hSup) = getSecSup($hl);
 		
 		#get the edit distance, and add to it the bases that were modified when processing the CIGAR
-		my $editDist = getEditDist($hl) + $editDist2;
+		my $editDist = getEditDist($hl) + $editDist2 + $editDist3;
 		
 		#get 1-based mapping position
 		my $pos = $parts[3];
@@ -250,7 +252,6 @@ sub collectIntersect {
 	#here check that absolute values of overlap are the same
 	unless (abs($overlap1) == abs($overlap2)) { 
 		print "Impossible overlap found\n";
-		$DB::single = 1;
 		return;
 	}
 	my $overlap = abs($overlap1);
