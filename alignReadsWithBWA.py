@@ -8,7 +8,7 @@ import re
 
 def build_bwa_args(path, index, read1, read2, output, threshold, match, mismatch, h, threads, insert, delete):
 	#build bwa args
-	bwa_args = [path, "mem", "-t", str(threads), "-A", str(match), "-B", str(mismatch), "-O", "{},{}".format(delete, insert), "-L", "0,0", "-T", str(threshold), "-h", str(h), "-M", index, read1]
+	bwa_args = [path, "mem", "-t", str(threads), "-A", str(match), "-B", str(mismatch), "-O", "{},{}".format(delete_open, insert_open), "-E", "{},{}".format(delete_extend, insert_extend), "-L", "0,0", "-T", str(threshold), "-h", str(h), "-M", index, read1]
 
 	#check if read1 and 2, or just read1
 	if read2 is not None:
@@ -71,8 +71,10 @@ def main(argv):
 	parser.add_argument('--threshold', help='Alignment threshold', required=False, default='30')
 	parser.add_argument('--match', help='Score for sequence match', required=False, default=1)
 	parser.add_argument('--mismatch', help='Penalty for mismatch', required=False, default=2)
-	parser.add_argument('--insert', help='Penalty for insertion open', required=False, default='6')
-	parser.add_argument('--delete', help='Pentalty for deletion open', required=False, default='6')
+	parser.add_argument('--insert_open', help='Penalty for insertion open', required=False, default='6')
+	parser.add_argument('--insert_extend', help='Penalty for insertion open', required=False, default='1')
+	parser.add_argument('--delete_open', help='Pentalty for deletion open', required=False, default='6')
+	parser.add_argument('--delete_extend', help='Penalty for insertion open', required=False, default='1')
 	parser.add_argument('--bwa', help='Path to BWA', required=False, default='bwa')
 	parser.add_argument('--output', help='Output', required=True)
 	parser.add_argument('--hflag', help='-h value (INT): if there are <INT hits with score >80% of the max score, output all in XA', required=False, default="5")
