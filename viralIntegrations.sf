@@ -375,9 +375,9 @@ rule run_int_scripts:
 
 	shell:
 		"""
-		perl -I. ./softClip.pl --viral {input.vSing} --human {input.hSing} --output {output.soft} --bed {output.softBed}
-		perl -I. ./discordant.pl --viral {input.vPaired} --human {input.hPaired} --output {output.discord} --bed {output.discordBed} 
-		perl -I. ./short.pl --viral {input.vShort} --human {input.hShort} --output {output.short} --bed {output.shortBed}
+		perl -I. ./softClip.pl --viral {input.vSing} --human {input.hSing} --output {output.soft} --bed {output.softBed} --tol 3
+		perl -I. ./discordant.pl --viral {input.vPaired} --human {input.hPaired} --output {output.discord} --bed {output.discordBed} --tol 3
+		perl -I. ./short.pl --viral {input.vShort} --human {input.hShort} --output {output.short} --bed {output.shortBed} --tol 3
 		sed -e '2,${{/Chr/d' -e '}}' {output.soft} {output.discord} {output.short} > {output.allInt}
 		sed -i 's\chr\ \g' {output.allInt}
 		sort -n -k1,1 -k2,2n {output.allInt} > {output.allIntTemp}
