@@ -34,6 +34,7 @@ def main(argv):
 	f = open( "evaluate_pipeline_output/output.txt", "w")
 	sys.stdout = f  
 	
+	print("STARTING...", flush = True) 
 	
 	#read in integration file 
 	ints = pd.read_csv(args.ints, header =0, sep='\t')
@@ -120,7 +121,7 @@ def filterList(pipe_ints, ID_list):
 	filter_idx = []
 	
 	for i in range (len(pipe_ints)): 
-		if pipe_ints["ReadID"] in ID_list: 
+		if pipe_ints["ReadID"][i] in ID_list: 
 			filter_idx.append(i)
 
 	#drop the unmapped rows 
