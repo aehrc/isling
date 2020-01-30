@@ -20,6 +20,7 @@ def main(argv):
 	parser.add_argument('--pipeline', help='output file from pipeline', required = True) 
 	parser.add_argument('--ints', help='integrations applied file', required = True)
 	parser.add_argument('--all_reads', help = 'file containing all reads IDs', required = True) 
+	parser.add_argument('--filter_list', help = 'file containing reads which were mapped to filter pipeline results', required = True)
 	parser.add_argument('--viral_reads', help='file with reads containing information on reads containing viral DNA', required = True)
 	args = parser.parse_args()  
 	
@@ -54,7 +55,12 @@ def main(argv):
 
 	#read in file listing the integrations detected by the pipeline 
 	pipe_ints = pd.read_csv(args.pipeline, header = 0, sep = '\t')
-	print("Number of reads detected by pipeline: " +str(len(pipe_ints))) 
+
+	#filter the pipeline list from a list of reads which have been successfully mapped 
+	ID_list = open(args.filter_list, 'r') 
+	ID_list = ID_list.read().splitlines()
+	pipe_ints = filterList(pipe_ints, ID_list)
+	print("Number of reads detected by pipeline: " +str(len(pipe_ints)))
 	#filter out ambiguous reads 
 	#pipe_ints = filterAmbiguous(pipe_ints)  
 	#filt_pipes = currentFiltering(pipe_ints) 
@@ -107,6 +113,24 @@ def main(argv):
 	"""
 	f.close()
 
+def filterList(pipe_ints, ID_list):
+	"""Filters the set of pipeline reads so that only mapped reads are included. Created to look at whether pipeline is including unmapped reads resulting in high false positive rate""" 
+
+	#create list of indexes to be filtered
+	filter_idx = []
+	
+	for i in range (len(pipe_ints)): 
+		if pipe_ints["ReadID"] in ID_list: 
+			filter_idx.append(i)
+
+	#drop the unmapped rows 
+	filt_pipe = pipe_ints.drop(pipe_ints.index[filter_idx])
+	
+	#reindex the filtered pipeline
+	filt_pipe = filt_pipe.reset_index(drop=True) 
+
+	return filt_pipe
+			
 
 def listIDs(viral_reads, pipe_ints, all_IDs): 
 	"""Create lists of the predicted and actual viral and non-viral reads""" 
