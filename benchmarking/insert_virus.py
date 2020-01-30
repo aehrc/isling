@@ -126,7 +126,7 @@ def main(argv):
 	counter = 0 # count number of iterations 
 	while len(host_ints) < int_num: 
 		#rand_int =  np.random.randint(0,len(insertion_types))
-		rand_int = 1 #uncomment for testing specific type of integration TODO  - portion
+		rand_int = 0 #uncomment for testing specific type of integration TODO  - portion
 		host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, min_len, sep)
 		counter += 1  
 		if counter % int_report == 0: 
@@ -136,7 +136,8 @@ def main(argv):
 	#episome loop 	
 	print("\nNUMBER OF EPISOMES: "+str(epi_num))
 	for i in range(0,epi_num): 
-		rand_int = np.random.randint(0,2)	
+		#rand_int = np.random.randint(0,2)
+		rand_int = 0 #TODO uncomment for specific type of episome 	
 		name = "episome "+str(i+1)
 		host_fasta = episome_types[rand_int](virus, min_len, host_fasta, name)  
 			

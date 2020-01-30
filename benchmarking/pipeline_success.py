@@ -359,7 +359,8 @@ def currentFiltering(pipe_ints):
 
 def compareFilters(pipe_ints,viral_reads, all_IDs):
 	"""Create function to compare the different types of filters on data and complete statistics after each""" 
-
+	#TODO tidy this up
+	
 	#Look at host edit distance 
 	filter_idx = []
 	edit_dist = 5 
@@ -386,7 +387,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 
 	#look at total edit distance
 	filter_idx = []
-	total_dist = 7 #TODO play around with this value 
+	total_dist = 7 
 	for i in range(len(pipe_ints)): 
 		if pipe_ints['TotalEditDist'][i] > total_dist: 
 			filter_idx.append(i)
@@ -409,7 +410,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	#look at discordant reads 
 	filter_idx = []
 	for i in range(len(pipe_ints)):
-		if pipe_ints['OverlapType'][i] == 'discordant': #TODO unsure of this 
+		if pipe_ints['OverlapType'][i] == 'discordant': 
 			filter_idx.append(i)
 	stats, conf_df = filteredStats(filter_idx, pipe_ints, "Discordant", all_IDs, viral_reads)
 	#add new stats to dataFrame 
@@ -436,22 +437,35 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	all_stats = all_stats.append(stats, ignore_index = True)
 	all_conf = all_conf.append(conf_df, ignore_index = True) 
 
-	#look at host possible ambiguous TODO
+	#look at host possible ambiguous 
+	filter_idx = []
+	for i in range(len(pipe_ints)): 
+		if pipe_ints['HostPossibleAmbiguous'][i] == 'yes': 
+			filter_idx.append(i) 
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "HostPossibleAmbiguous", all_IDs, viral_reads) 
+	#add new stats to dataFrame 
+	all_stats = all_stats.append(stats, ignore_index = True)
+	all_conf = all_conf.append(conf_df, ignore_index = True) 
 
+	#look at vector possible ambiguous 
+	filter_idx = []
+	for i in range(len(pipe_ints)): 
+		if pipe_ints['ViralPossibleAmbiguous'][i] == 'yes':
+			filter_idx.append(i) 
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, 'ViralPossibleAmbiguous', all_IDs, viral_reads) 
+	#add new stats to dataFrame 
+	all_stats = all_stats.append(stats, ignore_index = True)
+	all_conf = all_conf.append(conf_df, ignore_index = True)
 
-	#look at vector possible ambiguous TODO
-
-	print("\nNO FILTER APPLIED") 
-	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads  = listIDs(viral_reads,pipe_ints, all_IDs)
-	print("\nStats after filtering...")
-	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, False)
-	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads, 'NoFilter')
+	#look at no filter
+	filter_idx = []
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "Nofilter", all_IDs, viral_reads)
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
 	all_conf = all_conf.append(conf_df, ignore_index = True) 
 
 	#give the dataframes indexes
-	idx = ["HostEditDist <= 5", "ViralEditDist <=5", "TotalEditDist <=6" , "NoAmbiguousBases <= 20", "No Discordant", "PossibleVectorRearrangement", "PossibleHostTranslocation", "No filter"]
+	idx = ["HostEditDist <= 5", "ViralEditDist <=5", "TotalEditDist <=6" , "NoAmbiguousBases <= 20", "No Discordant", "PossibleVectorRearrangement", "PossibleHostTranslocation", "HostPossibleAmbiguous",'ViralPossibleAmbiguous', "No filter"]
 	all_stats.index = idx
 	all_conf.index = idx 
 
