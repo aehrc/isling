@@ -47,7 +47,7 @@ def main(argv):
 	parser.add_argument('--ints', help = 'output fasta file', required = True)
 	parser.add_argument('--locs', help = 'output text with viral integrations', required = True)
 	parser.add_argument('--ints_host', help = 'output csv with integration locations in host genome', required = True)
-	parser.add_argument('--int_num', help = 'number of integrations to be carried out', required=False, default=0)
+	parser.add_argument('--int_num', help = 'number of integrations to be carried out', required=True)
 	parser.add_argument('--fasta', help = 'output fasta of integrated host genome', required = False)
 	parser.add_argument('--sep', help = 'integrations must be seperated by this many bases', required=False, default=5)
 	parser.add_argument('--min_len', help = 'minimum length of integerations', required=False, default=50)
@@ -69,7 +69,7 @@ def main(argv):
  
 	
 	#set random seed
-	np.random.seed(3)
+	np.random.seed(1)
 
 	#types of insertions
 	insertion_types = [insertWholeVirus, insertShortVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
@@ -101,7 +101,7 @@ def main(argv):
 							])
 	handle.write(header)
 	
-	#### PERFORM INTEGRATION #####
+	#### PERFORM INTEGRATIONS #####
 	
 	#intialise the required number of integrations 
 	int_num = int(args.int_num)
@@ -112,7 +112,6 @@ def main(argv):
 	#intialise the separation from other integrations 
 	sep = int(args.sep) 
 
-	
 	#intialise how many episomal sequences included in the outputted fasta file 
 	epi_num = int(args.epi_num) 
 	
@@ -137,7 +136,7 @@ def main(argv):
 	print("\nNUMBER OF EPISOMES: "+str(epi_num))
 	for i in range(0,epi_num): 
 		#rand_int = np.random.randint(0,2)
-		rand_int = 0 #TODO uncomment for specific type of episome 	
+		rand_int = 2 #TODO uncomment for specific type of episome 	
 		name = "episome "+str(i+1)
 		host_fasta = episome_types[rand_int](virus, min_len, host_fasta, name)  
 			
@@ -145,7 +144,6 @@ def main(argv):
 	print(host_fasta,flush=True)
 	handle.close()
 	
-
 	#save statistics on the integration 
 	stats = Statistics.saveStats(host_ints)
 	with open(args.ints_host, 'w') as handle:

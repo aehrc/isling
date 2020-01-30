@@ -21,11 +21,11 @@ def main(argv):
 	parser.add_argument('--ints', help='integrations applied file', required = True)
 	parser.add_argument('--all_reads', help = 'file containing all reads IDs', required = True) 
 	parser.add_argument('--viral_reads', help='file with reads containing information on reads containing viral DNA', required = True)
-	parser.add_argument('--filter_list', help = 'file containing reads which were mapped to filter pipeline results', required = True) 
+	#parser.add_argument('--filter_list', help = 'file containing reads which were mapped to filter pipeline results', required = False, default = []) 
 	args = parser.parse_args()  
 	
 	
-	print("Output to be saved to /evaluate_pipeline_output/output.txt") 
+	print("Output to be saved to /evaluate_pipeline_output/output.txt", flush = True) 
 
 	#create directory to save output
 	os.makedirs('evaluate_pipeline_output', exist_ok = True)
@@ -34,6 +34,7 @@ def main(argv):
 	f = open( "evaluate_pipeline_output/output.txt", "w")
 	sys.stdout = f  
 	
+	print("STARTING...") 
 	
 	#read in integration file 
 	ints = pd.read_csv(args.ints, header =0, sep='\t')
@@ -57,9 +58,11 @@ def main(argv):
 	pipe_ints = pd.read_csv(args.pipeline, header = 0, sep = '\t')
 	
 	#filter out mapped reads 
-	ID_list = open(args.filter_list, 'r') 
-	ID_list = ID_list.read().splitlines()
-	pipe_ints = filterList(pipe_ints, ID_list)
+	#print("Before filter list")
+	#ID_list = open(args.filter_list, 'r') 
+	#ID_list = ID_list.read().splitlines()
+	#print("filter list read") 
+	#pipe_ints = filterList(pipe_ints, ID_list)
 	print("Number of reads detected by pipeline: " +str(len(pipe_ints))) 
 	#filter out ambiguous reads 
 	#pipe_ints = filterAmbiguous(pipe_ints)  
@@ -275,7 +278,9 @@ def barGraph(stats, xlabel):
 
 def filterList(pipe_ints, ID_list):
 	"""Filters the set of pipeline reads so that only mapped reads are included. Created to look at whether pipeline is including unmapped reads resulting in high false positive rate""" 
-
+	
+	print("Filter list starting") 
+	
 	#create list of indexes to be filtered
 	filter_idx = []
 	
@@ -288,6 +293,7 @@ def filterList(pipe_ints, ID_list):
 	
 	#reindex the filtered pipeline
 	filt_pipe = filt_pipe.reset_index(drop=True) 
+	print("Filter list done") 
 
 	return filt_pipe
 			
@@ -572,7 +578,7 @@ def filterLength(viral_reads, min_len):
 	right_length = max(viral_reads['left_read_amount'])
 	read_length = max(left_length, right_length) #could alternatively use right read amount 
 	read_length = 151 #TODO this is needed to look at the short reads 
-	print("Read length"+str(read_length)) 
+ 
 	#TODO remove this if there are no issues 
 	if read_length > 151:
 		read_length = 151 
