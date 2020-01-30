@@ -546,8 +546,7 @@ def filterLength(viral_reads, min_len):
 	#find the maximum amount of virus (ie 150bp)
 	left_length = max(viral_reads['left_read_amount'])
 	right_length = max(viral_reads['left_read_amount'])
-	read_length = max(left_length, right_length) #could alternatively use right read amount 
-	read_length = 151 #TODO this is needed to look at the short reads 
+	read_length = max(left_length, right_length) #could alternatively use right read amount  
 	print("Read length"+str(read_length)) 
 	#TODO remove this if there are no issues 
 	if read_length > 151:
