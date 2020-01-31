@@ -20,7 +20,6 @@ def main(argv):
 	parser.add_argument('--pipeline', help='output file from pipeline', required = True) 
 	parser.add_argument('--ints', help='integrations applied file', required = True)
 	parser.add_argument('--all_reads', help = 'file containing all reads IDs', required = True) 
-	#parser.add_argument('--filter_list', help = 'file containing reads which were mapped to filter pipeline results', required = True)
 	parser.add_argument('--viral_reads', help='file with reads containing information on reads containing viral DNA', required = True)
 	args = parser.parse_args()  
 	
@@ -49,18 +48,11 @@ def main(argv):
 	#read in file listing which reads contain viral DNA 
 	viral_reads = pd.read_csv(args.viral_reads, header=0, sep='\t')
 	viral_reads['fragment_id'] = [x.replace("chr","") for x in viral_reads['fragment_id']]
-	#filter our file to leave only chimeric reads 
-	viral_reads, discordant_ID = removeViral(viral_reads)
 	#pipeline can only detect a read as being viral if there is at least 20 bases each of host and virus DNA
 	viral_reads = filterLength(viral_reads,discordant_ID, 20)  
 
 	#read in file listing the integrations detected by the pipeline 
 	pipe_ints = pd.read_csv(args.pipeline, header = 0, sep = '\t')
-
-	#filter the pipeline list from a list of reads which have been successfully mapped 
-	#ID_list = open(args.filter_list, 'r') 
-	#ID_list = ID_list.read().splitlines()
-	#pipe_ints = filterList(pipe_ints, ID_list)
 	print("Number of reads detected by pipeline: " +str(len(pipe_ints)), flush = True)
 	#filter out ambiguous reads 
 	#pipe_ints = filterAmbiguous(pipe_ints)  
@@ -69,8 +61,6 @@ def main(argv):
 	#look at the different types of filtering 
 	compareFilters(pipe_ints,viral_reads, all_IDs )
 
-
-	
 	#look for what ratio of integrations we captured with the detected reads
 	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads = listIDs(viral_reads, pipe_ints, all_IDs)
 	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, False) 
@@ -550,86 +540,51 @@ def filterVectorRearrangement(pipe_ints):
 
 	return filt_pipe 
 
-def removeViral(viral_reads): 
-	"""Filters out reads which do not contain any host DNA. These reads are not detected by the pipeline""" 
-	#list of the indexes of the reads which are not chimeric
-	nonchimeric_idx = []
 
-	#list of ID of discordant reads 
-	discordant_ID = []
-
-	for i in range(len(viral_reads)): 
-		if viral_reads['left_read'][i] == 'viral' and viral_reads['right_read'][i] == 'viral': 
-			nonchimeric_idx.append(i) 
-		if (viral_reads['left_read'][i] == 'viral' and viral_reads['right_read'][i] == 'host') or (viral_reads['left_read'][i] == 'host' and viral_reads['right_read'][i] == 'viral'):
-			discordant_ID.append(viral_reads['fragment_id'][i]) 
-			
-	#drop the nonchimeric rows 
-	filt_reads = viral_reads.drop(viral_reads.index[nonchimeric_idx])  
-
-	#reindex the filtered reads
-	filt_reads = filt_reads.reset_index(drop=True) 
-
-	return filt_reads, discordant_ID
-
-
-def filterLength(viral_reads, discordant_ID, min_len): 
-	"""Function which filters the dataframe to contain only reads with more than a set amount of viral DNA. Pipeline can only detect viral DNA if there is more than 20 bp of viral DNA""" 
-
-	#list of the reads which have less than the min_len of base pairs 
-	short_idx = []
-
-	# miniminum amount of viral DNA in a read that the pipeline can detect (ie 20 base pairs) 
-	min_read = min_len
-
-	#find the maximum amount of virus (ie 150bp)
-	left_length = max(viral_reads['left_read_amount'])
-	right_length = max(viral_reads['left_read_amount'])
-	read_length = max(left_length, right_length) #could alternatively use right read amount  
-	print("Read length"+str(read_length)) 
-	#TODO remove this if there are no issues 
-	if read_length > 151:
-		read_length = 151 
-		#raise OSError("Max read length is greater than 151 base pairs!\nReturn to insert_virus.py to resolve this issue")
-
-	#look through viral_reads for reads with less than 20 bp of host or viral DNA 
-	for i in range(len(viral_reads)):
-		
-		#remove discordant reads from the code below 
-		if viral_reads['fragment_id'][i] not in discordant_ID: 
-
-			#integration causes both reads to be chimeric - common in short integrations 
-			if viral_reads['left_read'][i] == 'chimeric' and viral_reads['right_read'][i] == 'chimeric': 
-				if viral_reads['left_read_amount'][i] > read_length - min_read or viral_reads['left_read_amount'][i] < min_read: 
-					if  viral_reads['right_read_amount'][i] > read_length - min_read or viral_reads['right_read_amount'][i] < min_read:
-						short_idx.append(i) 
-			else: 			
-				# if the left read is all viral or all host we care about the right read 
-				if viral_reads['left_read_amount'][i] == read_length or viral_reads['left_read_amount'][i] == 0: 
-					chimeric = viral_reads['right_read_amount'][i]
-
-				# if the right read is all viral or all host we care about the left read
-				elif viral_reads['right_read_amount'][i] == read_length or viral_reads['right_read_amount'][i] == 0: 
-					chimeric = viral_reads['left_read_amount'][i]  		
-
-				#filter reads which are outside the range detectable by the pipeline 		
-				if chimeric > read_length - min_read or chimeric < min_read: 
-					short_idx.append(i) 
-  
-
-	#drop the short rows 
-	filt_reads = viral_reads.drop(viral_reads.index[short_idx]) 
+def filterLength(viral_reads):
+	"""Function which filters viral reads to contain only reads with a set amount of viral DNA""" 
 	
-	#redinex the filtered reads 
-	filt_reads = filt_reads.reset_index(drop=True)
+	#set the minimum length
+	min_len  = 20
 
+	#set the read length
+	read_len = 150 
+	
+	#make a list of the indexes of the reads we wish to filter
+	filt_idx = []
+
+	#loop through and adjust chimeric reads 
+	for i in range(len(viral_reads)):
+
+		#adjust left read to meet the threshold of 20bp to be chimeric 	
+		if viral_reads['left_read_amount'][i] > read_len - min_len: 
+			viral_reads['left_read'][i] = 'v'
+		elif viral_reads['left_read_amount'][i] < min_len: 
+			viral_reads['left_read'][i] = 'h'
+
+		#adjust right read to meet the threshold of 20bp to be chimeric 
+		if viral_reads['right_read_amount'][i] > read_len - min_len: 
+			viral_reads['right_read'][i] = 'v'
+		elif viral_reads['right_read_amount'][i] < min_len: 
+			viral_reads['right_read'][i] = 'h'
+
+		#if both left and right are viral or host do integration occured here
+		if viral_reads['right_read'][i] == 'h' and viral_reads['left_read'][i] == 'h' or viral_reads['right_read'][i] == 'v' and viral_reads['left_read'][i] == 'v':
+				filt_idx = []
+
+	#drop the false rows
+	filt_reads = viral_reads.drop(viral_reads.index[short_idx])
+	
+	#reindex the filtered reads
+	filt_reads = filt_reads.reset_index(drop=True)
+	
+	#report the filtering 
 	#report the filtering  
 	rem = (len(filt_reads)/len(viral_reads))*100
-	print("\nAfter filtering out reads with less than "+str(min_len)+" base pairs of viral DNA, {:.2f} % of reads remain.".format(rem), flush = True) 
+	print("\nAfter filtering out reads with less than "+str(min_len)+" base pairs of viral DNA, {:.2f} % of reads remain.".format(rem), flush = True)
 
 	return filt_reads
-
-	#report the amount of reads remaining after filtering 
+	
 
 def filterFalse(ints): 
 	"""Remove integrations which were unsuccessful""" 
