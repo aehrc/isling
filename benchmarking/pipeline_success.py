@@ -402,7 +402,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 		# identify reads with high HostEditDistance 
 		if pipe_ints['HostEditDist'][i] > edit_dist: 
 			filter_idx.append(i)
-	stats, conf_df = filteredStats(filter_idx, pipe_ints, "HostEditDist > 5", all_IDs, viral_reads)
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "HostEditDist > 5", all_IDs, viral_reads, False)
 	#create dataframe to append stats to 
 	all_stats = pd.DataFrame(stats)
 	all_conf = pd.DataFrame(conf_df) 
@@ -414,7 +414,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 		# identify reads with high HostEditDistance 
 		if pipe_ints['ViralEditDist'][i] > edit_dist: 
 			filter_idx.append(i)
-	stats, conf_df = filteredStats(filter_idx, pipe_ints, "ViralEditDist > 5", all_IDs, viral_reads)
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "ViralEditDist > 5", all_IDs, viral_reads, False)
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
 	all_conf = all_conf.append(conf_df, ignore_index = True) 
@@ -425,7 +425,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	for i in range(len(pipe_ints)): 
 		if pipe_ints['TotalEditDist'][i] > total_dist: 
 			filter_idx.append(i)
-	stats, conf_df = filteredStats(filter_idx, pipe_ints, "TotalEditDist > 7", all_IDs, viral_reads)
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "TotalEditDist > 7", all_IDs, viral_reads, False)
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
 	all_conf = all_conf.append(conf_df, ignore_index = True) 
@@ -436,7 +436,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	for i in range(len(pipe_ints)):
 		if pipe_ints['NoAmbiguousBases'][i] == "?" or int(pipe_ints['NoAmbiguousBases'][i]) > max_ambig:
 			filter_idx.append(i)
-	stats, conf_df = filteredStats(filter_idx, pipe_ints, "NoAmiguousBases == ? | 20", all_IDs, viral_reads)
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "NoAmiguousBases == ? | 20", all_IDs, viral_reads, False)
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
 	all_conf = all_conf.append(conf_df, ignore_index = True) 
@@ -446,7 +446,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	for i in range(len(pipe_ints)):
 		if pipe_ints['OverlapType'][i] == 'discordant': 
 			filter_idx.append(i)
-	stats, conf_df = filteredStats(filter_idx, pipe_ints, "Discordant", all_IDs, viral_reads)
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "Discordant", all_IDs, viral_reads, False)
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
 	all_conf = all_conf.append(conf_df, ignore_index = True)  
@@ -456,7 +456,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	for i in range(len(pipe_ints)):
 		if pipe_ints['PossibleVectorRearrangement'][i] == 'yes':
 			filter_idx.append(i)
-	stats, conf_df = filteredStats(filter_idx, pipe_ints, "PossibleVectorRearrangement", all_IDs, viral_reads)
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "PossibleVectorRearrangement", all_IDs, viral_reads, False)
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = False)
 	all_conf = all_conf.append(conf_df, ignore_index = False) 
@@ -466,7 +466,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	for i in range(len(pipe_ints)):
 		if pipe_ints['PossibleHostTranslocation'][i] == 'yes':
 			filter_idx.append(i)
-	stats, conf_df = filteredStats(filter_idx, pipe_ints, "PossibleHostTranslocation", all_IDs, viral_reads)
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "PossibleHostTranslocation", all_IDs, viral_reads, False)
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
 	all_conf = all_conf.append(conf_df, ignore_index = True) 
@@ -476,7 +476,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	for i in range(len(pipe_ints)): 
 		if pipe_ints['HostPossibleAmbiguous'][i] == 'yes': 
 			filter_idx.append(i) 
-	stats, conf_df = filteredStats(filter_idx, pipe_ints, "HostPossibleAmbiguous", all_IDs, viral_reads) 
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "HostPossibleAmbiguous", all_IDs, viral_reads, False) 
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
 	all_conf = all_conf.append(conf_df, ignore_index = True) 
@@ -486,14 +486,14 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	for i in range(len(pipe_ints)): 
 		if pipe_ints['ViralPossibleAmbiguous'][i] == 'yes':
 			filter_idx.append(i) 
-	stats, conf_df = filteredStats(filter_idx, pipe_ints, 'ViralPossibleAmbiguous', all_IDs, viral_reads) 
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, 'ViralPossibleAmbiguous', all_IDs, viral_reads, False) 
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
 	all_conf = all_conf.append(conf_df, ignore_index = True)
 
 	#look at no filter
 	filter_idx = []
-	stats, conf_df = filteredStats(filter_idx, pipe_ints, "Nofilter", all_IDs, viral_reads)
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "Nofilter", all_IDs, viral_reads, True)
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
 	all_conf = all_conf.append(conf_df, ignore_index = True) 
@@ -510,7 +510,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	all_stats.to_csv("evaluate_pipeline_output/filtering_stats.csv", sep = '\t', index = True)
 	all_conf.to_csv("evaluate_pipeline_output/conf_stats.csv", sep = '\t', index = True)  
 
-def filteredStats(filter_idx, pipe_ints, tag, all_IDs, viral_reads): 
+def filteredStats(filter_idx, pipe_ints, tag, all_IDs, viral_reads, save): 
 	"""Makes a dataframe of filtered statistics for a list of indexes to be removed"""
  	
 	#remove filtered indexes from pipeline results
@@ -521,7 +521,7 @@ def filteredStats(filter_idx, pipe_ints, tag, all_IDs, viral_reads):
 	#report statistics of filtering
 	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads  = listIDs(viral_reads,filt_pipe, all_IDs)
 	print("Stats after filtering...")
-	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, False)
+	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save)
 	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads, tag)
 
 	return stats, conf_df 
