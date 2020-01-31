@@ -61,7 +61,7 @@ def main(argv):
 	ID_list = open(args.filter_list, 'r') 
 	ID_list = ID_list.read().splitlines()
 	pipe_ints = filterList(pipe_ints, ID_list)
-	print("Number of reads detected by pipeline: " +str(len(pipe_ints)))
+	print("Number of reads detected by pipeline: " +str(len(pipe_ints)), flush = True)
 	#filter out ambiguous reads 
 	#pipe_ints = filterAmbiguous(pipe_ints)  
 	#filt_pipes = currentFiltering(pipe_ints) 
@@ -119,9 +119,15 @@ def filterList(pipe_ints, ID_list):
 
 	#create list of indexes to be filtered
 	filter_idx = []
+
+	pipe_IDs = pipe_ints["ReadID"]
+	ID_list = [i.replace("chr","") for i in ID_list]
+
+	print(pipe_IDs[1:5], flush = True) 
+	print(ID_list[1:5], flush = True) 
 	
-	for i in range (len(pipe_ints)): 
-		if pipe_ints["ReadID"][i] in ID_list: 
+	for i in range (len(pipe_IDs)): 
+		if pipe_IDs[i] not in ID_list: 
 			filter_idx.append(i)
 
 	#drop the unmapped rows 
@@ -130,6 +136,8 @@ def filterList(pipe_ints, ID_list):
 	#reindex the filtered pipeline
 	filt_pipe = filt_pipe.reset_index(drop=True) 
 
+	print("Entries before filtering: "+str(len(pipe_ints)), flush = True)
+	print("Entries after filtering: "+str(len(filt_pipe)), flush = True)
 	return filt_pipe
 			
 
