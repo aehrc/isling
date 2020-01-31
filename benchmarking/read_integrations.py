@@ -394,13 +394,12 @@ def checkOverlap(coordA, coordB):
 		 		
 
 def overlapLength(coordA,coordB): 
-	"""Tells us the length of the overlap betweeen coordA and coordB"""
-	#debugging remove later 	
+	"""Tells us the length of the overlap betweeen coordA and coordB"""	
 
 	A1, A2 = coordA
 	B1, B2 = coordB
 
-	overlap = min(B2, A2)-max(B1, A1) 
+	overlap = min(B2, A2)-max(B1, A1)-1
 
 	if overlap<0: 
 		raise OSError("Attempting to find length of overlap between regions which do not overlap")
