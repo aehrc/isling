@@ -9,7 +9,6 @@ from simplesam import Reader
 import pandas as pd
 import argparse
 import sys
-import time #remove after debugging - used to optimise code TODO
 import csv
 
 
@@ -45,59 +44,40 @@ def main(argv):
 
 
 	#find the number of fragments 
-	start_time = time.time() #TODO this could be optimise if it takes a long time 
 	num_reads = numReads(read_file)
-	now = time.time() 
-	print("Time taken to find the number of fragments "+format(now-start_time),flush=True)
 
 	#get the coordinates of each integration
 	int_coord = intCoords(int_file)
-	print("Integration coordinates found") 
 
 	#get the hPos of each integration - we use this later as an identifer
 	int_hPos = intHpos(int_file)
-	print("hPos of integrations found") 
 
 	#get the types of junctions for each integration
 	int_leftj, int_rightj = intJunction(int_file) 
-	print("Type of junction for each integration found") 
 	
 	#read in sam file to process reads 
 	sam_file = args.sam
 
 	#process reads to obtain the ID of each fragment and the coordinates of the corresponding reads
-	start_time = time.time()
 	fragment_id, first_read, second_read = processReads(sam_file,num_reads, filtered_id)
-	now = time.time() 
-	print("Time taken to process reads "+format(now-start_time),flush=True) 
 
 	#assess for the type of read and the amount of viral DNA (bp) in each read
-	start_time = time.time()
 	first_type, second_type, first_len, second_len, read_hPos, first_junc, second_junc  = analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_rightj)
-	now = time.time() 
-	print("Time taken to analyse reads "+format(now-start_time),flush=True)
 	
 	#save the entire file
-	start_time = time.time()
 	results = pd.DataFrame({"fragment_id":fragment_id,"left_read":first_type,"right_read":second_type,"left_read_amount":first_len,"right_read_amount":second_len,
 "left_read_coor":first_read,"right_read_coor":second_read, "hPos": read_hPos, "left_junc":first_junc, "right_junc":second_junc})
 	with open(args.save, 'w') as handle: 
 		results.to_csv(handle,sep='\t')
-	now = time.time() 
-	print("Time taken save entire file "+format(now-start_time),flush=True)
 	
 	#create a file which saves information only for reads which contain viral DNA
-	start_time = time.time() 
 	viral_only = getViralReads(results)
 	with open(args.viral_only, 'w') as handle: 
 		viral_only.to_csv(handle, sep='\t')
-	now = time.time() 
-	print("Time taken save viral only file "+format(now-start_time))
 		
 	print("COMPLETE")
 	print("Information on ALL reads saved to: "+str(args.save))
 	print("Information on VIRAL reads saved to: "+str(args.viral_only))
-	print("Time taken to run entire program "+format(start_time)) 
 	
 		
 def numReads(sam_file): 
@@ -114,6 +94,7 @@ def analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_righ
 	takes lists of the coordinates of the reads and the locations of the viral DNA in the host"""
 	# this function is very intensive - requires optimisiing 	
 
+	print("\nANALYSING READS", flush = True) 
 
 	#lists of the types of the reads  
 	first_type = []
@@ -202,8 +183,8 @@ def analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_righ
 		second_junc.append(junction_2)
 
 		#report how many reads have been analysed 
-		if i % 100000 == 0: 
-			print(str(i)+" reads analysed...",flush = True) 	
+		if i % 250000 == 0: 
+			print(str((i*100/len(first_read)))+"% of reads analysed...",flush = True) 	
 		
 	return first_type, second_type, first_len, second_len, read_hPos, first_junc, second_junc 
 
@@ -338,9 +319,12 @@ def processReads(sam_file,num_inserts, filtered_id):
 	#list of insert coordinates in the original fasta sequence
 	first_read = []
 	second_read = []
+
+
+	print("PROCESSING READS", flush = True) 
 	for i in range(0,num_inserts):
 		if i%500000==0 and i!=0:
-			print(str(i)+" READS PROCESSED") 
+			print(str((i*100/num_inserts))+"% of reads processed...") 
 		x = next(in_sam)
 		y = next(in_sam)
 
@@ -366,11 +350,9 @@ def processReads(sam_file,num_inserts, filtered_id):
 			first_read.append((x.pos-1,x.pos+len(x.seq)-1))
 			second_read.append((y.pos-1,y.pos+len(y.seq)-1))
 			
- 
 	return fragment_id, first_read, second_read
 	
- 
-	
+
 def checkOverlap(coordA, coordB): 
 	""" Function which tells us whether coordA (start of read, end of read) overlaps coordB (start of integration, end of integrations). Returns string which says which type of integrations occured""" 
 	
