@@ -354,15 +354,17 @@ def processReads(sam_file,num_inserts, filtered_id):
 				fragment_id.append(x.qname)
 		
 				#save the coordinates of the read 
-				first_read.append((x.pos,x.pos+len(x.seq)))
-				second_read.append((y.pos,y.pos+len(y.seq)))
+				#subract 1 as the SAM file position starts at 1 but we use index 0 
+				first_read.append((x.pos-1,x.pos+len(x.seq)-1))
+				second_read.append((y.pos-1,y.pos+len(y.seq)-1))
 		else: 
 			#save the ID of the read 
 			fragment_id.append(x.qname)
 		
-			#save the coordinates of the read 
-			first_read.append((x.pos,x.pos+len(x.seq)))
-			second_read.append((y.pos,y.pos+len(y.seq)))
+			#save the coordinates of the read
+			#subtract 1 as the SAM file position starts at 1 but we use index 0  
+			first_read.append((x.pos-1,x.pos+len(x.seq)-1))
+			second_read.append((y.pos-1,y.pos+len(y.seq)-1))
 			
  
 	return fragment_id, first_read, second_read
