@@ -354,15 +354,15 @@ def processReads(sam_file,num_inserts, filtered_id):
 				fragment_id.append(x.qname)
 		
 				#save the coordinates of the read 
-				first_read.append((x.pos-1,x.pos+len(x.seq)))
-				second_read.append((y.pos-1,y.pos+len(y.seq)))
+				first_read.append((x.pos,x.pos+len(x.seq)))
+				second_read.append((y.pos,y.pos+len(y.seq)))
 		else: 
 			#save the ID of the read 
 			fragment_id.append(x.qname)
 		
 			#save the coordinates of the read 
-			first_read.append((x.pos-1,x.pos+len(x.seq)))
-			second_read.append((y.pos-1,y.pos+len(y.seq)))
+			first_read.append((x.pos,x.pos+len(x.seq)))
+			second_read.append((y.pos,y.pos+len(y.seq)))
 			
  
 	return fragment_id, first_read, second_read
@@ -397,7 +397,7 @@ def overlapLength(coordA,coordB):
 	A1, A2 = coordA
 	B1, B2 = coordB
 
-	overlap = min(B2, A2)-max(B1, A1)-1
+	overlap = min(B2, A2)-max(B1, A1)
 
 	if overlap<0: 
 		raise OSError("Attempting to find length of overlap between regions which do not overlap")
