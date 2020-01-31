@@ -106,7 +106,8 @@ rule all:
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),
 #		expand("../out/summary/{dset}.combined.xlsx", dset = DATASETS),
-#		expand("../out/summary/ucsc_bed/{dset}.clean.bed", dset = DATASETS)
+		"../out/summary/num_sites.xlsx",
+		expand("../out/summary/ucsc_bed/{dset}.clean.bed", dset = DATASETS)
 		
 		
 
@@ -151,8 +152,8 @@ rule dedup:
 		"envs/bbmap.yml"
 	shell:
 		"""
-		dedupe.sh -Xmx10g threads=4 in1="{input.r1}" in2="{input.r2}" out="{params.temp}" ac=f
-		reformat.sh -Xmx10g threads=4 in="{params.temp}" out1="{output.r1}" out2="{output.r2}"
+		dedupe.sh -Xmx20g threads=4 in1="{input.r1}" in2="{input.r2}" out="{params.temp}" ac=f
+		reformat.sh -Xmx20g threads=4 in="{params.temp}" out1="{output.r1}" out2="{output.r2}"
 		rm {params.temp}
 		"""
 
@@ -437,17 +438,17 @@ rule count_mapped:
 #	script:
 #		"count_reads.R"
 	
-#rule summarise:
-#	input:
-#		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES),
-#		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES)
-#
-#	output:
-#		"../out/summary/num_sites.xlsx"
-#	conda:
-#		"envs/rscripts.yml"
-#	script:
-#		"summarise_ints.R"
+rule summarise:
+	input:
+		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES),
+		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES)
+
+	output:
+		"../out/summary/num_sites.xlsx"
+	conda:
+		"envs/rscripts.yml"
+	script:
+		"summarise_ints.R"
 
 rule ucsc_bed:
 	input:
