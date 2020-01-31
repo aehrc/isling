@@ -206,37 +206,35 @@ def analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_righ
 			print(str(i)+" reads analysed...",flush = True) 	
 		
 	return first_type, second_type, first_len, second_len, read_hPos, first_junc, second_junc 
-	
-	
+
 def readType(overlap_type): 
-	"""Identifies the type of a read: chimeric, split, viral or host.Uses one of the overlap_type lists (overlap_type1 or overlap_type2. Returns type as a string""" 
 	
 	#intialise string
 	read_type = ""
 	
 	#handle reads which are all viral DNA 
 	if "all" in overlap_type: 
-		read_type = "viral" 
+		read_type = "v" 
 
 	#handle short reads - where there is viral DNA in the middle of a read 	
 	elif "short" in overlap_type: 
-		read_type = "short" 
+		read_type = "sh" 
+	
+	#handle chimeric reads
+	elif "left" in overlap_type and "right" not in overlap_type: 
+		read_type = "vh"
 
 	#handle chimeric reads 
-	elif "left" in overlap_type and "right" not in overlap_type or "right" in overlap_type and "left" not in overlap_type: 
-		read_type = "chimeric" 
-		
-	#handle split reads 
-	#these are rare but we include them for completeness 
-	elif "left" in overlap_type and "right" in overlap_type: 
-		read_type = "split" 
-		
-	#handle reads without viral DNA 
+	elif "right" in overlap_type and "left" not in overlap_type: 
+		read_type = "hv" 
+	
+	#handle reads without viral DNA
 	else: 
-		read_type = "host" 
-		
+		read_type = "h" 
+	
 	return read_type
 	
+		
 def viralQuantity(overlap_type, overlap_len): 
 	"""function which finds the amount of viral DNA (bp) in a read""" 
 	
@@ -380,13 +378,13 @@ def checkOverlap(coordA, coordB):
 	
 
 	if B1<=A1 and B2>=A2: 
-		overlap_type = "all" 
+		overlap_type = "all"    #virus covers the entire read 
 	elif A1 < B1 and A2 > B2: 	 
-		overlap_type = "short"  
+		overlap_type = "short"  #virus is in the centre of the read 
 	elif A1 < B1 and B1 <= A2:
 		overlap_type = "right" 	#virus is on the right end of the read 
 	elif B2 < A2 and B2 >= A1:
-		overlap_type = "left"
+		overlap_type = "left"   #virus on the left end of the read 
 	else:
 		overlap_type = ""
 		
@@ -415,9 +413,9 @@ def getViralReads(results):
 	results = results.reset_index(drop=True)
 
 	for i in range(len(results)): 
-		if results['left_read'][i] != 'host' or results['right_read'][i] != 'host': 
+		if results['left_read'][i] != 'h' or results['right_read'][i] != 'h': 
 			idx.append(i)
-		if results['left_read'][i] != 'virus' or results['right_read'][i] != 'virus':
+		if results['left_read'][i] != 'v' or results['right_read'][i] != 'v':
 			idx.append(i)
 
 	viral_reads = results.loc[idx] 
