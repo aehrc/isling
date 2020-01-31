@@ -9,3 +9,10 @@ test_data
 Rplots.pdf
 benchmarking/LW_benchmarking/
 benchmarking/*.fa
+benchmarking/batch/*
+benchmarking/*ipynb
+benchmarking/.ipynb_checkpoints/*
+benchmarking/example.bam
+.ipynb_checkpoints/
+benchmarking/notebooks/Trace.ipynb
+Trace.ipynb

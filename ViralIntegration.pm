@@ -9,6 +9,9 @@ our @ISA = ('Exporter');
 our @EXPORT = qw(isRearrangeOrInt getEditDist processCIGAR processCIGAR2 extractSeqCoords extractCoords extractSequence gapOrOverlap getCigarParts getGenomicCoords getMatchedRegion getMatchedRegions getSecSup isAmbigLoc isRearrange printOutput printBed printMerged reverseComp reverseCigar);
 
 
+our $warn_flag = 0;
+$SIG{__WARN__} = sub { $warn_flag = 1; CORE::warn(@_) };
+
 ##### subroutines #####
 
 sub extractSeqCoords {
@@ -579,10 +582,11 @@ sub processCIGAR {
 	#	2 - matched,clipped
 
 	if ($oriCig =~ /^\d+[SH].+\d+[SH]$/) { return; } # skip if a double clipped read got through
+	if ($oriCig =~ /^\d+M$/) { return ($oriCig, 0); }
 	elsif ($oriCig =~ /^(\d+)[SH](.+)$/) { ($clipped, $other, $order) = ($1,$2,1); }
 	elsif ($oriCig =~ /^(.+[MIDP])(\d+)[SH]$/) { ($other, $clipped, $order) = ($1,$2,2); }
 	# Note I don't save if it's hard/soft clipped, only the number of bases
-
+	
 	# The CIGAR String can have multiple combinations of the following features:
 	# M - matched
 	# S - soft clipped (bases kept in the read)
@@ -612,6 +616,7 @@ sub processCIGAR {
 	}
 	# number of bases added is final matched bases - original matched bases
 	my $addedBases = $matched - $sum;
+
 	
 	# Construct simplified CIGAR string (only contains matched and clipped)
 	if ($order == 1) { return(join('',($clipped,"S",$matched,"M")), $addedBases); }

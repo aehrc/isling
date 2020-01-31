@@ -31,8 +31,7 @@ def main(argv):
 
 	#save output in terminal to a file 
 	f = open( "evaluate_pipeline_output/output.txt", "w")
-	sys.stdout = f 
-	print("test") 
+	sys.stdout = f  
 	
 	
 	#read in integration file 
@@ -64,10 +63,12 @@ def main(argv):
 	compareFilters(pipe_ints,viral_reads, all_IDs )
 
 
-	"""
-	#look for what ratio of integrations we captured with the detected reads 
+	
+	#look for what ratio of integrations we captured with the detected reads
+	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads = listIDs(viral_reads, pipe_ints, all_IDs)
+	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, False) 
 	missed_hPos = findMissed(viral_reads, detected_Vreads)
-
+	"""
 	#look at which integration caused false positives
 	missed_df = readDataFrame(detected_NVreads,all_reads) # dataframe of false positive reads 
 	#look at the location of false positive reads in the genome 
@@ -358,8 +359,8 @@ def currentFiltering(pipe_ints):
 
 def compareFilters(pipe_ints,viral_reads, all_IDs):
 	"""Create function to compare the different types of filters on data and complete statistics after each""" 
-
-
+	#TODO tidy this up
+	
 	#Look at host edit distance 
 	filter_idx = []
 	edit_dist = 5 
@@ -367,18 +368,10 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 		# identify reads with high HostEditDistance 
 		if pipe_ints['HostEditDist'][i] > edit_dist: 
 			filter_idx.append(i)
-	#drop the filtered rows 
-	filt_pipe = pipe_ints.drop(pipe_ints.index[filter_idx]) 
-	filt_pipe = filt_pipe.reset_index(drop=True)
-	print("\n"+str(len(filter_idx))+" Reads filtered with HostEditDist <="+str(edit_dist),flush = True)
-	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads  = listIDs(viral_reads,filt_pipe, all_IDs)
-	print("Stats after filtering...")
-	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, False)
-	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads, 'HosteditDist')
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "HostEditDist > 5", all_IDs, viral_reads)
 	#create dataframe to append stats to 
 	all_stats = pd.DataFrame(stats)
 	all_conf = pd.DataFrame(conf_df) 
-
 
 	#look at viral edit distance
 	filter_idx = []
@@ -387,13 +380,18 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 		# identify reads with high HostEditDistance 
 		if pipe_ints['ViralEditDist'][i] > edit_dist: 
 			filter_idx.append(i)
-	filt_pipe = pipe_ints.drop(pipe_ints.index[filter_idx]) 
-	filt_pipe = filt_pipe.reset_index(drop=True)
-	print("\n"+str(len(filter_idx))+" Reads filtered with ViralEditDist <="+str(edit_dist),flush = True)
-	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads  = listIDs(viral_reads,filt_pipe, all_IDs)
-	print("Stats after filtering...")
-	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, False)
-	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads, 'ViralEditDist')
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "ViralEditDist > 5", all_IDs, viral_reads)
+	#add new stats to dataFrame 
+	all_stats = all_stats.append(stats, ignore_index = True)
+	all_conf = all_conf.append(conf_df, ignore_index = True) 
+
+	#look at total edit distance
+	filter_idx = []
+	total_dist = 7 
+	for i in range(len(pipe_ints)): 
+		if pipe_ints['TotalEditDist'][i] > total_dist: 
+			filter_idx.append(i)
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "TotalEditDist > 7", all_IDs, viral_reads)
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
 	all_conf = all_conf.append(conf_df, ignore_index = True) 
@@ -404,13 +402,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	for i in range(len(pipe_ints)):
 		if pipe_ints['NoAmbiguousBases'][i] == "?" or int(pipe_ints['NoAmbiguousBases'][i]) > max_ambig:
 			filter_idx.append(i)
-	filt_pipe = pipe_ints.drop(pipe_ints.index[filter_idx]) 
-	filt_pipe = filt_pipe.reset_index(drop=True)
-	print("\n"+str(len(filter_idx))+" Reads filtered with NoAmbiguousBases <="+str(max_ambig),flush = True)
-	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads  = listIDs(viral_reads,filt_pipe, all_IDs)
-	print("Stats after filtering...")
-	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, True)
-	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads, 'NoAmbiguousBases')
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "NoAmiguousBases == ? | 20", all_IDs, viral_reads)
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
 	all_conf = all_conf.append(conf_df, ignore_index = True) 
@@ -418,15 +410,9 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	#look at discordant reads 
 	filter_idx = []
 	for i in range(len(pipe_ints)):
-		if pipe_ints['OverlapType'][i] == 'discordant': #TODO unsure of this 
+		if pipe_ints['OverlapType'][i] == 'discordant': 
 			filter_idx.append(i)
-	filt_pipe = pipe_ints.drop(pipe_ints.index[filter_idx]) 
-	filt_pipe = filt_pipe.reset_index(drop=True)
-	print("\n"+str(len(filter_idx))+" Discordant reads filtered" ,flush = True)
-	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads  = listIDs(viral_reads,filt_pipe, all_IDs)
-	print("Stats after filtering...")
-	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, False)
-	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads, 'OverlapType')
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "Discordant", all_IDs, viral_reads)
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
 	all_conf = all_conf.append(conf_df, ignore_index = True)  
@@ -436,45 +422,50 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	for i in range(len(pipe_ints)):
 		if pipe_ints['PossibleVectorRearrangement'][i] == 'yes':
 			filter_idx.append(i)
-	filt_pipe = pipe_ints.drop(pipe_ints.index[filter_idx]) 
-	filt_pipe = filt_pipe.reset_index(drop=True)
-	print("\n"+str(len(filter_idx))+" PossibleVecotorRearrangments filtered" ,flush = True)
-	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads  = listIDs(viral_reads,filt_pipe, all_IDs)
-	print("Stats after filtering...")
-	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, False)
-	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads, 'PossibleVectorRearrangement')
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "PossibleVectorRearrangement", all_IDs, viral_reads)
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = False)
 	all_conf = all_conf.append(conf_df, ignore_index = False) 
-
 
 	#look at host rearrangements 
 	filter_idx = []
 	for i in range(len(pipe_ints)):
 		if pipe_ints['PossibleHostTranslocation'][i] == 'yes':
 			filter_idx.append(i)
-	filt_pipe = pipe_ints.drop(pipe_ints.index[filter_idx]) 
-	filt_pipe = filt_pipe.reset_index(drop=True)
-	print("\n"+str(len(filter_idx))+" PossibleHostTranslocations filtered" ,flush = True)
-	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads  = listIDs(viral_reads,filt_pipe, all_IDs)
-	print("Stats after filtering...")
-	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, False)
-	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads, 'PossibleHostTranslocation')
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "PossibleHostTranslocation", all_IDs, viral_reads)
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
 	all_conf = all_conf.append(conf_df, ignore_index = True) 
 
-	print("\nNO FILTER APPLIED") 
-	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads  = listIDs(viral_reads,pipe_ints, all_IDs)
-	print("\nStats after filtering...")
-	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, False)
-	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads, 'NoFilter')
+	#look at host possible ambiguous 
+	filter_idx = []
+	for i in range(len(pipe_ints)): 
+		if pipe_ints['HostPossibleAmbiguous'][i] == 'yes': 
+			filter_idx.append(i) 
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "HostPossibleAmbiguous", all_IDs, viral_reads) 
+	#add new stats to dataFrame 
+	all_stats = all_stats.append(stats, ignore_index = True)
+	all_conf = all_conf.append(conf_df, ignore_index = True) 
+
+	#look at vector possible ambiguous 
+	filter_idx = []
+	for i in range(len(pipe_ints)): 
+		if pipe_ints['ViralPossibleAmbiguous'][i] == 'yes':
+			filter_idx.append(i) 
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, 'ViralPossibleAmbiguous', all_IDs, viral_reads) 
+	#add new stats to dataFrame 
+	all_stats = all_stats.append(stats, ignore_index = True)
+	all_conf = all_conf.append(conf_df, ignore_index = True)
+
+	#look at no filter
+	filter_idx = []
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "Nofilter", all_IDs, viral_reads)
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
 	all_conf = all_conf.append(conf_df, ignore_index = True) 
 
 	#give the dataframes indexes
-	idx = ["HostEditDist <= 5", "ViralEditDist <=5", "NoAmbiguousBases <= 20", "No Discordant", "PossibleVectorRearrangement", "PossibleHostTranslocation", "No filter"]
+	idx = ["HostEditDist <= 5", "ViralEditDist <=5", "TotalEditDist <=6" , "NoAmbiguousBases <= 20", "No Discordant", "PossibleVectorRearrangement", "PossibleHostTranslocation", "HostPossibleAmbiguous",'ViralPossibleAmbiguous', "No filter"]
 	all_stats.index = idx
 	all_conf.index = idx 
 
@@ -485,6 +476,21 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	all_stats.to_csv("evaluate_pipeline_output/filtering_stats.csv", sep = '\t', index = True)
 	all_conf.to_csv("evaluate_pipeline_output/conf_stats.csv", sep = '\t', index = True)  
 
+def filteredStats(filter_idx, pipe_ints, tag, all_IDs, viral_reads): 
+	"""Makes a dataframe of filtered statistics for a list of indexes to be removed"""
+ 	
+	#remove filtered indexes from pipeline results
+	filt_pipe = pipe_ints.drop(pipe_ints.index[filter_idx]) 
+	filt_pipe = filt_pipe.reset_index(drop=True)
+	print("\n"+str(len(filter_idx))+" "+tag+" filtered" ,flush = True)
+
+	#report statistics of filtering
+	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads  = listIDs(viral_reads,filt_pipe, all_IDs)
+	print("Stats after filtering...")
+	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, False)
+	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads, tag)
+
+	return stats, conf_df 
 
 def filterVectorRearrangement(pipe_ints): 
 	"""Filter out reads detected by the pipeline which are possible vector rearrangements. This may reduce the false positive rate of the pipeline""" 
@@ -519,11 +525,6 @@ def removeViral(viral_reads):
 		if viral_reads['left_read'][i] == 'viral' and viral_reads['right_read'][i] == 'viral': 
 			nonchimeric_idx.append(i) 
 
-	#TODO potentially remove this - here we more the discordant reads 
-	for i in range(len(viral_reads)): 
-		if viral_reads['left_read'][i] != 'chimeric' and viral_reads['right_read'][i] != 'chimeric': 
-			nonchimeric_idx.append(i) 
-			
 	#drop the nonchimeric rows 
 	filt_reads = viral_reads.drop(viral_reads.index[nonchimeric_idx])  
 
@@ -545,32 +546,34 @@ def filterLength(viral_reads, min_len):
 	#find the maximum amount of virus (ie 150bp)
 	left_length = max(viral_reads['left_read_amount'])
 	right_length = max(viral_reads['left_read_amount'])
-	read_length = max(left_length, right_length) #could alternatively use right read amount 
+	read_length = max(left_length, right_length) #could alternatively use right read amount  
+	print("Read length"+str(read_length)) 
 	#TODO remove this if there are no issues 
-	if read_length > 151: 
-		raise OSError("Max read length is greater than 151 base pairs!\nReturn to insert_virus.py to resolve this issue")
-
-	#debugging 
-	print(viral_reads[viral_reads['left_read_amount'] == read_length])
+	if read_length > 151:
+		read_length = 151 
+		#raise OSError("Max read length is greater than 151 base pairs!\nReturn to insert_virus.py to resolve this issue")
 
 	#look through viral_reads for reads with less than 20 bp of host or viral DNA 
 	for i in range(len(viral_reads)):
+		
+		#integration causes both reads to be chimeric - common in short integrations 
+		if viral_reads['left_read'][i] == 'chimeric' and viral_reads['right_read'][i] == 'chimeric': 
+			if viral_reads['left_read_amount'][i] > read_length - min_read or viral_reads['left_read_amount'][i] < min_read: 
+				if  viral_reads['right_read_amount'][i] > read_length - min_read or viral_reads['right_read_amount'][i] < min_read:
+					short_idx.append(i) 
+		else: 			
+			# if the left read is all viral or all host we care about the right read 
+			if viral_reads['left_read_amount'][i] == read_length or viral_reads['left_read_amount'][i] == 0: 
+				chimeric = viral_reads['right_read_amount'][i]
 
- 
-		# if the left read is all viral or all host we care about the right read 
-		if viral_reads['left_read_amount'][i] == read_length or viral_reads['left_read_amount'][i] == 0: 
-			chimeric = viral_reads['right_read_amount'][i]
+			# if the right read is all viral or all host we care about the left read
+			elif viral_reads['right_read_amount'][i] == read_length or viral_reads['right_read_amount'][i] == 0: 
+				chimeric = viral_reads['left_read_amount'][i]  		
 
-		# if the right read is all viral or all host we care about the left read
-		elif viral_reads['right_read_amount'][i] == read_length or viral_reads['right_read_amount'][i] == 0: 
-			chimeric = viral_reads['left_read_amount'][i] 
-		 
-		else: 
-			short_idx.append(i)    		
-
-		#filter reads which are outside the range detectable by the pipeline 		
-		if chimeric > read_length - min_read or chimeric < min_read: 
-			short_idx.append(i) 
+			#filter reads which are outside the range detectable by the pipeline 		
+			if chimeric > read_length - min_read or chimeric < min_read: 
+				short_idx.append(i) 
+  
 
 	#drop the short rows 
 	filt_reads = viral_reads.drop(viral_reads.index[short_idx]) 
