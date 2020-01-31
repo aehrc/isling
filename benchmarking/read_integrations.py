@@ -417,7 +417,9 @@ def getViralReads(results):
 	for i in range(len(results)): 
 		if results['left_read'][i] != 'host' or results['right_read'][i] != 'host': 
 			idx.append(i)
-	
+		if results['left_read'][i] != 'virus' or results['right_read'][i] != 'virus':
+			idx.append(i)
+
 	viral_reads = results.loc[idx] 
 	print("Number of viral reads: "+str(len(viral_reads)))
 
