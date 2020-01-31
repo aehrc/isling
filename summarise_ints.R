@@ -16,20 +16,13 @@ out_path = "../out/summary/"
 
 
 files <- list.files(data_path, pattern =".integrations.txt", recursive=TRUE)
-merged_files <- list.files(data_path, pattern =".integrations.merged.bed", recursive=TRUE)
 
 #import all datasets
 df <- tibble(filename = files) %>% # create a data frame holding the file names
   mutate(integrations = map(filename, ~ read_tsv(file.path(data_path, .), 
 						na = c("", "NA", "?"),
 						col_types = cols(Chr = col_character(), NoAmbiguousBases = col_integer(), .default =col_guess())))) %>%
-  mutate(merged_filename = merged_files) %>% 
-  mutate(merged = map(merged_files, ~read_tsv(file.path(data_path, .),
-                                              na = c("", "NA", "?"),
-                                              col_names = c("Chr", "Start", "Stop", "No_reads", "Reads")))) %>% 
-  mutate(total_count = flatten_int(map(integrations, ~nrow(.)))) %>% 
-  mutate(merged_count = flatten_int(map(merged, ~nrow(.))))
-
+  mutate(total_count = flatten_int(map(integrations, ~nrow(.)))) 
 
 #add extra columns with sample name, dataset, host
 df <- df %>% 
@@ -37,16 +30,13 @@ df <- df %>%
   mutate(sample = str_extract(basename(filename), "^[\\w]+(?=\\.)")) %>% 
   mutate( host = ifelse(str_detect(basename(filename), "mouse|mm10|GRCm38"), "mm10", ifelse(str_detect(basename(filename), "macaque|macaca|macFas5"), "macFas5", "hg38")))
 
-#write xls with summary of number of sites and merged sites
+#write xls with summary of number of sites 
 df %>% 
   select(-integrations) %>% 
-  select(-merged) %>% 
   write_xlsx(path = paste0(out_path, "num_sites.xlsx"))
 
 #select all integrations
 df <- df %>% 
-  select(-merged_filename) %>% 
-  select(-merged) %>% 
   filter(flatten_lgl(map(integrations, ~ nrow(.) != 0))) %>% 
   unnest()
 
@@ -176,7 +166,7 @@ for (i in unique(df$dataset)) {
 #  #make plot of all data
 #  pdf(paste0(out_path, "hostCircos_", i, "_density_all.pdf", sep = ""))
 #  if (str_detect(host, "hg38")) {circos.initializeWithIdeogram(species = host, 
-                                                               chromosome.index = chroms)} else {circos.initializeWithIdeogram#(species = host)}
+#                                                               chromosome.index = chroms)} else  {circos.initializeWithIdeogram#(species = host)}
 #  circos.genomicRainfall(bed, track.height = 0.2)
 #  circos.genomicDensity(bed, track.height = 0.1)
 #  dev.off()
