@@ -23,6 +23,7 @@ def main(argv):
 	parser.add_argument('--sam', help = 'sam file describing simulated reads', required = True)
 	parser.add_argument('--host_ints', help = 'csv file describing the location of viral DNA in the human host', required = True)
 	parser.add_argument('--save', help = 'csv file to save the output', required = True)
+	parser.add_argument('--viral_only', help = 'csv file to save only information for viral reads', required = True)
 	parser.add_argument('--filtered', help = 'list of IDs which are not mapped', required = False, default = False) 
 	args = parser.parse_args()
 	
@@ -69,6 +70,11 @@ def main(argv):
 "left_read_coor":first_read,"right_read_coor":second_read, "hPos": read_hPos, "left_junc":first_junc, "right_junc":second_junc})
 	with open(args.save, 'w') as handle: 
 		results.to_csv(handle,sep='\t')
+
+	#create a file which saves information only for reads which contain viral DNA
+	viral_only = getViralReads(results)
+	with open(args.viral_only, 'w') as handle: 
+		viral_only.to_csv(handle, sep='\t')
 		
 	print("COMPLETE")
 	print("Information on ALL reads saved to: "+str(args.save))
@@ -368,8 +374,29 @@ def checkOverlap(coordA, coordB):
 		overlap_type = ""
 		
 	return overlap_type 
-		 		
 
+
+def getViralReads(results): 
+	"""Function to create dataframe consisting of only viral reads. While this is more coded than required, this is the most efficient way to create a large dataframe with the required information""" 
+	
+	#create a list of the indexes we want to drop (more code but more efficient) 
+	idx = []
+	
+	#reindex column 
+	results = results.reset_index(drop=True)
+
+	for i in range(len(results)): 
+		if results['left_read'][i] != 'h' or results['right_read'][i] != 'h': 
+			idx.append(i)
+		if results['left_read'][i] != 'v' or results['right_read'][i] != 'v':
+			idx.append(i)
+
+	viral_reads = results.drop(results.index[idx]) 
+	print("Number of viral reads: "+str(len(viral_reads)))
+
+	return viral_reads
+
+		 		
 def overlapLength(coordA,coordB): 
 	"""Tells us the length of the overlap betweeen coordA and coordB"""	
 
