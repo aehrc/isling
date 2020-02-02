@@ -185,7 +185,7 @@ def analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_righ
 
 		#report how many reads have been analysed 
 		if i % 250000 == 0: 
-			print(str((i*100/len(first_read)))+"% of reads analysed...",flush = True) 	
+			print("{:.2f}".format(str((i*100/len(first_read))))+"% of reads analysed...",flush = True) 	
 		
 	return first_type, second_type, first_len, second_len, read_hPos, first_junc, second_junc 
 
@@ -325,7 +325,7 @@ def processReads(sam_file,num_inserts, filtered_id):
 	print("PROCESSING READS", flush = True) 
 	for i in range(0,num_inserts):
 		if i%500000==0 and i!=0:
-			print(str((i*100/num_inserts))+"% of reads processed...") 
+			print("{:.2f}".format(str((i*100/num_inserts)))+"% of reads processed...") 
 		x = next(in_sam)
 		y = next(in_sam)
 
