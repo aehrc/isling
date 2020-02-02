@@ -19,6 +19,7 @@ def main(argv):
 	parser = argparse.ArgumentParser(description='compares viral integrations identified by pipeline with known viral integrations')
 	parser.add_argument('--pipeline', help='output file from pipeline', required = True) 
 	parser.add_argument('--ints', help='integrations applied file', required = True)
+	parser.add_argument('--viral_reads', help='file with reads containing information on reads containing viral DNA', required = True)
 	parser.add_argument('--all_reads', help = 'file containing all reads IDs', required = True) 
 	args = parser.parse_args()  
 	
@@ -44,8 +45,12 @@ def main(argv):
 	all_IDs = list(set(all_reads["fragment_id"]))
 	all_IDs = [i.replace('chr', '') for i in all_IDs] 	
 
+
+	#read in file listing which reads contain viral DNA 
+	viral_reads = pd.read_csv(args.viral_reads, header=0, sep='\t')
+	viral_reads['fragment_id'] = [x.replace("chr","") for x in viral_reads['fragment_id']]
 	#pipeline can only detect a read as being viral if there is at least 20 bases each of host and virus DNA
-	all_reads = filterLength(all_reads, 20)  
+	all_reads = filterLength(viral_reads)  
 
 	#read in file listing the integrations detected by the pipeline 
 	pipe_ints = pd.read_csv(args.pipeline, header = 0, sep = '\t')
@@ -549,15 +554,15 @@ def filterLength(all_reads):
 
 		#adjust left read to meet the threshold of 20bp to be chimeric 	
 		if all_reads['left_read_amount'][i] > read_len - min_len: 
-			all_reads['left_read'][i] = 'v'
+			all_reads.loc[i,'left_read'] = 'v'
 		elif all_reads['left_read_amount'][i] < min_len: 
-			all_reads['left_read'][i] = 'h'
+			all_reads.loc[i,'left_read'] = 'h'
 
 		#adjust right read to meet the threshold of 20bp to be chimeric 
 		if all_reads['right_read_amount'][i] > read_len - min_len: 
-			all_reads['right_read'][i] = 'v'
+			all_reads.loc[i,'right_read'] = 'v'
 		elif all_reads['right_read_amount'][i] < min_len: 
-			all_reads['right_read'][i] = 'h'
+			all_reads.loc[i,'right_read'] = 'h'
 
 		#if both left and right are viral or host do integration occured here
 		if all_reads['right_read'][i] == 'h' and all_reads['left_read'][i] == 'h' or all_reads['right_read'][i] == 'v' and all_reads['left_read'][i] == 'v':
