@@ -162,11 +162,13 @@ def listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save):
 	
 	if save == True: 
 		#save the false positive reads to file
-		with open('evaluate_pipeline_output/false_positive_IDs.txt', 'w') as f: 
+		false_pos = directory + "/false_positive_IDs.txt"
+		with open(false_pos, 'w') as f: 
 			for item in detected_NVreads: 
 				f.write("%s\n" % item)
 		#save the false negative reads to file 
-		with open('evaluate_pipeline_output/false_negative_IDs.txt', 'w') as f: 
+		false_neg = directory + "/false_negative_IDs.txt"
+		with open(false_neg, 'w') as f: 
 			for item in undetected_Vreads: 
 				f.write("%s\n" % item)
 		print("False positive reads saved to 'evaluate_pipeline_output/false_positive_IDs.txt'", flush = True) 
