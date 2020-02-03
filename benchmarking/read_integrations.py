@@ -1,4 +1,5 @@
 ### combines data from simiulated reads and integrated host sequence to output which reads contain viral DNA ###
+
 ## uses .sam file outputted from reads simulated using ART https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3278762/
 ## uses file output from insert_virus.py which lists the location of viral DNA in the human .fasta
 ## when using 'coordinates' we consider (start point, end point) of either the viral integration in the host genome or the reads when aligned 
@@ -9,7 +10,6 @@ from simplesam import Reader
 import pandas as pd
 import argparse
 import sys
-import time #remove after debugging - used to optimise code TODO
 import csv
 
 
@@ -45,59 +45,40 @@ def main(argv):
 
 
 	#find the number of fragments 
-	start_time = time.time() #TODO this could be optimise if it takes a long time 
 	num_reads = numReads(read_file)
-	now = time.time() 
-	print("Time taken to find the number of fragments "+format(now-start_time),flush=True)
 
 	#get the coordinates of each integration
 	int_coord = intCoords(int_file)
-	print("Integration coordinates found") 
 
 	#get the hPos of each integration - we use this later as an identifer
 	int_hPos = intHpos(int_file)
-	print("hPos of integrations found") 
 
 	#get the types of junctions for each integration
 	int_leftj, int_rightj = intJunction(int_file) 
-	print("Type of junction for each integration found") 
 	
 	#read in sam file to process reads 
 	sam_file = args.sam
 
 	#process reads to obtain the ID of each fragment and the coordinates of the corresponding reads
-	start_time = time.time()
 	fragment_id, first_read, second_read = processReads(sam_file,num_reads, filtered_id)
-	now = time.time() 
-	print("Time taken to process reads "+format(now-start_time),flush=True) 
 
 	#assess for the type of read and the amount of viral DNA (bp) in each read
-	start_time = time.time()
 	first_type, second_type, first_len, second_len, read_hPos, first_junc, second_junc  = analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_rightj)
-	now = time.time() 
-	print("Time taken to analyse reads "+format(now-start_time),flush=True)
 	
 	#save the entire file
-	start_time = time.time()
 	results = pd.DataFrame({"fragment_id":fragment_id,"left_read":first_type,"right_read":second_type,"left_read_amount":first_len,"right_read_amount":second_len,
 "left_read_coor":first_read,"right_read_coor":second_read, "hPos": read_hPos, "left_junc":first_junc, "right_junc":second_junc})
 	with open(args.save, 'w') as handle: 
 		results.to_csv(handle,sep='\t')
-	now = time.time() 
-	print("Time taken save entire file "+format(now-start_time),flush=True)
-	
+
 	#create a file which saves information only for reads which contain viral DNA
-	start_time = time.time() 
 	viral_only = getViralReads(results)
 	with open(args.viral_only, 'w') as handle: 
 		viral_only.to_csv(handle, sep='\t')
-	now = time.time() 
-	print("Time taken save viral only file "+format(now-start_time))
 		
 	print("COMPLETE")
 	print("Information on ALL reads saved to: "+str(args.save))
 	print("Information on VIRAL reads saved to: "+str(args.viral_only))
-	print("Time taken to run entire program "+format(start_time)) 
 	
 		
 def numReads(sam_file): 
@@ -114,6 +95,7 @@ def analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_righ
 	takes lists of the coordinates of the reads and the locations of the viral DNA in the host"""
 	# this function is very intensive - requires optimisiing 	
 
+	print("\nANALYSING READS", flush = True) 
 
 	#lists of the types of the reads  
 	first_type = []
@@ -202,41 +184,39 @@ def analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_righ
 		second_junc.append(junction_2)
 
 		#report how many reads have been analysed 
-		if i % 100000 == 0: 
-			print(str(i)+" reads analysed...",flush = True) 	
+		if i % 250000 == 0: 
+			print("{:.2f}".format((i*100/len(first_read)))+"% of reads analysed...",flush = True) 	
 		
 	return first_type, second_type, first_len, second_len, read_hPos, first_junc, second_junc 
-	
-	
+
 def readType(overlap_type): 
-	"""Identifies the type of a read: chimeric, split, viral or host.Uses one of the overlap_type lists (overlap_type1 or overlap_type2. Returns type as a string""" 
 	
 	#intialise string
 	read_type = ""
 	
 	#handle reads which are all viral DNA 
 	if "all" in overlap_type: 
-		read_type = "viral" 
+		read_type = "v" 
 
 	#handle short reads - where there is viral DNA in the middle of a read 	
 	elif "short" in overlap_type: 
-		read_type = "short" 
+		read_type = "sh" 
+	
+	#handle chimeric reads
+	elif "left" in overlap_type and "right" not in overlap_type: 
+		read_type = "vh"
 
 	#handle chimeric reads 
-	elif "left" in overlap_type and "right" not in overlap_type or "right" in overlap_type and "left" not in overlap_type: 
-		read_type = "chimeric" 
-		
-	#handle split reads 
-	#these are rare but we include them for completeness 
-	elif "left" in overlap_type and "right" in overlap_type: 
-		read_type = "split" 
-		
-	#handle reads without viral DNA 
+	elif "right" in overlap_type and "left" not in overlap_type: 
+		read_type = "hv" 
+	
+	#handle reads without viral DNA
 	else: 
-		read_type = "host" 
-		
+		read_type = "h" 
+	
 	return read_type
 	
+		
 def viralQuantity(overlap_type, overlap_len): 
 	"""function which finds the amount of viral DNA (bp) in a read""" 
 	
@@ -259,7 +239,7 @@ def intCoords(int_file):
 	"""Finds the location of viral DNA in the host sequence"""
 	#get the integration coordinates  
 	int_coord = []
-	#TODO debug - high false positive rate for detecting reads with overlaps 
+
 	for i in range(len(int_file)):
 		c1 = int_file["Start point"][i]
 		#c1 = c1 + int_file["leftJunctionBases"][i] #adjust for junction bases on the left 
@@ -340,9 +320,12 @@ def processReads(sam_file,num_inserts, filtered_id):
 	#list of insert coordinates in the original fasta sequence
 	first_read = []
 	second_read = []
+
+
+	print("PROCESSING READS", flush = True) 
 	for i in range(0,num_inserts):
 		if i%500000==0 and i!=0:
-			print(str(i)+" READS PROCESSED") 
+			print("{:.2f}".format((i*100/num_inserts))+"% of reads processed...") 
 		x = next(in_sam)
 		y = next(in_sam)
 
@@ -356,21 +339,21 @@ def processReads(sam_file,num_inserts, filtered_id):
 				fragment_id.append(x.qname)
 		
 				#save the coordinates of the read 
-				first_read.append((x.pos-1,x.pos+len(x.seq)))
-				second_read.append((y.pos-1,y.pos+len(y.seq)))
+				#subract 1 as the SAM file position starts at 1 but we use index 0 
+				first_read.append((x.pos-1,x.pos+len(x.seq)-1))
+				second_read.append((y.pos-1,y.pos+len(y.seq)-1))
 		else: 
 			#save the ID of the read 
 			fragment_id.append(x.qname)
 		
-			#save the coordinates of the read 
-			first_read.append((x.pos-1,x.pos+len(x.seq)))
-			second_read.append((y.pos-1,y.pos+len(y.seq)))
+			#save the coordinates of the read
+			#subtract 1 as the SAM file position starts at 1 but we use index 0  
+			first_read.append((x.pos-1,x.pos+len(x.seq)-1))
+			second_read.append((y.pos-1,y.pos+len(y.seq)-1))
 			
- 
 	return fragment_id, first_read, second_read
 	
- 
-	
+
 def checkOverlap(coordA, coordB): 
 	""" Function which tells us whether coordA (start of read, end of read) overlaps coordB (start of integration, end of integrations). Returns string which says which type of integrations occured""" 
 	
@@ -380,31 +363,18 @@ def checkOverlap(coordA, coordB):
 	
 
 	if B1<=A1 and B2>=A2: 
-		overlap_type = "all" 
+		overlap_type = "all"    #virus covers the entire read 
 	elif A1 < B1 and A2 > B2: 	 
-		overlap_type = "short"  
+		overlap_type = "short"  #virus is in the centre of the read 
 	elif A1 < B1 and B1 <= A2:
 		overlap_type = "right" 	#virus is on the right end of the read 
 	elif B2 < A2 and B2 >= A1:
-		overlap_type = "left"
+		overlap_type = "left"   #virus on the left end of the read 
 	else:
 		overlap_type = ""
 		
 	return overlap_type 
-		 		
 
-def overlapLength(coordA,coordB): 
-	"""Tells us the length of the overlap betweeen coordA and coordB"""
-	#debugging remove later 	
-
-	A1, A2 = coordA
-	B1, B2 = coordB
-
-	overlap = min(B2, A2)-max(B1, A1) 
-
-	if overlap<0: 
-		raise OSError("Attempting to find length of overlap between regions which do not overlap")
-	return overlap
 
 def getViralReads(results): 
 	"""Function to create dataframe consisting of only viral reads. While this is more coded than required, this is the most efficient way to create a large dataframe with the required information""" 
@@ -416,13 +386,28 @@ def getViralReads(results):
 	results = results.reset_index(drop=True)
 
 	for i in range(len(results)): 
-		if results['left_read'][i] != 'host' or results['right_read'][i] != 'host': 
+		if results['left_read'][i] == 'h' and results['right_read'][i] == 'h': 
 			idx.append(i)
-	
-	viral_reads = results.loc[idx] 
+		if results['left_read'][i] == 'v' and results['right_read'][i] == 'v':
+			idx.append(i)
+
+	viral_reads = results.drop(results.index[idx]) 
 	print("Number of viral reads: "+str(len(viral_reads)))
 
 	return viral_reads
+
+		 		
+def overlapLength(coordA,coordB): 
+	"""Tells us the length of the overlap betweeen coordA and coordB"""	
+
+	A1, A2 = coordA
+	B1, B2 = coordB
+
+	overlap = min(B2, A2)-max(B1, A1)
+
+	if overlap<0: 
+		raise OSError("Attempting to find length of overlap between regions which do not overlap")
+	return overlap
  
 		
 if __name__ == "__main__":
