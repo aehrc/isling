@@ -503,7 +503,7 @@ def filterVectorRearrangement(pipe_ints):
 
 	return filt_pipe 
 
-def filterLength(all_reads,,min_len):
+def filterLength(all_reads,min_len):
 	"""Function which filters viral reads to contain only reads with a set amount of viral DNA (min_len)""" 
 
 	#set the read length
@@ -532,7 +532,7 @@ def filterLength(all_reads,,min_len):
 				filt_idx = []
 
 	#drop the false rows
-	filt_reads = all_reads.drop(all_reads.index[short_idx])
+	filt_reads = all_reads.drop(all_reads.index[filt_idx])
 	
 	#reindex the filtered reads
 	filt_reads = filt_reads.reset_index(drop=True)
