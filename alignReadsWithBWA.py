@@ -6,7 +6,7 @@ import argparse
 import subprocess
 import re
 
-def build_bwa_args(path, index, read1, read2, output, threshold, match, mismatch, h, threads, insert, delete):
+def build_bwa_args(path, index, read1, read2, output, threshold, match, mismatch, h, threads, insert_open, insert_extend, delete_open, delete_extend):
 	#build bwa args
 	bwa_args = [path, "mem", "-t", str(threads), "-A", str(match), "-B", str(mismatch), "-O", "{},{}".format(delete_open, insert_open), "-E", "{},{}".format(delete_extend, insert_extend), "-L", "0,0", "-T", str(threshold), "-h", str(h), "-M", index, read1]
 
@@ -16,11 +16,11 @@ def build_bwa_args(path, index, read1, read2, output, threshold, match, mismatch
 	return bwa_args
 
 
-def align_seqs(path, index, read1, read2, output, threshold, match, mismatch, h, threads, insert, delete):
+def align_seqs(path, index, read1, read2, output, threshold, match, mismatch, h, threads, insert_open, insert_extend, delete_open, delete_extend):
 
 	#if insert is a comma-seperated string of values, split into list
-	if re.search(",", insert):
-		insert = insert.split(",")
+	if re.search(",", insert_open):
+		insert_open = insert_open.split(",")
 	
 	#construct a list of bwa arguments, and a list of output filenames
 	bwa_args_lst = []
@@ -28,7 +28,7 @@ def align_seqs(path, index, read1, read2, output, threshold, match, mismatch, h,
 
 	#get part of output filename before ".sam"
 	#first strip out .insert\d+ if it's in there
-	output_name = re.search("(.+)\.insert\d+(.+)", output)
+	output_name = re.search("(.+)\.insertOpen\d+(.+)", output)
 	if output_name:
 		#if there is a match, splice together two parts either side of insert
 		output_name = output_name.group(1)+output_name.group(2)
@@ -46,13 +46,13 @@ def align_seqs(path, index, read1, read2, output, threshold, match, mismatch, h,
 	if len(insert) > 1:
 		for val in insert:
 			#add bwa args to list
-			bwa_args_lst.append(build_bwa_args(path, index, read1, read2, output, threshold, match, mismatch, h, threads, val, delete))
+			bwa_args_lst.append(build_bwa_args(path, index, read1, read2, output, threshold, match, mismatch, h, threads, val, insert_extend, delete_open, delete_extend))
 			#add output to list
 			outputs.append("{}.insert{}.sam".format(output_base, val))
 
 	#if only one alignment
 	else:
-		bwa_args_lst.append(build_bwa_args(path, index, read1, read2, output, threshold, match, mismatch, h, threads, insert, delete))
+		bwa_args_lst.append(build_bwa_args(path, index, read1, read2, output, threshold, match, mismatch, h, threads, insert_open, insert_extend, delete_open, delete_extend))
 		outputs.append(output)
 
 
@@ -82,7 +82,7 @@ def main(argv):
 	args = parser.parse_args()
 
 	#call to align_seqs
-	align_seqs(args.bwa, args.index, args.read1, args.read2, args.output, args.threshold, args.match, args.mismatch, args.hflag, args.threads, args.insert, args.delete)
+	align_seqs(args.bwa, args.index, args.read1, args.read2, args.output, args.threshold, args.match, args.mismatch, args.hflag, args.threads, args.insert_open, args.insert_extend, args.delete_open, args.delete_extend)
 
 	
 
