@@ -21,16 +21,19 @@ def main(argv):
 	parser.add_argument('--ints', help='integrations applied file', required = True)
 	parser.add_argument('--viral_reads', help='file with reads containing information on reads containing viral DNA', required = True)
 	parser.add_argument('--all_reads', help = 'file containing all reads IDs', required = True) 
+	parser.add_argument('--save', help = 'location to save output', required = True)
 	args = parser.parse_args()  
 	
 	
 	print("Output to be saved to /evaluate_pipeline_output/output.txt") 
 
 	#create directory to save output
-	os.makedirs('evaluate_pipeline_output', exist_ok = True)
+	directory =  str(args.save)+'/evaluate_pipeline_output'
+	os.makedirs(directory, exist_ok = True)
 
 	#save output in terminal to a file 
-	f = open( "evaluate_pipeline_output/output.txt", "w")
+	out = directory + "/output.txt"
+	f = open( out, "w")
 	sys.stdout = f  
 	
 	print("STARTING...", flush = True) 
