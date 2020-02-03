@@ -27,7 +27,7 @@ def align_seqs(path, index, read1, read2, output, threshold, match, mismatch, h,
 	outputs = []
 
 	#get part of output filename before ".sam"
-	#first strip out .insert\d+ if it's in there
+	#first strip out .insertOpen\d+ if it's in there
 	output_name = re.search("(.+)\.insertOpen\d+(.+)", output)
 	if output_name:
 		#if there is a match, splice together two parts either side of insert
@@ -43,12 +43,12 @@ def align_seqs(path, index, read1, read2, output, threshold, match, mismatch, h,
 		raise ValueError("Check output name contains .sam")
 
 	#if multiple alingments to be done
-	if len(insert) > 1:
-		for val in insert:
+	if len(insert_open) > 1:
+		for val in insert_open:
 			#add bwa args to list
 			bwa_args_lst.append(build_bwa_args(path, index, read1, read2, output, threshold, match, mismatch, h, threads, val, insert_extend, delete_open, delete_extend))
 			#add output to list
-			outputs.append("{}.insert{}.sam".format(output_base, val))
+			outputs.append("{}.insertOpen{}.sam".format(output_base, val))
 
 	#if only one alignment
 	else:
