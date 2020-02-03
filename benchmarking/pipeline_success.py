@@ -96,7 +96,7 @@ def filterList(pipe_ints, ID_list):
 	return filt_pipe
 			
 
-def listIDs(all_reads, pipe_ints, all_IDs): 
+def listIDs(viral_reads, pipe_ints, all_IDs): 
 	"""Create lists of the predicted and actual viral and non-viral reads""" 
 
 	#List all IDs 
@@ -109,7 +109,7 @@ def listIDs(all_reads, pipe_ints, all_IDs):
 	pipe_IDs = [i.replace(" ", "") for i in pipe_IDs]  
 	
 	#List actual viral reads 
-	actual_Vreads = list(set(all_reads['fragment_id']))
+	actual_Vreads = list(set(viral_reads['fragment_id']))
 	actual_Vreads = [i.replace("chr","") for i in actual_Vreads] 
 	print("Number of viral reads: "+str(len(actual_Vreads)), flush = True) 
 
@@ -133,6 +133,7 @@ def listIDs(all_reads, pipe_ints, all_IDs):
 	print("Sum of predicted reads: "+str(len(pred_Vreads)+len(pred_NVreads)),flush = True)
 
 	return actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads 
+
 
 def listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save): 
 	"""function which creates a list of the IDs successfully predicted by the pipeline and those missed. actual Vreads is a list of the reads known to be viral and pred_Vreads is a list of the reads predicted by the pipeline to contain viral DNA. Can save false positives and negatives to file if save == True.""" 
