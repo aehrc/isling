@@ -386,9 +386,9 @@ def getViralReads(results):
 	results = results.reset_index(drop=True)
 
 	for i in range(len(results)): 
-		if results['left_read'][i] != 'h' and results['right_read'][i] != 'h': 
+		if results['left_read'][i] == 'h' and results['right_read'][i] == 'h': 
 			idx.append(i)
-		if results['left_read'][i] != 'v' and results['right_read'][i] != 'v':
+		if results['left_read'][i] == 'v' and results['right_read'][i] == 'v':
 			idx.append(i)
 
 	viral_reads = results.drop(results.index[idx]) 
