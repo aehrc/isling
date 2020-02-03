@@ -529,7 +529,7 @@ def filterLength(all_reads,min_len):
 
 		#if both left and right are viral or host do integration occured here
 		if all_reads['right_read'][i] == 'h' and all_reads['left_read'][i] == 'h' or all_reads['right_read'][i] == 'v' and all_reads['left_read'][i] == 'v':
-				filt_idx = []
+				filt_idx.append(i) 
 
 	#drop the false rows
 	filt_reads = all_reads.drop(all_reads.index[filt_idx])
