@@ -50,56 +50,22 @@ def main(argv):
 	viral_reads = pd.read_csv(args.viral_reads, header=0, sep='\t')
 	viral_reads['fragment_id'] = [x.replace("chr","") for x in viral_reads['fragment_id']]
 	#pipeline can only detect a read as being viral if there is at least 20 bases each of host and virus DNA
-	all_reads = filterLength(viral_reads)  
+	all_reads = filterLength(viral_reads, 20)  
 
 	#read in file listing the integrations detected by the pipeline 
 	pipe_ints = pd.read_csv(args.pipeline, header = 0, sep = '\t')
 	print("Number of reads detected by pipeline: " +str(len(pipe_ints)), flush = True)
 
 	#look at the different types of filtering 
-	compareFilters(pipe_ints,all_reads, all_IDs )
+	compareFilters(pipe_ints,all_reads, all_IDs)
 
 	#look for what ratio of integrations we captured with the detected reads
+	"""
 	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads = listIDs(all_reads, pipe_ints, all_IDs)
 	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, False) 
 	missed_hPos = findMissed(all_reads, detected_Vreads)
 	"""
-	#look at which integration caused false positives
-	missed_df = readDataFrame(detected_NVreads,all_reads) # dataframe of false positive reads 
-	#look at the location of false positive reads in the genome 
-	missedLocation(missed_df)
-	
-	#look at the amount of viral DNA in our false negative reads 
-	missed_df = readDataFrame(undetected_Vreads, all_reads) 
-	readLength(missed_df)
-	pipelineMissed(missed_df,all_reads) 	
 
-	
-	
-
-	#filter out possible vector rearrangments #TODO play around with this particularly for chromosomes 14 and X
-	filt_pipe = filterVectorRearrangement(filt_pipe) 
-	actual_Vreads, pred_Vreads = listIDs(all_reads,filt_pipe, all_IDs)
-	print("\nStats after filtering vector rearrangements...") 
-	detected_Vreads, undetected_Vreads, false_reads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads)
-
-	#create a df of the missed reads
-	missed_df = readDataFrame(undetected_Vreads,all_reads) #look at whats up with these ones we missed 
-	missed_hPos = findMissed(all_reads, detected_Vreads)
-
-	#get the reads that we correctly identified and save 
-	correct_df = readDataFrame(detected_Vreads, all_reads) 
-	correct_df.to_csv("evaluate_pipeline_output/correctly_identifed_pipeline.csv", sep='\t') 
-	missed_df.to_csv("evaluate_pipeline_output/undetected_Vreads.csv", sep = '\t') 	
-
-
-	assessMissedLength(missed_hPos, ints)
-
-	#save a file with the false reads to analyse them later  
-	false_df = pipelineDataFrame(false_reads,pipe_ints)
-	false_df.to_csv("false_reads.csv",sep='\t') 
-
-	"""
 	f.close()
 
 def filterList(pipe_ints, ID_list):
@@ -537,11 +503,8 @@ def filterVectorRearrangement(pipe_ints):
 
 	return filt_pipe 
 
-def filterLength(all_reads):
-	"""Function which filters viral reads to contain only reads with a set amount of viral DNA""" 
-	
-	#set the minimum length
-	min_len  = 20
+def filterLength(all_reads,,min_len):
+	"""Function which filters viral reads to contain only reads with a set amount of viral DNA (min_len)""" 
 
 	#set the read length
 	read_len = 150 
