@@ -57,14 +57,15 @@ def main(argv):
 	print("Number of reads detected by pipeline: " +str(len(pipe_ints)), flush = True)
 
 	#look at the different types of filtering 
-	compareFilters(pipe_ints,all_reads, all_IDs)
+	#compareFilters(pipe_ints,all_reads, all_IDs)
 
 	#look for what ratio of integrations we captured with the detected reads
-	"""
+	
 	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads = listIDs(all_reads, pipe_ints, all_IDs)
-	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, False) 
-	missed_hPos = findMissed(all_reads, detected_Vreads)
-	"""
+	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, True)
+	
+	#missed_hPos = findMissed(all_reads, detected_Vreads)
+	
 
 	f.close()
 
