@@ -19,13 +19,12 @@ def main(argv):
 	parser = argparse.ArgumentParser(description='compares viral integrations identified by pipeline with known viral integrations')
 	parser.add_argument('--pipeline', help='output file from pipeline', required = True) 
 	parser.add_argument('--ints', help='integrations applied file', required = True)
-	parser.add_argument('--all_reads', help = 'file containing all reads IDs', required = True) 
 	parser.add_argument('--viral_reads', help='file with reads containing information on reads containing viral DNA', required = True)
-	#parser.add_argument('--filter_list', help = 'file containing reads which were mapped to filter pipeline results', required = False, default = []) 
+	parser.add_argument('--all_reads', help = 'file containing all reads IDs', required = True) 
 	args = parser.parse_args()  
 	
 	
-	print("Output to be saved to /evaluate_pipeline_output/output.txt", flush = True) 
+	print("Output to be saved to /evaluate_pipeline_output/output.txt") 
 
 	#create directory to save output
 	os.makedirs('evaluate_pipeline_output', exist_ok = True)
@@ -34,7 +33,7 @@ def main(argv):
 	f = open( "evaluate_pipeline_output/output.txt", "w")
 	sys.stdout = f  
 	
-	print("STARTING...") 
+	print("STARTING...", flush = True) 
 	
 	#read in integration file 
 	ints = pd.read_csv(args.ints, header =0, sep='\t')
@@ -46,78 +45,58 @@ def main(argv):
 	all_IDs = list(set(all_reads["fragment_id"]))
 	all_IDs = [i.replace('chr', '') for i in all_IDs] 	
 
+
 	#read in file listing which reads contain viral DNA 
 	viral_reads = pd.read_csv(args.viral_reads, header=0, sep='\t')
 	viral_reads['fragment_id'] = [x.replace("chr","") for x in viral_reads['fragment_id']]
-	#filter our file to leave only chimeric reads 
-	viral_reads = removeViral(viral_reads)
 	#pipeline can only detect a read as being viral if there is at least 20 bases each of host and virus DNA
-	viral_reads = filterLength(viral_reads,20)  
+	all_reads = filterLength(viral_reads, 20)  
 
 	#read in file listing the integrations detected by the pipeline 
 	pipe_ints = pd.read_csv(args.pipeline, header = 0, sep = '\t')
-	
-	#filter out mapped reads 
-	#print("Before filter list")
-	#ID_list = open(args.filter_list, 'r') 
-	#ID_list = ID_list.read().splitlines()
-	#print("filter list read") 
-	#pipe_ints = filterList(pipe_ints, ID_list)
-	print("Number of reads detected by pipeline: " +str(len(pipe_ints))) 
-	#filter out ambiguous reads 
-	#pipe_ints = filterAmbiguous(pipe_ints)  
-	#filt_pipes = currentFiltering(pipe_ints) 
+	print("Number of reads detected by pipeline: " +str(len(pipe_ints)), flush = True)
 
 	#look at the different types of filtering 
-	compareFilters(pipe_ints,viral_reads, all_IDs )
+	compareFilters(pipe_ints,all_reads, all_IDs)
 
-
-	
 	#look for what ratio of integrations we captured with the detected reads
-	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads = listIDs(viral_reads, pipe_ints, all_IDs)
+	"""
+	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads = listIDs(all_reads, pipe_ints, all_IDs)
 	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, False) 
-	missed_hPos = findMissed(viral_reads, detected_Vreads)
+	missed_hPos = findMissed(all_reads, detected_Vreads)
 	"""
-	#look at which integration caused false positives
-	missed_df = readDataFrame(detected_NVreads,all_reads) # dataframe of false positive reads 
-	#look at the location of false positive reads in the genome 
-	missedLocation(missed_df)
-	
-	#look at the amount of viral DNA in our false negative reads 
-	missed_df = readDataFrame(undetected_Vreads, all_reads) 
-	readLength(missed_df)
-	pipelineMissed(missed_df,viral_reads) 	
 
-	
-	
-
-	#filter out possible vector rearrangments #TODO play around with this particularly for chromosomes 14 and X
-	filt_pipe = filterVectorRearrangement(filt_pipe) 
-	actual_Vreads, pred_Vreads = listIDs(viral_reads,filt_pipe, all_IDs)
-	print("\nStats after filtering vector rearrangements...") 
-	detected_Vreads, undetected_Vreads, false_reads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads)
-
-	#create a df of the missed reads
-	missed_df = readDataFrame(undetected_Vreads,viral_reads) #look at whats up with these ones we missed 
-	missed_hPos = findMissed(viral_reads, detected_Vreads)
-
-	#get the reads that we correctly identified and save 
-	correct_df = readDataFrame(detected_Vreads, viral_reads) 
-	correct_df.to_csv("evaluate_pipeline_output/correctly_identifed_pipeline.csv", sep='\t') 
-	missed_df.to_csv("evaluate_pipeline_output/undetected_Vreads.csv", sep = '\t') 	
-
-
-	assessMissedLength(missed_hPos, ints)
-
-	#save a file with the false reads to analyse them later  
-	false_df = pipelineDataFrame(false_reads,pipe_ints)
-	false_df.to_csv("false_reads.csv",sep='\t') 
-
-	"""
 	f.close()
 
+def filterList(pipe_ints, ID_list):
+	"""Filters the set of pipeline reads so that only mapped reads are included. Created to look at whether pipeline is including unmapped reads resulting in high false positive rate""" 
 
-def listIDs(viral_reads, pipe_ints, all_IDs): 
+	#create list of indexes to be filtered
+	filter_idx = []
+
+	pipe_IDs = list(set(pipe_ints["ReadID"]))
+	ID_list = [i.replace("chr"," ") for i in ID_list]
+	ID_list = list(set(ID_list))
+
+	print(pipe_IDs[1:5], flush = True) 
+	print(ID_list[1:5], flush = True) 
+	
+	for i in range (len(pipe_IDs)): 
+		if pipe_IDs[i] in ID_list: 
+			filter_idx.append(i)
+
+	#drop the unmapped rows 
+	filt_pipe = pipe_ints.drop(pipe_ints.index[filter_idx])
+	
+	#reindex the filtered pipeline
+	filt_pipe = filt_pipe.reset_index(drop=True) 
+
+	print("Entries before filtering: "+str(len(pipe_ints)), flush = True)
+	print("Entries after filtering: "+str(len(filt_pipe)), flush = True)
+	return filt_pipe
+			
+
+def listIDs(all_reads, pipe_ints, all_IDs): 
 	"""Create lists of the predicted and actual viral and non-viral reads""" 
 
 	#List all IDs 
@@ -130,7 +109,7 @@ def listIDs(viral_reads, pipe_ints, all_IDs):
 	pipe_IDs = [i.replace(" ", "") for i in pipe_IDs]  
 	
 	#List actual viral reads 
-	actual_Vreads = list(set(viral_reads['fragment_id']))
+	actual_Vreads = list(set(all_reads['fragment_id']))
 	actual_Vreads = [i.replace("chr","") for i in actual_Vreads] 
 	print("Number of viral reads: "+str(len(actual_Vreads)), flush = True) 
 
@@ -276,29 +255,7 @@ def barGraph(stats, xlabel):
 	fig.savefig("evaluate_pipeline_output/bar_graph_tests.pdf") 
 	print("Bar graph of tests saved at evaluate_pipeline_output/confusion_matrix.pdf", flush = True) 
 
-def filterList(pipe_ints, ID_list):
-	"""Filters the set of pipeline reads so that only mapped reads are included. Created to look at whether pipeline is including unmapped reads resulting in high false positive rate""" 
 	
-	print("Filter list starting") 
-	
-	#create list of indexes to be filtered
-	filter_idx = []
-	
-	for i in range (len(pipe_ints)): 
-		if pipe_ints["ReadID"] in ID_list: 
-			filter_idx.append(i)
-
-	#drop the unmapped rows 
-	filt_pipe = pipe_ints.drop(pipe_ints.index[filter_idx])
-	
-	#reindex the filtered pipeline
-	filt_pipe = filt_pipe.reset_index(drop=True) 
-	print("Filter list done") 
-
-	return filt_pipe
-			
-
-
 def filterAmbiguous(pipe_ints): 
 	"""Filters out integrated reads which are ambiguous for the host or viral sequence""" 
 	#list of the indexes of ambiguous reads 
@@ -387,7 +344,7 @@ def currentFiltering(pipe_ints):
  
 	return filt_pipe
 
-def compareFilters(pipe_ints,viral_reads, all_IDs):
+def compareFilters(pipe_ints,all_reads, all_IDs):
 	"""Create function to compare the different types of filters on data and complete statistics after each""" 
 	#TODO tidy this up
 	
@@ -398,7 +355,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 		# identify reads with high HostEditDistance 
 		if pipe_ints['HostEditDist'][i] > edit_dist: 
 			filter_idx.append(i)
-	stats, conf_df = filteredStats(filter_idx, pipe_ints, "HostEditDist > 5", all_IDs, viral_reads, False)
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "HostEditDist > 5", all_IDs, all_reads, False)
 	#create dataframe to append stats to 
 	all_stats = pd.DataFrame(stats)
 	all_conf = pd.DataFrame(conf_df) 
@@ -410,7 +367,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 		# identify reads with high HostEditDistance 
 		if pipe_ints['ViralEditDist'][i] > edit_dist: 
 			filter_idx.append(i)
-	stats, conf_df = filteredStats(filter_idx, pipe_ints, "ViralEditDist > 5", all_IDs, viral_reads, False)
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "ViralEditDist > 5", all_IDs, all_reads, False)
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
 	all_conf = all_conf.append(conf_df, ignore_index = True) 
@@ -421,7 +378,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	for i in range(len(pipe_ints)): 
 		if pipe_ints['TotalEditDist'][i] > total_dist: 
 			filter_idx.append(i)
-	stats, conf_df = filteredStats(filter_idx, pipe_ints, "TotalEditDist > 7", all_IDs, viral_reads, False)
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "TotalEditDist > 7", all_IDs, all_reads, False)
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
 	all_conf = all_conf.append(conf_df, ignore_index = True) 
@@ -432,7 +389,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	for i in range(len(pipe_ints)):
 		if pipe_ints['NoAmbiguousBases'][i] == "?" or int(pipe_ints['NoAmbiguousBases'][i]) > max_ambig:
 			filter_idx.append(i)
-	stats, conf_df = filteredStats(filter_idx, pipe_ints, "NoAmiguousBases == ? | 20", all_IDs, viral_reads, False)
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "NoAmiguousBases == ? | 20", all_IDs, all_reads, False)
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
 	all_conf = all_conf.append(conf_df, ignore_index = True) 
@@ -442,7 +399,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	for i in range(len(pipe_ints)):
 		if pipe_ints['OverlapType'][i] == 'discordant': 
 			filter_idx.append(i)
-	stats, conf_df = filteredStats(filter_idx, pipe_ints, "Discordant", all_IDs, viral_reads, False)
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "Discordant", all_IDs, all_reads, False)
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
 	all_conf = all_conf.append(conf_df, ignore_index = True)  
@@ -452,7 +409,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	for i in range(len(pipe_ints)):
 		if pipe_ints['PossibleVectorRearrangement'][i] == 'yes':
 			filter_idx.append(i)
-	stats, conf_df = filteredStats(filter_idx, pipe_ints, "PossibleVectorRearrangement", all_IDs, viral_reads, False)
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "PossibleVectorRearrangement", all_IDs, all_reads, False)
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = False)
 	all_conf = all_conf.append(conf_df, ignore_index = False) 
@@ -462,7 +419,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	for i in range(len(pipe_ints)):
 		if pipe_ints['PossibleHostTranslocation'][i] == 'yes':
 			filter_idx.append(i)
-	stats, conf_df = filteredStats(filter_idx, pipe_ints, "PossibleHostTranslocation", all_IDs, viral_reads, False)
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "PossibleHostTranslocation", all_IDs, all_reads, False)
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
 	all_conf = all_conf.append(conf_df, ignore_index = True) 
@@ -472,7 +429,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	for i in range(len(pipe_ints)): 
 		if pipe_ints['HostPossibleAmbiguous'][i] == 'yes': 
 			filter_idx.append(i) 
-	stats, conf_df = filteredStats(filter_idx, pipe_ints, "HostPossibleAmbiguous", all_IDs, viral_reads, False) 
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "HostPossibleAmbiguous", all_IDs, all_reads, False) 
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
 	all_conf = all_conf.append(conf_df, ignore_index = True) 
@@ -482,14 +439,14 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	for i in range(len(pipe_ints)): 
 		if pipe_ints['ViralPossibleAmbiguous'][i] == 'yes':
 			filter_idx.append(i) 
-	stats, conf_df = filteredStats(filter_idx, pipe_ints, 'ViralPossibleAmbiguous', all_IDs, viral_reads, False) 
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, 'ViralPossibleAmbiguous', all_IDs, all_reads, False) 
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
 	all_conf = all_conf.append(conf_df, ignore_index = True)
 
 	#look at no filter
 	filter_idx = []
-	stats, conf_df = filteredStats(filter_idx, pipe_ints, "Nofilter", all_IDs, viral_reads, True)
+	stats, conf_df = filteredStats(filter_idx, pipe_ints, "Nofilter", all_IDs, all_reads, True)
 	#add new stats to dataFrame 
 	all_stats = all_stats.append(stats, ignore_index = True)
 	all_conf = all_conf.append(conf_df, ignore_index = True) 
@@ -506,7 +463,7 @@ def compareFilters(pipe_ints,viral_reads, all_IDs):
 	all_stats.to_csv("evaluate_pipeline_output/filtering_stats.csv", sep = '\t', index = True)
 	all_conf.to_csv("evaluate_pipeline_output/conf_stats.csv", sep = '\t', index = True)  
 
-def filteredStats(filter_idx, pipe_ints, tag, all_IDs, viral_reads, save): 
+def filteredStats(filter_idx, pipe_ints, tag, all_IDs, all_reads, save): 
 	"""Makes a dataframe of filtered statistics for a list of indexes to be removed"""
  	
 	#remove filtered indexes from pipeline results
@@ -515,7 +472,7 @@ def filteredStats(filter_idx, pipe_ints, tag, all_IDs, viral_reads, save):
 	print("\n"+str(len(filter_idx))+" "+tag+" filtered" ,flush = True)
 
 	#report statistics of filtering
-	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads  = listIDs(viral_reads,filt_pipe, all_IDs)
+	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads  = listIDs(all_reads,filt_pipe, all_IDs)
 	print("Stats after filtering...")
 	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save)
 	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads, tag)
@@ -546,79 +503,47 @@ def filterVectorRearrangement(pipe_ints):
 
 	return filt_pipe 
 
-def removeViral(viral_reads): 
-	"""Filters out reads which do not contain any host DNA. These reads are not detected by the pipeline""" 
-	#list of the indexes of the reads which are not chimeric
-	nonchimeric_idx = []
+def filterLength(all_reads,min_len):
+	"""Function which filters viral reads to contain only reads with a set amount of viral DNA (min_len)""" 
 
-	for i in range(len(viral_reads)): 
-		if viral_reads['left_read'][i] == 'viral' and viral_reads['right_read'][i] == 'viral': 
-			nonchimeric_idx.append(i) 
-
-	#drop the nonchimeric rows 
-	filt_reads = viral_reads.drop(viral_reads.index[nonchimeric_idx])  
-
-	#reindex the filtered reads
-	filt_reads = filt_reads.reset_index(drop=True) 
-
-	return filt_reads
-
-
-def filterLength(viral_reads, min_len): 
-	"""Function which filters the dataframe to contain only reads with more than a set amount of viral DNA. Pipeline can only detect viral DNA if there is more than 20 bp of viral DNA""" 
-
-	#list of the reads which have less than the min_len of base pairs 
-	short_idx = []
-
-	# miniminum amount of viral DNA in a read that the pipeline can detect (ie 20 base pairs) 
-	min_read = min_len
-
-	#find the maximum amount of virus (ie 150bp)
-	left_length = max(viral_reads['left_read_amount'])
-	right_length = max(viral_reads['left_read_amount'])
-	read_length = max(left_length, right_length) #could alternatively use right read amount 
-	read_length = 151 #TODO this is needed to look at the short reads 
- 
-	#TODO remove this if there are no issues 
-	if read_length > 151:
-		read_length = 151 
-		#raise OSError("Max read length is greater than 151 base pairs!\nReturn to insert_virus.py to resolve this issue")
-
-	#look through viral_reads for reads with less than 20 bp of host or viral DNA 
-	for i in range(len(viral_reads)):
-		
-		#integration causes both reads to be chimeric - common in short integrations 
-		if viral_reads['left_read'][i] == 'chimeric' and viral_reads['right_read'][i] == 'chimeric': 
-			if viral_reads['left_read_amount'][i] > read_length - min_read or viral_reads['left_read_amount'][i] < min_read: 
-				if  viral_reads['right_read_amount'][i] > read_length - min_read or viral_reads['right_read_amount'][i] < min_read:
-					short_idx.append(i) 
-		else: 			
-			# if the left read is all viral or all host we care about the right read 
-			if viral_reads['left_read_amount'][i] == read_length or viral_reads['left_read_amount'][i] == 0: 
-				chimeric = viral_reads['right_read_amount'][i]
-
-			# if the right read is all viral or all host we care about the left read
-			elif viral_reads['right_read_amount'][i] == read_length or viral_reads['right_read_amount'][i] == 0: 
-				chimeric = viral_reads['left_read_amount'][i]  		
-
-			#filter reads which are outside the range detectable by the pipeline 		
-			if chimeric > read_length - min_read or chimeric < min_read: 
-				short_idx.append(i) 
-  
-
-	#drop the short rows 
-	filt_reads = viral_reads.drop(viral_reads.index[short_idx]) 
+	#set the read length
+	read_len = 150 
 	
-	#redinex the filtered reads 
-	filt_reads = filt_reads.reset_index(drop=True)
+	#make a list of the indexes of the reads we wish to filter
+	filt_idx = []
 
+	#loop through and adjust chimeric reads 
+	for i in range(len(all_reads)):
+
+		#adjust left read to meet the threshold of 20bp to be chimeric 	
+		if all_reads['left_read_amount'][i] > read_len - min_len: 
+			all_reads.loc[i,'left_read'] = 'v'
+		elif all_reads['left_read_amount'][i] < min_len: 
+			all_reads.loc[i,'left_read'] = 'h'
+
+		#adjust right read to meet the threshold of 20bp to be chimeric 
+		if all_reads['right_read_amount'][i] > read_len - min_len: 
+			all_reads.loc[i,'right_read'] = 'v'
+		elif all_reads['right_read_amount'][i] < min_len: 
+			all_reads.loc[i,'right_read'] = 'h'
+
+		#if both left and right are viral or host do integration occured here
+		if all_reads['right_read'][i] == 'h' and all_reads['left_read'][i] == 'h' or all_reads['right_read'][i] == 'v' and all_reads['left_read'][i] == 'v':
+				filt_idx = []
+
+	#drop the false rows
+	filt_reads = all_reads.drop(all_reads.index[filt_idx])
+	
+	#reindex the filtered reads
+	filt_reads = filt_reads.reset_index(drop=True)
+	
+	#report the filtering 
 	#report the filtering  
-	rem = (len(filt_reads)/len(viral_reads))*100
-	print("\nAfter filtering out reads with less than "+str(min_len)+" base pairs of viral DNA, {:.2f} % of reads remain.".format(rem), flush = True) 
+	rem = (len(filt_reads)/len(all_reads))*100
+	print("\nAfter filtering out reads with less than "+str(min_len)+" base pairs of viral DNA, {:.2f} % of reads remain.".format(rem), flush = True)
 
 	return filt_reads
-
-	#report the amount of reads remaining after filtering 
+	
 
 def filterFalse(ints): 
 	"""Remove integrations which were unsuccessful""" 
@@ -638,13 +563,13 @@ def filterFalse(ints):
 
 	return filt_ints 
 
-def readDataFrame(read_list, viral_reads): 
+def readDataFrame(read_list, all_reads): 
 	"""Creates a dataframe of a subset of  reads using a list of read IDs""" 
 	
-	viral_reads = viral_reads.set_index('fragment_id') 
+	all_reads = all_reads.set_index('fragment_id') 
 	
 	#create df with only the entries in read_list
-	new_df = viral_reads.loc[read_list]
+	new_df = all_reads.loc[read_list]
 
 	#reset index on the new dataframe 
 	new_df['fragment_id'] = new_df.index 
@@ -653,13 +578,13 @@ def readDataFrame(read_list, viral_reads):
 
 	return new_df
 
-def pipelineDataFrame(read_list, viral_reads): 
+def pipelineDataFrame(read_list, all_reads): 
 	"""Creates a dataframe of a subset of  reads using a list of read IDs""" 
 	
-	viral_reads = viral_reads.set_index('ReadID') 
+	all_reads = all_reads.set_index('ReadID') 
 	
 	#create df with only the entries in read_list
-	new_df = viral_reads.loc[read_list]
+	new_df = all_reads.loc[read_list]
 
 	#reset index on the new dataframe 
 	new_df['ReadID'] = new_df.index 
@@ -668,17 +593,17 @@ def pipelineDataFrame(read_list, viral_reads):
 	return new_df
 
 
-def findMissed(viral_reads, detected_Vreads): 
+def findMissed(all_reads, detected_Vreads): 
 
 	"""Looks up the integrations missed by the pipeline enabling subsequent determination of what kind of reads we missed""" 
 
 	#find the maximum number of integrations that could be found from the reads if the pipeline was perfect 
-	detectable_hPos = hPosList(viral_reads) 
+	detectable_hPos = hPosList(all_reads) 
 	print('\nMax number of integrations detectable from reads: '+str(len(detectable_hPos)), flush = True) 
 
 	#look at how many of these integrations we cover with our results from the pipeline 
 	#make a dataframe of the correct reads 
-	correct_df = readDataFrame(detected_Vreads, viral_reads) 
+	correct_df = readDataFrame(detected_Vreads, all_reads) 
 	#find the number of integrations that the pipeline detected 
 	pipeline_hPos = hPosList(correct_df) 
 	print("Number of integrations detected by the pipeline: "+str(len(pipeline_hPos)),flush = True) 
@@ -797,21 +722,21 @@ def assessFragments(num_fragments):
 		print("{:.2f}% of integrations were broken into ".format(frag_freq)+str(i)+" fragments")
 
 
-def getOverlap(viral_reads):
+def getOverlap(all_reads):
 	"""Tells us what type of junctions the filter/filtered reads had (from the actual file not the pipeline)
 Inormation corresponds to read ID""" 
 	#get the requried columns 
-	left_read= viral_reads['left_read'].values
-	right_read = viral_reads['right_read'].values
-	left_junc = viral_reads['left_junc'].values
-	right_junc = viral_reads['right_junc'].values
-	int_ID = viral_reads['fragment_id'].values
+	left_read= all_reads['left_read'].values
+	right_read = all_reads['right_read'].values
+	left_junc = all_reads['left_junc'].values
+	right_junc = all_reads['right_junc'].values
+	int_ID = all_reads['fragment_id'].values
 
 	#column which says the type of overlaps 
 	overlap_type = []
 	
 
-	for i in range(len(viral_reads)):
+	for i in range(len(all_reads)):
 		if left_read[i] == "viral" and right_read[i] == 'host' or right_read[i] == 'viral' and left_read[i] == 'host': 
 			overlap_type.append("discordant")
 		elif left_read[i] == 'chimeric' and right_read[i] == 'host': 
@@ -832,16 +757,16 @@ Inormation corresponds to read ID"""
 
 	
 	
-def assessLength(viral_reads, undetected_Vreads): #TODO this is questionable remove 
+def assessLength(all_reads, undetected_Vreads): #TODO this is questionable remove 
 	"""Compare the number of viral base pairs in the missed reads and in alfg
 l reads"""
 	#get the required columns
-	int_ID = viral_reads['fragment_id'].values
-	first_len = viral_reads['left_read_amount'].values
-	second_len = viral_reads['right_read_amount'].values
+	int_ID = all_reads['fragment_id'].values
+	first_len = all_reads['left_read_amount'].values
+	second_len = all_reads['right_read_amount'].values
 
 	#find the length of virus in each read - excluding reads consisting of whole virus and no virus
-	viral_len = [max(first_len[i],second_len[i]) for i in range(len(viral_reads))]	
+	viral_len = [max(first_len[i],second_len[i]) for i in range(len(all_reads))]	
 	
 	#create a dictionay
 	len_dict = dict(zip(int_ID, viral_len)) 
@@ -862,10 +787,10 @@ l reads"""
 #look at the junctions in them 
 #were they close to an actual integration event? 
 
-def assessOverlap(viral_reads, undetected_Vreads): 
+def assessOverlap(all_reads, undetected_Vreads): 
 	"""Looks at what type of overlap the reads missed by the pipeline have. Takes a dataframe of all of the reads and a list of the IDs of the missed reads""" 
 	#dictionary of overlap types for each read 
-	overlap_dict = getOverlap(viral_reads)
+	overlap_dict = getOverlap(all_reads)
 	
 	#column of the overlap of the undetected_Vreads
 	overlap = [overlap_dict.get(missed) for missed in undetected_Vreads] 
@@ -887,11 +812,11 @@ def assessOverlap(viral_reads, undetected_Vreads):
 	print(str(otherFreq)+"%of missed reads had a junction other than those above") 
 
 
-def pipelineMissed(missed_df,viral_reads): 
+def pipelineMissed(missed_df,all_reads): 
 	"""looks at which integrations cuase false negative reads"""
 
 	#create a list of all possible hPos 
-	all_hPos = hPosList(viral_reads) 
+	all_hPos = hPosList(all_reads) 
 
 	#create a list of the hpos in the missed viral reads 
 	missr_hPos = []
@@ -970,7 +895,7 @@ def readLength(missed_df):
 	
 	
 
-def compareOverlap(viral_reads, pipe_ints): #TODO finish this 
+def compareOverlap(all_reads, pipe_ints): #TODO finish this 
 	"""Compares whether the pipeline has correctly predicted the gap type of the read. Takes list of predicted"""
 
 	#get the IDs of the pipeline reads
@@ -980,7 +905,7 @@ def compareOverlap(viral_reads, pipe_ints): #TODO finish this
 	pipe_overlap = pipe_ints['Type'].values
  
 	#create a dictionary of the overlap types for each read 
-	overlap_dict = getOverlap(viral_reads)
+	overlap_dict = getOverlap(all_reads)
 	
 	#get the known overlap type 
 	actual_overlap = [overlap_dict.get(pipeline) for pipeline in pipe_reads] 
