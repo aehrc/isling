@@ -139,7 +139,7 @@ def listIDs(viral_reads, pipe_ints, all_IDs):
 	return actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads 
 
 
-def listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save): 
+def listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save, location): 
 	"""function which creates a list of the IDs successfully predicted by the pipeline and those missed. actual Vreads is a list of the reads known to be viral and pred_Vreads is a list of the reads predicted by the pipeline to contain viral DNA. Can save false positives and negatives to file if save == True.""" 
 
 	#find how many of the viral reads were/were not detected by the pipeline
@@ -162,12 +162,12 @@ def listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save):
 	
 	if save == True: 
 		#save the false positive reads to file
-		false_pos = directory + "/false_positive_IDs.txt"
+		false_pos = str(args.save)+'/evaluate_pipeline_output/false_positive_IDs.txt'
 		with open(false_pos, 'w') as f: 
 			for item in detected_NVreads: 
 				f.write("%s\n" % item)
 		#save the false negative reads to file 
-		false_neg = directory + "/false_negative_IDs.txt"
+		false_neg = str(args.save)+'/evaluate_pipeline_output/false_negative_IDs.txt'
 		with open(false_neg, 'w') as f: 
 			for item in undetected_Vreads: 
 				f.write("%s\n" % item)
@@ -481,7 +481,7 @@ def filteredStats(filter_idx, pipe_ints, tag, all_IDs, all_reads, save):
 	#report statistics of filtering
 	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads  = listIDs(all_reads,filt_pipe, all_IDs)
 	print("Stats after filtering...")
-	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save)
+	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save, args.save)
 	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads, tag)
 
 	return stats, conf_df 
