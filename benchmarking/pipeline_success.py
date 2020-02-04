@@ -67,7 +67,10 @@ def main(argv):
 	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads = listIDs(all_reads, pipe_ints, all_IDs)
 	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, True, args.save)
 	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads)
-	conf_df.to_csv('conf_df.csv', sep = '\t') 
+	print("INFO") 
+	print(str(args.save)) 
+	print(conf_df) 
+	conf_df.to_csv(str(args.save)+'/evaluate_pipeline_output/conf_mat.csv', sep = '\t') 
 
 	
 	#missed_hPos = findMissed(all_reads, detected_Vreads)
@@ -196,7 +199,7 @@ def findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_N
 
 	#construct confusion matrix
 	conf_mat = np.array([[TPR,FPR],[FNR, TNR]])
-	consfusionMatrix(conf_mat)
+	#consfusionMatrix(conf_mat)
 
 	#accuracy - chance of making a correct prediction
 	acc = ((TP+TN)/(TP+TN+FP+FN))*100
