@@ -17,7 +17,7 @@
 	#location in host genome (chr, start, stop)
 	#part of viral genome inserted (virus, start, stop)
 	#integration type (whole, portion, rearrangement, etc)
-	#overlaps/gaps at each junction - *yet to be implemented*
+	#overlaps/gaps at each junction 
 # reports all integration sites relative to the host genome, independent of other integrations
 # so if there are two integrations on the same chromosome, both positions in host genome will be relative to reference
 
@@ -36,7 +36,7 @@ import os
 import numpy as np
 print("STARTING", flush=True) 
 ###
-max_attempts = 5 #maximum number of times to try to place an integration site
+max_attempts = 5 #maximum number of times to try to place an integration site - globl variable 
 
 ### main
 def main(argv):
@@ -73,7 +73,7 @@ def main(argv):
 	np.random.seed(3)
 
 	#types of insertions
-	insertion_types = [insertWholeVirus, insertShortVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
+	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
 
 	#types of episomes 
 	episome_types = [Episome.insertWhole, Episome.insertPortion, Episome.insertWholeRearrange, Episome.insertPortionRearrange, Episome.insertWholeDeletion, Episome.insertPortionDeletion] 
@@ -94,7 +94,7 @@ def main(argv):
 						"rearrangement",
 						"deletion",
 						"vStart",
-						"vStart",
+						"vStop",
 						"leftJunction",
 						"rightJunction",
 						"breakpoints", 
@@ -129,8 +129,9 @@ def main(argv):
 	counter = 0 # count number of iterations 
 	while len(host_ints) < int_num: 
 		#rand_int =  np.random.randint(0,len(insertion_types))
-		rand_int = 1 #uncomment for testing specific type of integration TODO  #clean whole
-		host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, min_len, sep)
+		#rand_int = 1 #uncomment for testing specific type of integration TODO  #clean whole
+		#host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, min_len, sep)
+		host_ints, host_fasta = insertSetLength(host_fasta, virus, host_ints, handle, min_len, sep, set_len)
 		counter += 1  
 		if counter % int_report == 0: 
 			print(str(counter) +" integrations complete...", flush = True)
@@ -164,9 +165,6 @@ def main(argv):
 
 def insertWholeVirus(host, viruses, int_list, filehandle, min_len, sep):
 	"""Inserts whole viral genome into host genome"""
-
-	#TODO add integrations of a set length 
-
 
 	#get positions of all current integrations
 	currentPos = Statistics.integratedIndices(int_list)
@@ -780,10 +778,8 @@ class Integration:
 		int_start = self.hPos 
 		int_stop = self.hPos 
 
-		
 		#adjust seqences with gaps by adding random sequence
 		self.gapAdjust()
-		#adjust sequences with overlap
 		#list previous integrations 
 		previousInt = Statistics.intList(self,int_list)
 
@@ -799,7 +795,6 @@ class Integration:
 		#adjust sequences with right overlap  		
 		if self.overlaps[1]<0:
 			(int_start,int_stop) = self.createRightOverlap(host,int_list,filehandle)
-			#remove homologous region so there is not double #TODO recheck reports correct coordinates and repeat for left overlap 
 			int_stop = int_start 
 			self.chunk.bases = self.chunk.bases[:len(self.chunk.bases)+self.overlaps[1]] 
 	
@@ -931,8 +926,11 @@ class ViralChunk:
 
 		#if we want a random of chunk of a predetermined size 
 		if isinstance(part, int): 
+			#get the length of the integration
+			set_len = part 
+
 			while True: 
-				self.start = np.random(0,len(viruses[self.virus].seq-set_len))
+				self.start = np.random.randint(0,len(viruses[self.virus].seq)-set_len)
 				self.stop = self.start + set_len
 				if self.stop - self.start > min_chunk: 
 					break
