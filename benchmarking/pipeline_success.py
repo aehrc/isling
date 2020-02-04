@@ -65,7 +65,10 @@ def main(argv):
 	#look for what ratio of integrations we captured with the detected reads
 	
 	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads = listIDs(all_reads, pipe_ints, all_IDs)
-	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, True)
+	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, True, args.save)
+	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads)
+	conf_df.to_csv('conf_df.csv', sep = '\t') 
+
 	
 	#missed_hPos = findMissed(all_reads, detected_Vreads)
 	
@@ -162,12 +165,12 @@ def listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save, 
 	
 	if save == True: 
 		#save the false positive reads to file
-		false_pos = str(args.save)+'/evaluate_pipeline_output/false_positive_IDs.txt'
+		false_pos = location+'/evaluate_pipeline_output/false_positive_IDs.txt'
 		with open(false_pos, 'w') as f: 
 			for item in detected_NVreads: 
 				f.write("%s\n" % item)
 		#save the false negative reads to file 
-		false_neg = str(args.save)+'/evaluate_pipeline_output/false_negative_IDs.txt'
+		false_neg = location+'/evaluate_pipeline_output/false_negative_IDs.txt'
 		with open(false_neg, 'w') as f: 
 			for item in undetected_Vreads: 
 				f.write("%s\n" % item)
@@ -176,7 +179,7 @@ def listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save, 
 
 	return detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads
 
-def findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads,save): 
+def findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads): 
 	"""Get statisitics on the the success of the pipeline""" 
 
 	# find the number of TP, FN, FP and TN 
@@ -482,7 +485,7 @@ def filteredStats(filter_idx, pipe_ints, tag, all_IDs, all_reads, save):
 	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads  = listIDs(all_reads,filt_pipe, all_IDs)
 	print("Stats after filtering...")
 	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save, args.save)
-	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads, tag)
+	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads)
 
 	return stats, conf_df 
 
