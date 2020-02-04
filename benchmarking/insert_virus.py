@@ -51,6 +51,7 @@ def main(argv):
 	parser.add_argument('--fasta', help = 'output fasta of integrated host genome', required = False)
 	parser.add_argument('--sep', help = 'integrations must be seperated by this many bases', required=False, default=5)
 	parser.add_argument('--min_len', help = 'minimum length of integerations', required=False, default=50)
+	parser.add_argument('--set_len', help = 'use if only want integrations of a specific length', required=False, default=0)
 	parser.add_argument('--epi_num', help = 'number of episomes', required=False, default=0)
 	args = parser.parse_args()
 	
@@ -69,7 +70,7 @@ def main(argv):
  
 	
 	#set random seed
-	np.random.seed(1)
+	np.random.seed(3)
 
 	#types of insertions
 	insertion_types = [insertWholeVirus, insertShortVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
@@ -112,6 +113,9 @@ def main(argv):
 	#intialise the separation from other integrations 
 	sep = int(args.sep) 
 
+	#intialise the set length of integration if specified 
+	set_len = int(args.set_len) 
+
 	#intialise how many episomal sequences included in the outputted fasta file 
 	epi_num = int(args.epi_num) 
 	
@@ -125,7 +129,7 @@ def main(argv):
 	counter = 0 # count number of iterations 
 	while len(host_ints) < int_num: 
 		#rand_int =  np.random.randint(0,len(insertion_types))
-		rand_int = 0 #uncomment for testing specific type of integration TODO  - portion
+		rand_int = 1 #uncomment for testing specific type of integration TODO  #clean whole
 		host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, min_len, sep)
 		counter += 1  
 		if counter % int_report == 0: 
@@ -161,6 +165,9 @@ def main(argv):
 def insertWholeVirus(host, viruses, int_list, filehandle, min_len, sep):
 	"""Inserts whole viral genome into host genome"""
 
+	#TODO add integrations of a set length 
+
+
 	#get positions of all current integrations
 	currentPos = Statistics.integratedIndices(int_list)
 
@@ -192,9 +199,12 @@ def insertWholeVirus(host, viruses, int_list, filehandle, min_len, sep):
 	
 	return int_list, host
 
-def insertShortVirus(host, viruses, int_list, filehandle, min_len, sep):
-	"""Inserts 100 bp of viral DNA allowing us to later simulate short reads"""
+def insertSetLength(host, viruses, int_list, filehandle, min_len, sep, set_len):
+	"""Inserts virus of a specified length. Not included in integration loop but useful for ATAY's work"""
 
+	if set_len == 0: 
+		raise OSError("Specifiy a set integration size")
+	
 	#get positions of all current integrations
 	currentPos = Statistics.integratedIndices(int_list)
 
@@ -204,7 +214,7 @@ def insertShortVirus(host, viruses, int_list, filehandle, min_len, sep):
 	while True:
 		#get one viral chunk
 		currentInt = Integration(host)
-		currentInt.addFragment(viruses, min_len, part = "short")
+		currentInt.addFragment(viruses, min_len, part = set_len)
 		attempts += 1
 		#check that all integrations are sep away from new integration
 		if all([ abs(currentInt.hPos-i) > sep for i in currentPos ]):
@@ -918,32 +928,37 @@ class ViralChunk:
 		
 		if min_chunk>len(viruses[self.virus].seq):
 			raise OSError("Viral genome is shorter than the minimum intgration size")
+
+		#if we want a random of chunk of a predetermined size 
+		if isinstance(part, int): 
+			while True: 
+				self.start = np.random(0,len(viruses[self.virus].seq-set_len))
+				self.stop = self.start + set_len
+				if self.stop - self.start > min_chunk: 
+					break
 		
+		#TODO add a max attempts here 
 		#if we want a random chunk of virus
-		if part == "rand":		
+		elif part == "rand":		
 			while True:
 				self.start = np.random.randint(0, len(viruses[self.virus].seq)-1)
 				self.stop = np.random.randint(self.start+1, len(viruses[self.virus].seq))
 				if self.stop-self.start>min_chunk:
 					break
-
-		if part == "short": 
-			while True: 
-				self.start = np.random.randint(0, len(viruses[self.virus].seq)-100)
-				self.stop = self.start +100 
-				if self.stop - self.start > min_chunk:
-					break
-								
+		
 		#if we want the whole virus
 		else:
 			self.start = 0
 			self.stop = len(viruses[self.virus].seq)
+
+		#give the integration an oreintation 
 		if np.random.uniform() > 0.5:
 			self.ori = "f" #define orientation
 			self.bases = viruses[self.virus][self.start:self.stop] #get bases to insert
 		else:
 			self.ori = "r" #define orientation
 			self.bases = viruses[self.virus][self.start:self.stop].reverse_complement() #get bases to insert remove this one
+		
 		#construct dictionary with keys 'bases', 'ori' and 'coords'
 		#use to keep track of order if 
 		self.pieces = {0:{"bases":self.bases, "ori":self.ori, "coords":(self.start, self.stop)}}
