@@ -66,10 +66,7 @@ def main(argv):
 	
 	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads = listIDs(all_reads, pipe_ints, all_IDs)
 	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, True, args.save)
-	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads)
-	print("INFO") 
-	print(str(args.save)) 
-	print(conf_df) 
+	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads) 
 	conf_df.to_csv(str(args.save)+'/evaluate_pipeline_output/conf_mat.csv', sep = '\t') 
 
 	
