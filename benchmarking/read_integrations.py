@@ -63,11 +63,11 @@ def main(argv):
 	fragment_id, first_read, second_read = processReads(sam_file,num_reads, filtered_id)
 
 	#assess for the type of read and the amount of viral DNA (bp) in each read
-	first_type, second_type, first_len, second_len, read_hPos, first_junc, second_junc  = analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_rightj)
+	first_type, second_type, first_len, second_len, first_loc, second_loc, read_hPos, first_junc, second_junc  = analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_rightj)
 	
 	#save the entire file
 	results = pd.DataFrame({"fragment_id":fragment_id,"left_read":first_type,"right_read":second_type,"left_read_amount":first_len,"right_read_amount":second_len,
-"left_read_coor":first_read,"right_read_coor":second_read, "hPos": read_hPos, "left_junc":first_junc, "right_junc":second_junc})
+"left_read_coor":first_read,"right_read_coor":second_read, "left_read_Vcoor": first_loc, "right_read_Vcoor": second_loc, "hPos": read_hPos, "left_junc":first_junc, "right_junc":second_junc})
 	with open(args.save, 'w') as handle: 
 		results.to_csv(handle,sep='\t')
 
@@ -97,14 +97,17 @@ def analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_righ
 
 	print("\nANALYSING READS", flush = True) 
 
-	#lists of the types of the reads  
+	#lists the types of the reads  
 	first_type = []
 	second_type = []
 	
-
-	#lists for the amount of viral DNA in each read
+	#lists the amount of viral DNA in each read
 	first_len = []
 	second_len = []
+	
+	#list the location of an integration in the read 
+	first_loc = []
+	second_loc = []
 	
 	#list of the integrations in each read - denoted as hPos 
 	read_hPos = []
@@ -123,6 +126,10 @@ def analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_righ
 		overlap_type1 = []
 		overlap_type2 = []
 
+		#record the location of viral DNA in reads
+		readloc_1 = []
+		readloc_2 = []
+
 		#list the integrations in the read 
 		int_list = []
 
@@ -139,8 +146,9 @@ def analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_righ
 				overlap_type1.append(c_type) 
 				
 				#save information on the amount of viral DNA in the read from the integration 
-				overlap = overlapLength(first_read[i],int_coord[j])
-				overlap_len1.append(overlap) 
+				overlap, start_1, stop_1 = overlapLength(first_read[i],int_coord[j])
+				overlap_len1.append(overlap)
+				readloc_1.append((start_1, stop_1)) 
 
 				#Store the hPos of the integration in the read 
 				int_list.append(int_hPos[j])  
@@ -152,8 +160,9 @@ def analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_righ
 				overlap_type2.append(c_type) 
 				
 				#save information on the amount of viral DNA in the read from the integration 
-				overlap = overlapLength(second_read[i], int_coord[j]) 
+				overlap, start_2, stop_2 = overlapLength(second_read[i], int_coord[j]) 
 				overlap_len2.append(overlap)
+				readloc_2.append((start_2,stop_2))
 
 				#Store the hPos of the integration in the read 
 				int_list.append(int_hPos[j]) 
@@ -174,6 +183,10 @@ def analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_righ
 		first_len.append(len1)
 		second_len.append(len2)
 
+		#save the start and stop positions of viral DNA in each read 
+		first_loc.append(readloc_1)
+		first_loc.append(readloc_2) 
+
 		#save the integrations (hPos) in each read 
 		read_hPos.append(set(int_list)) #exists as a list of lists
 
@@ -187,7 +200,7 @@ def analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_righ
 		if i % 250000 == 0: 
 			print("{:.2f}".format((i*100/len(first_read)))+"% of reads analysed...",flush = True) 	
 		
-	return first_type, second_type, first_len, second_len, read_hPos, first_junc, second_junc 
+	return first_type, second_type, first_len, second_len, first_loc, second_loc, read_hPos, first_junc, second_junc 
 
 def readType(overlap_type): 
 	
@@ -358,8 +371,8 @@ def checkOverlap(coordA, coordB):
 	""" Function which tells us whether coordA (start of read, end of read) overlaps coordB (start of integration, end of integrations). Returns string which says which type of integrations occured""" 
 	
 	#get coordinates 
-	A1, A2 = coordA
-	B1, B2 = coordB 
+	A1, A2 = coordA #start and stop position of read 
+	B1, B2 = coordB #start and stop position of integration
 	
 
 	if B1<=A1 and B2>=A2: 
@@ -386,8 +399,10 @@ def getViralReads(results):
 	results = results.reset_index(drop=True)
 
 	for i in range(len(results)): 
+		#no integration if left and right reads are host
 		if results['left_read'][i] == 'h' and results['right_read'][i] == 'h': 
 			idx.append(i)
+		#no integration if left and right reads are viral
 		if results['left_read'][i] == 'v' and results['right_read'][i] == 'v':
 			idx.append(i)
 
@@ -400,15 +415,43 @@ def getViralReads(results):
 def overlapLength(coordA,coordB): 
 	"""Tells us the length of the overlap betweeen coordA and coordB"""	
 
-	A1, A2 = coordA
-	B1, B2 = coordB
+	A1, A2 = coordA #start and stop position of read
+	B1, B2 = coordB #start and stop position of integration 
 
+	#find the amount of DNA shared by the read and the integration
+	#plus 1 to find the number of viruses (ie if the first base of an integration was at 4 and the last base at 6 the number of viral bases is 6 - 4 +1 = 3 as bases 4,5 and 6 are viral.  
 	overlap = min(B2, A2)-max(B1, A1)+1
 
 	if overlap<0: 
 		raise OSError("Attempting to find length of overlap between regions which do not overlap")
-	return overlap
- 
-		
+
+	#if there is an integration find the position of the integration in the read 
+	vStart = ""
+	vStop = ""
+	if overlap > 0: 
+		vStart, vStop = vStartStop(coordA, coordB) 
+	
+	return overlap, vStart, vStop
+
+def vStartStop(coordA, coordB): 
+	"""Finds the start and stop positions of viral DNA in a read"""
+	
+	A1, A2 = coordA #start and stop position of read
+	B1, B2 = coordB #start and stop position of integration
+
+	#get start position of integration in read 
+	if A1 < B1:
+		vStart = B1
+	else: 
+		vStart = B2
+
+	#get stop position of integration in read 
+	if A2 > B2: 
+		vStop = B2 
+	else: 
+		vStop = A2 
+	
+	return vStart, vStop 
+
 if __name__ == "__main__":
 	main(sys.argv[1:]) 	
