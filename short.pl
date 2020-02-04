@@ -17,7 +17,7 @@ use Getopt::Long;
 
 my $cutoff = 20; # default clipping cutoff
 my $thresh = 0.95; #default amount of read that must be covered by alignments for rearrangement
-my $tol = 0; #when processing CIGARS, combine any IDPN elements between M regions with this number of bases or less
+my $tol = 7; #when processing CIGARS, combine any IDPN elements between M regions with this number of bases or less
 my $viral;
 my $human;
 my $output = "short.txt";
