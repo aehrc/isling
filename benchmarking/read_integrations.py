@@ -204,11 +204,11 @@ def readType(overlap_type):
 	
 	#handle chimeric reads
 	elif "left" in overlap_type and "right" not in overlap_type: 
-		read_type = "hv"
+		read_type = "vh"
 
 	#handle chimeric reads 
 	elif "right" in overlap_type and "left" not in overlap_type: 
-		read_type = "vh" 
+		read_type = "hv" 
 	
 	#handle reads without viral DNA
 	else: 
