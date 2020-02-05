@@ -449,6 +449,10 @@ def vStartStop(coordA, coordB):
 		vStop = B2 
 	else: 
 		vStop = A2 
+
+	#adjust the start and stop to give position in relation to the read 
+	vStart = vStart - A1 
+	vStop = vStop - A1
 	
 	return vStart, vStop 
 
