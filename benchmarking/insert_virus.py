@@ -70,7 +70,7 @@ def main(argv):
  
 	
 	#set random seed
-	np.random.seed(3)
+	np.random.seed(1)
 
 	#types of insertions
 	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
@@ -129,9 +129,9 @@ def main(argv):
 	counter = 0 # count number of iterations 
 	while len(host_ints) < int_num: 
 		#rand_int =  np.random.randint(0,len(insertion_types))
-		#rand_int = 1 #uncomment for testing specific type of integration TODO  #clean whole
-		#host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, min_len, sep)
-		host_ints, host_fasta = insertSetLength(host_fasta, virus, host_ints, handle, min_len, sep, set_len)
+		rand_int = 0 #uncomment for testing specific type of integration TODO  #clean whole
+		host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, min_len, sep)
+		#host_ints, host_fasta = insertSetLength(host_fasta, virus, host_ints, handle, min_len, sep, set_len)
 		counter += 1  
 		if counter % int_report == 0: 
 			print(str(counter) +" integrations complete...", flush = True)
@@ -141,7 +141,7 @@ def main(argv):
 	print("\nNUMBER OF EPISOMES: "+str(epi_num))
 	for i in range(0,epi_num): 
 		#rand_int = np.random.randint(0,2)
-		rand_int = 2 #TODO uncomment for specific type of episome 	
+		rand_int = 2 #TODO uncomment for specific type of episome - this is an rearranged episome (repisome) 	
 		name = "episome "+str(i+1)
 		host_fasta = episome_types[rand_int](virus, min_len, host_fasta, name)  
 			
