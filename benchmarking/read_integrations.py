@@ -65,13 +65,6 @@ def main(argv):
 	#assess for the type of read and the amount of viral DNA (bp) in each read
 	first_type, second_type, first_len, second_len, first_loc, second_loc, read_hPos, first_junc, second_junc  = analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_rightj)
 	
-	#debugging 
-	print("Len of first loc "+str(len(first_loc)))
-	print("Len of second loc "+str(len(second_loc)))
-	print("length of others " +str(len(second_type)))
-	print(second_loc[1:5]) 
-
-
 
 	#save the entire file
 	results = pd.DataFrame({"fragment_id":fragment_id,"left_read":first_type,"right_read":second_type,"left_read_amount":first_len,"right_read_amount":second_len,
@@ -193,7 +186,7 @@ def analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_righ
 
 		#save the start and stop positions of viral DNA in each read 
 		first_loc.append(readloc_1)
-		first_loc.append(readloc_2) 
+		second_loc.append(readloc_2) 
 
 		#save the integrations (hPos) in each read 
 		read_hPos.append(set(int_list)) #exists as a list of lists
