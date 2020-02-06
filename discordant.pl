@@ -11,7 +11,7 @@ use Getopt::Long;
 
 my $cutoff = 20; # default clipping cutoff
 my $thresh = 0.95; #default amount of read that must be covered by alignments for rearrangement
-my $tol = 5; #when processing CIGARS, combine any IDPN elements between matched regions with this number of bases or less
+my $tol = 3; #when processing CIGARS, combine any IDPN elements between matched regions with this number of bases or less
 my $viral;
 my $human;
 my $output = "integrationSites.txt";
