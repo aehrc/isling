@@ -70,7 +70,7 @@ def main(argv):
  
 	
 	#set random seed
-	np.random.seed(1)
+	np.random.seed(3)
 
 	#types of insertions
 	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
@@ -129,9 +129,9 @@ def main(argv):
 	counter = 0 # count number of iterations 
 	while len(host_ints) < int_num: 
 		#rand_int =  np.random.randint(0,len(insertion_types))
-		#rand_int = 0 #uncomment for testing specific type of integration TODO  #clean whole
-		#host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, min_len, sep)
-		host_ints, host_fasta = insertSetLength(host_fasta, virus, host_ints, handle, min_len, sep, set_len)
+		rand_int = 0 #uncomment for testing specific type of integration TODO  #clean whole
+		host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, min_len, sep)
+		#host_ints, host_fasta = insertSetLength(host_fasta, virus, host_ints, handle, min_len, sep, set_len)
 		counter += 1  
 		if counter % int_report == 0: 
 			print(str(counter) +" integrations complete...", flush = True)
@@ -449,7 +449,7 @@ class Integration:
 		#integration cannot not have negative overlap at both ends - can be changed later** 
 
 		#TODO adjust to reflect the junctions for the experiment - here just gaps 
-		"""
+		#"""
 		while True: 
 			self.overlaps = (np.random.randint(0,10),np.random.randint(0,10))
 			#self.overlaps = (0,0)
@@ -462,7 +462,7 @@ class Integration:
 		
 		self.overlaps = (0,0) #Uncomment for just clean junctions
 		
-		"""
+		""
 		#when producing only overlaps  
 		end = np.random.randint(0,2)
 		if end == 0: 
