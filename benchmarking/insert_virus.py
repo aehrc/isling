@@ -70,7 +70,7 @@ def main(argv):
  
 	
 	#set random seed
-	np.random.seed(3)
+	np.random.seed(1)
 
 	#types of insertions
 	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
@@ -449,7 +449,7 @@ class Integration:
 		#integration cannot not have negative overlap at both ends - can be changed later** 
 
 		#TODO adjust to reflect the junctions for the experiment - here just gaps 
-		#"""
+		"""
 		while True: 
 			self.overlaps = (np.random.randint(0,10),np.random.randint(0,10))
 			#self.overlaps = (0,0)
@@ -457,12 +457,12 @@ class Integration:
 				continue
 			else: 
 				break
-		"""
+		""
 		
 		
 		self.overlaps = (0,0) #Uncomment for just clean junctions
 		
-		""
+		"""
 		#when producing only overlaps  
 		end = np.random.randint(0,2)
 		if end == 0: 
