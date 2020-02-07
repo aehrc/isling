@@ -527,16 +527,16 @@ def filterLength(all_reads,min_len):
 
 		#TODO this a bit of a hack job. Make more elegant if time 
 		#adjust left short reads 
-		if all_reads['left_read'][i] == 'sh'
+		if all_reads['left_read'][i] == 'sh':
 			left_c  = list(all_reads['left_read_coor'][i]) 
-			L1 = left_c[2]
-			L2 = left_c[4]
+			L1 = int(left_c[2])
+			L2 = int(left_c[4])
 			#if the integration is less than 20 bp 
 			if (L2-L1+1) < min_len: 
 				all_reads.loc[i,'left_read'] = 'h'
 	
 		#adjust right short reads
-		if all_reads['right_read'][i] == 'sh'
+		if all_reads['right_read'][i] == 'sh':
 			right_c = list(all_reads['right_read_coor'][i])
 			R1 = right_c[2]
 			R2 = right_c[4]
