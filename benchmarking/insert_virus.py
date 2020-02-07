@@ -70,7 +70,7 @@ def main(argv):
  
 	
 	#set random seed
-	np.random.seed(1)
+	np.random.seed(2)
 
 	#types of insertions
 	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
@@ -457,20 +457,21 @@ class Integration:
 				continue
 			else: 
 				break
-		""
+		"""
 		
 		
 		self.overlaps = (0,0) #Uncomment for just clean junctions
 		
-		"""
+		
 		#when producing only overlaps  
 		end = np.random.randint(0,2)
 		if end == 0: 
 			self.overlaps = (np.random.randint(-10,0),0)
 		else: 
 			self.overlaps = (0,np.random.randint(-10,0)) 
+		print(str(self.overlaps)) 
 	
-		"""
+		
 		#record the type of junction for saving to file later
 		self.junction = (self.convertJunction(self.overlaps[0]),
 				self.convertJunction(self.overlaps[1]))
@@ -622,7 +623,6 @@ class Integration:
 		Handles overlaps on the left of a viral chunk. Left and right are treated as different functions as different operations must be performed. 
 		Works by finding closest regions of homology on left side of the randomly selected integration point. It checks if the homologous region is caused by an existing integration and concatenates the search range and attempts to find a homologous region again if the homology was caused by an existing integration. This is repeated for the right side of te integration point. The region closest to randomly selected integration point is then used to insert the viral chunk. 
 		"""
-
 		viral_chunk = self.chunk.bases
 
 		l_overlap = str(viral_chunk[:-self.overlaps[0]].seq) #sequence left of the integration site 
@@ -632,14 +632,13 @@ class Integration:
 				
 		#find homologous region on the left side 
 		left_seq = host[self.chr][:self.hPos].seq
-
 		while left_site <0: 
 			left_search = str(left_seq).rfind(l_overlap)
-
 			if left_search == -1:
 				break 
 			if left_search in dont_integrate: #check homology is not from a previous integration
-				left_seq = left_seq[:left_search-self.overlaps[0]]  
+				#print(str(len(left_seq)), flush = True) 
+				left_seq = left_seq[:left_search]  
 			else:
 				left_site= left_search 
 				
