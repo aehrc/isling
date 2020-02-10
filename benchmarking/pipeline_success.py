@@ -21,16 +21,19 @@ def main(argv):
 	parser.add_argument('--ints', help='integrations applied file', required = True)
 	parser.add_argument('--viral_reads', help='file with reads containing information on reads containing viral DNA', required = True)
 	parser.add_argument('--all_reads', help = 'file containing all reads IDs', required = True) 
+	parser.add_argument('--save', help = 'location to save output', required = True)
 	args = parser.parse_args()  
 	
 	
 	print("Output to be saved to /evaluate_pipeline_output/output.txt") 
 
 	#create directory to save output
-	os.makedirs('evaluate_pipeline_output', exist_ok = True)
+	directory =  str(args.save)+'/evaluate_pipeline_output'
+	os.makedirs(directory, exist_ok = True)
 
 	#save output in terminal to a file 
-	f = open( "evaluate_pipeline_output/output.txt", "w")
+	out = directory + "/output.txt"
+	f = open( out, "w")
 	sys.stdout = f  
 	
 	print("STARTING...", flush = True) 
@@ -57,14 +60,18 @@ def main(argv):
 	print("Number of reads detected by pipeline: " +str(len(pipe_ints)), flush = True)
 
 	#look at the different types of filtering 
-	compareFilters(pipe_ints,all_reads, all_IDs)
+	#compareFilters(pipe_ints,all_reads, all_IDs)
 
 	#look for what ratio of integrations we captured with the detected reads
-	"""
+	
 	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads = listIDs(all_reads, pipe_ints, all_IDs)
-	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, False) 
-	missed_hPos = findMissed(all_reads, detected_Vreads)
-	"""
+	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, True, args.save)
+	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads) 
+	conf_df.to_csv(str(args.save)+'/evaluate_pipeline_output/conf_mat.csv', sep = '\t') 
+
+	
+	#missed_hPos = findMissed(all_reads, detected_Vreads)
+	
 
 	f.close()
 
@@ -96,7 +103,7 @@ def filterList(pipe_ints, ID_list):
 	return filt_pipe
 			
 
-def listIDs(all_reads, pipe_ints, all_IDs): 
+def listIDs(viral_reads, pipe_ints, all_IDs): 
 	"""Create lists of the predicted and actual viral and non-viral reads""" 
 
 	#List all IDs 
@@ -109,7 +116,7 @@ def listIDs(all_reads, pipe_ints, all_IDs):
 	pipe_IDs = [i.replace(" ", "") for i in pipe_IDs]  
 	
 	#List actual viral reads 
-	actual_Vreads = list(set(all_reads['fragment_id']))
+	actual_Vreads = list(set(viral_reads['fragment_id']))
 	actual_Vreads = [i.replace("chr","") for i in actual_Vreads] 
 	print("Number of viral reads: "+str(len(actual_Vreads)), flush = True) 
 
@@ -134,7 +141,8 @@ def listIDs(all_reads, pipe_ints, all_IDs):
 
 	return actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads 
 
-def listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save): 
+
+def listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save, location): 
 	"""function which creates a list of the IDs successfully predicted by the pipeline and those missed. actual Vreads is a list of the reads known to be viral and pred_Vreads is a list of the reads predicted by the pipeline to contain viral DNA. Can save false positives and negatives to file if save == True.""" 
 
 	#find how many of the viral reads were/were not detected by the pipeline
@@ -157,11 +165,13 @@ def listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save):
 	
 	if save == True: 
 		#save the false positive reads to file
-		with open('evaluate_pipeline_output/false_positive_IDs.txt', 'w') as f: 
+		false_pos = location+'/evaluate_pipeline_output/false_positive_IDs.txt'
+		with open(false_pos, 'w') as f: 
 			for item in detected_NVreads: 
 				f.write("%s\n" % item)
 		#save the false negative reads to file 
-		with open('evaluate_pipeline_output/false_negative_IDs.txt', 'w') as f: 
+		false_neg = location+'/evaluate_pipeline_output/false_negative_IDs.txt'
+		with open(false_neg, 'w') as f: 
 			for item in undetected_Vreads: 
 				f.write("%s\n" % item)
 		print("False positive reads saved to 'evaluate_pipeline_output/false_positive_IDs.txt'", flush = True) 
@@ -169,7 +179,7 @@ def listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save):
 
 	return detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads
 
-def findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads,save): 
+def findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads): 
 	"""Get statisitics on the the success of the pipeline""" 
 
 	# find the number of TP, FN, FP and TN 
@@ -186,7 +196,7 @@ def findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_N
 
 	#construct confusion matrix
 	conf_mat = np.array([[TPR,FPR],[FNR, TNR]])
-	consfusionMatrix(conf_mat)
+	#consfusionMatrix(conf_mat)
 
 	#accuracy - chance of making a correct prediction
 	acc = ((TP+TN)/(TP+TN+FP+FN))*100
@@ -474,8 +484,8 @@ def filteredStats(filter_idx, pipe_ints, tag, all_IDs, all_reads, save):
 	#report statistics of filtering
 	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads  = listIDs(all_reads,filt_pipe, all_IDs)
 	print("Stats after filtering...")
-	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save)
-	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads, tag)
+	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save, args.save)
+	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads)
 
 	return stats, conf_df 
 
@@ -529,7 +539,7 @@ def filterLength(all_reads,min_len):
 
 		#if both left and right are viral or host do integration occured here
 		if all_reads['right_read'][i] == 'h' and all_reads['left_read'][i] == 'h' or all_reads['right_read'][i] == 'v' and all_reads['left_read'][i] == 'v':
-				filt_idx = []
+				filt_idx.append(i) 
 
 	#drop the false rows
 	filt_reads = all_reads.drop(all_reads.index[filt_idx])
