@@ -70,7 +70,7 @@ def main(argv):
 	conf_df.to_csv(str(args.save)+'/evaluate_pipeline_output/conf_mat.csv', sep = '\t') 
 
 	
-	#missed_hPos = findMissed(all_reads, detected_Vreads)
+	missed_hPos = findMissed(all_reads, detected_Vreads)
 	
 
 	f.close()
