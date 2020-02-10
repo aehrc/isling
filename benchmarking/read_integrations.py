@@ -24,6 +24,7 @@ def main(argv):
 	parser.add_argument('--host_ints', help = 'csv file describing the location of viral DNA in the human host', required = True)
 	parser.add_argument('--save', help = 'csv file to save the output', required = True)
 	parser.add_argument('--viral_only', help = 'csv file to save only information for viral reads', required = True)
+	parser.add_argument('--paired', help = 'specify whether reads are paired', required = False, default = False)
 	parser.add_argument('--filtered', help = 'list of IDs which are not mapped', required = False, default = False) 
 	args = parser.parse_args()
 	
@@ -56,14 +57,31 @@ def main(argv):
 	#get the types of junctions for each integration
 	int_leftj, int_rightj = intJunction(int_file) 
 	
+	#TODO determine if reads are paired
+	#if reads are paired we use one loop 
+	if args.paired == True: 
+
+		#process reads to obtain the ID of each fragment and the coordinates of the corresponding reads
+		fragment_id, first_read, second_read = processPairedReads(sam_file,num_reads, filtered_id)
+
+		#assess for the type of read and the amount of viral DNA (bp) in each read
+		first_type, second_type, first_len, second_len, read_hPos, first_junc, second_junc  = analysePairedReads(first_read,second_read, int_coord, int_hPos, int_leftj, int_rightj)
+
+	#if the reads are not paired we use another loop 	
+	else: 
+		#process reads to obtain the ID of each fragment and the coordinates of the corresponding reads
+
+		#assess tfor the type of read and the amount of viral DNA (bp)in each read
+	
+	
 	#read in sam file to process reads 
 	sam_file = args.sam
 
 	#process reads to obtain the ID of each fragment and the coordinates of the corresponding reads
-	fragment_id, first_read, second_read = processReads(sam_file,num_reads, filtered_id)
+	fragment_id, first_read, second_read = processPairedReads(sam_file,num_reads, filtered_id)
 
 	#assess for the type of read and the amount of viral DNA (bp) in each read
-	first_type, second_type, first_len, second_len, read_hPos, first_junc, second_junc  = analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_rightj)
+	first_type, second_type, first_len, second_len, read_hPos, first_junc, second_junc  = analysePairedReads(first_read,second_read, int_coord, int_hPos, int_leftj, int_rightj)
 	
 	#save the entire file
 	results = pd.DataFrame({"fragment_id":fragment_id,"left_read":first_type,"right_read":second_type,"left_read_amount":first_len,"right_read_amount":second_len,
@@ -88,11 +106,83 @@ def numReads(sam_file):
 	num_reads = len(df[~df[0].str.contains('@')])
 	num_inserts = int(num_reads/2)
 	return num_inserts 
-	
-		
-def analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_rightj):  
-	"""Creates a list of whether a read overlaps (True/False) and a list of the length of the corresponding overlap
+
+def analyseReads(reads, int_coord, int_hPos, int_j):
+		"""Creates a list of whether a read overlaps (True/False) and a list of the length of the corresponding overlap
 	takes lists of the coordinates of the reads and the locations of the viral DNA in the host"""
+
+		print("\nANALYSING READS", flush = True) 
+
+	#lists of the types of the reads  
+	read_type = []
+
+	#lists for the amount of viral DNA in each read
+	viral_len = []
+	
+	#list of the integrations in each read - denoted as hPos 
+	read_hPos = []
+
+	#list the junction types in each read
+	read_junc = []
+
+	#loop to iterate through the reads. len(first_read) used though could have used len(second_read) 
+	for i in range(len(first_read)):
+		#count number of bases which overlap 
+		overlap_len = []
+		
+		#keep record of which overlaps occur
+		overlap_type = []
+
+		#list the integrations in the read 
+		int_list = []
+
+		#list the junction types 
+		junction_1 = ""
+		
+		for j in range(len(int_coord)):
+			
+			#compare the ith left read with the jth integration 
+			c_type = checkOverlap(reads[i],int_coord[j])			
+			if c_type != "": 
+				#store information on the type of integration 
+				overlap_type.append(c_type) 
+				
+				#save information on the amount of viral DNA in the read from the integration 
+				overlap = overlapLength(reads[i],int_coord[j])
+				overlap_len.append(overlap) 
+
+				#Store the hPos of the integration in the read 
+				int_list.append(int_hPos[j])  
+		
+		#find the types of the read 
+		type1 = readType(overlap_type)
+		
+		#save these read types 
+		read_type.append(type1) 
+		
+		#find the amount of viral DNA in each read 
+		len1 = viralQuantity(overlap_type, overlap_len)
+		
+		#save the amount of viral DNA in each read 
+		viral_len.append(len1)
+
+		#save the integrations (hPos) in each read 
+		read_hPos.append(set(int_list)) #exists as a list of lists
+
+		#save the junction types of each read
+		junction = int_j[]
+	
+
+		#report how many reads have been analysed 
+		if i % 250000 == 0: 
+			print("{:.2f}".format((i*100/len(first_read)))+"% of reads analysed...",flush = True) 	
+		
+	return 
+
+		
+def analysePairedReads(first_read,second_read, int_coord, int_hPos, int_leftj, int_rightj):  
+	"""Creates a list of whether a read overlaps (True/False) and a list of the length of the corresponding overlap
+	takes lists of the coordinates of the reads and the locations of the viral DNA in the host for paired end reads"""
 	# this function is very intensive - requires optimisiing 	
 
 	print("\nANALYSING READS", flush = True) 
@@ -178,8 +268,9 @@ def analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_righ
 		read_hPos.append(set(int_list)) #exists as a list of lists
 
 		#save the junction types of each read
-		junction_1 = readJunction(j, overlap_type1 ,int_leftj, int_rightj)
-		junction_2 = readJunction(j, overlap_type2 ,int_leftj, int_rightj) 
+		junction_1 = readPairedJunction(j, overlap_type1 ,int_leftj, int_rightj)
+		junction_2 = readPairedJunction(j, overlap_type2 ,int_leftj, int_rightj)
+		#TODO issue here - j is not in the loop???  
 		first_junc.append(junction_1)
 		second_junc.append(junction_2)
 
@@ -278,7 +369,7 @@ def intJunction(int_file):
 
 	return int_leftj, int_rightj
 
-def readJunction(index, overlap_type, int_leftj, int_rightj): 
+def readPairedJunction(index, overlap_type, int_leftj, int_rightj): 
 	"""finds the type of junction in a read""" 
 
 	#if entire stretch is viral DNA there is no junction
@@ -307,9 +398,48 @@ def readJunction(index, overlap_type, int_leftj, int_rightj):
 
 	return junction
 
+def processReads((sam_file,num_inserts, filtered_id):
+
+	read_file = open(sam_file,'r')
+	in_sam = Reader(read_file) 
+	#list of insert IDs
+	fragment_id = []
+
+	#list of insert coordinates in the original fasta sequence
+	reads = []
 	
-def processReads(sam_file,num_inserts, filtered_id):
-	"""Creates a list of the read IDs and their alignment coordinates""" 
+	
+	print("PROCESSING READS", flush = True) 
+	for i in range(0,num_inserts):
+		if i%500000==0 and i!=0:
+			print("{:.2f}".format((i*100/num_inserts))+"% of reads processed...") 
+		x = next(in_sam)
+
+	#get ID of the read being processed
+		this_ID = str(x.qname) 
+		
+		#only consider the read is mapped 
+		if len(filtered_id) > 0: 
+			if this_ID in filtered_id: 
+				#save the ID of the read 
+				fragment_id.append(x.qname)
+		
+				#save the coordinates of the read 
+				#subract 1 as the SAM file position starts at 1 but we use index 0 
+				reads.append((x.pos-1,x.pos+len(x.seq)-1))
+			else: 
+				#save the ID of the read 
+				fragment_id.append(x.qname)
+		
+				#save the coordinates of the read
+				#subtract 1 as the SAM file position starts at 1 but we use index 0  
+				reads.append((x.pos-1,x.pos+len(x.seq)-1))
+
+	return reads
+		
+	
+def processPairedReads(sam_file,num_inserts, filtered_id):
+	"""Creates a list of the read IDs and their alignment coordinates for paired reads""" 
 
 
 	read_file = open(sam_file,'r')
