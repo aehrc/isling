@@ -221,6 +221,9 @@ def analysePairedReads(first_read,second_read, int_coord, int_hPos, int_leftj, i
 		junction_2 = ""
 		
 		for j in range(len(int_coord)):
+
+			#index of integration 
+			idx = -1
 			
 			#compare the ith left read with the jth integration 
 			c_type = checkOverlap(first_read[i],int_coord[j])			
@@ -233,7 +236,10 @@ def analysePairedReads(first_read,second_read, int_coord, int_hPos, int_leftj, i
 				overlap_len1.append(overlap) 
 
 				#Store the hPos of the integration in the read 
-				int_list.append(int_hPos[j])  
+				int_list.append(int_hPos[j]) 
+
+				#store the index so we can get the junction later 
+				idx = j 
 			
 			#compare the ith right read with the jth integration 
 			c_type = checkOverlap(second_read[i], int_coord[j]) 
@@ -247,6 +253,8 @@ def analysePairedReads(first_read,second_read, int_coord, int_hPos, int_leftj, i
 
 				#Store the hPos of the integration in the read 
 				int_list.append(int_hPos[j]) 
+				
+				#store the index so we can get the junction later 
 		
 		#find the types of the read 
 		type1 = readType(overlap_type1)
@@ -268,8 +276,13 @@ def analysePairedReads(first_read,second_read, int_coord, int_hPos, int_leftj, i
 		read_hPos.append(set(int_list)) #exists as a list of lists
 
 		#save the junction types of each read
-		junction_1 = readPairedJunction(j, overlap_type1 ,int_leftj, int_rightj)
-		junction_2 = readPairedJunction(j, overlap_type2 ,int_leftj, int_rightj)
+		if idx > 0: 
+			junction_1 = readPairedJunction(idx, overlap_type1 ,int_leftj, int_rightj)
+			junction_2 = readPairedJunction(idx, overlap_type2 ,int_leftj, int_rightj)
+		else:
+			junction_1 = ""
+			junction_2 = ""
+
 		#TODO issue here - j is not in the loop???  
 		first_junc.append(junction_1)
 		second_junc.append(junction_2)
