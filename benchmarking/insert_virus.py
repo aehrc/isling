@@ -70,7 +70,7 @@ def main(argv):
  
 	
 	#set random seed
-	np.random.seed(2)
+	np.random.seed(3)
 
 	#types of insertions
 	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
@@ -462,15 +462,14 @@ class Integration:
 		
 		self.overlaps = (0,0) #Uncomment for just clean junctions
 		
-		
+		"""
 		#when producing only overlaps  
 		end = np.random.randint(0,2)
 		if end == 0: 
 			self.overlaps = (np.random.randint(-10,0),0)
 		else: 
 			self.overlaps = (0,np.random.randint(-10,0)) 
-		print(str(self.overlaps)) 
-	
+		"""
 		
 		#record the type of junction for saving to file later
 		self.junction = (self.convertJunction(self.overlaps[0]),

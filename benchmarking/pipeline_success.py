@@ -524,7 +524,7 @@ def filterLength(all_reads,min_len):
 
 	#loop through and adjust chimeric reads 
 	for i in range(len(all_reads)):
-
+		"""
 		#TODO this a bit of a hack job. Make more elegant if time 
 		#adjust left short reads 
 		if all_reads['left_read'][i] == 'sh':
@@ -538,12 +538,12 @@ def filterLength(all_reads,min_len):
 		#adjust right short reads
 		if all_reads['right_read'][i] == 'sh':
 			right_c = list(all_reads['right_read_coor'][i])
-			R1 = right_c[2]
-			R2 = right_c[4]
+			R1 = int(right_c[2])
+			R2 = int(right_c[4])
 			#if the integration is less than 20 bp
 			if (R2-R1+1) > min_len: 
 				all_reads.loc[i,'left_read'] = 'h'
-
+		"""
 		#adjust left read to meet the threshold of 20bp to be chimeric 	
 		if all_reads['left_read_amount'][i] > read_len - min_len: 
 			all_reads.loc[i,'left_read'] = 'v'
