@@ -594,7 +594,7 @@ def vStartStop(coordA, coordB):
 	if A1 < B1:
 		vStart = B1
 	else: 
-		vStart = B2
+		vStart = A1
 
 	#get stop position of integration in read 
 	if A2 > B2: 
