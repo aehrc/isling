@@ -70,20 +70,24 @@ def main(argv):
 		#assess for the type of read and the amount of viral DNA (bp) in each read
 		first_type, second_type, first_len, second_len, first_loc, second_loc, read_hPos, first_junc, second_junc  = analysePairedRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_rightj)
 
+		#create dataframe with info 
+		results = pd.DataFrame({"fragment_id":fragment_id,"left_read":first_type,"right_read":second_type,"left_read_amount":first_len,"right_read_amount":second_len,
+"left_read_coor":first_read,"right_read_coor":second_read, "left_read_Vcoor": first_loc, "right_read_Vcoor": second_loc, "hPos": read_hPos, "left_junc":first_junc, "right_junc":second_junc})
+
 	else: 
 		#process reads to obtain the ID of each fragment and the cooordinates of the corresponding reads 
 		fragment_id, read_coord = processReads(sam_file, num_reads, filtered_id)
 
 		#assess for the type of the read and the amount of viral DNA (bp) in each read 
 		read_type, viral_len, int_loc, read_hPos, first_junc, read_junc = analyseRead(read_coord, int_coord, int_hPos, int_leftj, int_rightj)
-		
-	
 
-	#save the entire file
-	results = pd.DataFrame({"fragment_id":fragment_id,"left_read":first_type,"right_read":second_type,"left_read_amount":first_len,"right_read_amount":second_len,
-"left_read_coor":first_read,"right_read_coor":second_read, "left_read_Vcoor": first_loc, "right_read_Vcoor": second_loc, "hPos": read_hPos, "left_junc":first_junc, "right_junc":second_junc})
+		#create dataframe with info 
+		results = pd.DataFrame({"fragment_id": fragment_id, "read_type": read_type, "read_amount": viral_len, "read_coord": read_coord, "read_Vcoor": int_loc, "hPos": read_hPos, "read_junc": read_junc})
+	
+	
+	#save the entire file 
 	with open(args.save, 'w') as handle: 
-		results.to_csv(handle,sep='\t')
+		results.to_csv(handle,sep='\t')	
 
 	#create a file which saves information only for reads which contain viral DNA
 	viral_only = getViralReads(results)
