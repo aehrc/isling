@@ -62,8 +62,7 @@ def main(argv):
 
 	print(str(args.paired))
 
-	if args.paired == True: 
-		print("Know its true")
+	if args.paired == "True": 
 		#process reads to obtain the ID of each fragment and the coordinates of the corresponding reads
 		fragment_id, first_read, second_read = processPairedReads(sam_file,num_reads, filtered_id)
 
@@ -79,7 +78,7 @@ def main(argv):
 		fragment_id, read_coord = processReads(sam_file, num_reads, filtered_id)
 
 		#assess for the type of the read and the amount of viral DNA (bp) in each read 
-		read_type, viral_len, int_loc, read_hPos, first_junc, read_junc = analyseRead(read_coord, int_coord, int_hPos, int_leftj, int_rightj)
+		read_type, viral_len, int_loc, read_hPos, read_junc = analyseRead(read_coord, int_coord, int_hPos, int_leftj, int_rightj)
 
 		#create dataframe with info 
 		results = pd.DataFrame({"fragment_id": fragment_id, "read_type": read_type, "read_amount": viral_len, "read_coord": read_coord, "read_Vcoor": int_loc, "hPos": read_hPos, "read_junc": read_junc})
@@ -90,9 +89,15 @@ def main(argv):
 		results.to_csv(handle,sep='\t')	
 
 	#create a file which saves information only for reads which contain viral DNA
-	viral_only = getViralReads(results)
+	if args.paired == "True":
+		viral_only = getPairedIntegrations(results)
+	else: 
+		viral_only = getIntegrations(results)
+   
 	with open(args.viral_only, 'w') as handle: 
 		viral_only.to_csv(handle, sep='\t')
+		
+	
 		
 	print("COMPLETE")
 	print("Information on ALL reads saved to: "+str(args.save))
@@ -141,9 +146,6 @@ def analyseRead(read_coord, int_coord, int_hPos, int_leftj, int_rightj):
 		#list the integrations in the read 
 		int_list = []
 
-		#list the type of junction in the read if there is an integration in the read 
-		read_junc = ""
-
 		for j in range(len(int_coord)):
 
 			#index of where integration is detected (-1 denotes no integration detected) 
@@ -185,14 +187,14 @@ def analyseRead(read_coord, int_coord, int_hPos, int_leftj, int_rightj):
 		read_hPos.append(set(int_list)) #exists as a list of lists
 
 		#save the junction types of each read
-		junction = readJunction(idx, overlap_type ,int_leftj, int_rightj) 
-		read_junc.append(junction)
+		this_junc = readJunction(idx, overlap_type ,int_leftj, int_rightj) 
+		read_junc.append(this_junc)
 
 		#report how many reads have been analysed 
 		if i % 250000 == 0: 
-			print("{:.2f}".format((i*100/len(first_read)))+"% of reads analysed...",flush = True) 	
+			print("{:.2f}".format((i*100/len(read_coord)))+"% of reads analysed...",flush = True) 	
 
-	return read_type, viral_len, int_loc, read_hPos, first_junc, read_junc
+	return read_type, viral_len, int_loc, read_hPos, read_junc
 	
 
 def analysePairedRead(first_read, second_read, int_coord, int_hPos, int_leftj, int_rightj):  
@@ -540,8 +542,29 @@ def checkOverlap(coordA, coordB):
 	return overlap_type 
 
 
-def getViralReads(results): 
-	"""Function to create dataframe consisting of only viral reads. While this is more coded than required, this is the most efficient way to create a large dataframe with the required information""" 
+
+def getIntegrations(results): 
+	"""Function which creates a dataframe of non-paired reads containing integrations""" 
+
+	#create a list of the indexes we want to drop
+	idx = []
+
+	#reindex columm
+	results = results.reset_index(drop=True) 
+
+	for i in range(len(results)): 
+		#if the read is viral we drop it 
+		if results['read_type'][i] == 'h' or results['read_type'][i] == 'v':
+			idx.append(i)
+
+	viral_reads = results.drop(results.index[idx])
+	print("Number of viral reads: "+str(len(viral_reads))) 
+
+	return viral_reads 
+
+
+def getPairedIntegrations(results): 
+	"""Function to create dataframe consisting of only reads with integrations. While this is more coded than required, this is the most efficient way to create a large dataframe with the required information for paired reads""" 
 	
 	#create a list of the indexes we want to drop (more code but more efficient) 
 	idx = []
