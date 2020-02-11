@@ -68,6 +68,7 @@ def main(argv):
 	else:
 		raise OSError("Could not open virus fasta")
  
+	#TODO add os error if int_type is not valid 
 	
 	#set random seed
 	np.random.seed(1)
@@ -95,7 +96,7 @@ def main(argv):
 						"rearrangement",
 						"deletion",
 						"vStart",
-						"vStart",
+						"vStop",
 						"leftJunction",
 						"rightJunction",
 						"breakpoints", 
