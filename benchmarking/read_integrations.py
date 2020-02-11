@@ -60,8 +60,6 @@ def main(argv):
 	#read in sam file to process reads 
 	sam_file = args.sam
 
-	print(str(args.paired))
-
 	if args.paired == "True": 
 		#process reads to obtain the ID of each fragment and the coordinates of the corresponding reads
 		fragment_id, first_read, second_read = processPairedReads(sam_file,num_reads, filtered_id)
