@@ -52,6 +52,7 @@ def main(argv):
 	parser.add_argument('--sep', help = 'integrations must be seperated by this many bases', required=False, default=5)
 	parser.add_argument('--min_len', help = 'minimum length of integerations', required=False, default=50)
 	parser.add_argument('--epi_num', help = 'number of episomes', required=False, default=0)
+	parser.add_argument('--int_type', help = 'specificy is a particular type of integrations are wanted (ie whole, portion, rearrange, deletion', required=False, default='rand')
 	args = parser.parse_args()
 	
 
@@ -69,11 +70,12 @@ def main(argv):
  
 	
 	#set random seed
-	np.random.seed(3)
+	np.random.seed(1)
 
 	#types of insertions
-	insertion_types = [insertWholeVirus, insertShortVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
-
+	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
+	insertion_dict = {'whole': 0, 'portion': 1, 'rearrange': 2, 'deletion': 3, 'portionrearrange': 4, 'portiondeletion': 5}
+	
 	#types of episomes 
 	episome_types = [Episome.insertWhole, Episome.insertPortion, Episome.insertWholeRearrange, Episome.insertPortionRearrange, Episome.insertWholeDeletion, Episome.insertPortionDeletion] 
 	
@@ -123,14 +125,24 @@ def main(argv):
 	print("\nNUMBER OF INTEGRATIONS TO INSERT: "+str(int_num),flush=True)
 	
 	#integration loop 
+
 	counter = 0 # count number of iterations 
 	while len(host_ints) < int_num: 
-		#rand_int =  np.random.randint(0,len(insertion_types))
-		rand_int = 0 #uncomment for testing specific type of integration TODO  - portion
-		host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, min_len, sep)
+
+		#do random integrations if a specific type of integrations is not selected
+		if args.int_type == 'rand': 
+			int_type =  np.random.randint(0,len(insertion_types))
+		else: 
+			int_type = insertion_dict.get(str(args.int_type)) 
+		
+		#apply integration 	
+		host_ints, host_fasta = insertion_types[int_type](host_fasta, virus, host_ints, handle, min_len, sep)
+
+		#count the number of integrations applied 
 		counter += 1  
 		if counter % int_report == 0: 
 			print(str(counter) +" integrations complete...", flush = True)
+
 	print("NUMBER OF INTEGRATIONS DONE: "+str(len(host_ints)),flush=True)
 	
 	#episome loop 	
@@ -231,7 +243,6 @@ def insertShortVirus(host, viruses, int_list, filehandle, min_len, sep):
 def insertViralPortion(host, viruses, int_list, filehandle, min_len,sep):
 	"""Inserts portion of viral DNA into host genome"""
 	
-
 	#get positions of all current integrations
 	currentPos = Statistics.integratedIndices(int_list)
 	
