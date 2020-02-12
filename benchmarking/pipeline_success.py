@@ -72,8 +72,6 @@ def main(argv):
 	pipe_ints.ReadID = replace_pipe_IDs
 	
 
-	print("Number of reads detected by pipeline: " +str(len(pipe_ints)), flush = True)
-
 	#look at the different types of filtering 
 	#compareFilters(pipe_ints,all_reads, all_IDs)
 
@@ -129,14 +127,15 @@ def listIDs(viral_reads, pipe_ints, all_IDs, directory):
 	pipe_IDs =list(set(pipe_ints["ReadID"]))
 	#remove space at the start of the ID
 	pipe_IDs = [i.replace(" ", "") for i in pipe_IDs]  
-	
+	print("Number of reads detected by pipeline: " +str(len(pipe_IDs)), flush = True)
+
 	#List actual viral reads 
 	actual_Vreads = list(set(viral_reads['fragment_id']))
 	actual_Vreads = [i.replace("chr","") for i in actual_Vreads] 
 	print("Number of viral reads: "+str(len(actual_Vreads)), flush = True) 
 
 	#List viral reads predicted by the pipeline 
-	pred_Vreads = list(set(pipe_IDs).intersection(set(actual_Vreads)))
+	pred_Vreads = list(set(pipe_IDs))
 	print("Number of viral reads predicted by the pipeline: "+str(len(pred_Vreads)), flush = True)
 
 	#List viral reads appearing in pipeline which are unknown 
