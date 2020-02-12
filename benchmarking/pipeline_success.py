@@ -568,9 +568,9 @@ def filterLength(all_reads,min_len):
 			all_reads.loc[i,'left_read'] = 'h'
 
 		#adjust right read to meet the threshold of 20bp to be chimeric 
-		if all_reads['right_read_amount'][i] > read_len - min_len: 
+		if all_reads['right_read_amount'][i] >= read_len - min_len: 
 			all_reads.loc[i,'right_read'] = 'v'
-		elif all_reads['right_read_amount'][i] < min_len: 
+		elif all_reads['right_read_amount'][i] <= min_len: 
 			all_reads.loc[i,'right_read'] = 'h'
 
 		#if both left and right are viral or host do integration occured here
