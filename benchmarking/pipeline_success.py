@@ -46,31 +46,44 @@ def main(argv):
 	#read in file listing all reads 
 	all_reads = pd.read_csv(args.all_reads,header = 0, sep = '\t')
 	all_IDs = list(set(all_reads["fragment_id"]))
-	all_IDs = [i.replace('chr', '') for i in all_IDs] 	
-
+	#make the ids match the format of those provided by the pipeline 
+	all_IDs = [i.replace('chr', '') for i in all_IDs]
 
 	#read in file listing which reads contain viral DNA 
 	viral_reads = pd.read_csv(args.viral_reads, header=0, sep='\t')
+	#make the ids match the format of those provided by the pipeline 
 	viral_reads['fragment_id'] = [x.replace("chr","") for x in viral_reads['fragment_id']]
+		#make the ids match the format of those provided by the pipeline 
+	viral_reads['fragment_id'] = [i.replace('chr', '') for i in viral_reads['fragment_id']]
+
 	#pipeline can only detect a read as being viral if there is at least 20 bases each of host and virus DNA
-	all_reads = filterLength(viral_reads, 20)  
+	viral_reads = filterLength(viral_reads, 20)  
 
 	#read in file listing the integrations detected by the pipeline 
 	pipe_ints = pd.read_csv(args.pipeline, header = 0, sep = '\t')
-	print("Number of reads detected by pipeline: " +str(len(pipe_ints)), flush = True)
+	replace_pipe_IDs = []
+	#change format of episome IDs to match the read files if present
+	for i in range(len(pipe_ints["ReadID"])): 
+		if 'episome' in pipe_ints["ReadID"][i]: 
+			ID = pipe_ints["ReadID"][i].split('/')
+			replace_pipe_IDs.append(ID[0])
+		else: 
+			replace_pipe_IDs.append(pipe_ints["ReadID"][i])
+	pipe_ints.ReadID = replace_pipe_IDs
+	
 
 	#look at the different types of filtering 
 	#compareFilters(pipe_ints,all_reads, all_IDs)
 
 	#look for what ratio of integrations we captured with the detected reads
 	
-	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads = listIDs(all_reads, pipe_ints, all_IDs)
+	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads = listIDs(viral_reads, pipe_ints, all_IDs, directory)
 	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, True, args.save)
 	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads) 
 	conf_df.to_csv(str(args.save)+'/evaluate_pipeline_output/conf_mat.csv', sep = '\t') 
 
 	
-	missed_hPos = findMissed(all_reads, detected_Vreads)
+	#missed_hPos = findMissed(all_reads, detected_Vreads)
 	
 
 	f.close()
@@ -103,43 +116,47 @@ def filterList(pipe_ints, ID_list):
 	return filt_pipe
 			
 
-def listIDs(viral_reads, pipe_ints, all_IDs): 
+def listIDs(viral_reads, pipe_ints, all_IDs, directory): 
 	"""Create lists of the predicted and actual viral and non-viral reads""" 
 
 	#List all IDs 
-	all_reads = list(set(all_IDs))
-	print("Number of reads: "+str(len(all_reads)), flush = True)
+	all_IDs = list(set(all_IDs))
+	print("Number of reads: "+str(len(all_IDs)), flush = True)
 
 	#list pipeline predictions
 	pipe_IDs =list(set(pipe_ints["ReadID"]))
 	#remove space at the start of the ID
 	pipe_IDs = [i.replace(" ", "") for i in pipe_IDs]  
-	
+	print("Number of reads detected by pipeline: " +str(len(pipe_IDs)), flush = True)
+
 	#List actual viral reads 
 	actual_Vreads = list(set(viral_reads['fragment_id']))
 	actual_Vreads = [i.replace("chr","") for i in actual_Vreads] 
 	print("Number of viral reads: "+str(len(actual_Vreads)), flush = True) 
 
 	#List viral reads predicted by the pipeline 
-	pred_Vreads = list(set(pipe_IDs).intersection(set(all_reads)))
+	pred_Vreads = list(set(pipe_IDs))
 	print("Number of viral reads predicted by the pipeline: "+str(len(pred_Vreads)), flush = True)
 
 	#List viral reads appearing in pipeline which are unknown 
-	pred_unk = list(set(pipe_IDs)-set(all_reads)) 
+	pred_unk = list(set(pipe_IDs)-set(all_IDs)) 
+	#have less than the required length but being detected by the pipeline 
 	print("Reads filtered in processing (ie low quality): "+str(len(pred_unk)), flush = True) 
+	pd.DataFrame(pred_unk).to_csv(directory+"/weird_reads.csv", sep = '\t')
 
 	#List actual non-viral reads 
-	actual_NVreads = list(set(all_reads) - set(actual_Vreads)) 
+	actual_NVreads = list(set(all_IDs) - set(actual_Vreads)) 
 	print("Number of non-viral reads: "+str(len(actual_NVreads)), flush = True) 
 
 	#list non-viral reads predicted by the pipeline 
-	pred_NVreads = list(set(all_reads)-set(pred_Vreads))
+	pred_NVreads = list(set(all_IDs)-set(pred_Vreads))
 	print("Number of predicted non-viral reads: " +str(len(pred_NVreads)), flush = True) 
 
 	print("Sum of actual reads: "+str(len(actual_Vreads)+len(actual_NVreads)),flush = True)
 	print("Sum of predicted reads: "+str(len(pred_Vreads)+len(pred_NVreads)),flush = True)
 
 	return actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads 
+
 
 
 def listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save, location): 
@@ -524,7 +541,26 @@ def filterLength(all_reads,min_len):
 
 	#loop through and adjust chimeric reads 
 	for i in range(len(all_reads)):
-
+		"""
+		#TODO this a bit of a hack job. Make more elegant if time 
+		#adjust left short reads 
+		if all_reads['left_read'][i] == 'sh':
+			left_c  = list(all_reads['left_read_coor'][i]) 
+			L1 = int(left_c[2])
+			L2 = int(left_c[4])
+			#if the integration is less than 20 bp 
+			if (L2-L1+1) < min_len: 
+				all_reads.loc[i,'left_read'] = 'h'
+	
+		#adjust right short reads
+		if all_reads['right_read'][i] == 'sh':
+			right_c = list(all_reads['right_read_coor'][i])
+			R1 = int(right_c[2])
+			R2 = int(right_c[4])
+			#if the integration is less than 20 bp
+			if (R2-R1+1) > min_len: 
+				all_reads.loc[i,'left_read'] = 'h'
+		"""
 		#adjust left read to meet the threshold of 20bp to be chimeric 	
 		if all_reads['left_read_amount'][i] > read_len - min_len: 
 			all_reads.loc[i,'left_read'] = 'v'
