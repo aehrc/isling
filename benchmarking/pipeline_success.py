@@ -536,6 +536,7 @@ def filterLength(all_reads,min_len):
 	#set the read length
 	read_len = 150 
 	
+	print("length filter") 
 	#make a list of the indexes of the reads we wish to filter
 	filt_idx = []
 
@@ -562,15 +563,15 @@ def filterLength(all_reads,min_len):
 				all_reads.loc[i,'left_read'] = 'h'
 		"""
 		#adjust left read to meet the threshold of 20bp to be chimeric 	
-		if all_reads['left_read_amount'][i] > read_len - min_len: 
+		if all_reads['left_read_amount'][i] >= read_len - min_len: 
 			all_reads.loc[i,'left_read'] = 'v'
-		elif all_reads['left_read_amount'][i] < min_len: 
+		elif all_reads['left_read_amount'][i] <= min_len: 
 			all_reads.loc[i,'left_read'] = 'h'
 
 		#adjust right read to meet the threshold of 20bp to be chimeric 
-		if all_reads['right_read_amount'][i] > read_len - min_len: 
+		if all_reads['right_read_amount'][i] >= read_len - min_len: 
 			all_reads.loc[i,'right_read'] = 'v'
-		elif all_reads['right_read_amount'][i] < min_len: 
+		elif all_reads['right_read_amount'][i] <= min_len: 
 			all_reads.loc[i,'right_read'] = 'h'
 
 		#if both left and right are viral or host do integration occured here
@@ -588,6 +589,7 @@ def filterLength(all_reads,min_len):
 	rem = (len(filt_reads)/len(all_reads))*100
 	print("\nAfter filtering out reads with less than "+str(min_len)+" base pairs of viral DNA, {:.2f} % of reads remain.".format(rem), flush = True)
 
+	print("length filter done" )
 	return filt_reads
 	
 
