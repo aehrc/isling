@@ -60,7 +60,6 @@ def main(argv):
 	#read in sam file to process reads 
 	sam_file = args.sam
 
-<<<<<<< HEAD
 	if args.paired == "True": 
 		#process reads to obtain the ID of each fragment and the coordinates of the corresponding reads
 		fragment_id, first_read, second_read = processPairedReads(sam_file,num_reads, filtered_id)
@@ -95,27 +94,6 @@ def main(argv):
    
 	with open(args.viral_only, 'w') as handle: 
 		viral_only.to_csv(handle, sep='\t')
-		
-	
-=======
-	#process reads to obtain the ID of each fragment and the coordinates of the corresponding reads
-	fragment_id, first_read, second_read = processReads(sam_file,num_reads, filtered_id)
-
-	#assess for the type of read and the amount of viral DNA (bp) in each read
-	first_type, second_type, first_len, second_len, first_loc, second_loc, read_hPos, first_junc, second_junc  = analyseRead(first_read,second_read, int_coord, int_hPos, int_leftj, int_rightj)
-	
-
-	#save the entire file
-	results = pd.DataFrame({"fragment_id":fragment_id,"left_read":first_type,"right_read":second_type,"left_read_amount":first_len,"right_read_amount":second_len,
-"left_read_coor":first_read,"right_read_coor":second_read, "left_read_Vcoor": first_loc, "right_read_Vcoor": second_loc, "hPos": read_hPos, "left_junc":first_junc, "right_junc":second_junc})
-	with open(args.save, 'w') as handle: 
-		results.to_csv(handle,sep='\t')
-
-	#create a file which saves information only for reads which contain viral DNA
-	viral_only = getViralReads(results)
-	with open(args.viral_only, 'w') as handle: 
-		viral_only.to_csv(handle, sep='\t')
->>>>>>> dedup2
 		
 	print("COMPLETE")
 	print("Information on ALL reads saved to: "+str(args.save))
@@ -558,8 +536,6 @@ def checkOverlap(coordA, coordB):
 		overlap_type = ""
 		
 	return overlap_type 
-<<<<<<< HEAD
-
 
 
 def getIntegrations(results): 
@@ -570,9 +546,6 @@ def getIntegrations(results):
 
 	#reindex columm
 	results = results.reset_index(drop=True) 
-=======
-
->>>>>>> dedup2
 
 	for i in range(len(results)): 
 		#if the read is viral we drop it 
@@ -639,11 +612,8 @@ def vStartStop(coordA, coordB):
 	if A1 < B1:
 		vStart = B1
 	else: 
-<<<<<<< HEAD
 		vStart = A1
-=======
-		vStart = B2
->>>>>>> dedup2
+
 
 	#get stop position of integration in read 
 	if A2 > B2: 
@@ -651,13 +621,8 @@ def vStartStop(coordA, coordB):
 	else: 
 		vStop = A2 
 
-<<<<<<< HEAD
 	#adjust the start and stop to give position in relation to the read 
 	vStart = vStart - A1 
-=======
-	#adjust start and stop position so that it is given in relation to the read
-	vStart = vStart - A1
->>>>>>> dedup2
 	vStop = vStop - A1
 	
 	return vStart, vStop 
