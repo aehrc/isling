@@ -76,12 +76,9 @@ def main(argv):
 
 	#types of insertions
 	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
-<<<<<<< HEAD
-	insertion_dict = {'whole': 0, 'portion': 1, 'rearrange': 2, 'deletion': 3, 'portionrearrange': 4, 'portiondeletion': 5}
-	
-=======
 
->>>>>>> dedup2
+	insertion_dict = {'whole': 0, 'portion': 1, 'rearrange': 2, 'deletion': 3, 'portionrearrange': 4, 'portiondeletion': 5}
+
 	#types of episomes 
 	episome_types = [Episome.insertWhole, Episome.insertPortion, Episome.insertWholeRearrange, Episome.insertPortionRearrange, Episome.insertWholeDeletion, Episome.insertPortionDeletion] 
 	
@@ -136,7 +133,6 @@ def main(argv):
 
 	counter = 0 # count number of iterations 
 	while len(host_ints) < int_num: 
-<<<<<<< HEAD
 
 		#do random integrations if a specific type of integrations is not selected
 		if args.int_type == 'rand': 
@@ -148,12 +144,6 @@ def main(argv):
 		host_ints, host_fasta = insertion_types[int_type](host_fasta, virus, host_ints, handle, min_len, sep)
 
 		#count the number of integrations applied 
-=======
-		#rand_int =  np.random.randint(0,len(insertion_types))
-		rand_int = 0 #uncomment for testing specific type of integration TODO  #clean whole
-		host_ints, host_fasta = insertion_types[rand_int](host_fasta, virus, host_ints, handle, min_len, sep)
-		#host_ints, host_fasta = insertSetLength(host_fasta, virus, host_ints, handle, min_len, sep, set_len)
->>>>>>> dedup2
 		counter += 1  
 		if counter % int_report == 0: 
 			print(str(counter) +" integrations complete...", flush = True)
