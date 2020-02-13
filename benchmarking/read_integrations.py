@@ -218,7 +218,8 @@ def analysePairedRead(first_read, second_read, int_coord, int_hPos, int_leftj, i
 	#list the junction types in each read
 	first_junc = []
 	second_junc = [] 
-	
+
+	print("\nANALYSING READS", flush = True)	
 	#loop to iterate through the reads. len(first_read) used though could have used len(second_read) 
 	for i in range(len(first_read)):
 		#count number of bases which overlap 
