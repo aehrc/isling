@@ -151,9 +151,7 @@ rule dedup:
 		"envs/bbmap.yml"
 	shell:
 		"""
-		dedupe.sh -Xmx10g threads=4 in1="{input.r1}" in2="{input.r2}" out="{params.temp}" ac=f
-		reformat.sh -Xmx10g threads=4 in="{params.temp}" out1="{output.r1}" out2="{output.r2}"
-		rm {params.temp}
+		clumpify.sh -Xmx15g in1="{input.r1}" in2="{input.r2}" out1="{output.r1}" out2="{output.r2}" dedupe subs=0
 		"""
 
 
