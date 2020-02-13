@@ -536,6 +536,7 @@ def filterLength(all_reads,min_len):
 	#set the read length
 	read_len = 150 
 	
+	print("length filter") 
 	#make a list of the indexes of the reads we wish to filter
 	filt_idx = []
 
@@ -588,6 +589,7 @@ def filterLength(all_reads,min_len):
 	rem = (len(filt_reads)/len(all_reads))*100
 	print("\nAfter filtering out reads with less than "+str(min_len)+" base pairs of viral DNA, {:.2f} % of reads remain.".format(rem), flush = True)
 
+	print("length filter done" )
 	return filt_reads
 	
 
