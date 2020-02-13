@@ -160,8 +160,8 @@ rule dedup:
 
 rule seqPrep:
 	input:
-		r1 = "../out/reads/{dset}/{samp}_1.dedup.fastq.gz",
-		r2 = "../out/reads/{dset}/{samp}_2.dedup.fastq.gz"
+		r1 = "../out/reads/{dset}/{samp}_1.fastq.gz",
+		r2 = "../out/reads/{dset}/{samp}_2.fastq.gz"
 	output:
 		merged = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz"),
 		proc_r1 = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_1.fastq.gz"),
