@@ -152,9 +152,7 @@ rule dedup:
 		"envs/bbmap.yml"
 	shell:
 		"""
-		dedupe.sh -Xmx35g threads=8 in1="{input.r1}" in2="{input.r2}" out="{params.temp}" ac=f
-		reformat.sh -Xmx35g threads=8 in="{params.temp}" out1="{output.r1}" out2="{output.r2}"
-		rm {params.temp}
+		clumpify.sh -Xmx15g in1="{input.r1}" in2="{input.r2}" out1="{output.r1}" out2="{output.r2}" dedupe subs=0
 		"""
 
 
@@ -261,7 +259,7 @@ rule align_bwa_virus:
 		"""
 		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.r1} --read2 {input.r2} --output {output.vPaired} --threshold 10 --hflag 200
 		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.all} --output {output.vSing} --threshold 10 --hflag 200
-		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.all} --output {output.vShort} --threshold 10 --hflag 200 --insert 0
+		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.all} --output {output.vShort} --threshold 10 --hflag 200  
 		"""
 
 rule extract_vAligned:
@@ -335,7 +333,7 @@ rule align_bwa_host:
 		"""
 		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.r1} --read2 {input.r2} --output {output.hPaired} --threshold 10 --hflag 200
 		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.all} --output {output.hSing} --threshold 10 --hflag 200
-		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.allShort} --output {output.hShort} --threshold 10 --hflag 200 --insert 0
+		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.allShort} --output {output.hShort} --threshold 10 --hflag 200 --insert_extend 0
 		"""
 rule convert:
 	input:
