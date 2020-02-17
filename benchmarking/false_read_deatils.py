@@ -16,15 +16,18 @@ def main(argv):
 
 	print("STARTING...")
 	parser = argparse.ArgumentParser(description='obtain seq, CIGAR, XA and SA for a list of read IDs') 
-	parser.add_argument('--ID', help = 'list of read IDs missed by the pipeline', required = True)
+	parser.add_argument('--ID', help = 'list of read IDs missed by the pipeline', required = False, default = False)
 	parser.add_argument('--bam', help = 'host aligned bam file', required = True)
 	parser.add_argument('--save', help = 'name/location to save file', required = True) #TODO 
 	args = parser.parse_args() 
 
 
 	#get the list of read IDs 
-	false_ID = open(args.ID, 'r') 
-	false_ID = false_ID.read().splitlines()
+	if args.ID != False: 
+		false_ID = open(args.ID, 'r') 
+		false_ID = false_ID.read().splitlines()
+	else: 
+		false_ID = [] #dummy list to parse to getDetails method
 
 	#TODO - append chr to match bam file 
 	false_ID = ['chr'+ x for x in false_ID]
@@ -36,7 +39,7 @@ def main(argv):
 	false_details.to_csv(args.save, sep = '\t') 
 	print('Details of parsed reads saved to '+args.save) 
 
-def getDetails(bam, false_IDs): 
+def getDetails(bam, false_IDs, args.ID): 
 	"""Extract the required details from the bam file on each of the missed integrations""" 
 		
 	#create reader to read through bam file
@@ -55,17 +58,29 @@ def getDetails(bam, false_IDs):
 	read_sa = [] #list of primary alignment 
 
 
-	#loop through the reads in the bam file 
-	for i in range(num_bam): 
-		x = next(in_bam) 
-		if x.qname in false_IDs: 
-			read_id.append(x.qname) 
-			read_seq.append(x.seq)
-			read_pos.append(x.pos) 
-			read_cig.append(x.cigar)
-			xa, sa = processTags(x.tags)
-			read_xa.append(xa) 
-			read_sa.append(sa)   
+	if args.ID != False: 
+		#loop through the reads in the bam file excluding reads which do not appear in the ID list 
+		for i in range(num_bam): 
+			x = next(in_bam) 
+			if x.qname in false_IDs: 
+				read_id.append(x.qname) 
+				read_seq.append(x.seq)
+				read_pos.append(x.pos) 
+				read_cig.append(x.cigar)
+				xa, sa = processTags(x.tags)
+				read_xa.append(xa) 
+				read_sa.append(sa) 
+	else: 
+		#loop through all of the reads in the bam file 
+		for i in range(num_bam): 
+			x = next(in_bam) 
+				read_id.append(x.qname) 
+				read_seq.append(x.seq)
+				read_pos.append(x.pos) 
+				read_cig.append(x.cigar)
+				xa, sa = processTags(x.tags)
+				read_xa.append(xa) 
+				read_sa.append(sa) 
 	
 	#create dataFrame of information
 	false_details = pd.DataFrame({"ID": read_id,"Pos": read_pos, "Seq":read_seq, "Cigar": read_cig, "XA": read_xa, "SA": read_sa}) 
