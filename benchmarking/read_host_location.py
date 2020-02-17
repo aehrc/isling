@@ -74,7 +74,7 @@ def main(argv):
 			intStop = int(left_coor[1].replace(')','')) 
 
 			#loop through integrations to get the location of reads in the host 
- 			start = intStart 
+			start = intStart 
 			stop = intStop 
 
 			for ints in host_ints['Start point']:
