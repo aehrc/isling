@@ -26,7 +26,7 @@ def main(argv):
 	host_ints = pd.read_csv(args.host_ints, header = 0 , sep='\t') 	
 
 	#make a dictionary of the length of each integration 
-	int_lens = [host_ints['Stop point'][i]-host_ints['Start point'][i]+1 for i in range(len(host_ints))]
+	int_lens = [host_ints['Stop point'][i]-host_ints['Start point'][i] for i in range(len(host_ints))]
 	int_dict = pd.Series(int_lens,index = host_ints['Start point'])
 
 	#adjust right reads
@@ -94,8 +94,8 @@ def main(argv):
 	reads["host_right"] = pd.Series(adj_Rreads,index = reads.index) 
 
 	#replace placeholder -1's for viral reads with nan
-	reads =  reads.assign(host_left = reads.host_left.where(reads.host_left.ge(0))) 
-	reads = reads.assign(host_right = reads.host_right.where(reads.host_right.ge(0)))
+	#reads =  reads.assign(host_left = reads.host_left.where(reads.host_left.ge(0))) 
+	#reads = reads.assign(host_right = reads.host_right.where(reads.host_right.ge(0)))
 
 	#save to csv file 
 	reads.to_csv('host_location_reads.csv', sep = '\t') 
