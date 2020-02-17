@@ -26,7 +26,7 @@ def main(argv):
 	host_ints = pd.read_csv(args.host_ints, header = 0 , sep='\t') 	
 
 	#make a dictionary of the length of each integration 
-	int_lens = [host_ints['Stop point'][i]-host_ints['Start point'][i] for i in range(len(host_ints))]
+	int_lens = [host_ints['Stop point'][i]-host_ints['Start point'][i] +1 for i in range(len(host_ints))]
 	int_dict = pd.Series(int_lens,index = host_ints['Start point'])
 
 	#adjust right reads
@@ -51,10 +51,16 @@ def main(argv):
 				if ints < intStart: 
 					start = start - int_dict.get(ints)
 					stop = stop - int_dict.get(ints)
+
+			#adjust the start and stop positions as the SAM/BAM file format uses a 1-based coordinate system
+			start = start+1 
+			stop = stop+1 
+			
 		
 		#give some placeholder values to viral rads 
 		else: 
 			start, stop = (-1,-1) 
+
 	
 		#store the adjusted coordinates 		
 		adj_Rreads.append((start,stop)) 
@@ -82,8 +88,12 @@ def main(argv):
 					start = start - int_dict.get(ints)
 					stop = stop - int_dict.get(ints)
 
+			#adjust the start and stop positions as the SAM/BAM file format uses a 1-based coordinate system 
+			start = start +1 
+			stop = stop +1 
+
 		else: 
-			intStart, intStop = (-1,-1) #placeholder for viral reads
+			start, stop = (-1,-1) #placeholder for viral reads
 
 		#store the adjusted coordinates 		
 		adj_Lreads.append((start,stop)) 
