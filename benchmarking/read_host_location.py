@@ -37,11 +37,20 @@ def main(argv):
 
 		#process the coordinates of all reads except for viral reads as they can not be mapped to the host 
 		if reads["right_read"][i] != 'v': 
-			right_coor = reads['right_read_coor'][i].split(", ")
 
-			#obtain the intial start and stop positions before adjustment 
-			intStart = int(right_coor[0].replace('(','')) 
-			intStop = int(right_coor[1].replace(')','')) 
+			#reads in the reverse orientation must be handled separately 
+			if reads["left_read"][i] != 'v' ad reads["right_read"][i] != 'hv': 
+				left_coor = reads['left_read_coor'][i].split(", ")
+				#obtain the intial start and stop positions before adjustment 
+				intStart = int(left_coor[1].replace('(',''))
+				intStop = int(right_coor[1].replace('(',''))	
+
+			else: 
+				right_coor = reads['right_read_coor'][i].split(", ")
+
+				#obtain the intial start and stop positions before adjustment 
+				intStart = int(right_coor[0].replace('(','')) 
+				intStop = int(right_coor[1].replace(')','')) 
 		
 			#loop through integrations to get location of reads in host 
 			start = intStart 
