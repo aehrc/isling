@@ -33,7 +33,7 @@ def main(argv):
 	false_ID = ['chr'+ x for x in false_ID]
 	
 	#get details on the reads 
-	false_details = getDetails(args.bam, false_ID) 
+	false_details = getDetails(args.bam, false_ID, args.ID) 
 
 	#save dataframe of false details as a dataframe 
 	false_details.to_csv(args.save, sep = '\t') 
