@@ -39,7 +39,7 @@ def main(argv):
 	false_details.to_csv(args.save, sep = '\t') 
 	print('Details of parsed reads saved to '+args.save) 
 
-def getDetails(bam, false_IDs, args.ID): 
+def getDetails(bam, false_IDs, ID_status): 
 	"""Extract the required details from the bam file on each of the missed integrations""" 
 		
 	#create reader to read through bam file
@@ -58,7 +58,7 @@ def getDetails(bam, false_IDs, args.ID):
 	read_sa = [] #list of primary alignment 
 
 
-	if args.ID != False: 
+	if ID_status != False: 
 		#loop through the reads in the bam file excluding reads which do not appear in the ID list 
 		for i in range(num_bam): 
 			x = next(in_bam) 
@@ -74,13 +74,13 @@ def getDetails(bam, false_IDs, args.ID):
 		#loop through all of the reads in the bam file 
 		for i in range(num_bam): 
 			x = next(in_bam) 
-				read_id.append(x.qname) 
-				read_seq.append(x.seq)
-				read_pos.append(x.pos) 
-				read_cig.append(x.cigar)
-				xa, sa = processTags(x.tags)
-				read_xa.append(xa) 
-				read_sa.append(sa) 
+			read_id.append(x.qname) 
+			read_seq.append(x.seq)
+			read_pos.append(x.pos) 
+			read_cig.append(x.cigar)
+			xa, sa = processTags(x.tags)
+			read_xa.append(xa) 
+			read_sa.append(sa) 
 	
 	#create dataFrame of information
 	false_details = pd.DataFrame({"ID": read_id,"Pos": read_pos, "Seq":read_seq, "Cigar": read_cig, "XA": read_xa, "SA": read_sa}) 
