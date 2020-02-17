@@ -34,41 +34,68 @@ def main(argv):
 
 
 	for i in range(len(reads)): 
+
+		#process the coordinates of all reads except for viral reads as they can not be mapped to the host 
 		if reads["right_read"][i] != 'v': 
 			right_coor = reads['right_read_coor'][i].split(", ")
-			start = int(right_coor[0].replace('(','')) 
-			stop = int(right_coor[1].replace(')','')) 
+
+			#obtain the intial start and stop positions before adjustment 
+			intStart = int(right_coor[0].replace('(','')) 
+			intStop = int(right_coor[1].replace(')','')) 
+		
+			#loop through integrations to get location of reads in host 
+			start = intStart 
+			stop = intStop 
+
+			for ints in host_ints['Start point']:
+				if ints < intStart: 
+					start = start - int_dict.get(ints)
+					stop = stop - int_dict.get(ints)
+		
+		#give some placeholder values to viral rads 
 		else: 
 			start, stop = (-1,-1) 
- 
-		for ints in host_ints['Start point']:
-			if ints < start: 
-				start = start - int_dict.get(ints)
-				stop = stop - int_dict.get(ints)
-		adj_Rreads.append((start,stop)) 
-
 	
+		#store the adjusted coordinates 		
+		adj_Rreads.append((start,stop)) 
+	
+
 	#adjust left reads 
 	adj_Lreads = []
 
 	for i in range(len(reads)): 
+
+		#process the coordinates of all reads except for viral reads as they can not be mapped to the host
 		if reads["left_read"][i] != 'v': 
 			left_coor = reads['left_read_coor'][i].split(", ")
-			start = int(left_coor[0].replace('(','')) 
-			stop = int(left_coor[1].replace(')','')) 
+
+			#obtain the intial start and stop positions before adjustment 
+			intStart = int(left_coor[0].replace('(','')) 
+			intStop = int(left_coor[1].replace(')','')) 
+
+			#loop through integrations to get the location of reads in the host 
+ 			start = intStart 
+			stop = intStop 
+
+			for ints in host_ints['Start point']:
+				if ints < intStart: 
+					start = start - int_dict.get(ints)
+					stop = stop - int_dict.get(ints)
+
 		else: 
-			start, stop = (-1,-1) 
- 
-		for ints in host_ints['Start point']:
-			if ints < start: 
-				start = start - int_dict.get(ints)
-				stop = stop - int_dict.get(ints)
+			intStart, intStop = (-1,-1) #placeholder for viral reads
+
+		#store the adjusted coordinates 		
 		adj_Lreads.append((start,stop)) 
 
 	
 	#save the adjusted coordinates as a dataframe 
 	reads["host_left"] = pd.Series(adj_Lreads,index = reads.index)
 	reads["host_right"] = pd.Series(adj_Rreads,index = reads.index) 
+
+	#replace placeholder -1's for viral reads with nan
+	reads =  reads.assign(host_left = reads.host_left.where(reads.host_left.ge(0))) 
+	reads = reads.assign(host_right = reads.host_right.where(reads.host_right.ge(0)))
 
 	#save to csv file 
 	reads.to_csv('host_location_reads.csv', sep = '\t') 
