@@ -57,7 +57,7 @@ def main(argv):
 	viral_reads['fragment_id'] = [i.replace('chr', '') for i in viral_reads['fragment_id']]
 
 	#pipeline can only detect a read as being viral if there is at least 20 bases each of host and virus DNA
-	viral_reads = filterLength(viral_reads, 20)  
+	viral_reads = filterLength(viral_reads, 20, directory)  
 
 	#read in file listing the integrations detected by the pipeline 
 	pipe_ints = pd.read_csv(args.pipeline, header = 0, sep = '\t')
@@ -530,31 +530,42 @@ def filterVectorRearrangement(pipe_ints):
 
 	return filt_pipe 
 
-def filterLength(all_reads,min_len):
+def filterLength(all_reads,min_len, directory):
 	"""Function which filters viral reads to contain only reads with a set amount of viral DNA (min_len)""" 
 
 	#set the read length
 	read_len = 150 
+
+	filt_idx = [] 
 	
-	print("length filter") 
+	#loop through and adjust chimeric reads 
+	for i in range(len(all_reads)):
 
-	filt_reads = all_reads[all_reads['left_read_amount'] <= read_len - min_len]
-	filt_reads = filt_reads[filt_reads['left_read_amount'] >= min_len]
-	filt_reads = filt_reads[filt_reads['right_read_amount'] <= read_len - min_len ]
-	filt_reads = filt_reads[filt_reads['right_read_amount'] >= min_len]
+		#adjust left read to meet the threshold of 20bp to be chimeric 	
+		if all_reads['left_read_amount'][i] >= read_len - min_len: 			
+			all_reads.loc[i,'left_read'] = 'v'
+		elif all_reads['left_read_amount'][i] <= min_len: 
+			all_reads.loc[i,'left_read'] = 'h'
 
-	filt_reads = filt_reads.reset_index()
+		#adjust right read to meet the threshold of 20bp to be chimeric 
+		if all_reads['right_read_amount'][i] >= read_len - min_len: 
+			all_reads.loc[i,'right_read'] = 'v'
+		elif all_reads['right_read_amount'][i] <= min_len: 
+			all_reads.loc[i,'right_read'] = 'h'
 
-	for i in range(len(filt_reads)): 
 		#if both left and right are viral or host do integration occured here
-		if filt_reads['right_read'][i] == 'h' and filt_reads['left_read'][i] == 'h' or filt_reads['right_read'][i] == 'v' and filt_reads['left_read'][i] == 'v':
-			filt_idx.append(i) 
+		if all_reads['right_read'][i] == 'h' and all_reads['left_read'][i] == 'h' or all_reads['right_read'][i] == 'v' and all_reads['left_read'][i] == 'v':
+				filt_idx.append(i) 
+
 
 	#drop the false rows
-	filt_reads = filt_reads.drop(all_reads.index[filt_idx])
+	filt_reads = all_reads.drop(all_reads.index[filt_idx])
 	
 	#reindex the filtered reads
 	filt_reads = filt_reads.reset_index(drop=True)
+
+	#save the filtered reads dataframe for debugging purposes 
+	filt_reads.to_csv(directory+"/filteredlength_reads.csv", sep='\t')
 	
 	#report the filtering  
 	rem = (len(filt_reads)/len(all_reads))*100
