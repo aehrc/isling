@@ -53,7 +53,8 @@ def main(argv):
 	parser.add_argument('--min_len', help = 'minimum length of integerations', required=False, default=50)
 	parser.add_argument('--set_len', help = 'use if only want integrations of a specific length', required=False, default=0)
 	parser.add_argument('--epi_num', help = 'number of episomes', required=False, default=0)
-	parser.add_argument('--int_type', help = 'specificy is a particular type of integrations are wanted (ie whole, portion, rearrange, deletion', required=False, default='rand')
+	parser.add_argument('--int_type', help = 'specificy is a particular type of integrations are wanted (ie whole, portion, rearrange, deletion)', required=False, default='rand')
+	parser.add_argument('--junc_type', help = 'specificy is a particular type of junctions are wanted (ie clean gap or overlap)', required=False, default='rand')
 	args = parser.parse_args()
 	
 
@@ -132,19 +133,32 @@ def main(argv):
 	#integration loop 
 
 	counter = 0 # count number of iterations 
-	while len(host_ints) < int_num: 
 
-		#do random integrations if a specific type of integrations is not selected
-		if args.int_type == 'rand': 
-			int_type =  np.random.randint(0,len(insertion_types))
+	while len(host_ints) < int_num:
+
+		#if a set length of integrations has been specified: 
+		if set_len != 0: 
+
+			host_ints, host_fasta = insertSetLength(host_fasta, viruses, host_ints, filehandle, min_len, sep, set_len, args.set_junc)
 		else: 
-			int_type = insertion_dict.get(str(args.int_type)) 
+
+			#do random integrations if a specific type of integrations is not selected
+			if args.int_type == 'rand': 
+				int_type =  np.random.randint(0,len(insertion_types))
+
+			else: 
+				if args.int_type not in insertion_types: 
+					raise OSError("Not a valid type of integration")
+				else: 	
+					int_type = insertion_dict.get(str(args.int_type)) 
 		
-		#apply integration 	
-		host_ints, host_fasta = insertion_types[int_type](host_fasta, virus, host_ints, handle, min_len, sep)
+			#apply integration 	
+			host_ints, host_fasta = insertion_types[int_type](host_fasta, virus, host_ints, handle, min_len, sep, args.set_junc)
 
 		#count the number of integrations applied 
 		counter += 1  
+
+		#periodically print how many integrations have been completed
 		if counter % int_report == 0: 
 			print(str(counter) +" integrations complete...", flush = True)
 
@@ -153,8 +167,7 @@ def main(argv):
 	#episome loop 	
 	print("\nNUMBER OF EPISOMES: "+str(epi_num))
 	for i in range(0,epi_num): 
-		#rand_int = np.random.randint(0,2)
-		rand_int = 2 #TODO uncomment for specific type of episome - this is an rearranged episome (repisome) 	
+		rand_int = np.random.randint(0,2)	
 		name = "episome "+str(i+1)
 		host_fasta = episome_types[rand_int](virus, min_len, host_fasta, name)  
 			
@@ -176,7 +189,7 @@ def main(argv):
     		print("Details of where intgrations lie in host sequence saved as "+str(args.ints_host),flush=True)
 
 
-def insertWholeVirus(host, viruses, int_list, filehandle, min_len, sep):
+def insertWholeVirus(host, viruses, int_list, filehandle, min_len, sep, set_junc):
 	"""Inserts whole viral genome into host genome"""
 
 	#get positions of all current integrations
@@ -187,7 +200,7 @@ def insertWholeVirus(host, viruses, int_list, filehandle, min_len, sep):
  
 	while True:
 		#get one viral chunk
-		currentInt = Integration(host)
+		currentInt = Integration(host, set_junc)
 		currentInt.addFragment(viruses, min_len, part = "whole")
 		attempts += 1
 		#check that all integrations are sep away from new integration
@@ -210,7 +223,7 @@ def insertWholeVirus(host, viruses, int_list, filehandle, min_len, sep):
 	
 	return int_list, host
 
-def insertSetLength(host, viruses, int_list, filehandle, min_len, sep, set_len):
+def insertSetLength(host, viruses, int_list, filehandle, min_len, sep, set_len, set_junc):
 	"""Inserts virus of a specified length. Not included in integration loop but useful for ATAY's work"""
 
 	if set_len == 0: 
@@ -224,7 +237,7 @@ def insertSetLength(host, viruses, int_list, filehandle, min_len, sep, set_len):
  
 	while True:
 		#get one viral chunk
-		currentInt = Integration(host)
+		currentInt = Integration(host, set_junc)
 		currentInt.addFragment(viruses, min_len, part = set_len)
 		attempts += 1
 		#check that all integrations are sep away from new integration
@@ -247,7 +260,7 @@ def insertSetLength(host, viruses, int_list, filehandle, min_len, sep, set_len):
 	
 	return int_list, host
 
-def insertViralPortion(host, viruses, int_list, filehandle, min_len,sep):
+def insertViralPortion(host, viruses, int_list, filehandle, min_len,sep, set_junc):
 	"""Inserts portion of viral DNA into host genome"""
 	
 	#get positions of all current integrations
@@ -257,7 +270,7 @@ def insertViralPortion(host, viruses, int_list, filehandle, min_len,sep):
 	attempts = 0
 	while True:
 		#get one viral chunk 
-		currentInt = Integration(host)
+		currentInt = Integration(host, set_junc)
 		currentInt.addFragment(viruses, min_len, part = "rand")
 		attempts += 1
 		
@@ -282,7 +295,7 @@ def insertViralPortion(host, viruses, int_list, filehandle, min_len,sep):
 	
 	return int_list, host
 
-def insertWholeRearrange(host, viruses, int_list, filehandle, min_len,sep):
+def insertWholeRearrange(host, viruses, int_list, filehandle, min_len,sep, set_junc):
 	""" Inserts a single portion of viral DNA with n rearrangements """
 	
 	#get positions of all current integrations
@@ -292,7 +305,7 @@ def insertWholeRearrange(host, viruses, int_list, filehandle, min_len,sep):
 	attempts = 0
 	while True:
 		#get one viral chunk
-		currentInt = Integration(host)
+		currentInt = Integration(host, set_junc)
 		currentInt.addRearrange(viruses, min_len, part = "whole")
 		attempts += 1
 		
@@ -317,7 +330,7 @@ def insertWholeRearrange(host, viruses, int_list, filehandle, min_len,sep):
 
 	return int_list, host
 
-def insertWithDeletion(host, viruses, int_list, filehandle, min_len,sep):
+def insertWithDeletion(host, viruses, int_list, filehandle, min_len,sep, set_junc):
 	""" Inserts n portions of viral DNA into host genome"""
 	#get positions of all current integrations 
 	currentPos = Statistics.integratedIndices(int_list)
@@ -326,7 +339,7 @@ def insertWithDeletion(host, viruses, int_list, filehandle, min_len,sep):
 	attempts = 0
 	while True:
 		#get one viral chunk
-		currentInt = Integration(host)
+		currentInt = Integration(host, set_junc)
 		currentInt.addDeletion(viruses, min_len,part = "whole")
 		attempts += 1
 		#check that all integrations are args.sep away from new integration
@@ -350,7 +363,7 @@ def insertWithDeletion(host, viruses, int_list, filehandle, min_len,sep):
 	
 	return int_list, host
 
-def insertPortionRearrange(host, viruses, int_list, filehandle, min_len,sep): 
+def insertPortionRearrange(host, viruses, int_list, filehandle, min_len,sep, set_junc): 
 	"""Rearranges a portion of virus""" 
 
 	#get positions of all current integrations
@@ -360,7 +373,7 @@ def insertPortionRearrange(host, viruses, int_list, filehandle, min_len,sep):
 	attempts = 0
 	while True:
 		#get one viral chunk
-		currentInt = Integration(host)
+		currentInt = Integration(host, set_junc)
 		currentInt.addRearrange(viruses, min_len, part = "rand")
 		attempts += 1
 		
@@ -386,7 +399,7 @@ def insertPortionRearrange(host, viruses, int_list, filehandle, min_len,sep):
 	
 	return int_list, host
 
-def insertPortionDeletion(host, viruses, int_list, filehandle, min_len,sep):
+def insertPortionDeletion(host, viruses, int_list, filehandle, min_len,sep, set_junc):
 	"""Takes a segment of the virus and then deletes a segment from it and inserts the resulting portion. This have the potentional to be short - useful for simulating short reads later""" 
 
 	#get positions of all current integrations 
@@ -396,7 +409,7 @@ def insertPortionDeletion(host, viruses, int_list, filehandle, min_len,sep):
 	attempts = 0
 	while True:
 		#get one viral chunk
-		currentInt = Integration(host)
+		currentInt = Integration(host, set_junc)
 		currentInt.addDeletion(viruses, min_len,part = "rand")
 		attempts += 1
 		#check that all integrations are args.sep away from new integration
@@ -444,7 +457,7 @@ class Integration:
 	Class to store the properties of integrations 
 	"""
 	
-	def __init__(self, host):
+	def __init__(self, host, args.set_junc):
 		"""
 		initalize integration at a random place in the host genome
 		only one integration, but may be of a rearranged chunk
@@ -461,27 +474,21 @@ class Integration:
 		#integration cannot not have negative overlap at both ends - can be changed later** 
 
 		#TODO adjust to reflect the junctions for the experiment - here just gaps 
-		"""
-		while True: 
-			self.overlaps = (np.random.randint(0,10),np.random.randint(0,10))
-			#self.overlaps = (0,0)
-			if self.overlaps[0]<0 and self.overlaps[1]<0: 
-				continue
-			else: 
-				break
-		"""
-		
-		
-		self.overlaps = (0,0) #Uncomment for just clean junctions
-		
-		"""
-		#when producing only overlaps  
-		end = np.random.randint(0,2)
-		if end == 0: 
-			self.overlaps = (np.random.randint(-10,0),0)
+
+		junc_dict = {'clean': 0, 'gap': 1, 'overlap': 2}
+		junction_types = ['clean', 'gap', 'overlap']
+
+		if args.set_junc == 'rand': 
+			this_junc = np.random.randitn(0, len(junction_types)) 
 		else: 
-			self.overlaps = (0,np.random.randint(-10,0)) 
-		"""
+			if args.set_junc not in junction_types: 
+				raise OSError("Not a valid type of junction")
+			else: 
+				this_junc = junc_dict.get(str(args.set_junc))
+		
+		#generate junctions 
+		addJunction(self, this_junc) 
+	
 		
 		#record the type of junction for saving to file later
 		self.junction = (self.convertJunction(self.overlaps[0]),
@@ -489,6 +496,49 @@ class Integration:
 
 		#used when an integration with an overlap is intgrated at a location other than hPos 
 		self.newpoint = -1 
+
+	def addJunction(self, junc):
+		""" sets the coordinates for a junction - clean, gap or overlap""" 
+
+		#assign integration a clean junction
+		if junc == 'clean':
+			self.overlaps = (0,0)
+		
+		#assign integration a gap junction 
+		elif junc == 'gap': 
+
+			#generate a random number to decide whether there are gaps at one or both ends
+			gap_num = np.random.randint(0,2) 
+
+			#only have a gap at one end 
+			if gap_num == 0: 
+				
+				#generate a random number to decide which end the gap goes on 
+				gap_end = np.random.randint(0,2)
+				
+				#gap on the left 
+					self.overlaps = (np.random.randint(1,10),0)
+
+				#gap on the right 
+					self.overlaps = (0, np.random.randint(1,10))
+
+			#have gaps at both ends 
+			else: 
+				self.overlaps = (np.random.randint(1,10), np.random.randint(1,10))	
+
+		#assign integration an overlap juncion 
+		elif junc == 'overlap':
+		
+			#generate a random number to decide which end the overlap ocurs at   
+			end = np.random.randint(0,2)
+
+			if end == 0: 
+				self.overlaps = (np.random.randint(-10,0),0)
+			else: 
+				self.overlaps = (0,np.random.randint(-10,0))
+
+		else: 
+			print("Broken, fix") #TODO remove debugging line 
  		 
 	def addFragment(self, viruses, min_len, part = "rand"):
 		"""
