@@ -517,9 +517,11 @@ class Integration:
 				gap_end = np.random.randint(0,2)
 				
 				#gap on the left 
+				if gap_end == 0: 
 					self.overlaps = (np.random.randint(1,10),0)
 
 				#gap on the right 
+				else: 
 					self.overlaps = (0, np.random.randint(1,10))
 
 			#have gaps at both ends 
