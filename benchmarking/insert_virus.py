@@ -54,7 +54,7 @@ def main(argv):
 	parser.add_argument('--set_len', help = 'use if only want integrations of a specific length', required=False, default=0)
 	parser.add_argument('--epi_num', help = 'number of episomes', required=False, default=0)
 	parser.add_argument('--int_type', help = 'specificy is a particular type of integrations are wanted (ie whole, portion, rearrange, deletion)', required=False, default='rand')
-	parser.add_argument('--junc_type', help = 'specificy is a particular type of junctions are wanted (ie clean gap or overlap)', required=False, default='rand')
+	parser.add_argument('--set_junc', help = 'specificy is a particular type of junctions are wanted (ie clean gap or overlap)', required=False, default='rand')
 	args = parser.parse_args()
 	
 
@@ -123,6 +123,9 @@ def main(argv):
 
 	#intialise how many episomal sequences included in the outputted fasta file 
 	epi_num = int(args.epi_num) 
+
+	#intialise the type of junctions if not random
+	set_junc = str(args.set_junc)
 	
 	#intialise after how many intergrations the number of integrations performed is reported to the user 
 	int_report = 50
@@ -139,7 +142,7 @@ def main(argv):
 		#if a set length of integrations has been specified: 
 		if set_len != 0: 
 
-			host_ints, host_fasta = insertSetLength(host_fasta, viruses, host_ints, filehandle, min_len, sep, set_len, args.set_junc)
+			host_ints, host_fasta = insertSetLength(host_fasta, viruses, host_ints, filehandle, min_len, sep, set_len, set_junc)
 		else: 
 
 			#do random integrations if a specific type of integrations is not selected
@@ -153,7 +156,7 @@ def main(argv):
 					int_type = insertion_dict.get(str(args.int_type)) 
 		
 			#apply integration 	
-			host_ints, host_fasta = insertion_types[int_type](host_fasta, virus, host_ints, handle, min_len, sep, args.set_junc)
+			host_ints, host_fasta = insertion_types[int_type](host_fasta, virus, host_ints, handle, min_len, sep, set_junc)
 
 		#count the number of integrations applied 
 		counter += 1  
@@ -479,7 +482,7 @@ class Integration:
 		junction_types = ['clean', 'gap', 'overlap']
 
 		if set_junc == 'rand': 
-			this_junc = np.random.randitn(0, len(junction_types)) 
+			this_junc = np.random.randint(0, len(junction_types)) 
 		else: 
 			if args.set_junc not in junction_types: 
 				raise OSError("Not a valid type of junction")
