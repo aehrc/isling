@@ -457,7 +457,7 @@ class Integration:
 	Class to store the properties of integrations 
 	"""
 	
-	def __init__(self, host, args.set_junc):
+	def __init__(self, host, set_junc):
 		"""
 		initalize integration at a random place in the host genome
 		only one integration, but may be of a rearranged chunk
@@ -478,13 +478,13 @@ class Integration:
 		junc_dict = {'clean': 0, 'gap': 1, 'overlap': 2}
 		junction_types = ['clean', 'gap', 'overlap']
 
-		if args.set_junc == 'rand': 
+		if set_junc == 'rand': 
 			this_junc = np.random.randitn(0, len(junction_types)) 
 		else: 
 			if args.set_junc not in junction_types: 
 				raise OSError("Not a valid type of junction")
 			else: 
-				this_junc = junc_dict.get(str(args.set_junc))
+				this_junc = junc_dict.get(str(set_junc))
 		
 		#generate junctions 
 		addJunction(self, this_junc) 
