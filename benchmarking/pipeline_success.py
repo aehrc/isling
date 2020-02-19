@@ -543,9 +543,12 @@ def filterLength(all_reads,min_len):
 	filt_reads = filt_reads[filt_reads['right_read_amount'] <= read_len - min_len ]
 	filt_reads = filt_reads[filt_reads['right_read_amount'] >= min_len]
 
-	#if both left and right are viral or host do integration occured here
-	if filt_reads['right_read'][i] == 'h' and filt_reads['left_read'][i] == 'h' or filt_reads['right_read'][i] == 'v' and filt_reads['left_read'][i] == 'v':
-				filt_idx.append(i) 
+	filt_reads = filt_reads.reset_index()
+
+	for i in range(len(filt_reads)): 
+		#if both left and right are viral or host do integration occured here
+		if filt_reads['right_read'][i] == 'h' and filt_reads['left_read'][i] == 'h' or filt_reads['right_read'][i] == 'v' and filt_reads['left_read'][i] == 'v':
+			filt_idx.append(i) 
 
 	#drop the false rows
 	filt_reads = filt_reads.drop(all_reads.index[filt_idx])
