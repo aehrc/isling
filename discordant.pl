@@ -81,7 +81,7 @@ while (my $vl = <VIRAL>) {
 	
 	#so essentially only exclude reads where both reads are unmapped
 	
-	if (($parts[1] & 0x8) and ($parts[1] & 0x4)) { next; }
+	#if (($parts[1] & 0x8) and ($parts[1] & 0x4)) { next; }
 
 	#get cigar
 	my ($cig, $editDist2) = processCIGAR2($parts[5], $tol); # Note that could be a cigar or * if unmapped
@@ -119,7 +119,7 @@ while (my $hl = <HUMAN>) {
 	my @parts = split(' ', $hl); #get fields from each alignment
 	
 	#want reads where if not mapped, mate is mapped, or vice versa
-	if (!($parts[1] & 0x8) and !($parts[1] & 0x4)) { next; }
+	#if (!($parts[1] & 0x8) and !($parts[1] & 0x4)) { next; }
 	
 	unless ((exists $viralR1{$parts[0]}) and (exists $viralR2{$parts[0]})) { next; } #only consider reads from viral alignment
 	
@@ -314,11 +314,12 @@ sub findDiscordant {
 sub printHelp {
 	print "Pipeline for detection of viral integration sites within a genome\n\n";
 	print "Usage:\n";
-	print "\tperl discordant.pl --viral <sam> --human <sam> --cutoff <n> --output <out> --bed <bed> --help\n\n";
+	print "\tperl discordant.pl --viral <sam> --human <sam> --cutoff <n> --output <out> --bed <bed> --tol <tol> --help\n\n";
 	print "Arguments:\n";
 	print "\t--viral:   Alignment of reads to viral genomes (sam)\n";
 	print "\t--human:   Alignment of reads to human genome (sam)\n";
 	print "\t--cutoff:  Minimum number of clipped reads to be considered (default = 20)\n";
+	print "\t--tol:     Tolerance when combining short elements with neigbouring matched regions (default = 5)\n";
 	print "\t--output:  Output file for results (default = integrationSite.txt\n";
 	print "\t--bed:     Print integrations sites to indicated bed file (default = NA)\n";
 	print "\t--merged:  Merge bedfile into overlapping integration sites (default = NA)\n";
