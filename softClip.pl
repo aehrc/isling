@@ -242,8 +242,8 @@ sub collectIntersect {
 	my ($vClip) = ($vCig =~ /(\d+)S/);
 	my ($vAlig) = ($vCig =~ /(\d+)M/);
 
-	#check that human and viral soft-clipped and aligned regions meet cutoff
-	unless (($hClip > $cutoff) and ($hAlig > $cutoff) and ($vClip > $cutoff) and ($vAlig > $cutoff)) { return; }
+	#check that host and viral aligned regions meet cutoff
+	unless (($hAlig > $cutoff) and ($vAlig > $cutoff)) { return; }
 	
 	### Overlap should be the same regardless of how it's calculated so double check
 	my $overlap1 = abs($hAlig - $vClip);
