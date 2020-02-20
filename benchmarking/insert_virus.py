@@ -150,7 +150,7 @@ def main(argv):
 				int_type =  np.random.randint(0,len(insertion_types))
 
 			else: 
-				if args.int_type not in insertion_types: 
+				if args.int_type not in insertion_dict.keys(): 
 					raise OSError("Not a valid type of integration")
 				else: 	
 					int_type = insertion_dict.get(str(args.int_type)) 
@@ -484,7 +484,7 @@ class Integration:
 		if set_junc == 'rand': 
 			junc_num = np.random.randint(0, len(junction_types)) 
 		else: 
-			if args.set_junc not in junction_types: 
+			if set_junc not in junction_types: 
 				raise OSError("Not a valid type of junction")
 			else: 
 				junc_num = junc_dict.get(str(set_junc))
@@ -504,8 +504,6 @@ class Integration:
 
 	def addJunction(self, junc):
 		""" sets the coordinates for a junction - clean, gap or overlap""" 
-	
-		print("Junc: "+str(junc)) #TODO remove debugging line 
 	
 
 		#assign integration a clean junction
@@ -558,7 +556,7 @@ class Integration:
 		add a viral fragment to this integration
 		"""
 		
-		#check there isn't alreafbdy a fragmentfg
+		#check there isn't alreafbdy a fragment
 		if self.fragments > 0:
 			print("Fragment has already been added!")
 			return
@@ -869,7 +867,7 @@ class Integration:
 		if self.overlaps[1]<0:
 			(int_start,int_stop) = self.createRightOverlap(host,int_list,filehandle)
 			int_stop = int_start 
-			self.chunk.bases = self.chunk.bases[:len(self.chunk.bases)+(overlap1, overlap2)[1]] 
+			self.chunk.bases = self.chunk.bases[:len(self.chunk.bases)+self.overlaps[1]] 
 	
 			
 		#If integration cannot be performed we stop 
