@@ -482,15 +482,17 @@ class Integration:
 		junction_types = ['clean', 'gap', 'overlap']
 
 		if set_junc == 'rand': 
-			this_junc = np.random.randint(0, len(junction_types)) 
+			junc_num = np.random.randint(0, len(junction_types)) 
 		else: 
 			if args.set_junc not in junction_types: 
 				raise OSError("Not a valid type of junction")
 			else: 
-				this_junc = junc_dict.get(str(set_junc))
-		
+				junc_num = junc_dict.get(str(set_junc))
+				
+		this_junc = junction_types[junc_num] 
+
 		#generate junctions 
-		addJunction(self, this_junc) 
+		self.overlaps = self.addJunction(this_junc) 
 	
 		
 		#record the type of junction for saving to file later
@@ -502,10 +504,13 @@ class Integration:
 
 	def addJunction(self, junc):
 		""" sets the coordinates for a junction - clean, gap or overlap""" 
+	
+		print("Junc: "+str(junc)) #TODO remove debugging line 
+	
 
 		#assign integration a clean junction
 		if junc == 'clean':
-			self.overlaps = (0,0)
+			overlap1, overlap2 = (0,0)
 		
 		#assign integration a gap junction 
 		elif junc == 'gap': 
@@ -521,15 +526,15 @@ class Integration:
 				
 				#gap on the left 
 				if gap_end == 0: 
-					self.overlaps = (np.random.randint(1,10),0)
+					overlap1, overlap2 = (np.random.randint(1,10),0)
 
 				#gap on the right 
 				else: 
-					self.overlaps = (0, np.random.randint(1,10))
+					overlap1, overlap2 = (0, np.random.randint(1,10))
 
 			#have gaps at both ends 
 			else: 
-				self.overlaps = (np.random.randint(1,10), np.random.randint(1,10))	
+				overlap1, overlap2 = (np.random.randint(1,10), np.random.randint(1,10))	
 
 		#assign integration an overlap juncion 
 		elif junc == 'overlap':
@@ -538,12 +543,15 @@ class Integration:
 			end = np.random.randint(0,2)
 
 			if end == 0: 
-				self.overlaps = (np.random.randint(-10,0),0)
+				overlap1, overlap2 = (np.random.randint(-10,0),0)
 			else: 
-				self.overlaps = (0,np.random.randint(-10,0))
+				overlap1, overlap2 = (0,np.random.randint(-10,0))
 
 		else: 
 			print("Broken, fix") #TODO remove debugging line 
+
+
+		return overlap1, overlap2
  		 
 	def addFragment(self, viruses, min_len, part = "rand"):
 		"""
@@ -861,7 +869,7 @@ class Integration:
 		if self.overlaps[1]<0:
 			(int_start,int_stop) = self.createRightOverlap(host,int_list,filehandle)
 			int_stop = int_start 
-			self.chunk.bases = self.chunk.bases[:len(self.chunk.bases)+self.overlaps[1]] 
+			self.chunk.bases = self.chunk.bases[:len(self.chunk.bases)+(overlap1, overlap2)[1]] 
 	
 			
 		#If integration cannot be performed we stop 
