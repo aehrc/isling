@@ -53,8 +53,8 @@ def main(argv):
 	parser.add_argument('--min_len', help = 'minimum length of integerations', required=False, default=50)
 	parser.add_argument('--set_len', help = 'use if only want integrations of a specific length', required=False, default=0)
 	parser.add_argument('--epi_num', help = 'number of episomes', required=False, default=0)
-	parser.add_argument('--int_type', help = 'specificy is a particular type of integrations are wanted (ie whole, portion, rearrange, deletion)', required=False, default='rand')
-	parser.add_argument('--set_junc', help = 'specificy is a particular type of junctions are wanted (ie clean gap or overlap)', required=False, default='rand')
+	parser.add_argument('--int_type', help = 'specificy is a particular type of integrations are wanted from: whole, portion, rearrange or deletion. If no type specified the type of integration will be randomly selected.', required=False, default='rand')
+	parser.add_argument('--set_junc', help = 'specificy is a particular type of junctions are wanted from: clean gap or overlap. If no type of junction is specified junctions will be selected at random', required=False, default='rand')
 	args = parser.parse_args()
 	
 
@@ -70,10 +70,8 @@ def main(argv):
 	else:
 		raise OSError("Could not open virus fasta")
  
-	#TODO add os error if int_type is not valid 
-	
 	#set random seed
-	np.random.seed(1)
+	np.random.seed(2)
 
 	#types of insertions
 	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
@@ -137,12 +135,13 @@ def main(argv):
 
 	counter = 0 # count number of iterations 
 
-	while len(host_ints) < int_num:
+	while len(host_ints) < int_num: #TODO uncomment -debugging 
+	#while counter <2:  
 
 		#if a set length of integrations has been specified: 
 		if set_len != 0: 
 
-			host_ints, host_fasta = insertSetLength(host_fasta, viruses, host_ints, filehandle, min_len, sep, set_len, set_junc)
+			host_ints, host_fasta = insertSetLength(host_fasta, virus, host_ints, handle, min_len, sep, set_len, set_junc)
 		else: 
 
 			#do random integrations if a specific type of integrations is not selected
@@ -501,6 +500,7 @@ class Integration:
 
 		#used when an integration with an overlap is intgrated at a location other than hPos 
 		self.newpoint = -1 
+		
 
 	def addJunction(self, junc):
 		""" sets the coordinates for a junction - clean, gap or overlap""" 
@@ -543,10 +543,7 @@ class Integration:
 			if end == 0: 
 				overlap1, overlap2 = (np.random.randint(-10,0),0)
 			else: 
-				overlap1, overlap2 = (0,np.random.randint(-10,0))
-
-		else: 
-			print("Broken, fix") #TODO remove debugging line 
+				overlap1, overlap2 = (0,np.random.randint(-10,0)) 
 
 
 		return overlap1, overlap2
@@ -696,12 +693,20 @@ class Integration:
 		Works by finding closest regions of homology on left side of the randomly selected integration point. It checks if the homologous region is caused by an existing integration and concatenates the search range and attempts to find a homologous region again if the homology was caused by an existing integration. This is repeated for the right side of te integration point. The region closest to randomly selected integration point is then used to insert the viral chunk. 
 		"""
 		viral_chunk = self.chunk.bases
+		dont_integrate = self.dontIntegrate(int_list)
 
-		l_overlap = str(viral_chunk[:-self.overlaps[0]].seq) #sequence left of the integration site 
+
+		#find sequence left of the integration 
+		#convert the viral chunk to a seq object. Will already be a seq object if a deletion or rearrangement 
+		if self.chunk.isRearranged == False and self.chunk.deletion == False:
+			l_overlap = str(viral_chunk[:-self.overlaps[0]].seq)
+		else: 
+			l_overlap = str(viral_chunk[:-self.overlaps[0]])
+			
+		#give placeholder values to the homology sites left and right of the integration site 	
 		left_site = -1
 		right_site = -1
-		dont_integrate = self.dontIntegrate(int_list)
-				
+
 		#find homologous region on the left side 
 		left_seq = host[self.chr][:self.hPos].seq
 		while left_site <0: 
@@ -709,7 +714,6 @@ class Integration:
 			if left_search == -1:
 				break 
 			if left_search in dont_integrate: #check homology is not from a previous integration
-				#print(str(len(left_seq)), flush = True) 
 				left_seq = left_seq[:left_search]  
 			else:
 				left_site= left_search 
@@ -747,8 +751,14 @@ class Integration:
 		viral_chunk = self.chunk.bases
 		dont_integrate = self.dontIntegrate(int_list)
 
-		r_overlap = str(viral_chunk[len(viral_chunk)+self.overlaps[1]:].seq) #sequence right of the integration site 
+		#find sequence right of the integration 
+		#convert the viral chunk to a seq object. Will already be a seq object if a deletion or rearrangement 
+		if self.chunk.isRearranged == False and self.chunk.deletion == False:
+			r_overlap = str(viral_chunk[len(viral_chunk)+self.overlaps[1]:].seq)
+		else: 
+			r_overlap = str(viral_chunk[len(viral_chunk)+self.overlaps[1]:]) 
 
+		#give placeholder values to the homology sites left and right of the integration site
 		left_site = -1
 		right_site = -1
 	
