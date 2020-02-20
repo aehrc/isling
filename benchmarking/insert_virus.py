@@ -1013,7 +1013,7 @@ class ViralChunk:
 			while True: 
 				self.start = np.random.randint(0,len(viruses[self.virus].seq)-set_len)
 				self.stop = self.start + set_len
-				if self.stop - self.start > min_chunk: 
+				if self.stop - self.start >= min_chunk:  #TODO fix - getting stuck in this loop test with real data? 
 					break
 		
 		#TODO add a max attempts here 
