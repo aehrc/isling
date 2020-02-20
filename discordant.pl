@@ -72,6 +72,7 @@ while (my $vl = <VIRAL>) {
 
 	if ($parts[1] & 0x800) { next(); } # skip supplementary alignments
 	if ($parts[1] & 0x2) { next(); } # skip mapped in proper pair
+	if ($parts[1] & 0x100) { next(); } # skip alignments that are not primary
 	
 	#for read pairs where one read is mapped and the other is not:
 	#want reads where if not mapped, mate is mapped, or vice versa
@@ -125,6 +126,7 @@ while (my $hl = <HUMAN>) {
 	
 	if ($parts[1] & 0x800) { next(); } # skip supplementary alignments
 	if ($parts[1] & 0x2) { next(); } # skip mapped in proper pair
+	if ($parts[1] & 0x100) { next(); } # skip alignments that are not primary
 	
 	#get cigar
 	my ($cig, $editDist2) = processCIGAR2($parts[5], $tol); # Note that could be a cigar or * if unmapped
