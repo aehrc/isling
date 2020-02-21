@@ -1008,12 +1008,12 @@ class ViralChunk:
 			#get the length of the integration
 			set_len = part 
 
-			#can't use a set_len longer the virus #TODO
+			#can't use a set_len longer the virus
 			if set_len > len(viruses[self.virus].seq): 
 				raise OSError("Set length for integrations is longer the viral sequence!")
 			
 
-			#set_len can't be shorter than the min_chunk #TODO 
+			#set_len can't be shorter than the min_chunk 
 				raise OSError("Set lenfth for integrations is shorter than the minimum integration length!")
 
 			while True: 
