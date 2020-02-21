@@ -38,15 +38,18 @@ def main(argv):
 		#process the coordinates of all reads except for viral reads as they can not be mapped to the host 
 		if reads["right_read"][i] != 'v': 
 
+			right_coor = reads['right_read_coor'][i].split(", ")
+
 			#reads in the reverse orientation must be handled separately 
-			if reads["left_read"][i] != 'v' ad reads["right_read"][i] != 'hv': 
-				left_coor = reads['left_read_coor'][i].split(", ")
-				#obtain the intial start and stop positions before adjustment 
-				intStart = int(left_coor[1].replace('(',''))
-				intStop = int(right_coor[1].replace('(',''))	
+			if reads["left_read"][i] == 'v' and reads["right_read"][i] == 'hv': 
+				intStart = int(right_coor[0].replace('(','')) + reads["right_read_amount"][i]
+				intStop = int(right_coor[1].replace(')',''))+ reads["right_read_amount"][i]
+
+			elif reads["left_read"][i] == 'hv' and reads["right_read"][i] == 'h':
+				intStart = int(right_coor[0].replace('(','')) + reads["right_read_amount"][i]
+				intStop = int(right_coor[1].replace(')',''))+ reads["right_read_amount"][i]
 
 			else: 
-				right_coor = reads['right_read_coor'][i].split(", ")
 
 				#obtain the intial start and stop positions before adjustment 
 				intStart = int(right_coor[0].replace('(','')) 
@@ -85,8 +88,8 @@ def main(argv):
 			left_coor = reads['left_read_coor'][i].split(", ")
 
 			#obtain the intial start and stop positions before adjustment 
-			intStart = int(left_coor[0].replace('(','')) 
-			intStop = int(left_coor[1].replace(')','')) 
+			intStart = int(left_coor[0].replace('(','')) -1
+			intStop = int(left_coor[1].replace(')','')) -1 
 
 			#loop through integrations to get the location of reads in the host 
 			start = intStart 
@@ -98,8 +101,8 @@ def main(argv):
 					stop = stop - int_dict.get(ints)
 
 			#adjust the start and stop positions as the SAM/BAM file format uses a 1-based coordinate system 
-			start = start +1 
-			stop = stop +1 
+			start = start + 1 
+			stop = stop + 1 
 
 		else: 
 			start, stop = (-1,-1) #placeholder for viral reads
