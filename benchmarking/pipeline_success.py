@@ -575,7 +575,6 @@ def filterLength(all_reads,min_len, directory):
 	
 
 
-
 def filterFalse(ints): 
 	"""Remove integrations which were unsuccessful""" 
 	
@@ -694,43 +693,6 @@ def evaluateMissed(missed_hPos,ints):
 	assessFragments(miss_num_fragments)   
 
 
-def assessMissedLength(missed_hPos, ints): 
-	"""Look at the properities of the integrations which were not detected by the pipeline""" 
-	#make dictionary of integrations  
-	hPos_dict = ints.set_index('hPos').to_dict()
-	hPos_keys = list(hPos_dict.get('vBases').keys())
-
-	#get a list of the lengths of the integrations 
-	all_lengths = []
-
-	for i in range(len(hPos_keys)): 
-		seq = hPos_dict.get('vBases')[hPos_keys[i]]  
-		length = len(seq) 
-		all_lengths.append(length)
-	 
-	hPos_length = dict(zip(ints['hPos'],all_lengths)) 
-	
-	#save distribution of all integration lengths   
-	"""plt.pyplot.figure(0)
-	weights_all = np.ones_like(all_lengths)/float(len(all_lengths)) 	
-	plt.pyplot.hist(all_lengths, weights = weights_all) 
-	plt.pyplot.title("Histogram of the length of all integrations") 
-	plt.pyplot.xlabel('length of integration')
-	plt.pyplot.ylabel('Density')  
-	plt.pyplot.savefig("evaluate_pipeline_output/integration_lengths.pdf")
-	print("Distribution of all integrations saved to integration_lengths.pdf") 
-"""
-	#save distribution of the missed integration lengths
-	missed_ints = [hPos_length.get(missed_int) for missed_int in missed_hPos]
-	weights_missed = np.ones_like(missed_ints)/float(len(missed_ints)) 
-	plt.pyplot.figure(1)  
-	plt.pyplot.hist(missed_ints, weights = weights_missed)
-	plt.pyplot.title("Histogram of the length of missed integrations") 
-	plt.pyplot.xlabel('length of integration')
-	plt.pyplot.ylabel('Density')  
-	plt.pyplot.savefig("evaluate_pipeline_output/missed_integration_lengths.pdf")
-	print("Distribution of all integrations saved to evaluate_pipeline_output/missed_integration_lengths.pdf")
-	
 def percentactual(values): 
 	"""counts the number of actual variables in a list of values""" 
 
@@ -786,37 +748,6 @@ Inormation corresponds to read ID"""
 
 	return overlap_dict
 
-	
-	
-def assessLength(all_reads, undetected_Vreads): #TODO this is questionable remove 
-	"""Compare the number of viral base pairs in the missed reads and in alfg
-l reads"""
-	#get the required columns
-	int_ID = all_reads['fragment_id'].values
-	first_len = all_reads['left_read_amount'].values
-	second_len = all_reads['right_read_amount'].values
-
-	#find the length of virus in each read - excluding reads consisting of whole virus and no virus
-	viral_len = [max(first_len[i],second_len[i]) for i in range(len(all_reads))]	
-	
-	#create a dictionay
-	len_dict = dict(zip(int_ID, viral_len)) 
-	#get the lengths for missed reads 
-	missed_len = [len_dict.get(missed) for missed in undetected_Vreads] 
-	
-	#save distribution of length of the missed data 
-	ax = sns.distplot(missed_len, hist=False)
-	ax.set_title("Distribton of the length of missed integrations") 
-	ax.set(xlabel='length of missed integration', ylabel = 'Density')  
-	fig = ax.get_figure()
-	fig.savefig("evaluate_pipeline_output/missedread_len_distplot.pdf")
-	print("Distribution of the length of the missed reads saved to evaluate_pipeline_output/evaluate_pipeline_output/missedread_len_distplot.pdf")
-
-
-	
-#def assessFalseReads #TODO look at the integrations which were falsely detected by the pipeline 
-#look at the junctions in them 
-#were they close to an actual integration event? 
 
 def assessOverlap(all_reads, undetected_Vreads): 
 	"""Looks at what type of overlap the reads missed by the pipeline have. Takes a dataframe of all of the reads and a list of the IDs of the missed reads""" 
@@ -901,59 +832,6 @@ def missedLocation(missed_df):
 	ax.tick_params(axis="both",which="major", labelsize = 7) 
 	fig = ax.get_figure()
 	fig.savefig("evaluate_pipeline_output/missedread_location.pdf")
-
-def readLength(missed_df): 
-	"""Look at the length of viral DNA in false negative reads""" 
-	
-	#get the amount of viral DNA in the chimeric read 
-	missed_viral = [] 
-	
-	for i in range(len(missed_df)): 
-		if missed_df["left_read"][i] == "chimeric": 
-			missed_viral.append(missed_df["left_read_amount"][i])
-		else: 
-			missed_viral.append(missed_df["right_read_amount"][i])
-
-	#visualise as a distribution 
-	fig, ax = plt.pyplot.subplots()
-	ax = sns.distplot(missed_viral) #TODO normalise? 
-	ax.set_xlabel("Viral DNA (bp)")
-	ax.set_ylabel("Density") 
-	ax.set_title("Distribution of the amount of viral DNA in false negative reads")
-	fg = ax.get_figure()
-	fig.savefig("evaluate_pipeline_output/missedread_viralDNA.pdf")
-	print("Amount of viral DNA in reads missed by the pipeline saved to evaluate_pipeline_output/missedread_viralDNA.pdf",flush = True) 
-	
-	
-
-def compareOverlap(all_reads, pipe_ints): #TODO finish this 
-	"""Compares whether the pipeline has correctly predicted the gap type of the read. Takes list of predicted"""
-
-	#get the IDs of the pipeline reads
-	pipe_reads = pipe_ints['ReadID'].values 
-
-	#get the overlap type of the pipeline reads
-	pipe_overlap = pipe_ints['Type'].values
- 
-	#create a dictionary of the overlap types for each read 
-	overlap_dict = getOverlap(all_reads)
-	
-	#get the known overlap type 
-	actual_overlap = [overlap_dict.get(pipeline) for pipeline in pipe_reads] 
-	#TODO handle reads in pipeline but don't actually contain viral DNA 
-
-	#make comparisons between pipeline overlaps and known overlaps 
-	correct = 0 #counter for the number of correct estimations 
-	for i in range(len(pipe_reads)): 
-		if pipe_overlaps[i] == actual_overlap[i]: 
-			correct = correct +1 
-
-	#caluclate the accuracy of the pipeline to find the type of junction
-	accuracy = (correct/len(pipe_reads))*100 
-	print("Pipeline predicted the type of junction correctly "+str(accuracy)+"% of the time:") 
-
-	#we also want to know which ones we got wrong 
-	#find the distribtuion of rearrangements and deletions so that these can be compared - plot using seaborn?
 
 
 
