@@ -142,7 +142,6 @@ def listIDs(viral_reads, pipe_ints, all_IDs, directory):
 	pred_unk = list(set(pipe_IDs)-set(all_IDs)) 
 	#have less than the required length but being detected by the pipeline 
 	print("Reads filtered in processing (ie low quality): "+str(len(pred_unk)), flush = True) 
-	pd.DataFrame(pred_unk).to_csv(directory+"/weird_reads.csv", sep = '\t')
 
 	#List actual non-viral reads 
 	actual_NVreads = list(set(all_IDs) - set(actual_Vreads)) 
@@ -574,44 +573,6 @@ def filterLength(all_reads,min_len, directory):
 	print("length filter done" )
 	return filt_reads
 	
-
-def filterLength(all_reads,min_len, directory):
-	"""Function which filters viral reads to contain only reads with a set amount of viral DNA (min_len)""" 
-
-	#set the read length
-	read_len = 150 
-
-	filt_idx = [] 
-
-	filt_reads = all_reads[all_reads['left_read_amount'] <= read_len - min_len]
-	filt_reads = filt_reads[filt_reads['left_read_amount'] >= min_len]
-	filt_reads = filt_reads[filt_reads['right_read_amount'] <= read_len - min_len]
-	filt_reads = filt_reads[filt_reads['right_read_amount'] >= min_len]
-		
-
-	#loop through and adjust chimeric reads 
-	for i in range(len(filte_reads)):
-
-		#if both left and right are viral or host do integration occured here
-		if filt_reads['right_read'][i] == 'h' and filt_reads['left_read'][i] == 'h' or filt_reads['right_read'][i] == 'v' and filt_reads['left_read'][i] == 'v':
-				filt_idx.append(i) 
-
-
-	#drop the false rows
-	filt_reads = filt_reads.drop(all_reads.index[filt_idx])
-	
-	#reindex the filtered reads
-	filt_reads = filt_reads.reset_index(drop=True)
-
-	#save the filtered reads dataframe for debugging purposes 
-	filt_reads.to_csv(directory+"/filteredlength_reads.csv", sep='\t')
-	
-	#report the filtering  
-	rem = (len(filt_reads)/len(all_reads))*100
-	print("\nAfter filtering out reads with less than "+str(min_len)+" base pairs of viral DNA, {:.2f} % of reads remain.".format(rem), flush = True)
-
-	print("length filter done" )
-	return filt_reads
 
 
 
