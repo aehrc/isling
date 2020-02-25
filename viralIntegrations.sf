@@ -75,7 +75,6 @@ DATASETS = []
 SAMPLES = []
 HOSTS = []
 VIRUSES = []
-REFSEQ = []
 #also make dictionary MERGE, with key dataset_sample and value True or False
 MERGE = {}
 
@@ -88,7 +87,6 @@ for dataset in config:
 		SAMPLES.append(sample)
 		HOSTS.append(config[dataset]["host"])
 		VIRUSES.append(config[dataset]["virus"])
-		REFSEQ.append(config[dataset]["refseq"][:-4])
 		MERGE["{}_{}".format(dataset, sample)] = config[dataset]["merge"]
 
 
@@ -386,30 +384,6 @@ rule run_int_scripts:
 		cp {output.allBedTemp} {output.allBed}
 		"""
 
-#rule merge_bed:
-#	input:
-#		bed = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.bed"
-#	output:
-#		merge = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed"
-#	conda:
-#		"envs/bedtools.yml"
-#	shell:	
-#		"bedtools merge -c 5,4 -o count,distinct -i {input.bed} > {output.merge}"
-
-#rule refseq:
-#	input:
-#		merge = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed",
-#		ref = "../data/references/{refseq}.gff"
-#	output:
-#		genes = "../out/{dset}/ints/{samp}.{host}.{virus}.{refseq}.merged.bed"
-#	wildcard_constraints:
-#		samp = "[\w\d_]+",
-#		host = "[\w\d-]+",
-#		virus = "[\w\d-]+"
-#	conda:
-#		"envs/bedtools.yml"
-#	shell:
-#		"bedtools intersect -loj -a {input.merge} -b {input.ref} > {output.genes}"
 	
 #### visualization ####
 
