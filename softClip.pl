@@ -13,7 +13,7 @@ use Getopt::Long;
 
 my $cutoff = 20; # each alignment must contain this number of aligned bases and this number of soft-clipped bases 
 my $thresh = 0.95; #default amount of read that must be covered by alignments for rearrangement
-my $tol = 3; #when processing CIGARS, combine any SHp IDPN elements between M regions with this number of bases or less
+my $tol = 5; #when processing CIGARS, combine any SHp IDPN elements between M regions with this number of bases or less
 my $viral;
 my $human;
 my $output = "integrationSites.txt";
@@ -242,8 +242,8 @@ sub collectIntersect {
 	my ($vClip) = ($vCig =~ /(\d+)S/);
 	my ($vAlig) = ($vCig =~ /(\d+)M/);
 
-	#check that human and viral soft-clipped and aligned regions meet cutoff
-	unless (($hClip > $cutoff) and ($hAlig > $cutoff) and ($vClip > $cutoff) and ($vAlig > $cutoff)) { return; }
+	#check that host and viral aligned regions meet cutoff
+	unless (($hAlig > $cutoff) and ($vAlig > $cutoff)) { return; }
 	
 	### Overlap should be the same regardless of how it's calculated so double check
 	my $overlap1 = abs($hAlig - $vClip);

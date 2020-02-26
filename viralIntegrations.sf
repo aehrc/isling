@@ -76,7 +76,6 @@ DATASETS = []
 SAMPLES = []
 HOSTS = []
 VIRUSES = []
-REFSEQ = []
 #also make dictionary MERGE, with key dataset_sample and value True or False
 MERGE = {}
 
@@ -89,7 +88,6 @@ for dataset in config:
 		SAMPLES.append(sample)
 		HOSTS.append(config[dataset]["host"])
 		VIRUSES.append(config[dataset]["virus"])
-		REFSEQ.append(config[dataset]["refseq"][:-4])
 		MERGE["{}_{}".format(dataset, sample)] = config[dataset]["merge"]
 
 
@@ -153,9 +151,7 @@ rule dedup:
 		"envs/bbmap.yml"
 	shell:
 		"""
-		dedupe.sh -Xmx35g threads=8 in1="{input.r1}" in2="{input.r2}" out="{params.temp}" ac=f
-		reformat.sh -Xmx35g threads=8 in="{params.temp}" out1="{output.r1}" out2="{output.r2}"
-		rm {params.temp}
+		clumpify.sh -Xmx15g in1="{input.r1}" in2="{input.r2}" out1="{output.r1}" out2="{output.r2}" dedupe subs=0
 		"""
 
 
@@ -262,7 +258,7 @@ rule align_bwa_virus:
 		"""
 		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.r1} --read2 {input.r2} --output {output.vPaired} --threshold 10 --hflag 200
 		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.all} --output {output.vSing} --threshold 10 --hflag 200
-		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.all} --output {output.vShort} --threshold 10 --hflag 200 --insert 0
+		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.all} --output {output.vShort} --threshold 10 --hflag 200  
 		"""
 
 rule extract_vAligned:
@@ -336,7 +332,7 @@ rule align_bwa_host:
 		"""
 		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.r1} --read2 {input.r2} --output {output.hPaired} --threshold 10 --hflag 200
 		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.all} --output {output.hSing} --threshold 10 --hflag 200
-		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.allShort} --output {output.hShort} --threshold 10 --hflag 200 --insert 0
+		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.allShort} --output {output.hShort} --threshold 10 --hflag 200 --insert_extend 0
 		"""
 rule convert:
 	input:
@@ -389,30 +385,6 @@ rule run_int_scripts:
 		cp {output.allBedTemp} {output.allBed}
 		"""
 
-#rule merge_bed:
-#	input:
-#		bed = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.bed"
-#	output:
-#		merge = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed"
-#	conda:
-#		"envs/bedtools.yml"
-#	shell:	
-#		"bedtools merge -c 5,4 -o count,distinct -i {input.bed} > {output.merge}"
-
-#rule refseq:
-#	input:
-#		merge = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.merged.bed",
-#		ref = "../data/references/{refseq}.gff"
-#	output:
-#		genes = "../out/{dset}/ints/{samp}.{host}.{virus}.{refseq}.merged.bed"
-#	wildcard_constraints:
-#		samp = "[\w\d_]+",
-#		host = "[\w\d-]+",
-#		virus = "[\w\d-]+"
-#	conda:
-#		"envs/bedtools.yml"
-#	shell:
-#		"bedtools intersect -loj -a {input.merge} -b {input.ref} > {output.genes}"
 	
 #### visualization ####
 

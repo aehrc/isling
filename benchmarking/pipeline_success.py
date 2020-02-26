@@ -21,16 +21,19 @@ def main(argv):
 	parser.add_argument('--ints', help='integrations applied file', required = True)
 	parser.add_argument('--viral_reads', help='file with reads containing information on reads containing viral DNA', required = True)
 	parser.add_argument('--all_reads', help = 'file containing all reads IDs', required = True) 
+	parser.add_argument('--save', help = 'location to save output', required = True)
 	args = parser.parse_args()  
 	
 	
 	print("Output to be saved to /evaluate_pipeline_output/output.txt") 
 
 	#create directory to save output
-	os.makedirs('evaluate_pipeline_output', exist_ok = True)
+	directory =  str(args.save)+'/evaluate_pipeline_output'
+	os.makedirs(directory, exist_ok = True)
 
 	#save output in terminal to a file 
-	f = open( "evaluate_pipeline_output/output.txt", "w")
+	out = directory + "/output.txt"
+	f = open( out, "w")
 	sys.stdout = f  
 	
 	print("STARTING...", flush = True) 
@@ -43,28 +46,45 @@ def main(argv):
 	#read in file listing all reads 
 	all_reads = pd.read_csv(args.all_reads,header = 0, sep = '\t')
 	all_IDs = list(set(all_reads["fragment_id"]))
-	all_IDs = [i.replace('chr', '') for i in all_IDs] 	
-
+	#make the ids match the format of those provided by the pipeline 
+	all_IDs = [i.replace('chr', '') for i in all_IDs]
 
 	#read in file listing which reads contain viral DNA 
 	viral_reads = pd.read_csv(args.viral_reads, header=0, sep='\t')
+	#make the ids match the format of those provided by the pipeline 
 	viral_reads['fragment_id'] = [x.replace("chr","") for x in viral_reads['fragment_id']]
+		#make the ids match the format of those provided by the pipeline 
+	viral_reads['fragment_id'] = [i.replace('chr', '') for i in viral_reads['fragment_id']]
+
 	#pipeline can only detect a read as being viral if there is at least 20 bases each of host and virus DNA
-	all_reads = filterLength(viral_reads, 20)  
+	viral_reads = filterLength(viral_reads, 20, directory)  
 
 	#read in file listing the integrations detected by the pipeline 
 	pipe_ints = pd.read_csv(args.pipeline, header = 0, sep = '\t')
-	print("Number of reads detected by pipeline: " +str(len(pipe_ints)), flush = True)
+	replace_pipe_IDs = []
+	#change format of episome IDs to match the read files if present
+	for i in range(len(pipe_ints["ReadID"])): 
+		if 'episome' in pipe_ints["ReadID"][i]: 
+			ID = pipe_ints["ReadID"][i].split('/')
+			replace_pipe_IDs.append(ID[0])
+		else: 
+			replace_pipe_IDs.append(pipe_ints["ReadID"][i])
+	pipe_ints.ReadID = replace_pipe_IDs
+	
 
 	#look at the different types of filtering 
-	compareFilters(pipe_ints,all_reads, all_IDs)
+	#compareFilters(pipe_ints,all_reads, all_IDs)
 
 	#look for what ratio of integrations we captured with the detected reads
-	"""
-	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads = listIDs(all_reads, pipe_ints, all_IDs)
-	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, False) 
-	missed_hPos = findMissed(all_reads, detected_Vreads)
-	"""
+	
+	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads = listIDs(viral_reads, pipe_ints, all_IDs, directory)
+	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, True, args.save)
+	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads) 
+	conf_df.to_csv(str(args.save)+'/evaluate_pipeline_output/conf_mat.csv', sep = '\t') 
+
+	
+	#missed_hPos = findMissed(all_reads, detected_Vreads)
+	
 
 	f.close()
 
@@ -96,37 +116,39 @@ def filterList(pipe_ints, ID_list):
 	return filt_pipe
 			
 
-def listIDs(all_reads, pipe_ints, all_IDs): 
+def listIDs(viral_reads, pipe_ints, all_IDs, directory): 
 	"""Create lists of the predicted and actual viral and non-viral reads""" 
 
 	#List all IDs 
-	all_reads = list(set(all_IDs))
-	print("Number of reads: "+str(len(all_reads)), flush = True)
+	all_IDs = list(set(all_IDs))
+	print("Number of reads: "+str(len(all_IDs)), flush = True)
 
 	#list pipeline predictions
 	pipe_IDs =list(set(pipe_ints["ReadID"]))
 	#remove space at the start of the ID
 	pipe_IDs = [i.replace(" ", "") for i in pipe_IDs]  
-	
+	print("Number of reads detected by pipeline: " +str(len(pipe_IDs)), flush = True)
+
 	#List actual viral reads 
-	actual_Vreads = list(set(all_reads['fragment_id']))
+	actual_Vreads = list(set(viral_reads['fragment_id']))
 	actual_Vreads = [i.replace("chr","") for i in actual_Vreads] 
 	print("Number of viral reads: "+str(len(actual_Vreads)), flush = True) 
 
 	#List viral reads predicted by the pipeline 
-	pred_Vreads = list(set(pipe_IDs).intersection(set(all_reads)))
+	pred_Vreads = list(set(pipe_IDs))
 	print("Number of viral reads predicted by the pipeline: "+str(len(pred_Vreads)), flush = True)
 
 	#List viral reads appearing in pipeline which are unknown 
-	pred_unk = list(set(pipe_IDs)-set(all_reads)) 
+	pred_unk = list(set(pipe_IDs)-set(all_IDs)) 
+	#have less than the required length but being detected by the pipeline 
 	print("Reads filtered in processing (ie low quality): "+str(len(pred_unk)), flush = True) 
 
 	#List actual non-viral reads 
-	actual_NVreads = list(set(all_reads) - set(actual_Vreads)) 
+	actual_NVreads = list(set(all_IDs) - set(actual_Vreads)) 
 	print("Number of non-viral reads: "+str(len(actual_NVreads)), flush = True) 
 
 	#list non-viral reads predicted by the pipeline 
-	pred_NVreads = list(set(all_reads)-set(pred_Vreads))
+	pred_NVreads = list(set(all_IDs)-set(pred_Vreads))
 	print("Number of predicted non-viral reads: " +str(len(pred_NVreads)), flush = True) 
 
 	print("Sum of actual reads: "+str(len(actual_Vreads)+len(actual_NVreads)),flush = True)
@@ -134,7 +156,9 @@ def listIDs(all_reads, pipe_ints, all_IDs):
 
 	return actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads 
 
-def listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save): 
+
+
+def listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save, location): 
 	"""function which creates a list of the IDs successfully predicted by the pipeline and those missed. actual Vreads is a list of the reads known to be viral and pred_Vreads is a list of the reads predicted by the pipeline to contain viral DNA. Can save false positives and negatives to file if save == True.""" 
 
 	#find how many of the viral reads were/were not detected by the pipeline
@@ -157,11 +181,13 @@ def listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save):
 	
 	if save == True: 
 		#save the false positive reads to file
-		with open('evaluate_pipeline_output/false_positive_IDs.txt', 'w') as f: 
+		false_pos = location+'/evaluate_pipeline_output/false_positive_IDs.txt'
+		with open(false_pos, 'w') as f: 
 			for item in detected_NVreads: 
 				f.write("%s\n" % item)
 		#save the false negative reads to file 
-		with open('evaluate_pipeline_output/false_negative_IDs.txt', 'w') as f: 
+		false_neg = location+'/evaluate_pipeline_output/false_negative_IDs.txt'
+		with open(false_neg, 'w') as f: 
 			for item in undetected_Vreads: 
 				f.write("%s\n" % item)
 		print("False positive reads saved to 'evaluate_pipeline_output/false_positive_IDs.txt'", flush = True) 
@@ -169,7 +195,7 @@ def listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save):
 
 	return detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads
 
-def findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads,save): 
+def findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads): 
 	"""Get statisitics on the the success of the pipeline""" 
 
 	# find the number of TP, FN, FP and TN 
@@ -186,7 +212,7 @@ def findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_N
 
 	#construct confusion matrix
 	conf_mat = np.array([[TPR,FPR],[FNR, TNR]])
-	consfusionMatrix(conf_mat)
+	#consfusionMatrix(conf_mat)
 
 	#accuracy - chance of making a correct prediction
 	acc = ((TP+TN)/(TP+TN+FP+FN))*100
@@ -474,8 +500,8 @@ def filteredStats(filter_idx, pipe_ints, tag, all_IDs, all_reads, save):
 	#report statistics of filtering
 	actual_Vreads, pred_Vreads, actual_NVreads, pred_NVreads  = listIDs(all_reads,filt_pipe, all_IDs)
 	print("Stats after filtering...")
-	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save)
-	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads, tag)
+	detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads = listSuccess(actual_Vreads, actual_NVreads, pred_Vreads, pred_NVreads, save, args.save)
+	stats, conf_df = findStats(detected_Vreads, undetected_Vreads, detected_NVreads, undetected_NVreads)
 
 	return stats, conf_df 
 
@@ -503,47 +529,51 @@ def filterVectorRearrangement(pipe_ints):
 
 	return filt_pipe 
 
-def filterLength(all_reads,min_len):
+def filterLength(all_reads,min_len, directory):
 	"""Function which filters viral reads to contain only reads with a set amount of viral DNA (min_len)""" 
 
 	#set the read length
 	read_len = 150 
-	
-	#make a list of the indexes of the reads we wish to filter
-	filt_idx = []
 
+	filt_idx = [] 
+	
 	#loop through and adjust chimeric reads 
 	for i in range(len(all_reads)):
 
 		#adjust left read to meet the threshold of 20bp to be chimeric 	
-		if all_reads['left_read_amount'][i] > read_len - min_len: 
+		if all_reads['left_read_amount'][i] >= read_len - min_len: 			
 			all_reads.loc[i,'left_read'] = 'v'
-		elif all_reads['left_read_amount'][i] < min_len: 
+		elif all_reads['left_read_amount'][i] <= min_len: 
 			all_reads.loc[i,'left_read'] = 'h'
 
 		#adjust right read to meet the threshold of 20bp to be chimeric 
-		if all_reads['right_read_amount'][i] > read_len - min_len: 
+		if all_reads['right_read_amount'][i] >= read_len - min_len: 
 			all_reads.loc[i,'right_read'] = 'v'
-		elif all_reads['right_read_amount'][i] < min_len: 
+		elif all_reads['right_read_amount'][i] <= min_len: 
 			all_reads.loc[i,'right_read'] = 'h'
 
 		#if both left and right are viral or host do integration occured here
 		if all_reads['right_read'][i] == 'h' and all_reads['left_read'][i] == 'h' or all_reads['right_read'][i] == 'v' and all_reads['left_read'][i] == 'v':
-				filt_idx = []
+				filt_idx.append(i) 
+
 
 	#drop the false rows
 	filt_reads = all_reads.drop(all_reads.index[filt_idx])
 	
 	#reindex the filtered reads
 	filt_reads = filt_reads.reset_index(drop=True)
+
+	#save the filtered reads dataframe for debugging purposes 
+	filt_reads.to_csv(directory+"/filteredlength_reads.csv", sep='\t')
 	
-	#report the filtering 
 	#report the filtering  
 	rem = (len(filt_reads)/len(all_reads))*100
 	print("\nAfter filtering out reads with less than "+str(min_len)+" base pairs of viral DNA, {:.2f} % of reads remain.".format(rem), flush = True)
 
+	print("length filter done" )
 	return filt_reads
 	
+
 
 def filterFalse(ints): 
 	"""Remove integrations which were unsuccessful""" 
@@ -663,43 +693,6 @@ def evaluateMissed(missed_hPos,ints):
 	assessFragments(miss_num_fragments)   
 
 
-def assessMissedLength(missed_hPos, ints): 
-	"""Look at the properities of the integrations which were not detected by the pipeline""" 
-	#make dictionary of integrations  
-	hPos_dict = ints.set_index('hPos').to_dict()
-	hPos_keys = list(hPos_dict.get('vBases').keys())
-
-	#get a list of the lengths of the integrations 
-	all_lengths = []
-
-	for i in range(len(hPos_keys)): 
-		seq = hPos_dict.get('vBases')[hPos_keys[i]]  
-		length = len(seq) 
-		all_lengths.append(length)
-	 
-	hPos_length = dict(zip(ints['hPos'],all_lengths)) 
-	
-	#save distribution of all integration lengths   
-	"""plt.pyplot.figure(0)
-	weights_all = np.ones_like(all_lengths)/float(len(all_lengths)) 	
-	plt.pyplot.hist(all_lengths, weights = weights_all) 
-	plt.pyplot.title("Histogram of the length of all integrations") 
-	plt.pyplot.xlabel('length of integration')
-	plt.pyplot.ylabel('Density')  
-	plt.pyplot.savefig("evaluate_pipeline_output/integration_lengths.pdf")
-	print("Distribution of all integrations saved to integration_lengths.pdf") 
-"""
-	#save distribution of the missed integration lengths
-	missed_ints = [hPos_length.get(missed_int) for missed_int in missed_hPos]
-	weights_missed = np.ones_like(missed_ints)/float(len(missed_ints)) 
-	plt.pyplot.figure(1)  
-	plt.pyplot.hist(missed_ints, weights = weights_missed)
-	plt.pyplot.title("Histogram of the length of missed integrations") 
-	plt.pyplot.xlabel('length of integration')
-	plt.pyplot.ylabel('Density')  
-	plt.pyplot.savefig("evaluate_pipeline_output/missed_integration_lengths.pdf")
-	print("Distribution of all integrations saved to evaluate_pipeline_output/missed_integration_lengths.pdf")
-	
 def percentactual(values): 
 	"""counts the number of actual variables in a list of values""" 
 
@@ -755,37 +748,6 @@ Inormation corresponds to read ID"""
 
 	return overlap_dict
 
-	
-	
-def assessLength(all_reads, undetected_Vreads): #TODO this is questionable remove 
-	"""Compare the number of viral base pairs in the missed reads and in alfg
-l reads"""
-	#get the required columns
-	int_ID = all_reads['fragment_id'].values
-	first_len = all_reads['left_read_amount'].values
-	second_len = all_reads['right_read_amount'].values
-
-	#find the length of virus in each read - excluding reads consisting of whole virus and no virus
-	viral_len = [max(first_len[i],second_len[i]) for i in range(len(all_reads))]	
-	
-	#create a dictionay
-	len_dict = dict(zip(int_ID, viral_len)) 
-	#get the lengths for missed reads 
-	missed_len = [len_dict.get(missed) for missed in undetected_Vreads] 
-	
-	#save distribution of length of the missed data 
-	ax = sns.distplot(missed_len, hist=False)
-	ax.set_title("Distribton of the length of missed integrations") 
-	ax.set(xlabel='length of missed integration', ylabel = 'Density')  
-	fig = ax.get_figure()
-	fig.savefig("evaluate_pipeline_output/missedread_len_distplot.pdf")
-	print("Distribution of the length of the missed reads saved to evaluate_pipeline_output/evaluate_pipeline_output/missedread_len_distplot.pdf")
-
-
-	
-#def assessFalseReads #TODO look at the integrations which were falsely detected by the pipeline 
-#look at the junctions in them 
-#were they close to an actual integration event? 
 
 def assessOverlap(all_reads, undetected_Vreads): 
 	"""Looks at what type of overlap the reads missed by the pipeline have. Takes a dataframe of all of the reads and a list of the IDs of the missed reads""" 
@@ -870,59 +832,6 @@ def missedLocation(missed_df):
 	ax.tick_params(axis="both",which="major", labelsize = 7) 
 	fig = ax.get_figure()
 	fig.savefig("evaluate_pipeline_output/missedread_location.pdf")
-
-def readLength(missed_df): 
-	"""Look at the length of viral DNA in false negative reads""" 
-	
-	#get the amount of viral DNA in the chimeric read 
-	missed_viral = [] 
-	
-	for i in range(len(missed_df)): 
-		if missed_df["left_read"][i] == "chimeric": 
-			missed_viral.append(missed_df["left_read_amount"][i])
-		else: 
-			missed_viral.append(missed_df["right_read_amount"][i])
-
-	#visualise as a distribution 
-	fig, ax = plt.pyplot.subplots()
-	ax = sns.distplot(missed_viral) #TODO normalise? 
-	ax.set_xlabel("Viral DNA (bp)")
-	ax.set_ylabel("Density") 
-	ax.set_title("Distribution of the amount of viral DNA in false negative reads")
-	fg = ax.get_figure()
-	fig.savefig("evaluate_pipeline_output/missedread_viralDNA.pdf")
-	print("Amount of viral DNA in reads missed by the pipeline saved to evaluate_pipeline_output/missedread_viralDNA.pdf",flush = True) 
-	
-	
-
-def compareOverlap(all_reads, pipe_ints): #TODO finish this 
-	"""Compares whether the pipeline has correctly predicted the gap type of the read. Takes list of predicted"""
-
-	#get the IDs of the pipeline reads
-	pipe_reads = pipe_ints['ReadID'].values 
-
-	#get the overlap type of the pipeline reads
-	pipe_overlap = pipe_ints['Type'].values
- 
-	#create a dictionary of the overlap types for each read 
-	overlap_dict = getOverlap(all_reads)
-	
-	#get the known overlap type 
-	actual_overlap = [overlap_dict.get(pipeline) for pipeline in pipe_reads] 
-	#TODO handle reads in pipeline but don't actually contain viral DNA 
-
-	#make comparisons between pipeline overlaps and known overlaps 
-	correct = 0 #counter for the number of correct estimations 
-	for i in range(len(pipe_reads)): 
-		if pipe_overlaps[i] == actual_overlap[i]: 
-			correct = correct +1 
-
-	#caluclate the accuracy of the pipeline to find the type of junction
-	accuracy = (correct/len(pipe_reads))*100 
-	print("Pipeline predicted the type of junction correctly "+str(accuracy)+"% of the time:") 
-
-	#we also want to know which ones we got wrong 
-	#find the distribtuion of rearrangements and deletions so that these can be compared - plot using seaborn?
 
 
 

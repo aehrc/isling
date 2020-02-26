@@ -11,7 +11,7 @@ use Getopt::Long;
 
 my $cutoff = 20; # default clipping cutoff
 my $thresh = 0.95; #default amount of read that must be covered by alignments for rearrangement
-my $tol = 3; #when processing CIGARS, combine any IDPN elements between matched regions with this number of bases or less
+my $tol = 5; #when processing CIGARS, combine any IDPN elements between matched regions with this number of bases or less
 my $viral;
 my $human;
 my $output = "integrationSites.txt";
@@ -72,6 +72,7 @@ while (my $vl = <VIRAL>) {
 
 	if ($parts[1] & 0x800) { next(); } # skip supplementary alignments
 	if ($parts[1] & 0x2) { next(); } # skip mapped in proper pair
+	if ($parts[1] & 0x100) { next(); } # skip alignments that are not primary
 	
 	#for read pairs where one read is mapped and the other is not:
 	#want reads where if not mapped, mate is mapped, or vice versa
@@ -81,7 +82,7 @@ while (my $vl = <VIRAL>) {
 	
 	#so essentially only exclude reads where both reads are unmapped
 	
-	if (($parts[1] & 0x8) and ($parts[1] & 0x4)) { next; }
+	#if (($parts[1] & 0x8) and ($parts[1] & 0x4)) { next; }
 
 	#get cigar
 	my ($cig, $editDist2) = processCIGAR2($parts[5], $tol); # Note that could be a cigar or * if unmapped
@@ -119,12 +120,13 @@ while (my $hl = <HUMAN>) {
 	my @parts = split(' ', $hl); #get fields from each alignment
 	
 	#want reads where if not mapped, mate is mapped, or vice versa
-	if (!($parts[1] & 0x8) and !($parts[1] & 0x4)) { next; }
+	#if (!($parts[1] & 0x8) and !($parts[1] & 0x4)) { next; }
 	
 	unless ((exists $viralR1{$parts[0]}) and (exists $viralR2{$parts[0]})) { next; } #only consider reads from viral alignment
 	
 	if ($parts[1] & 0x800) { next(); } # skip supplementary alignments
 	if ($parts[1] & 0x2) { next(); } # skip mapped in proper pair
+	if ($parts[1] & 0x100) { next(); } # skip alignments that are not primary
 	
 	#get cigar
 	my ($cig, $editDist2) = processCIGAR2($parts[5], $tol); # Note that could be a cigar or * if unmapped
@@ -314,11 +316,12 @@ sub findDiscordant {
 sub printHelp {
 	print "Pipeline for detection of viral integration sites within a genome\n\n";
 	print "Usage:\n";
-	print "\tperl discordant.pl --viral <sam> --human <sam> --cutoff <n> --output <out> --bed <bed> --help\n\n";
+	print "\tperl discordant.pl --viral <sam> --human <sam> --cutoff <n> --output <out> --bed <bed> --tol <tol> --help\n\n";
 	print "Arguments:\n";
 	print "\t--viral:   Alignment of reads to viral genomes (sam)\n";
 	print "\t--human:   Alignment of reads to human genome (sam)\n";
 	print "\t--cutoff:  Minimum number of clipped reads to be considered (default = 20)\n";
+	print "\t--tol:     Tolerance when combining short elements with neigbouring matched regions (default = 5)\n";
 	print "\t--output:  Output file for results (default = integrationSite.txt\n";
 	print "\t--bed:     Print integrations sites to indicated bed file (default = NA)\n";
 	print "\t--merged:  Merge bedfile into overlapping integration sites (default = NA)\n";
