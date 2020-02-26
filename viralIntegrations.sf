@@ -9,6 +9,7 @@
 # parent_folder/
 # ├── data
 # │   ├── metadata
+# │   │   └── dataset1
 # │   ├── reads
 # │   │   └── dataset1
 # │   │       ├── sample1_1.fastq.gz
