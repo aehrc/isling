@@ -79,9 +79,9 @@ VIRUSES = []
 MERGE = {}
 
 for dataset in config:
-	#get files in directory and strip off "_1.fastq.gz"
-	samples = [os.path.basename(f)[:-11] for f in glob.glob("../data/reads/{}/*_1.fastq.gz".format(dataset))]
-	samples = samples + [os.path.basename(f)[:-12] for f in glob.glob("../data/reads/{}/*_R1.fastq.gz".format(dataset))]
+	#get files in directory and strip off suffix (specified in "R1_suffix" field)
+	suffix = config[dataset]["R1_suffix"]
+	samples = [os.path.basename(f)[:-len(suffix)] for f in glob.glob("../data/reads/{}/*{}".format(dataset, suffix))]
 	for sample in samples:
 		DATASETS.append(dataset)
 		SAMPLES.append(sample)
@@ -111,23 +111,11 @@ rule all:
 
 #### merging and dedup ###
 
-rule rename:
-	input:
-		r1 = "../data/reads/{dset}/{samp}_R1.fastq.gz",
-		r2 = "../data/reads/{dset}/{samp}_R2.fastq.gz"
-	output:
-		r1_out = temp("../out/reads/{dset}/{samp}_1.fastq.gz"),
-		r2_out = temp("../out/reads/{dset}/{samp}_2.fastq.gz")
-	shell:
-		"""
-		cp {input.r1} {output.r1_out}
-		cp {input.r2} {output.r2_out}
-		"""
 
 rule copy:
 	input:
-		r1 = "../data/reads/{dset}/{samp}_1.fastq.gz",
-		r2 = "../data/reads/{dset}/{samp}_2.fastq.gz"
+		r1 = lambda wildcards: "../data/reads/{}/{}{}".format(wildcards.dset, wildcards.samp, config[wildcards.dset]["R1_suffix"]) ,
+		r2 = lambda wildcards: "../data/reads/{}/{}{}".format(wildcards.dset, wildcards.samp, config[wildcards.dset]["R2_suffix"])
 	output:
 		r1_out = temp("../out/reads/{dset}/{samp}_1.fastq.gz"),
 		r2_out = temp("../out/reads/{dset}/{samp}_2.fastq.gz")
