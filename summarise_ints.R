@@ -1,4 +1,4 @@
-#### Plot integration site FRG206 ####
+
 
 #### Packages ####
 library(stringr)
@@ -8,12 +8,11 @@ library(purrr)
 library(tidyr)
 library(readr)
 library(writexl)
-library(circlize)
+#library(circlize)
  
 #### import data ####
 data_path = "../out/"
 out_path = "../out/summary/"
-
 
 files <- list.files(data_path, pattern =".integrations.txt", recursive=TRUE)
 
@@ -27,8 +26,8 @@ df <- tibble(filename = files) %>% # create a data frame holding the file names
 #add extra columns with sample name, dataset, host
 df <- df %>% 
   mutate(dataset = dirname(dirname(filename))) %>% 
-  mutate(sample = str_extract(basename(filename), "^[\\w]+(?=\\.)")) %>% 
-  mutate( host = ifelse(str_detect(basename(filename), "mouse|mm10|GRCm38"), "mm10", ifelse(str_detect(basename(filename), "macaque|macaca|macFas5"), "macFas5", "hg38")))
+  mutate(sample = str_extract(basename(filename), "^[\\w-_]+(?=\\.)")) %>% 
+  mutate(host = ifelse(str_detect(basename(filename), "mouse|mm10|GRCm38"), "mm10", ifelse(str_detect(basename(filename), "macaque|macaca|macFas5"), "macFas5", "hg38")))
 
 #write xls with summary of number of sites 
 df %>% 
