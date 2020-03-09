@@ -130,7 +130,6 @@ def main(argv):
 	print("\nNUMBER OF INTEGRATIONS TO INSERT: "+str(int_num),flush=True)
 	
 	#integration loop 
-
 	counter = 0 # count number of iterations 
 
 	while len(host_ints) < int_num: 
@@ -140,7 +139,6 @@ def main(argv):
 
 			host_ints, host_fasta = insertSetLength(host_fasta, virus, host_ints, handle, min_len, sep, set_len, set_junc)
 		else: 
-
 			#do random integrations if a specific type of integrations is not selected
 			if args.int_type == 'rand': 
 				int_type =  np.random.randint(0,len(insertion_types))
@@ -151,8 +149,9 @@ def main(argv):
 				else: 	
 					int_type = insertion_dict.get(str(args.int_type)) 
 		
-			#apply integration 	
+			#apply integration	
 			host_ints, host_fasta = insertion_types[int_type](host_fasta, virus, host_ints, handle, min_len, sep, set_junc)
+			
 
 		#count the number of integrations applied 
 		counter += 1  
@@ -409,7 +408,7 @@ def insertPortionDeletion(host, viruses, int_list, filehandle, min_len,sep, set_
 	while True:
 		#get one viral chunk
 		currentInt = Integration(host, set_junc)
-		currentInt.addDeletion(viruses, min_len,part = "rand")
+		currentInt.addDeletion(viruses, min_len, part = "rand")
 		attempts += 1
 		#check that all integrations are args.sep away from new integration
 		if all([ abs(currentInt.hPos-i) > sep for i in currentPos ]):
@@ -417,6 +416,7 @@ def insertPortionDeletion(host, viruses, int_list, filehandle, min_len,sep, set_
 		#if we've made a lot of attempts, give up
 		elif attempts > max_attempts:
 			return int_list, host
+	
 	
 	#do integration
 	host, status = currentInt.doIntegration(host,int_list,filehandle)
@@ -488,14 +488,13 @@ class Integration:
 
 		#generate junctions 
 		self.overlaps = self.addJunction(this_junc) 
-	
 		
 		#record the type of junction for saving to file later
 		self.junction = (self.convertJunction(self.overlaps[0]),
 				self.convertJunction(self.overlaps[1]))
 
-		#used when an integration with an overlap is intgrated at a location other than hPos 
-		self.newpoint = -1 
+		#used when an integration with an overlap is integrated at a location other than hPos 
+		self.newpoint = -1
 		
 
 	def addJunction(self, junc):
@@ -587,13 +586,13 @@ class Integration:
 		new_chunk = ""
 		for i in range(0,n): 
 			portion = self.chunk.pieces.get(i).get('bases').seq
-			new_chunk = new_chunk+portion
+			new_chunk = new_chunk + portion
 		self.chunk.bases = new_chunk
 	
 	def addDeletion(self, viruses, min_len,part = "rand"):
 		"""
 		add a fragment with a deletion in the middle
-		always split into >3 pieces and delete the middle
+		always split into > 3 pieces and delete the middle
 		"""
 		#check there isn't already a fragment
 		if self.fragments > 0:
@@ -609,11 +608,11 @@ class Integration:
 				break
 		self.fragments = n
 		
-		
 		#add a rearranged fragment
 		self.chunk = ViralChunk(viruses, min_len, part)
 		self.chunk.delete(n)
 		self.fragments -= 1
+		print(f"fragments: {self.fragments}, chunk: {self.chunk}")
 
 		#create new chunk using the set of fragments
 		new_chunk = ""
@@ -974,11 +973,11 @@ class Integration:
 		if self.fragments == 0:
 			return f"Integration on chromosome {self.chr}, position {self.hPos}"
 		elif self.fragments == 1:
-			(oris, coords, bases) = getOrisCoordsBases(self)
+			(oris, coords, bases) = self.getOrisCoordsBases()
 			return f"Integration of {self.fragments} viral fragument on chromosome {self.chr}, position {self.hPos}.\n" \
 				f"Integrated virus: {self.chunk.virus}, virus bases: {bases}, virus orientations: {oris}, coords {coords}"	
 		else:
-			(oris, coords, bases) = getOrisCoordsBases(self)
+			(oris, coords, bases) = self.getOrisCoordsBases()
 			return f"Integration of {self.fragments} viral fraguments on chromosome {self.chr}, position {self.hPos}.\n" \
 				f"\tIntegrated virus: {self.chunk.virus},\n\tvirus bases: {bases}," \
 				f"\n\tvirus orientations: {oris},\n\tvirus breakpoints: {coords}"			
@@ -987,8 +986,7 @@ class ViralChunk:
 	"""
 	Class with a chunk of virus
 	Default is to get a random chunk (part = 'rand')
-	use part = "whole" (or some other string) to get whole virus
-	
+	use part = "whole" (or some other string) to get whole virus, or use part = int to get a chunk of lenth int
 	"""
 	
 	#make viral chunk
@@ -999,9 +997,8 @@ class ViralChunk:
 		#set minimum size for a chunk of virus 
 		min_chunk = min_len
 		
-		if min_chunk>len(viruses[self.virus].seq):
+		if min_chunk > len(viruses[self.virus].seq):
 			raise OSError("Viral genome is shorter than the minimum intgration size!")
-
 
 		#if we want a random of chunk of a predetermined size (set_len) 
 		if isinstance(part, int): 
@@ -1011,10 +1008,10 @@ class ViralChunk:
 			#can't use a set_len longer the virus
 			if set_len > len(viruses[self.virus].seq): 
 				raise OSError("Set length for integrations is longer the viral sequence!")
-			
 
 			#set_len can't be shorter than the min_chunk 
 				raise OSError("Set lenfth for integrations is shorter than the minimum integration length!")
+
 
 			while True: 
 				self.start = np.random.randint(0,len(viruses[self.virus].seq)-set_len)
@@ -1024,11 +1021,11 @@ class ViralChunk:
 		
 
 		#if we want a random chunk of virus
-		elif part == "rand":		
+		elif part == "rand":
 			while True:
 				self.start = np.random.randint(0, len(viruses[self.virus].seq)-1)
 				self.stop = np.random.randint(self.start+1, len(viruses[self.virus].seq))
-				if self.stop-self.start>min_chunk:
+				if (self.stop - self.start + 1) >= min_chunk:
 					break
 		
 		#if we want the whole virus
@@ -1036,7 +1033,7 @@ class ViralChunk:
 			self.start = 0
 			self.stop = len(viruses[self.virus].seq)
 
-		#give the integration an oreintation 
+		#give the integration an orientation 
 		if np.random.uniform() > 0.5:
 			self.ori = "f" #define orientation
 			self.bases = viruses[self.virus][self.start:self.stop] #get bases to insert
@@ -1056,14 +1053,13 @@ class ViralChunk:
 	def split(self, n):
 		#split a part of a virus into n random parts
 		#for later rearrangement or deletion
-		
+
 		if self.isSplit is True:
 			print("Already split")
 			return
-		self.isSplit = True
 		
 		#need to check that we have enough bases to leave at least one base in each section
-		if self.stop - self.start < n:
+		if (self.stop - self.start) < n:
 			print("Not enough bases to split")
 			return
 		
@@ -1071,7 +1067,11 @@ class ViralChunk:
 		oris = [self.pieces[0]["ori"] for i in range(n)]
 		
 		#get n random coordinates to be breakpoints (plus original start and stop)
-		breaks = [self.start, self.stop] + list(np.random.randint(self.start+1, self.stop-1, n-1))
+		while True:
+			breaks = [self.start, self.stop] + list(np.random.randint(self.start+1, self.stop-1, n-1))
+			# check that all coordinates are unique
+			if len(set(breaks)) == len(breaks):
+				break
 				
 		#sort breakpoints 
 		breaks.sort()
@@ -1097,6 +1097,9 @@ class ViralChunk:
 		#convert oris, bases, breakpoints to dict
 		self.pieces = { i:{"bases":bases[i], "ori":oris[i], "coords":(breaks[i], breaks[i+1])} for i in range(n)}
 		
+		# isSplit is now true
+		self.isSplit = True
+		
 	def rearrange(self, n):
 		#rearrange a chunk in n parts
 		#pick n random breakpoints, and extract sequence of each
@@ -1106,16 +1109,17 @@ class ViralChunk:
 		#check if chunk has already been split into parts
 		if self.isSplit is False:
 			self.split(n)
-			
 		#if has been split into a different number of parts, just use that number
 		else:
 			n = len(self.breakpoints)
-		
+
+		# check we were able to successfully split the chunk
+		if self.isSplit is False:
+			return
+
 		#don't rearrange chunk if it's already been rearranged
 		if self.isRearranged is True:
 			raise ValueError("Chunk has already been rearranged!")
-			
-		self.isRearranged = True #rearranged is now true
 		
 		#get new order, and make sure it's not the same as before
 		order = np.arange(n)
@@ -1126,6 +1130,8 @@ class ViralChunk:
 		
 		#replace keys with shuffled numbers
 		self.pieces = {order[key]:value for key, value in self.pieces.items()}
+
+		self.isRearranged = True #rearranged is now true
 			
 	def delete(self, n):
 		#delete a middle from a viral chunk of n pieces
@@ -1133,31 +1139,38 @@ class ViralChunk:
 		#if there are less than 3 pieces, just use 3
 		if n < 2:
 			n = 3
-		
+		print(f"pieces: {self.pieces}")	
+	
 		#check if chunk has already been split into parts
 		if self.isSplit is False:
 			self.split(n)
-			
+
 		#if has been split into a different number of parts, just use that number
 		else:
 			n = len(self.breakpoints)
-			
+
+		# check we were able to successfully split the chunk
+		if self.isSplit is False:
+			return
+
+		print(f"pieces: {self.pieces}")	
+
 		#don't rearrange chunk if it's already been rearranged
 		if self.isRearranged is True:
 			raise ValueError("Chunk has already been rearranged!")
-			
-		self.deletion = True #deletion is now true	
-		
+
 	
 		#get piece to delete - use middle piece
 		key_del = np.around((max(self.pieces.keys()) - min(self.pieces.keys()))/2)
-		
 
 		#replace keys with shuffled numbers
 		del self.pieces[key_del]
+
+		self.deletion = True #deletion is now true
 		
-		#return the number of deleted fragments
-		return 
+
+	def __str__(self):
+		return f"viral chunk from virus {self.virus} with start and stop coordinates ({self.start}, {self.stop}), pieces {self.pieces}.  Has it been split?: {self.isSplit}; Has it been rearranged? {self.isRearranged}; does it have a deletion? {self.deletion}"
 
 class Statistics:
 	"""
