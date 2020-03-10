@@ -52,10 +52,10 @@ def main(argv):
 	parser.add_argument('--min_len', help = 'minimum length of integerations [50]', required=False, default=50, type=int)
 	parser.add_argument('--set_len', help = 'use to get integrations of a specific length', required=False, default=0, type=int)
 	parser.add_argument('--epi_num', help = 'number of episomes [0]', required=False, default=0, type=int)
-	parser.add_argument('--int_portion', help = 'specify is a particular type of integrations are wanted: whole, portion, both [both]', required=False, default='random', type=str)
-	parser.add_argument('--int_deletions', help = 'specify if deletions should be conducted on none, some or all integrations [some]', required=False, default='rand', type=str)
+	parser.add_argument('--int_portion', help = 'specify is a particular type of integrations are wanted: whole, portion, both [both]', required=False, default='both', type=str)
+	parser.add_argument('--int_deletion', help = 'specify if deletions should be conducted on none, some or all integrations [some]', required=False, default='rand', type=str)
 	parser.add_argument('--int_rearrange', help = 'specify if rearrangements should be conducted on none, some or all integrations [some]', required=False, default='rand', type=str)
-	parser.add_argument('--set_junc', help = 'specify is a particular type of junctions are wanted from: clean gap or overlap. If no type of junction is specified junctions will be selected at random', required=False, default='rand', type=str)
+	parser.add_argument('--set_junc', help = 'specify is a particular type of junctions are wanted from: clean, gap, overlap or rand [rand]', required=False, default='rand', type=str)
 	parser.add_argument('--seed', help = 'seed for random number generator', required=False, default=1, type=int)
 	parser.add_argument('--verbose', help = 'display extra output for debugging', required=False, default=False, type=bool)
 	args = parser.parse_args()
@@ -87,117 +87,22 @@ def main(argv):
 	# assume that number of bases that are ruled out for each integration is 2 x sep
 	if np.sum([len(seq) for seq in host.values()]) < (args.sep * 2):
 		raise ValueError("Integrations are likely to clash. Specify fewer integrations or a shorter separation")
- 	
+
 	# check the specified type of junction is valid
 	if args.set_junc not in ["clean", "gap", "overlap", "rand"]:
 		raise ValueError("junction type (--set_junc) must be one of \"clean\", \"gap\" or \"overlap\"")
 
 	# check the specified type of integration is valid
-	if args.int_portion not in ["whole", "portion", "random"]:
-		raise ValueError("Not a valid type of integration: \"--int_portion\" should be one of \"whole\", \"portion\" \"random\"")
+	if args.int_portion not in ["whole", "portion", "both"]:
+		raise ValueError("Not a valid type of integration: \"--int_portion\" should be one of \"whole\", \"portion\", \"both\"")
 	if args.int_deletion not in ["all", "some", "none", "rand"]:
-		raise ValueError("not a valid type of integration: \"--int_deletion\" should be one of \"all\", \"some\" \"none\"")
+		raise ValueError("not a valid type of integration: \"--int_deletion\" should be one of \"all\", \"some\", \"none\"")
 	if args.int_rearrange not in ["all", "some", "none", "rand"]:
-		raise ValueError("not a valid type of integration: \"--int_rearrange\" should be one of \"all\", \"some\" \"none\"")
-	if (args.int_deletion == "all") :
-		if (args.int_rearrange == "all") or (args.int_rearrange == "some"):
-			raise ValueError("if \"int_deletion\" is \"all\", \"int_rearrange\" cannot both be \"all\" or \"some\"")
-	if (args.int_rearrange == "all"): 
-		if (args.int_deletion == "all") or (args.int_deletion == "some"):
-			raise ValueError("if \"int_rearrange\" is \"all\", \"int_deletion\" cannot both be \"all\" or \"some\"")
+		raise ValueError("not a valid type of integration: \"--int_rearrange\" should be one of \"all\", \"some\", \"none\"")
 
-	# for convenience, if we want integrations of only one type to be "all", should be able to specify just that one type
-	# but this creates conflicts between "all" and "some"
-	# resolve this by using "rand" as default and changing values depending on inputs
-	if (args.int_deletion == "all") (args.int_rearrange == "rand"):
-		args.int_rearrange = "none"
-	if (args.int_rearrange == "all") and (args.int_deletion == "rand"):
-		args.int_deletion = "none"
-	if (args.int_rearrange == "rand") and (args.int_deletion == "rand"):
-		args.int_deletion = "some"
-		args.int_deletion = "some"
+	# get integration types from combination of int_portion, int_deletion and int_rearrange
+	int_types = parseIntTypes(args)
 
-	print(f"portion: {args.int_portion}, rearrange: {args.int_rearrange}, deletion: {args.int_deletion}")
-
-
-	#integration types are: [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
-	int_types = []
-	if args.int_portion == "whole": # only whole integrations
-
-		# check if we want deletions
-		# only deletions
-		if (args.int_deletion == "all"):
-			int_types.append(insertWithDeletion)
-		# include integrations with and without deletions
-		elif (args.int_deletion == "some"):
-			int_types.append(insertWithDeletion)
-			int_types.append(insertWholeVirus)
-		else:
-			# no deletions
-			int_types.append(insertWholeVirus)
-
-		# check if we want rearrangements
-		# note that block above should have already added 'insertWholeVirus' unless we only want deletions
-		# only rearranged viruses
-		if (args.int_rearrange == "all"):
-			int_types.append(insertWholeRearrange)
-		# include integrations with and without rearrangements
- 		elif (args.int_rearrange == "some"):
-			int_types.append(insertWholeRearrange)
-
-
-	elif args.int_portion == "portion": #only partial integrations
-		# check if we want deletions
-		# only deletions
-		if (args.int_deletion == "all"):
-			int_types.append(insertPortionDeletion)
-		# include integrations with and without deletions
-		elif (args.int_deletion == "some"):
-			int_types.append(insertPortionDeletion)
-			int_types.append(insertViralPortion)
-		# no deletions		
-		else:
-			int_types.append(insertViralPortion)
-
-		# check if we want rearrangements
-		# note that block above should have already added 'insertViralPortion' unless we only want deletions
-		# only rearranged viruses
-		if (args.int_rearrange == "all"):
-			int_types.append(insertPortionRearrange)
-		# include integrations with and without rearrangements
- 		elif (args.int_rearrange == "some"):
-			int_types.append(insertPortionRearrange)
-
-	# both whole and partial integrations
-	else:
-		# check if we want deletions
-		# only deletions
-		if (args.int_deletion == "all"):
-			int_types.append(insertWithDeletion)
-			int_types.append(insertPortionDeletion)
-		# include integrations with and without deletions
-		elif (args.int_deletion == "some"):
-			int_types.append(insertWithDeletion)
-			int_types.append(insertWholeVirus)
-			int_types.append(insertPortionDeletion)
-			int_types.append(insertViralPortion)
-		# no deletions
-		else:
-			int_types.append(insertWholeVirus)
-			int_types.append(insertViralPortion)
-
-		# check if we want rearrangements
-		# note that block above should have already added 'insertWholeVirus' and 'insertViralPortion' unless we only want deletions
-		if (args.int_rearrange == "all"): # only rearranged viruses
-			int_types.append(insertWholeRearrange)
-			int_types.append(insertPortionRearrange)
- 		elif (args.int_rearrange == "some"): # include integrations with and without rearrangements
-			int_types.append(insertWholeRearrange)
-			int_types.append(insertPortionRearrange)
-
-	print(f"int_types: {int_types}")
-	
-	exit()	
 	
 	# if the user has specified a set length, set the minimum length to be the same
 	if args.set_len != 0:
@@ -300,7 +205,6 @@ def main(argv):
     		print("\nIntegrated host saved as "+str(args.ints),flush=True)
     		print("Details of sequences integrated saved as "+str(args.locs),flush=True)
     		print("Details of where intgrations lie in host sequence saved as "+str(args.ints_host),flush=True)
-
 
 def insertWholeVirus(host, viruses, int_list, filehandle, min_len, sep, set_junc):
 	"""Inserts whole viral genome into host genome"""
@@ -561,6 +465,89 @@ def checkFastaExists(file):
 		if not((prefix == "fa") or (prefix == "fasta") or (prefix == "fna")):
 			return False
 	return True
+	
+def parseIntTypes(args):
+		# for convenience, if we want integrations of only one type to be "all", should be able to specify just that one type
+	# but this creates conflicts between "all" and "some"
+	# resolve this by using "rand" as default and changing values depending on inputs
+	
+	# if one all, assume the other should be none
+	if (args.int_deletion == "all") and (args.int_rearrange == "rand"):
+		args.int_rearrange = "none"
+	if (args.int_rearrange == "all") and (args.int_deletion == "rand"):
+		args.int_deletion = "none"
+	# if one is some, assume the other should be some
+	if (args.int_deletion == "some") and (args.int_rearrange == "rand"):
+		args.int_rearrange = "some"
+	if (args.int_rearrange == "some") and (args.int_deletion == "rand"):
+		args.int_deletion = "some"
+	# if one is none, the other should be some
+	if (args.int_deletion == "none") and (args.int_rearrange == "rand"):
+		args.int_rearrange = "some"
+	if (args.int_rearrange == "none") and (args.int_deletion == "rand"):
+		args.int_deletion = "some"
+	# if neither specified, both should be some
+	if (args.int_rearrange == "rand") and (args.int_deletion == "rand"):
+		args.int_rearrange = "some"
+		args.int_deletion = "some"
+
+	#integration types are: [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
+	
+	# only whole integrations
+	if args.int_portion == "whole": 
+	
+		if (args.int_deletion == "all") and (args.int_rearrange == "none"):
+			int_types = [insertWithDeletion]
+		elif (args.int_deletion == "none") and (args.int_rearrange == "all"):
+			int_types = [insertWholeRearrange]
+		elif (args.int_deletion == "some") and (args.int_rearrange == "some"):
+			int_types = [insertWholeVirus, insertWholeRearrange, insertWithDeletion]
+		elif (args.int_deletion == "some") and (args.int_rearrange == "none"):
+			int_types = [insertWholeVirus, insertWithDeletion]
+		elif (args.int_deletion == "none") and (args.int_rearrange == "some"):
+			int_types = [insertWholeVirus, insertWholeRearrange]
+		elif (args.int_deletion == "none") and (args.int_rearrange == "none"):
+			int_types = [insertWholeVirus]
+		else:
+			raise ValueError("combination of int_deletion and int_rearrange is invalid")
+			
+	elif args.int_portion == "portion": #only partial integrations	
+		if (args.int_deletion == "all") and (args.int_rearrange == "none"):
+			int_types = [insertPortionDeletion]
+		elif (args.int_deletion == "none") and (args.int_rearrange == "all"):
+			int_types = [insertPortionRearrange]
+		elif (args.int_deletion == "some") and (args.int_rearrange == "some"):
+			int_types = [insertViralPortion, insertPortionRearrange, insertPortionDeletion]
+		elif (args.int_deletion == "some") and (args.int_rearrange == "none"):
+			int_types = [insertViralPortion, insertPortionDeletion]
+		elif (args.int_deletion == "none") and (args.int_rearrange == "some"):
+			int_types = [insertViralPortion, insertPortionRearrange]
+		elif (args.int_deletion == "none") and (args.int_rearrange == "none"):
+			int_types = [insertViralPortion]
+		else:
+			raise ValueError("combination of int_deletion and int_rearrange is invalid")
+
+	# both whole and partial integrations
+	else:
+		if (args.int_deletion == "all") and (args.int_rearrange == "none"):
+			int_types = [insertWithDeletion, insertPortionDeletion]
+		elif (args.int_deletion == "none") and (args.int_rearrange == "all"):
+			int_types = [insertWholeRearrange,insertPortionRearrange]
+		elif (args.int_deletion == "some") and (args.int_rearrange == "some"):
+			int_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
+		elif (args.int_deletion == "some") and (args.int_rearrange == "none"):
+			int_types = [insertWholeVirus, insertViralPortion, insertWithDeletion, insertPortionDeletion]
+		elif (args.int_deletion == "none") and (args.int_rearrange == "some"):
+			int_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertPortionRearrange]
+		elif (args.int_deletion == "none") and (args.int_rearrange == "none"):
+			int_types = [insertWholeVirus, insertViralPortion]
+		else:
+			raise ValueError("combination of int_deletion and int_rearrange is invalid")
+			
+	if args.verbose is True:
+		print(f"integration types will be: {int_types}")
+			
+	return int_types
 	
 class Integrations:
 	"""
