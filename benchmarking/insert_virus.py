@@ -40,21 +40,22 @@ max_attempts = 5 #maximum number of times to try to place an integration site
 ### main
 def main(argv):
 	#get arguments
-	parser = argparse.ArgumentParser(description='simulate viral insertions')
-	parser.add_argument('--host', help='host fasta file', required = True)
-	parser.add_argument('--virus', help = 'virus fasta file', required = True)
-	parser.add_argument('--ints', help = 'output fasta file', required = True)
-	parser.add_argument('--locs', help = 'output text with viral integrations', required = True)
-	parser.add_argument('--ints_host', help = 'output csv with integration locations in host genome', required = True)
-	parser.add_argument('--int_num', help = 'number of integrations to be carried out', required=True)
-	parser.add_argument('--fasta', help = 'output fasta of integrated host genome', required = False)
+	parser = argparse.ArgumentParser(description='simulate viral integrations')
+	parser.add_argument('--host', help='host fasta file', required = True, type=str)
+	parser.add_argument('--virus', help = 'virus fasta file', required = True, type=str)
+	parser.add_argument('--ints', help = 'output fasta file', required = True, type=str)
+	parser.add_argument('--locs', help = 'output text with viral integrations', required = True, type=str)
+	parser.add_argument('--ints_host', help = 'output csv with integration locations in host genome', required = True, type=str)
+	parser.add_argument('--int_num', help = 'number of integrations to be carried out', required=True, type=int)
+	parser.add_argument('--fasta', help = 'output fasta of integrated host genome', required = False, type=str)
 	parser.add_argument('--sep', help = 'integrations must be seperated by this many bases', required=False, default=20, type=int)
 	parser.add_argument('--min_len', help = 'minimum length of integerations', required=False, default=50, type=int)
-	parser.add_argument('--set_len', help = 'use if only want integrations of a specific length', required=False, default=0, type=int)
+	parser.add_argument('--set_len', help = 'use to get integrations of a specific length', required=False, default=0, type=int)
 	parser.add_argument('--epi_num', help = 'number of episomes', required=False, default=0, type=int)
-	parser.add_argument('--int_type', help = 'specificy is a particular type of integrations are wanted from: whole, portion, rearrange or deletion. If no type specified the type of integration will be randomly selected.', required=False, default='rand')
-	parser.add_argument('--set_junc', help = 'specificy is a particular type of junctions are wanted from: clean gap or overlap. If no type of junction is specified junctions will be selected at random', required=False, default='rand')
+	parser.add_argument('--int_type', help = 'specificy is a particular type of integrations are wanted from: whole, portion, rearrange or deletion. If no type specified the type of integration will be randomly selected.', required=False, default='rand', type=str)
+	parser.add_argument('--set_junc', help = 'specificy is a particular type of junctions are wanted from: clean gap or overlap. If no type of junction is specified junctions will be selected at random', required=False, default='rand', type=str)
 	parser.add_argument('--seed', help = 'seed for random number generator', required=False, default=1, type=int)
+	parser.add_argument('--verbose', help = 'display extra output for debugging', required=False, default=False, type=bool)
 	args = parser.parse_args()
 	
 	#read host fasta - use index which doesn't load sequences into memory because host is large genome
@@ -68,14 +69,30 @@ def main(argv):
 		virus = SeqIO.to_dict(SeqIO.parse(args.virus, 'fasta', alphabet=unambiguous_dna))
 	else:
 		raise OSError("Could not open virus fasta")
+	
+	print(f"min_len: {args.min_len}, sep: {args.sep}, set_len: {args.set_len}")
+
+	# check that input arguments make sense
+	# check that minimum integration size is longer than all the virus sequences
+	if (args.set_len == 0) and not(all([args.min_len < len(seq) for seq in virus.values()])):
+		raise ValueError(f"Minimum integration length (--min_len) must be longer than all virus sequences. \
+				   viral sequence lengths: {[len(seq) for seq in virus.values()]}")
+
+	# check that minimum separation allows for the desired number of integrations
+	# assume that number of bases that are ruled out for each integration is 2x sep
+	if np.sum([len(seq) for seq in host.values()]) < (args.sep * 2):
+		raise ValueError("Integrations are likely to clash. Use fewer integrations or a shorter separation")
+
+	# check that set integration size is longer than all the virus sequences
+	if (args.set_len != 0) and (not(all([args.set_len < len(seq) for seq in virus.values()]))):
+		raise ValueError(f"Minimum integration length (--set_len) must be longer than all virus sequences. \
+				   viral sequence lengths: {[len(seq) for seq in virus.values()]}")
  
-	#set random seed - change to make separate replicates 
+	#set random seed
 	np.random.seed(args.seed)
 
 	#types of insertions
 	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
-
-	insertion_dict = {'whole': 0, 'portion': 1, 'rearrange': 2, 'deletion': 3, 'portionrearrange': 4, 'portiondeletion': 5}
 
 	#types of episomes 
 	episome_types = [Episome.insertWhole, Episome.insertPortion, Episome.insertWholeRearrange, Episome.insertPortionRearrange, Episome.insertWholeDeletion, Episome.insertPortionDeletion] 
@@ -105,20 +122,11 @@ def main(argv):
 	handle.write(header)
 	
 	#### PERFORM INTEGRATIONS #####
-	
-	#intialise the required number of integrations 
-	int_num = int(args.int_num)
-	
-	#intialise the minimum chunk size 
-	min_len = int(args.min_len) 
-	
-	#intialise the separation from other integrations 
-	sep = int(args.sep) 
 
 	#intialise the set length of integration if specified 
 	set_len = int(args.set_len) 
 
-	#intialise how many episomal sequences included in the outputted fasta file 
+	#intialise how many episomal sequences included in the output fasta file 
 	epi_num = int(args.epi_num) 
 
 	#intialise the type of junctions if not random
@@ -128,30 +136,28 @@ def main(argv):
 	int_report = 50
 	
 	
-	print("\nNUMBER OF INTEGRATIONS TO INSERT: "+str(int_num),flush=True)
+	print("\nNUMBER OF INTEGRATIONS TO DO: "+str(args.int_num),flush=True)
 	
 	#integration loop 
 	counter = 0 # count number of iterations 
 
-	while len(host_ints) < int_num: 
+	while len(host_ints) < args.int_num: 
 
 		#if a set length of integrations has been specified: 
-		if set_len != 0: 
+		if args.set_len != 0: 
 
-			host_ints, host_fasta = insertSetLength(host_fasta, virus, host_ints, handle, min_len, sep, set_len, set_junc)
+			host_ints, host_fasta = insertSetLength(host_fasta, virus, host_ints, handle, args.min_len, args.sep, args.set_len, args.set_junc)
 		else: 
 			#do random integrations if a specific type of integrations is not selected
 			if args.int_type == 'rand': 
-				int_type =  np.random.randint(0,len(insertion_types))
-
+				int_type =  np.random.choice(insertion_types)
 			else: 
-				if args.int_type not in insertion_dict.keys(): 
-					raise OSError("Not a valid type of integration")
-				else: 	
-					int_type = insertion_dict.get(str(args.int_type)) 
-		
-			#apply integration	
-			host_ints, host_fasta = insertion_types[int_type](host_fasta, virus, host_ints, handle, min_len, sep, set_junc)
+				if args.int_type not in insertion_types: 
+					raise ValueError("Not a valid type of integration")
+			#apply integration
+			if args.verbose is True:	
+				print(f"trying integration type: {int_type}, integrations already done: {[repr(int) for int in host_ints]}")
+			host_ints, host_fasta = int_type(host_fasta, virus, host_ints, handle, args.min_len, args.sep, args.set_junc)
 			
 
 		#count the number of integrations applied 
@@ -159,7 +165,8 @@ def main(argv):
 
 		#periodically print how many integrations have been completed
 		if counter % int_report == 0: 
-			print(str(counter) +" integrations complete...", flush = True)
+			if args.verbose is True:
+				print(str(counter) +" integrations attempted...", flush = True)
 
 	print("NUMBER OF INTEGRATIONS DONE: "+str(len(host_ints)),flush=True)
 	
@@ -168,7 +175,7 @@ def main(argv):
 	for i in range(0,epi_num): 
 		rand_int = np.random.randint(0,2)	
 		name = "episome "+str(i+1)
-		host_fasta = episome_types[rand_int](virus, min_len, host_fasta, name)  
+		host_fasta = episome_types[rand_int](virus, args.min_len, host_fasta, name)  
 			
 	print("\n***INTEGRATIONS COMPLETE***",flush=True)
 	print(host_fasta,flush=True)
@@ -375,6 +382,7 @@ def insertPortionRearrange(host, viruses, int_list, filehandle, min_len,sep, set
 		currentInt = Integration(host, set_junc)
 		currentInt.addRearrange(viruses, min_len, part = "rand")
 		attempts += 1
+		print(currentInt)
 		
 		#check that all integrations are args.sep away from new integration
 		if all([ abs(currentInt.hPos-i) > sep for i in currentPos ]):
@@ -952,16 +960,16 @@ class Integration:
 	def setStopStart(self,int_start,int_stop): 
 		""" provides coordinates of where viral DNA starts and ends. hstart and hstop denote human genome"""
 
-		if self.overlaps[0]>0: #ie there is a gap 
+		if self.overlaps[0]>0: # ie there is a gap 
 			self.hstart = int_start+self.overlaps[0]
-		elif self.overlaps[0]<0: #ie there is an overlap
+		elif self.overlaps[0]<0: # ie there is an overlap
 			self.hstart = int_start 
 		else: 
 			self.hstart = int_start 
 			
-		if self.overlaps[1]>0: #ie there is a gap
+		if self.overlaps[1]>0: # ie there is a gap
 			self.hstop = int_stop-self.overlaps[1]
-		elif self.overlaps[1]<0: #ie there is an overlap 
+		elif self.overlaps[1]<0: #i e there is an overlap 
 			self.hstop = int_stop
 		else: 
 			self.hstop = int_stop 
@@ -969,18 +977,14 @@ class Integration:
 		self.hstop = self.hstop+len(self.chunk.bases) 
 
 		
-	def __str__(self):
+	def __repr__(self):
 		if self.fragments == 0:
 			return f"Integration on chromosome {self.chr}, position {self.hPos}"
-		elif self.fragments == 1:
-			(oris, coords, bases) = self.getOrisCoordsBases()
-			return f"Integration of {self.fragments} viral fragument on chromosome {self.chr}, position {self.hPos}.\n" \
-				f"Integrated virus: {self.chunk.virus}, virus bases: {bases}, virus orientations: {oris}, coords {coords}"	
 		else:
-			(oris, coords, bases) = self.getOrisCoordsBases()
-			return f"Integration of {self.fragments} viral fraguments on chromosome {self.chr}, position {self.hPos}.\n" \
-				f"\tIntegrated virus: {self.chunk.virus},\n\tvirus bases: {bases}," \
-				f"\n\tvirus orientations: {oris},\n\tvirus breakpoints: {coords}"			
+			return f"Integration of {self.fragments} viral fragument on chromosome {self.chr}, position {self.hPos}.\n" \
+			       f"Integrated virus: {repr(self.chunk)}"	
+	def __str__(self):
+			return f"Integration on chromosome {self.chr}, position {self.hPos}"		
 		
 class ViralChunk:
 	"""
@@ -1165,9 +1169,11 @@ class ViralChunk:
 
 		self.deletion = True #deletion is now true
 		
-
-	def __str__(self):
-		return f"viral chunk from virus {self.virus} with start and stop coordinates ({self.start}, {self.stop}), pieces {self.pieces}.  Has it been split?: {self.isSplit}; Has it been rearranged? {self.isRearranged}; does it have a deletion? {self.deletion}"
+	def __repr__(self):
+		split = "split" if self.isSplit else "unsplit"
+		rearranged = "rearranged" if self.isRearranged else "unrearranged"
+		deletion = "deletion" if self.deletion else "no deletion"
+		return f"{split}, {rearranged} viral chunk with {deletion} from virus {self.virus} with start and stop coordinates ({self.start}, {self.stop}), pieces [self.pieces[key] for key in self.pieces.keys()]."
 
 class Statistics:
 	"""
