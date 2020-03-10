@@ -158,19 +158,24 @@ def main(argv):
 	while len(host_ints) < args.int_num: 
 
 		#if a set length of integrations has been specified: 
-		if args.set_len != 0: 
+		#if args.set_len != 0: 
 
-			host_ints, host_fasta = insertSetLength(host_fasta, virus, host_ints, handle, args.min_len, args.sep, args.set_len, args.set_junc)
-		else: 
-			#do random integrations if a specific type of integrations is not selected
-			if args.int_type == 'rand': 
-				int_type =  np.random.choice(insertion_types)
+		#	host_ints, host_fasta = insertSetLength(host_fasta, virus, host_ints, handle, args.min_len, args.sep, args.set_len, args.set_junc)
+		#else: 
+		#	#do random integrations if a specific type of integrations is not selected
+		#	if args.int_type == 'rand': 
+		#		int_type =  np.random.choice(insertion_types)
 
-			#apply integration
-			if args.verbose is True:	
+		#	#apply integration
+		#	if args.verbose is True:	
+		#		print(f"trying integration type: {int_type}, integrations already done: {[repr(int) for int in host_ints]}")
+		#	host_ints, host_fasta = int_type(host_fasta, virus, host_ints, handle, args.min_len, args.sep, args.set_junc)
+		
+		# get a random integration type from available choices (which depends on inputs)
+		int_type =  np.random.choice(int_types)
+		if args.verbose is True:	
 				print(f"trying integration type: {int_type}, integrations already done: {[repr(int) for int in host_ints]}")
-			host_ints, host_fasta = int_type(host_fasta, virus, host_ints, handle, args.min_len, args.sep, args.set_junc)
-			
+		host_ints, host_fasta = int_type(host_fasta, virus, host_ints, handle, int_len, args.sep, args.set_junc)
 
 		#count the number of integrations applied 
 		counter += 1  
@@ -187,7 +192,7 @@ def main(argv):
 	for i in range(0,args.epi_num): 
 		rand_int = np.random.randint(0,2)	
 		name = "episome "+str(i+1)
-		host_fasta = episome_types[rand_int](virus, args.min_len, host_fasta, name)  
+		host_fasta = episome_types[rand_int](virus, int_len, host_fasta, name)  
 			
 	print("\n***INTEGRATIONS COMPLETE***",flush=True)
 	print(host_fasta,flush=True)
@@ -206,7 +211,7 @@ def main(argv):
     		print("Details of sequences integrated saved as "+str(args.locs),flush=True)
     		print("Details of where intgrations lie in host sequence saved as "+str(args.ints_host),flush=True)
 
-def insertWholeVirus(host, viruses, int_list, filehandle, min_len, sep, set_junc):
+def insertWholeVirus(host, viruses, int_list, filehandle, length, sep, set_junc):
 	"""Inserts whole viral genome into host genome"""
 
 	#get positions of all current integrations
@@ -218,7 +223,7 @@ def insertWholeVirus(host, viruses, int_list, filehandle, min_len, sep, set_junc
 	while True:
 		#get one viral chunk
 		currentInt = Integration(host, set_junc)
-		currentInt.addFragment(viruses, min_len, part = "whole")
+		currentInt.addFragment(viruses, length, part = "whole")
 		attempts += 1
 		#check that all integrations are sep away from new integration
 		if all([ abs(currentInt.hPos-i) > sep for i in currentPos ]):
@@ -240,7 +245,7 @@ def insertWholeVirus(host, viruses, int_list, filehandle, min_len, sep, set_junc
 	
 	return int_list, host
 
-def insertSetLength(host, viruses, int_list, filehandle, min_len, sep, set_len, set_junc):
+def insertSetLength(host, viruses, int_list, filehandle, length, sep, set_len, set_junc):
 	"""Inserts virus of a specified length. Not included in integration loop but useful for ATAY's work"""
 
 	if set_len == 0: 
@@ -255,7 +260,7 @@ def insertSetLength(host, viruses, int_list, filehandle, min_len, sep, set_len, 
 	while True:
 		#get one viral chunk
 		currentInt = Integration(host, set_junc)
-		currentInt.addFragment(viruses, min_len, part = set_len)
+		currentInt.addFragment(viruses, length, part = set_len)
 		attempts += 1
 		#check that all integrations are sep away from new integration
 		if all([ abs(currentInt.hPos-i) > sep for i in currentPos ]):
@@ -277,7 +282,7 @@ def insertSetLength(host, viruses, int_list, filehandle, min_len, sep, set_len, 
 	
 	return int_list, host
 
-def insertViralPortion(host, viruses, int_list, filehandle, min_len, sep, set_junc):
+def insertViralPortion(host, viruses, int_list, filehandle, length, sep, set_junc):
 	"""Inserts portion of viral DNA into host genome"""
 	
 	#get positions of all current integrations
@@ -288,7 +293,7 @@ def insertViralPortion(host, viruses, int_list, filehandle, min_len, sep, set_ju
 	while True:
 		#get one viral chunk 
 		currentInt = Integration(host, set_junc)
-		currentInt.addFragment(viruses, min_len, part = "rand")
+		currentInt.addFragment(viruses, length, part = "rand")
 		attempts += 1
 		
 		#check that all integrations are sep away from new integration
@@ -312,7 +317,7 @@ def insertViralPortion(host, viruses, int_list, filehandle, min_len, sep, set_ju
 	
 	return int_list, host
 
-def insertWholeRearrange(host, viruses, int_list, filehandle, min_len,sep, set_junc):
+def insertWholeRearrange(host, viruses, int_list, filehandle, length, sep, set_junc):
 	""" Inserts a single portion of viral DNA with n rearrangements """
 	
 	#get positions of all current integrations
@@ -323,7 +328,7 @@ def insertWholeRearrange(host, viruses, int_list, filehandle, min_len,sep, set_j
 	while True:
 		#get one viral chunk
 		currentInt = Integration(host, set_junc)
-		currentInt.addRearrange(viruses, min_len, part = "whole")
+		currentInt.addRearrange(viruses, length, part = "whole")
 		attempts += 1
 		
 		#check that all integrations are args.sep away from new integration
@@ -347,7 +352,7 @@ def insertWholeRearrange(host, viruses, int_list, filehandle, min_len,sep, set_j
 
 	return int_list, host
 
-def insertWithDeletion(host, viruses, int_list, filehandle, min_len,sep, set_junc):
+def insertWithDeletion(host, viruses, int_list, filehandle, length,sep, set_junc):
 	""" Inserts n portions of viral DNA into host genome"""
 	#get positions of all current integrations 
 	currentPos = Statistics.integratedIndices(int_list)
@@ -357,7 +362,7 @@ def insertWithDeletion(host, viruses, int_list, filehandle, min_len,sep, set_jun
 	while True:
 		#get one viral chunk
 		currentInt = Integration(host, set_junc)
-		currentInt.addDeletion(viruses, min_len,part = "whole")
+		currentInt.addDeletion(viruses, length ,part = "whole")
 		attempts += 1
 		#check that all integrations are args.sep away from new integration
 		if all([ abs(currentInt.hPos-i) > sep for i in currentPos ]):
@@ -380,7 +385,7 @@ def insertWithDeletion(host, viruses, int_list, filehandle, min_len,sep, set_jun
 	
 	return int_list, host
 
-def insertPortionRearrange(host, viruses, int_list, filehandle, min_len,sep, set_junc): 
+def insertPortionRearrange(host, viruses, int_list, filehandle, length,sep, set_junc): 
 	"""Rearranges a portion of virus""" 
 
 	#get positions of all current integrations
@@ -391,7 +396,7 @@ def insertPortionRearrange(host, viruses, int_list, filehandle, min_len,sep, set
 	while True:
 		#get one viral chunk
 		currentInt = Integration(host, set_junc)
-		currentInt.addRearrange(viruses, min_len, part = "rand")
+		currentInt.addRearrange(viruses, length, part = "rand")
 		attempts += 1
 		print(currentInt)
 		
@@ -417,7 +422,7 @@ def insertPortionRearrange(host, viruses, int_list, filehandle, min_len,sep, set
 	
 	return int_list, host
 
-def insertPortionDeletion(host, viruses, int_list, filehandle, min_len,sep, set_junc):
+def insertPortionDeletion(host, viruses, int_list, filehandle, length,sep, set_junc):
 	"""Takes a segment of the virus and then deletes a segment from it and inserts the resulting portion. This have the potentional to be short - useful for simulating short reads later""" 
 
 	#get positions of all current integrations 
@@ -428,7 +433,7 @@ def insertPortionDeletion(host, viruses, int_list, filehandle, min_len,sep, set_
 	while True:
 		#get one viral chunk
 		currentInt = Integration(host, set_junc)
-		currentInt.addDeletion(viruses, min_len, part = "rand")
+		currentInt.addDeletion(viruses, length, part = "rand")
 		attempts += 1
 		#check that all integrations are args.sep away from new integration
 		if all([ abs(currentInt.hPos-i) > sep for i in currentPos ]):
@@ -646,7 +651,7 @@ class Integration:
 
 		return overlap1, overlap2
  		 
-	def addFragment(self, viruses, min_len, part = "rand"):
+	def addFragment(self, viruses, length, part = "rand"):
 		"""
 		add a viral fragment to this integration
 		"""
@@ -655,15 +660,15 @@ class Integration:
 		if self.fragments > 0:
 			print("Fragment has already been added!")
 			return
-			
-		#add a simple fragment
-		self.fragments = 1
 		
 		#get viral chunk
-		self.chunk = ViralChunk(viruses, min_len, part)
+		self.chunk = ViralChunk(viruses, length, part)
+		
+		#add a simple fragment
+		self.fragments = 1
 	
 		
-	def addRearrange(self, viruses, min_len, part = "rand"):
+	def addRearrange(self, viruses, length, part = "rand"):
 		"""
 		add a rearranged fragment
 		"""
@@ -682,7 +687,7 @@ class Integration:
 		self.fragments = n
 			
 		#add a rearranged fragment
-		self.chunk = ViralChunk(viruses, min_len, part)
+		self.chunk = ViralChunk(viruses, length, part)
 		self.chunk.rearrange(n)
 
 		#change the bases of the viral chunk to the rearranged fragment 
@@ -692,7 +697,7 @@ class Integration:
 			new_chunk = new_chunk + portion
 		self.chunk.bases = new_chunk
 	
-	def addDeletion(self, viruses, min_len,part = "rand"):
+	def addDeletion(self, viruses, length, part = "rand"):
 		"""
 		add a fragment with a deletion in the middle
 		always split into > 3 pieces and delete the middle
@@ -712,7 +717,7 @@ class Integration:
 		self.fragments = n
 		
 		#add a rearranged fragment
-		self.chunk = ViralChunk(viruses, min_len, part)
+		self.chunk = ViralChunk(viruses, length, part)
 		self.chunk.delete(n)
 		self.fragments -= 1
 
@@ -1003,7 +1008,6 @@ class Integration:
 			oris = [self.chunk.pieces[i]["ori"] for i in pieces]
 			coords = [self.chunk.pieces[i]["coords"] for i in pieces]
 			bases = [self.chunk.pieces[i]["bases"].seq for i in pieces]
-	
 			return oris, coords, bases
 		else:
 			return
@@ -1087,40 +1091,34 @@ class ViralChunk:
 	use part = "whole" (or some other string) to get whole virus, or use part = int to get a chunk of lenth int
 	"""
 	
-	#make viral chunk
-	def __init__(self, viruses, min_len, part = "rand"):
+	# make viral chunk
+	def __init__(self, viruses, length, part = "rand"):
 
-		#get virus to integrate
+		# get virus to integrate
 		self.virus = np.random.choice(list(viruses.keys()))
 		
-		if min_len > len(viruses[self.virus].seq):
-			raise ValueError("Viral genome is shorter than the minimum intgration size!")
-
-		#if we want a random of chunk of a predetermined size (set_len) 
-		if isinstance(part, int): 
-			#get the length of the integration
-			set_len = part 
-
-			#can't use a set_len longer the virus
-			if set_len > len(viruses[self.virus].seq): 
-				raise ValueError("Set length for integrations is longer the viral sequence!")
-
-			self.start = np.random.randint(0, len(viruses[self.virus].seq) - set_len)
-			self.stop = self.start + set_len
+		# parse length, which specifies if the integration length is either a set number or a minimum length
+		# this is a s a string composed of either 'min' or 'set' and the corresponding length, separated by an underscore
+		(int_len_type, int_len) = length.split("_")
+		int_len = int(int_len)
 		
+		if int_len > len(viruses[self.virus].seq):
+			raise ValueError("Viral genome is shorter than the minimum/set intgration size!")
 
-		#if we want a random chunk of virus
-		elif part == "rand":
-			while True:
-				self.start = np.random.randint(0, len(viruses[self.virus].seq) - min_len)
-				self.stop = np.random.randint(self.start+1, len(viruses[self.virus].seq))
-				if (self.stop - self.start) > min_len:
-					break
-		
-		#if we want the whole virus
-		else:
+		# if we want the whole virus
+		if part == "whole":
 			self.start = 0
 			self.stop = len(viruses[self.virus].seq)
+		
+		# if we want a subsequence of a set length
+		elif int_len_type == 'set': 
+			self.start = np.random.randint(0, len(viruses[self.virus].seq) - int_len)
+			self.stop = self.start + int_len
+		
+		# if we want a random chunk of virus with a minimum length
+		else:
+			self.start = np.random.randint(0, len(viruses[self.virus].seq) - int_len)
+			self.stop = np.random.randint(self.start + int_len, len(viruses[self.virus].seq))
 
 		#give the integration an orientation 
 		if np.random.uniform() > 0.5:
@@ -1396,10 +1394,10 @@ class Episome:
 	"""Class of functions used to create episomes to add to the resulting fasta file""" 
 
 	
-	def insertWhole(viruses, min_len, host, name):
+	def insertWhole(viruses, length, host, name):
 		"""Adds a viral sequence to the output fasta file without modification"""
 		#get a chunk of virus 
-		chunk = ViralChunk(viruses, min_len, 'whole')
+		chunk = ViralChunk(viruses, length, 'whole')
 		
 		#as the episome is circular it can be cut at any point 
 		#randomly select the point at which the episome is 'cut' 
@@ -1417,10 +1415,10 @@ class Episome:
 		
 		return host 
 
-	def insertPortion(viruses, min_len, host, name): 
+	def insertPortion(viruses, length, host, name): 
 		"""Adds a portion of the viral sequence to the output fasta file""" 
 		#get a chunk of virus 
-		chunk = ViralChunk(viruses, min_len, 'rand')
+		chunk = ViralChunk(viruses, length, 'rand')
 
 		#as the episome is circular it can be cut at any point 
 		#randomly select the point at which the episome is 'cut' 
@@ -1438,12 +1436,12 @@ class Episome:
 		
 		return host 
 
-	def insertWholeRearrange(viruses, min_len, host, name): 
+	def insertWholeRearrange(viruses, length, host, name): 
 		"""Adds a rearranged viral sequece to the output fasta file""" 
 		#need to split it then rearrange the split
 
 		#get a chunk of virus 
-		chunk = ViralChunk(viruses, min_len, 'whole')
+		chunk = ViralChunk(viruses, length, 'whole')
 
 		#as the episome is circular it can be cut at any point 
 		#randomly select the point at which the episome is 'cut' 
@@ -1477,11 +1475,11 @@ class Episome:
  
 		return host
 
-	def insertPortionRearrange(viruses, min_len, host, name):
+	def insertPortionRearrange(viruses, length, host, name):
 		"""Adds a portion of a rearranged viral sequence to the output fasta file""" 
 
 		#get a chunk of virus 
-		chunk = ViralChunk(viruses, min_len, 'rand')
+		chunk = ViralChunk(viruses, length, 'rand')
 
 		#as the episome is circular it can be cut at any point 
 		#randomly select the point at which the episome is 'cut' 
@@ -1515,12 +1513,12 @@ class Episome:
  
 		return host
 
-	def insertWholeDeletion(viruses, min_len, host, name):
+	def insertWholeDeletion(viruses, length, host, name):
 		"""Inserts a whole viral sequence with deletion to the output fasta file""" 
 		#get an order for the fragments 
 		 
 		#get a chunk of virus 
-		chunk = ViralChunk(viruses, min_len, 'whole')
+		chunk = ViralChunk(viruses, length, 'whole')
 
 		#randomly select the point at which the episome is 'cut' 
 		cutP = np.random.randint(0,len(chunk.bases))
@@ -1556,12 +1554,12 @@ class Episome:
  
 		return host
 
-	def insertPortionDeletion(viruses, min_len, host, name):
+	def insertPortionDeletion(viruses, length, host, name):
 		"""Inserts a whole viral sequence with deletion to the output fasta file""" 
 		#get an order for the fragments 
 		 
 		#get a chunk of virus 
-		chunk = ViralChunk(viruses, min_len, 'rand')
+		chunk = ViralChunk(viruses, length, 'rand')
 
 		#randomly select the point at which the episome is 'cut' 
 		cutP = np.random.randint(0,len(chunk.bases))
