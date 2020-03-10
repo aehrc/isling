@@ -48,12 +48,13 @@ def main(argv):
 	parser.add_argument('--ints_host', help = 'output csv with integration locations in host genome', required = True)
 	parser.add_argument('--int_num', help = 'number of integrations to be carried out', required=True)
 	parser.add_argument('--fasta', help = 'output fasta of integrated host genome', required = False)
-	parser.add_argument('--sep', help = 'integrations must be seperated by this many bases', required=False, default=5)
-	parser.add_argument('--min_len', help = 'minimum length of integerations', required=False, default=50)
-	parser.add_argument('--set_len', help = 'use if only want integrations of a specific length', required=False, default=0)
-	parser.add_argument('--epi_num', help = 'number of episomes', required=False, default=0)
+	parser.add_argument('--sep', help = 'integrations must be seperated by this many bases', required=False, default=20, type=int)
+	parser.add_argument('--min_len', help = 'minimum length of integerations', required=False, default=50, type=int)
+	parser.add_argument('--set_len', help = 'use if only want integrations of a specific length', required=False, default=0, type=int)
+	parser.add_argument('--epi_num', help = 'number of episomes', required=False, default=0, type=int)
 	parser.add_argument('--int_type', help = 'specificy is a particular type of integrations are wanted from: whole, portion, rearrange or deletion. If no type specified the type of integration will be randomly selected.', required=False, default='rand')
 	parser.add_argument('--set_junc', help = 'specificy is a particular type of junctions are wanted from: clean gap or overlap. If no type of junction is specified junctions will be selected at random', required=False, default='rand')
+	parser.add_argument('--seed', help = 'seed for random number generator', required=False, default=1, type=int)
 	args = parser.parse_args()
 	
 	#read host fasta - use index which doesn't load sequences into memory because host is large genome
@@ -69,7 +70,7 @@ def main(argv):
 		raise OSError("Could not open virus fasta")
  
 	#set random seed - change to make separate replicates 
-	np.random.seed(1)
+	np.random.seed(args.seed)
 
 	#types of insertions
 	insertion_types = [insertWholeVirus, insertViralPortion, insertWholeRearrange, insertWithDeletion, insertPortionRearrange, insertPortionDeletion]
@@ -612,7 +613,6 @@ class Integration:
 		self.chunk = ViralChunk(viruses, min_len, part)
 		self.chunk.delete(n)
 		self.fragments -= 1
-		print(f"fragments: {self.fragments}, chunk: {self.chunk}")
 
 		#create new chunk using the set of fragments
 		new_chunk = ""
@@ -1139,7 +1139,6 @@ class ViralChunk:
 		#if there are less than 3 pieces, just use 3
 		if n < 2:
 			n = 3
-		print(f"pieces: {self.pieces}")	
 	
 		#check if chunk has already been split into parts
 		if self.isSplit is False:
@@ -1152,8 +1151,6 @@ class ViralChunk:
 		# check we were able to successfully split the chunk
 		if self.isSplit is False:
 			return
-
-		print(f"pieces: {self.pieces}")	
 
 		#don't rearrange chunk if it's already been rearranged
 		if self.isRearranged is True:
