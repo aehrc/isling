@@ -108,10 +108,7 @@ rule all:
 		expand("../out/summary/ucsc_bed/{dset}.clean.bed", dset = DATASETS)
 		
 		
-
 #### merging and dedup ###
-
-
 rule copy:
 	input:
 		r1 = lambda wildcards: "../data/reads/{}/{}{}".format(wildcards.dset, wildcards.samp, config[wildcards.dset]["R1_suffix"]) ,
@@ -177,7 +174,6 @@ rule combine:
 		cat {input.r1} {input.r2} > {output.all}
 		"""
 #functions for if we did seqPrep or not
-
 def get_all(wildcards):
 	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
 		folder = "merged_reads"
@@ -364,7 +360,6 @@ rule run_int_scripts:
 		perl -I. ./discordant.pl --viral {input.vPaired} --human {input.hPaired} --output {output.discord} --bed {output.discordBed} --tol 3
 		perl -I. ./short.pl --viral {input.vShort} --human {input.hShort} --output {output.short} --bed {output.shortBed} --tol 3
 		sed -e '2,${{/Chr/d' -e '}}' {output.soft} {output.discord} {output.short} > {output.allInt}
-		sed -i 's\chr\ \g' {output.allInt}
 		sort -n -k1,1 -k2,2n {output.allInt} > {output.allIntTemp}
 		cp {output.allIntTemp} {output.allInt}
 		cat {output.softBed} {output.discordBed} {output.shortBed} > {output.allBed}
