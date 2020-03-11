@@ -11,6 +11,9 @@
 ### nearest-gtf: annotate the nearest genomic feature from a gtf file
 ### nearest-bed: annotate the nearest genomic feature from a bed file
 
+## after post-processing, files will be saved in their original location
+## with ".postprocessed" added before the file extension
+
 #### packages ####
 library(tidyverse)
 cat("\n")
@@ -237,12 +240,14 @@ if (filt)
 }
 
 #### masking ####
- 
+
+# do exluding based on intersect with bed file
 if (mask_exclude[1] != "")
 {
   source("mask-exclude.R")
 }
 
+# do excluding based on lack of intersect with bed file
 if (mask_include[1] != "")
 {
   source("mask-include.R")
@@ -250,18 +255,26 @@ if (mask_include[1] != "")
 
 #### annotating ####
 
+# annotate nearest feature from gtf file(s)
 if (nearest_gtf[1] != "")
 {
   source("nearest-gtf.R")
 }
 
+#annotate nearest feature from bed file(s)
 if (nearest_bed[1] != "")
 {
   source("nearest-bed.R")
 }
 
+#### save output postprocessed file ####
 
-print(head(ints))
+base_name <- tools::file_path_sans_ext(args[1])
+ext <- tools::file_ext(args[1])
+
+readr::write_tsv(ints, path = paste0(base_name, ".post.", ext))
+
+
 #### session info ####
 cat("\n")
 #sessionInfo()
