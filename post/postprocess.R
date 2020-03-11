@@ -115,7 +115,80 @@ if ("mask-include" %in% args)
   
 }
 
-#### data import ###
+# check if we want to annotate based on a gtf file
+nearest_gtf <- ""
+if ("nearest-gtf" %in% args)
+{
+  # get bed files to use for masking
+  if (which(args == "nearest-gtf") + 1 > length(args))
+  {
+    stop("specify gtf files for annotation")
+  }
+  
+  nearest_gtf <- args[which(args == "nearest-gtf") + 1]
+  
+  # check that we didn't get any other types (indicating a missing bed file)
+  if (sum(types %in% nearest_gtf) > 0)
+  {
+    stop("specify gtf files for annotation")
+  }
+  
+  # check that file extension of specified gtf files is ".gtf"
+  for (i in nearest_gtf)
+  {
+    extension <- tools::file_ext(i)
+    if (extension[length(extension)] != "gtf")
+    {
+      stop("specify gtf files for annotation")
+    }
+  }
+  
+  # check that files exist
+  if (sum(file.exists(nearest_gtf)) != length(nearest_gtf))
+  {
+    stop("(some) gtf file(s) do not exist")
+  }
+}
+
+# check if we want to annotate based on a bed file
+nearest_bed <- ""
+if ("nearest-bed" %in% args)
+{
+  # get bed files to use for masking
+  if (which(args == "nearest-bed") + 1 > length(args))
+  {
+    stop("specify bed files for annotation")
+  }
+  
+  nearest_bed <- args[which(args == "nearest-bed") + 1]
+  
+  # check that we didn't get any other types (indicating a missing bed file)
+  if (sum(types %in% nearest_bed) > 0)
+  {
+    stop("specify bed files for annotation")
+  }
+  
+  # check that file extension of specified bed files is ".bed"
+  for (i in nearest_bed)
+  {
+    extension <- tools::file_ext(i)
+    if (extension[length(extension)] != "bed" & extension[length(extension)] != "tsv")
+    {
+      stop("specify bed/tsv files for annotation")
+    }
+  }
+  
+  print(nearest_bed)
+  
+  # check that files exist
+  if (sum(file.exists(nearest_bed)) != length(nearest_bed))
+  {
+    stop("(some) bed file(s) do not exist")
+  }
+}
+
+
+#### data import ####
 # columns are dependent on the output of the perl scripts that identify integrations
 int_cols <- readr::cols(
   Chr = col_character(),
@@ -177,12 +250,18 @@ if (mask_include[1] != "")
 
 #### annotating ####
 
+if (nearest_gtf[1] != "")
+{
+  source("nearest-gtf.R")
+}
+
+if (nearest_bed[1] != "")
+{
+  source("nearest-bed.R")
+}
 
 
-
-
-
-
+print(head(ints))
 #### session info ####
 cat("\n")
-sessionInfo()
+#sessionInfo()
