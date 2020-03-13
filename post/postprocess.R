@@ -15,7 +15,8 @@
 ## with ".postprocessed" added before the file extension
 
 #### packages ####
-library(tidyverse)
+library(dplyr)
+library(readr)
 cat("\n")
 
 #### parse command-line arguments ####
@@ -68,7 +69,7 @@ if ("mask-exclude" %in% args)
   # check that file extension of specified bed files is ".bed"
   for (i in mask_exclude)
   {
-    extension <- stringr::str_split(i, "\\.")[[1]]
+    extension <- tools::file_ext(i)
     if (extension[length(extension)] != "bed")
     {
       stop("specify bed files containing regions to use for masking")
@@ -103,7 +104,7 @@ if ("mask-include" %in% args)
   # check that file extension of specified bed files is ".bed"
   for (i in mask_include)
   {
-    extension <- stringr::str_split(i, "\\.")[[1]]
+    extension <- tools::file_ext(i)
     if (extension[length(extension)] != "bed")
     {
       stop("specify bed files containing regions to use for masking")
@@ -229,14 +230,14 @@ cat(nrow(ints), "integrations imported\n")
 
 if (dedup)
 {
-  source("dedup.R")
+  source("post/dedup.R")
 }
 
 #### filtering ####
 
 if (filt)
 {
-  source("filter.R")
+  source("post/filter.R")
 }
 
 #### masking ####
@@ -244,13 +245,13 @@ if (filt)
 # do exluding based on intersect with bed file
 if (mask_exclude[1] != "")
 {
-  source("mask-exclude.R")
+  source("post/mask-exclude.R")
 }
 
 # do excluding based on lack of intersect with bed file
 if (mask_include[1] != "")
 {
-  source("mask-include.R")
+  source("post/mask-include.R")
 }
 
 #### annotating ####
@@ -258,13 +259,13 @@ if (mask_include[1] != "")
 # annotate nearest feature from gtf file(s)
 if (nearest_gtf[1] != "")
 {
-  source("nearest-gtf.R")
+  source("post/nearest-gtf.R")
 }
 
 #annotate nearest feature from bed file(s)
 if (nearest_bed[1] != "")
 {
-  source("nearest-bed.R")
+  source("post/nearest-bed.R")
 }
 
 #### save output postprocessed file ####

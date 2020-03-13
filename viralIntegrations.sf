@@ -64,8 +64,6 @@ import os
 
 references_path = "../data/references/"
 
-#this is of the form { dset1: {host: host1, virus: host2, merge: True, refseq: refseq1}, dset2: {host: host2, virus: virus2, merge: False, refseq: refseq1} }
-
 #make four lists, with each entry in each list corresponding to one desired output file
 
 DATASETS = []
@@ -87,55 +85,45 @@ for dataset in config:
 		MERGE["{}_{}".format(dataset, sample)] = config[dataset]["merge"]
 
 # construct arguments for postprocess.R script for each dataset
-POSTARGS = []
+POSTARGS = {}
 for dataset in config:
-	string = ""
+	POSTARGS[dataset] = []
 	if "post" in config[dataset]:
-		if "filter" in config[dataset]["post"]
-
-
+		if "filter" in config[dataset]["post"]:
+			POSTARGS[dataset].append("filter")
+		if "dedup" in config[dataset]["post"]:
+			POSTARGS[dataset].append("post")
 
 #### local rules ####
-localrules: all, combine, rename, copy, ucsc_bed
+localrules: all, combine, ucsc_bed
 
 #### target files ####
 rule all:
 	input: 
-		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt", zip, dset=DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES),
 		expand("../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.bam", zip, dset = DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES),
 		expand("../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.{virus}Mappedreads.bam", zip, dset = DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES),
 		expand("../out/{dset}/host_aligned/{samp}.{host}.bwaShort.{virus}Mappedreads.bam", zip, dset = DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES),
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),		
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),
-#		expand("../out/summary/{dset}.combined.xlsx", dset = DATASETS),
 		"../out/summary/num_sites.xlsx",
-		expand("../out/summary/ucsc_bed/{dset}.clean.bed", dset = DATASETS)
-		
+		expand("../out/summary/ucsc_bed/{dset}.post.bed", dset = DATASETS)
+
+#### get reads from bam files if necesssary ####
+
+
+	
 		
 #### merging and dedup ###
-rule copy:
-	input:
-		r1 = lambda wildcards: "../data/reads/{}/{}{}".format(wildcards.dset, wildcards.samp, config[wildcards.dset]["R1_suffix"]) ,
-		r2 = lambda wildcards: "../data/reads/{}/{}{}".format(wildcards.dset, wildcards.samp, config[wildcards.dset]["R2_suffix"])
-	output:
-		r1_out = temp("../out/reads/{dset}/{samp}_1.fastq.gz"),
-		r2_out = temp("../out/reads/{dset}/{samp}_2.fastq.gz")
-	shell:
-		"""
-		cp "{input.r1}" "{output.r1_out}"
-		cp "{input.r2}" "{output.r2_out}"
-		"""
 
 rule dedup:
+# remove exact duplicates (subs=0)
 	input:
-		r1 = "../out/reads/{dset}/{samp}_1.fastq.gz",
-		r2 = "../out/reads/{dset}/{samp}_2.fastq.gz"
+		r1 = lambda wildcards: "../data/reads/{}/{}{}".format(wildcards.dset, wildcards.samp, config[wildcards.dset]["R1_suffix"]),
+		r2 = lambda wildcards: "../data/reads/{}/{}{}".format(wildcards.dset, wildcards.samp, config[wildcards.dset]["R2_suffix"])
 	output:
 		r1 = temp("../out/reads/{dset}/{samp}_1.dedup.fastq.gz"),
 		r2 = temp("../out/reads/{dset}/{samp}_2.dedup.fastq.gz")
-	params:
-		temp = lambda wildcards: f"../out/reads/{wildcards.dset}/{wildcards.samp}.temp.fq"
 	conda:
 		"envs/bbmap.yml"
 	shell:
@@ -143,8 +131,8 @@ rule dedup:
 		clumpify.sh -Xmx15g in1="{input.r1}" in2="{input.r2}" out1="{output.r1}" out2="{output.r2}" dedupe subs=0
 		"""
 
-
 rule seqPrep:
+# if we're doing it
 	input:
 		r1 = "../out/reads/{dset}/{samp}_1.dedup.fastq.gz",
 		r2 = "../out/reads/{dset}/{samp}_2.dedup.fastq.gz"
@@ -165,6 +153,7 @@ rule seqPrep:
 		"""
 
 rule combine:
+# for if we don't want to do seqPrep
 	input:
 		r1 = "../out/reads/{dset}/{samp}_1.fastq.gz",
 		r2 = "../out/reads/{dset}/{samp}_2.fastq.gz"
@@ -395,25 +384,32 @@ rule post:
 		"../out/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt"
 	conda:
 		"envs/rscripts.yml"
+	params:
+		lambda wildcards: " ".join(([f"../out/{wildcards.dset}/ints/{wildcards.samp}.{wildcards.host}.{wildcards.virus}.integrations.txt"] + POSTARGS[wildcards.dset]))
+	shell:
+		"Rscript post/postprocess.R {params}"
 
 	
 rule summarise:
 	input:
-		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES)
+		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES)
 
 	output:
 		"../out/summary/num_sites.xlsx"
 	conda:
 		"envs/rscripts.yml"
-	script:
-		"summarise_ints.R"
+	shell:
+		"Rscript summarise_ints.R {input}"
 
 rule ucsc_bed:
 	input:
-		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES)
+		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES)
 	output:
-		expand("../out/summary/ucsc_bed/{dset}.clean.bed", dset = set(DATASETS)),
+		expand("../out/summary/ucsc_bed/{dset}.post.bed", dset = set(DATASETS)),
 	conda:
 		"envs/rscripts.yml"
 	shell:
-		"bash -e format_ucsc.sh"
+		"""
+		Rscript writeBed.R {input}
+		bash -e format_ucsc.sh
+		"""
