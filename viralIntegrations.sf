@@ -63,7 +63,7 @@ import os
 #### CONFIG FILE ####
 #which datasets are to be aligned to which hosts and viruses are specified in dsets.yaml
 #also whether or not to try to merge R1 and R2
-configfile: "../proj-spcfc/dsets.yaml"
+#configfile: "../proj-spcfc/dsets.yaml"
 
 references_path = "../data/references/"
 
