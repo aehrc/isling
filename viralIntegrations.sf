@@ -19,7 +19,7 @@
 # │       ├── host.fa
 # │       └── virus.fa
 # ├── intvi_pipeline 
-# │   ├── all pipeline files from git repo
+# │   └── all pipeline files from git repo
 # └── proj-spcfc
 #     └── dsets.yaml
 #
@@ -44,15 +44,12 @@
 # 3. perl scripts
 #   - run perl scripts with alignment sam  files as inputs to detect integrations
 # 4. postprocessing
-#   - run R script to generate ouput xlsx files for each dataset, summary graphs
-#   - merge bed files for each dataset
-#   - intersect with refseq
-#   - output files for visualzation in UCSC browser
+#   - apply various types of postprocessing: dedup, filter, mask, annotate
+#   - generate ouput xlsx files for each dataset
+#   - write output files for visualzation in UCSC browser
 #  
 # the primary output of the pipeline is the xlsx files for each datasets which
 # contain the details of the detected integrations.
-
-
 
 
 #### python modules ####
@@ -88,6 +85,14 @@ for dataset in config:
 		HOSTS.append(config[dataset]["host"])
 		VIRUSES.append(config[dataset]["virus"])
 		MERGE["{}_{}".format(dataset, sample)] = config[dataset]["merge"]
+
+# construct arguments for postprocess.R script for each dataset
+POSTARGS = []
+for dataset in config:
+	string = ""
+	if "post" in config[dataset]:
+		if "filter" in config[dataset]["post"]
+
 
 
 #### local rules ####
@@ -368,7 +373,7 @@ rule run_int_scripts:
 		"""
 
 	
-#### visualization ####
+#### postprocessingvisualization ####
 
 rule count_mapped:
 	input:
@@ -383,15 +388,14 @@ rule count_mapped:
 	shell:
 		"./count_mapped.sh"
 
-#rule plot_mapped:
-#	input:
-#		"../out/summary/count_mapped.txt"
-#	output:
-#		"../out/summary/count_mapped.xlsx"
-#	conda:
-#		"envs/rscripts.yml"
-#	script:
-#		"count_reads.R"
+rule post:
+	input:
+		"../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
+	output:
+		"../out/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt"
+	conda:
+		"envs/rscripts.yml"
+
 	
 rule summarise:
 	input:
