@@ -84,15 +84,46 @@ for dataset in config:
 		VIRUSES.append(config[dataset]["virus"])
 		MERGE["{}_{}".format(dataset, sample)] = config[dataset]["merge"]
 
+
 # construct arguments for postprocess.R script for each dataset
 POSTARGS = {}
 for dataset in config:
 	POSTARGS[dataset] = []
 	if "post" in config[dataset]:
-		if "filter" in config[dataset]["post"]:
-			POSTARGS[dataset].append("filter")
-		if "dedup" in config[dataset]["post"]:
-			POSTARGS[dataset].append("post")
+		for element in config[dataset]["post"]:
+			# need to check if this element is a string or a dict
+			if type(element) is str:
+				# look for "filter"
+				if element == "filter":
+					POSTARGS[dataset].append("filter")
+				elif element == "dedup":
+					POSTARGS[dataset].append("dedup")
+			# postprocessing types with files specified will be in ordered dictionaries
+			elif type(element) is OrderedDict:
+				if "mask-exclude" in element.keys():
+					for bed in element["mask-exclude"]:
+						POSTARGS[dataset].append("mask-exclude")
+						POSTARGS[dataset].append(bed)
+				elif "mask-include" in element.keys():
+					for bed in element["mask-include"]:
+						POSTARGS[dataset].append("mask-include")
+						POSTARGS[dataset].append(bed)
+				elif "nearest-gtf" in element.keys():
+					for gtf in element["nearest-gtf"]:
+						POSTARGS[dataset].append("nearest-gtf")
+						POSTARGS[dataset].append(gtf)
+				elif "nearest-bed" in element.keys():
+					for bed in element["nearest-bed"]:
+						POSTARGS[dataset].append("nearest-bed")
+						POSTARGS[dataset].append(bed)
+				elif "RNA-seq" in element.keys():
+					ref = element["genes"]
+					for tsv in element["counts"]:
+						POSTARGS[dataset].append("RNA-seq")
+						POSTARGS[dataset].append(ref)
+						POSTARGS[dataset].append(tsv)
+
+
 
 #### local rules ####
 localrules: all, combine, ucsc_bed
