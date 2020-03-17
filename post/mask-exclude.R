@@ -29,7 +29,7 @@ for (bed in mask_exclude)
                           )
   
   # check that there is some overlap between chromosome names in bed_regions and ints
-  if (sum(bed_regions$X1 %in% ints$Chr))
+  if (sum(unique(bed_regions$X1) %in% unique(ints$Chr)) == 0)
   {
     stop(paste0("no overlap between chromosome names in ints file and ", bed))
   }

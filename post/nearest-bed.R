@@ -6,40 +6,31 @@
 #### write integration bed file ####
 # make necessary changes to ints tibble
 bed <- ints %>% 
-  dplyr::mutate(Chr = paste0("chr", Chr)) %>% 
   dplyr::mutate(strand = ".") %>% 
-  dplyr::select(Chr, IntStart, IntStop, strand, ReadID)
+  dplyr::select(Chr, IntStart, IntStop, strand, ReadID) %>%
+  dplyr::arrange(Chr, IntStart)
 
 # generate file names for saving
-filt_file <- paste0(tools::file_path_sans_ext(args[1]), ".filt.bed")
 sorted_file <- paste0(tools::file_path_sans_ext(args[1]), ".filt.sorted.bed")
 
 # save bed file
 readr::write_tsv(bed, 
-                 path = filt_file,
+                 path = sorted_file,
                  col_names = FALSE)
 
-# use bedtools to sort
-cmd <- paste0("bedtools sort -i ", filt_file, " > ", sorted_file)
-system(cmd)
 
 #### loop over bed files and annotate nearest feature ####
 for (bed in nearest_bed)
 {
   # generate filename for sorted file
-  sorted_bed <- paste0(tools::file_path_sans_ext(bed), ".sorted.bed")
   nearest_bed <- paste0(tools::file_path_sans_ext(args[1]), ".nearest.", basename(tools::file_path_sans_ext(bed)), ".bed")
-  
-  # use bedtools to sort
-  cmd <- paste0("bedtools sort -i ", bed, " > ", sorted_bed)
-  system(cmd)
+
   
   # use bedtools to get nearest feature
-  cmd <- paste0("bedtools closest -d -t first -a ", sorted_file, " -b ", sorted_bed, " > ", nearest_bed)
+  cmd <- paste0("bedtools closest -d -t first -a ", sorted_file, " -b ", bed, " > ", nearest_bed)
   system(cmd)
   
   # import nearest file to get nearest feature
-  bedCols <- c("Chr", "IntStart", "IntStop", "strand",  "ReadID")
   tmp <- readr::read_tsv(nearest_bed,
                          col_names = FALSE) 
   
@@ -57,11 +48,9 @@ for (bed in nearest_bed)
   ints <- left_join(ints, tmp, by = c("Chr", "IntStart", "IntStop", "ReadID"))
   
   # remove temp files
-  file.remove(sorted_bed)
   file.remove(nearest_bed)
   
 }
 
 # remove temp bed files
-file.remove(filt_file)
 file.remove(sorted_file)

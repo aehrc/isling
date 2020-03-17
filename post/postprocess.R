@@ -25,15 +25,16 @@ args <- commandArgs(trailingOnly=TRUE)
 
 if (length(args) < 1)
 {
-  stop("provide path to file to process")
+  stop("provide path to file(s to process")
 }
+
 if (length(args) < 2)
 {
   cat("no types specified!\n")
 }
 
 # types of post-processing available
-types <- c("filter", "mask-exclude", "mask-include", "nearest-gtf", "nearest-bed")
+types <- c("filter", "dedup", "mask-exclude", "mask-include", "nearest-gtf", "nearest-bed")
 
 # check which types of post-processing to do
 # check if we want to do de-duplication
@@ -196,20 +197,20 @@ if ("nearest-bed" %in% args)
 # columns are dependent on the output of the perl scripts that identify integrations
 int_cols <- readr::cols(
   Chr = col_character(),
-  IntStart = col_double(),
-  IntStop = col_double(),
+  IntStart = col_integer(),
+  IntStop = col_integer(),
   VirusRef = col_character(),
-  VirusStart = col_double(),
-  VirusStop = col_double(),
-  NoAmbiguousBases = col_double(),
+  VirusStart = col_integer(),
+  VirusStop = col_integer(),
+  NoAmbiguousBases = col_integer(),
   OverlapType = col_character(),
   Orientation = col_character(),
   HostSeq = col_character(),
   ViralSeq = col_character(),
   AmbiguousSeq = col_character(),
-  HostEditDist = col_double(),
-  ViralEditDist = col_double(),
-  TotalEditDist = col_double(),
+  HostEditDist = col_integer(),
+  ViralEditDist = col_integer(),
+  TotalEditDist = col_integer(),
   PossibleHostTranslocation = col_character(),
   PossibleVectorRearrangement = col_character(),
   HostPossibleAmbiguous = col_character(),

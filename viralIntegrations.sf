@@ -87,6 +87,8 @@ for dataset in config:
 
 # construct arguments for postprocess.R script for each dataset
 POSTARGS = {}
+TOSORT = []
+SORTED = []
 for dataset in config:
 	POSTARGS[dataset] = []
 	if "post" in config[dataset]:
@@ -103,26 +105,37 @@ for dataset in config:
 				if "mask-exclude" in element.keys():
 					for bed in element["mask-exclude"]:
 						POSTARGS[dataset].append("mask-exclude")
-						POSTARGS[dataset].append(bed)
+						POSTARGS[dataset].append(bed)	
 				elif "mask-include" in element.keys():
 					for bed in element["mask-include"]:
 						POSTARGS[dataset].append("mask-include")
 						POSTARGS[dataset].append(bed)
 				elif "nearest-gtf" in element.keys():
 					for gtf in element["nearest-gtf"]:
+						sortedgtf = os.path.splitext(gtf)[0] + ".sorted.gtf"
 						POSTARGS[dataset].append("nearest-gtf")
-						POSTARGS[dataset].append(gtf)
+						POSTARGS[dataset].append(sortedgtf)
+						if gtf not in TOSORT:
+							TOSORT.append(gtf)
+							SORTED.append(sortedgtf)
 				elif "nearest-bed" in element.keys():
 					for bed in element["nearest-bed"]:
+						sortedbed = os.path.splitext(bed)[0] + ".sorted.bed"
 						POSTARGS[dataset].append("nearest-bed")
-						POSTARGS[dataset].append(bed)
+						POSTARGS[dataset].append(sortedbed)
+						if bed not in TOSORT:
+							TOSORT.append(bed)
+							SORTED.append(sortedbed)
 				elif "RNA-seq" in element.keys():
 					ref = element["genes"]
+					sortedref = os.path.splitext(ref)[0] + ".sorted." + os.path.splitext(ref)[1]
+					if ref not in TOSORT:
+						TOSORT.append(ref)
+						SORTED.append(sortedref)
 					for tsv in element["counts"]:
 						POSTARGS[dataset].append("RNA-seq")
-						POSTARGS[dataset].append(ref)
+						POSTARGS[dataset].append(sortedref)
 						POSTARGS[dataset].append(tsv)
-
 
 
 #### local rules ####
@@ -369,31 +382,23 @@ rule run_int_scripts:
 
 	output:
 		allInt = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
-		allBed = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.bed",
 		short = temp("../out/{dset}/ints/{samp}.{host}.{virus}.short.txt"),
 		soft = temp("../out/{dset}/ints/{samp}.{host}.{virus}.soft.txt"),
 		discord = temp("../out/{dset}/ints/{samp}.{host}.{virus}.discordant.txt"),
-		softBed = temp("../out/{dset}/ints/{samp}.{host}.{virus}.soft.bed"),
-		discordBed = temp("../out/{dset}/ints/{samp}.{host}.{virus}.discordant.bed"),
-		shortBed = temp("../out/{dset}/ints/{samp}.{host}.{virus}.short.bed"),
 		allIntTemp = temp("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp"),
-		allBedTemp = temp("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.bed.tmp")
 
 	shell:
 		"""
-		perl -I. ./softClip.pl --viral {input.vSing} --human {input.hSing} --output {output.soft} --bed {output.softBed} --tol 3
-		perl -I. ./discordant.pl --viral {input.vPaired} --human {input.hPaired} --output {output.discord} --bed {output.discordBed} --tol 3
-		perl -I. ./short.pl --viral {input.vShort} --human {input.hShort} --output {output.short} --bed {output.shortBed} --tol 3
+		perl -I. ./softClip.pl --viral {input.vSing} --human {input.hSing} --output {output.soft} --tol 3
+		perl -I. ./discordant.pl --viral {input.vPaired} --human {input.hPaired} --output {output.discord} --tol 3
+		perl -I. ./short.pl --viral {input.vShort} --human {input.hShort} --output {output.short} --tol 3
 		sed -e '2,${{/Chr/d' -e '}}' {output.soft} {output.discord} {output.short} > {output.allInt}
 		sort -n -k1,1 -k2,2n {output.allInt} > {output.allIntTemp}
 		cp {output.allIntTemp} {output.allInt}
-		cat {output.softBed} {output.discordBed} {output.shortBed} > {output.allBed}
-		sort -k1,1 -k2,2n {output.allBed} > {output.allBedTemp}
-		cp {output.allBedTemp} {output.allBed}
 		"""
 
 	
-#### postprocessingvisualization ####
+#### postprocessing ####
 
 rule count_mapped:
 	input:
@@ -408,9 +413,33 @@ rule count_mapped:
 	shell:
 		"./count_mapped.sh"
 
+rule sortbed:
+	input:
+		TOSORT
+	output:
+		SORTED
+	run:
+		for i in range(len(TOSORT)):
+			print(f"sorting file {TOSORT[i]} into file {SORTED[i]}, file extension {os.path.splitext(TOSORT[i])[1]}")
+			
+			# if file is a bed file
+			if (os.path.splitext(TOSORT[i])[1] == ".bed"):
+				body = f"sort -k1,1 -k2,2n {TOSORT[i]} > {SORTED[i]}"
+				shell(body)
+				print(body)
+			# if file is a gtf file
+			elif (os.path.splitext(TOSORT[i])[1] == ".gtf"):
+				
+				body = f"awk '{{{{ if ($0 !~ /^#/) {{{{ print $0 }}}} }}}}' {TOSORT[i]} | sort -k1,1 -k4,4n > {SORTED[i]}"
+				shell(body)
+				print(body)
+			else:
+				raise ValueError("only gtf files and bed files are supported")
+
 rule post:
 	input:
-		"../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
+		"../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
+		SORTED
 	output:
 		"../out/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt"
 	conda:
