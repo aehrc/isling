@@ -183,8 +183,6 @@ if ("nearest-bed" %in% args)
     }
   }
   
-  print(nearest_bed)
-  
   # check that files exist
   if (sum(file.exists(nearest_bed)) != length(nearest_bed))
   {
@@ -211,6 +209,11 @@ if ("RNA-seq-gtf" %in% args)
   # get the tsv file containing RNA-seq counts
   RNA_seq_tsv <- args[which(args == "RNA-seq-gtf") + 3]
 
+  #check that all these vectors are the same length
+  if ((length(nearest_gtf_RNA) != length(RNA_seq_col)) | (length(RNA_seq_col) != length(RNA_seq_tsv))) {
+    stop("specify a gtf file, column and tsv file for each RNA-seq annotation")
+  }
+  
   # check that we didn't get any other types (indicating a missing bed file)
   if (sum(types %in% nearest_gtf) > 0)
   {
@@ -318,7 +321,8 @@ if (nearest_bed[1] != "")
 }
 
 #annotate nearest feature from bed file(s)
-if (RNA_gtf_tsv[1] != "")
+
+if (RNA_seq_tsv[1] != "")
 {
   source("post/RNA-seq-gtf-tsv.R")
 }

@@ -22,6 +22,9 @@ readr::write_tsv(bed,
 #### loop over bed files and annotate nearest feature ####
 for (bed in nearest_bed)
 {
+  
+  cat("annotating integrations with nearest region from bed file", bed, "\n")
+  
   # generate filename for sorted file
   nearest_bed <- paste0(tools::file_path_sans_ext(args[1]), ".nearest.", basename(tools::file_path_sans_ext(bed)), ".bed")
 
@@ -41,7 +44,7 @@ for (bed in nearest_bed)
     dplyr::rename(IntStart = X2) %>% 
     dplyr::rename(IntStop = X3) %>% 
     dplyr::rename(ReadID = X5) %>% 
-    dplyr::rename_at(vars(starts_with(tmp_cols[length(tmp_cols)])), ~paste0(basename(tools::file_path_sans_ext(bed)), "_nearest")) %>% 
+    dplyr::rename_at(vars(starts_with(tmp_cols[length(tmp_cols)])), ~paste0(basename(tools::file_path_sans_ext(bed)), "_closest_dist")) %>% 
     dplyr::select(-starts_with("X"))  
   
   # join this annotation with ints

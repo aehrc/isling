@@ -23,6 +23,8 @@ readr::write_tsv(bed,
 #### loop over gtf files and annotate nearest feature ####
 for (gtf in nearest_gtf)
 {
+  cat("annotating integrations with nearest region from gtf file", gtf, "\n")
+  
   # generate filename for sorted file
   nearest_gtf <- paste0(tools::file_path_sans_ext(args[1]), ".nearest.", basename(tools::file_path_sans_ext(gtf)), ".bed")
   
