@@ -34,7 +34,7 @@ if (length(args) < 2)
 }
 
 # types of post-processing available
-types <- c("filter", "dedup", "mask-exclude", "mask-include", "nearest-gtf", "nearest-bed")
+types <- c("filter", "dedup", "mask-exclude", "mask-include", "nearest-gtf", "nearest-bed", "RNA-seq-gtf")
 
 # check which types of post-processing to do
 # check if we want to do de-duplication
@@ -192,6 +192,54 @@ if ("nearest-bed" %in% args)
   }
 }
 
+# check if we want to use RNA-seq
+RNA_gtf_tsv <- ""
+if ("RNA-seq-gtf" %in% args)
+{
+  # get gtf files to use for nearest
+  if (which(args == "RNA-seq-gtf") + 1 > length(args))
+  {
+    stop("specify gtf files for annotation")
+  }
+  
+  # need to provide the GTF file as the first argument after the RNA-seq-gtf argument
+  nearest_gtf_RNA <- args[which(args == "RNA-seq-gtf") + 1]
+  
+  # get the name of the column to get from the RNA-seq tsv files
+  RNA_seq_col <- args[which(args == "RNA-seq-gtf") + 2]
+  
+  # get the tsv file containing RNA-seq counts
+  RNA_seq_tsv <- args[which(args == "RNA-seq-gtf") + 3]
+
+  # check that we didn't get any other types (indicating a missing bed file)
+  if (sum(types %in% nearest_gtf) > 0)
+  {
+    stop("specify gtf files for annotation")
+  }
+  
+  # check that file extension of specified gtf files is ".gtf"
+  for (i in nearest_gtf_RNA)
+  {
+    extension <- tools::file_ext(i)
+    if (extension[length(extension)] != "gtf")
+    {
+      stop("specify gtf files for annotation")
+    }
+  }
+  
+  # check that files exist
+  if (sum(file.exists(nearest_gtf_RNA)) != length(nearest_gtf_RNA))
+  {
+    stop("(some) gtf file(s) do not exist")
+  }
+  
+  # check that files exist
+  if (sum(file.exists(RNA_seq_tsv)) != length(RNA_seq_tsv))
+  {
+    stop("(some) RNA-seq txt file(s) do not exist")
+  }
+}
+
 
 #### data import ####
 # columns are dependent on the output of the perl scripts that identify integrations
@@ -267,6 +315,12 @@ if (nearest_gtf[1] != "")
 if (nearest_bed[1] != "")
 {
   source("post/nearest-bed.R")
+}
+
+#annotate nearest feature from bed file(s)
+if (RNA_gtf_tsv[1] != "")
+{
+  source("post/RNA-seq-gtf-tsv.R")
 }
 
 #### save output postprocessed file ####
