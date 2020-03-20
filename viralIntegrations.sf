@@ -462,7 +462,10 @@ rule post:
 	params:
 		lambda wildcards: " ".join(([f"../out/{wildcards.dset}/ints/{wildcards.samp}.{wildcards.host}.{wildcards.virus}.integrations.txt"] + POSTARGS[wildcards.dset]))
 	shell:
-		"Rscript post/postprocess.R {params}"
+		"""
+		Rscript post/postprocess.R {params}
+		wait
+		"""
 
 	
 rule summarise:
