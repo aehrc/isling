@@ -163,8 +163,8 @@ rule all:
 rule dedup:
 # remove exact duplicates (subs=0)
 	input:
-		r1 = lambda wildcards: "../data/reads/{}/{}{}".format(wildcards.dset, wildcards.samp, config[wildcards.dset]["R1_suffix"]),
-		r2 = lambda wildcards: "../data/reads/{}/{}{}".format(wildcards.dset, wildcards.samp, config[wildcards.dset]["R2_suffix"])
+		r1 = lambda wildcards: f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['R1_suffix']}",
+		r2 = lambda wildcards: f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['R2_suffix']}"
 	output:
 		r1 = temp("../out/reads/{dset}/{samp}_1.dedup.fastq.gz"),
 		r2 = temp("../out/reads/{dset}/{samp}_2.dedup.fastq.gz")
@@ -175,11 +175,26 @@ rule dedup:
 		clumpify.sh -Xmx15g in1="{input.r1}" in2="{input.r2}" out1="{output.r1}" out2="{output.r2}" dedupe subs=0
 		"""
 
+# input functions for if we want to do deduplication or not
+def get_r1_for_seqprep(wildcards):
+	if config[wildcards.dset]['dedup'] == "True":
+		return f"../out/reads/{wilcards.dset}/{wildcards.samp}_1.dedup.fastq.gz"
+	else:
+		return f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['R1_suffix']}"
+
+
+def get_r2_for_seqprep(wildcards):
+	if config[wildcards.dset]['dedup'] == "True":
+		return f"../out/reads/{wilcards.dset}/{wildcards.samp}_2.dedup.fastq.gz"
+	else:
+		return f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['R2_suffix']}"
+
+
 rule seqPrep:
 # if we're doing it
 	input:
-		r1 = "../out/reads/{dset}/{samp}_1.dedup.fastq.gz",
-		r2 = "../out/reads/{dset}/{samp}_2.dedup.fastq.gz"
+		r1 = get_r1_for_seqprep,
+		r2 = get_r2_for_seqprep
 	output:
 		merged = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz"),
 		proc_r1 = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_1.fastq.gz"),
@@ -199,8 +214,8 @@ rule seqPrep:
 rule combine:
 # for if we don't want to do seqPrep
 	input:
-		r1 = "../out/reads/{dset}/{samp}_1.fastq.gz",
-		r2 = "../out/reads/{dset}/{samp}_2.fastq.gz"
+		r1 = get_r1_for_seqprep,
+		r2 = get_r2_for_seqprep
 	output:
 		proc_r1 = temp("../out/{dset}/processed_reads/{samp}.1.fastq.gz"),
 		proc_r2 = temp("../out/{dset}/processed_reads/{samp}.2.fastq.gz"),
@@ -212,14 +227,14 @@ rule combine:
 		cat {input.r1} {input.r2} > {output.all}
 		"""
 #functions for if we did seqPrep or not
-def get_all(wildcards):
+def get_all_for_align(wildcards):
 	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
 		folder = "merged_reads"
 	else:
 		folder = "processed_reads"
 	return "../out/{}/{}/{}.all.fastq.gz".format(wildcards.dset, folder, wildcards.samp)
 
-def get_r1(wildcards):
+def get_r1_for_align(wildcards):
 	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
 		typeRead = "SeqPrep_1"
 		folder = "merged_reads"
@@ -228,7 +243,7 @@ def get_r1(wildcards):
 		folder = "processed_reads"
 	return "../out/{}/{}/{}.{}.fastq.gz".format(wildcards.dset, folder, wildcards.samp, typeRead)
 
-def get_r2(wildcards):
+def get_r2_for_align(wildcards):
 	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
 		typeRead = "SeqPrep_2"
 		folder = "merged_reads"
@@ -263,9 +278,9 @@ rule align_bwa_virus:
 		bwt = "../data/references/{virus}.bwt",
 		pac = "../data/references/{virus}.pac",
 		sa = "../data/references/{virus}.sa",
-		all = get_all,
-		r1 = get_r1,
-		r2 = get_r2
+		all = get_all_for_align,
+		r1 = get_r1_for_align,
+		r2 = get_r2_for_align
 	output:
 		vPaired = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam"),
 		vSing = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam"),
