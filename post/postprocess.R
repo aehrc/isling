@@ -191,7 +191,7 @@ if ("nearest-bed" %in% args)
 }
 
 # check if we want to use RNA-seq
-RNA_gtf_tsv <- ""
+nearest_gtf_RNA <- ""
 if ("RNA-seq-gtf" %in% args)
 {
   # get gtf files to use for nearest
@@ -323,7 +323,7 @@ if (nearest_bed[1] != "")
 
 #annotate nearest feature from bed file(s)
 
-if (RNA_seq_tsv[1] != "")
+if (nearest_gtf_RNA[1] != "")
 {
   source("post/RNA-seq-gtf-tsv.R")
 }
