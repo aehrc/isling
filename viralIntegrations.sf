@@ -128,13 +128,14 @@ for dataset in config:
 							SORTED.append(sortedbed)
 				elif "RNA-seq" in element.keys():
 					ref = element["genes"]
-					sortedref = os.path.splitext(ref)[0] + ".sorted." + os.path.splitext(ref)[1]
+					sortedref = os.path.splitext(ref)[0] + ".sorted" + os.path.splitext(ref)[1]
 					if ref not in TOSORT:
 						TOSORT.append(ref)
 						SORTED.append(sortedref)
 					for tsv in element["counts"]:
-						POSTARGS[dataset].append("RNA-seq")
+						POSTARGS[dataset].append("RNA-seq-gtf")
 						POSTARGS[dataset].append(sortedref)
+						POSTARGS[dataset].append(element["col"])
 						POSTARGS[dataset].append(tsv)
 
 
@@ -178,14 +179,14 @@ rule dedup:
 # input functions for if we want to do deduplication or not
 def get_r1_for_seqprep(wildcards):
 	if config[wildcards.dset]['dedup'] == "True":
-		return f"../out/reads/{wilcards.dset}/{wildcards.samp}_1.dedup.fastq.gz"
+		return f"../out/reads/{wildcards.dset}/{wildcards.samp}_1.dedup.fastq.gz"
 	else:
 		return f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['R1_suffix']}"
 
 
 def get_r2_for_seqprep(wildcards):
 	if config[wildcards.dset]['dedup'] == "True":
-		return f"../out/reads/{wilcards.dset}/{wildcards.samp}_2.dedup.fastq.gz"
+		return f"../out/reads/{wildcards.dset}/{wildcards.samp}_2.dedup.fastq.gz"
 	else:
 		return f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['R2_suffix']}"
 

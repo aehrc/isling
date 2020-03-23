@@ -202,6 +202,7 @@ if ("RNA-seq-gtf" %in% args)
   
   # need to provide the GTF file as the first argument after the RNA-seq-gtf argument
   nearest_gtf_RNA <- args[which(args == "RNA-seq-gtf") + 1]
+  print(nearest_gtf_RNA)
   
   # get the name of the column to get from the RNA-seq tsv files
   RNA_seq_col <- args[which(args == "RNA-seq-gtf") + 2]
