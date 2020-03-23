@@ -16,3 +16,4 @@ benchmarking/example.bam
 .ipynb_checkpoints/
 benchmarking/notebooks/Trace.ipynb
 Trace.ipynb
+*.Rproj

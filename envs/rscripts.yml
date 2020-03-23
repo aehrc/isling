@@ -22,5 +22,6 @@ dependencies:
   - r-viridislite=0.3
   - r-withr=2.1
   - r-writexl=1.1
+  - bedtools=2.28
 
 

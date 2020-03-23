@@ -20,7 +20,7 @@
 # │       ├── host.fa
 # │       └── virus.fa
 # ├── intvi_pipeline 
-# │   ├── all pipeline files from git repo
+# │   └── all pipeline files from git repo
 # └── proj-spcfc
 #     └── dsets.yaml
 #
@@ -45,15 +45,12 @@
 # 3. perl scripts
 #   - run perl scripts with alignment sam  files as inputs to detect integrations
 # 4. postprocessing
-#   - run R script to generate ouput xlsx files for each dataset, summary graphs
-#   - merge bed files for each dataset
-#   - intersect with refseq
-#   - output files for visualzation in UCSC browser
+#   - apply various types of postprocessing: dedup, filter, mask, annotate
+#   - generate ouput xlsx files for each dataset
+#   - write output files for visualzation in UCSC browser
 #  
 # the primary output of the pipeline is the xlsx files for each datasets which
 # contain the details of the detected integrations.
-
-
 
 
 #### python modules ####
@@ -64,11 +61,9 @@ import os
 #### CONFIG FILE ####
 #which datasets are to be aligned to which hosts and viruses are specified in dsets.yaml
 #also whether or not to try to merge R1 and R2
-configfile: "../proj-spcfc/dsets.yaml"
+#configfile: "../proj-spcfc/dsets.yaml"
 
 references_path = "../data/references/"
-
-#this is of the form { dset1: {host: host1, virus: host2, merge: True, refseq: refseq1}, dset2: {host: host2, virus: virus2, merge: False, refseq: refseq1} }
 
 #make four lists, with each entry in each list corresponding to one desired output file
 
@@ -80,9 +75,9 @@ VIRUSES = []
 MERGE = {}
 
 for dataset in config:
-	#get files in directory and strip off "_1.fastq.gz"
-	samples = [os.path.basename(f)[:-11] for f in glob.glob("../data/reads/{}/*_1.fastq.gz".format(dataset))]
-	samples = samples + [os.path.basename(f)[:-12] for f in glob.glob("../data/reads/{}/*_R1.fastq.gz".format(dataset))]
+	#get files in directory and strip off suffix (specified in "R1_suffix" field)
+	suffix = config[dataset]["R1_suffix"]
+	samples = [os.path.basename(f)[:-len(suffix)] for f in glob.glob("../data/reads/{}/*{}".format(dataset, suffix))]
 	for sample in samples:
 		DATASETS.append(dataset)
 		SAMPLES.append(sample)
@@ -91,62 +86,90 @@ for dataset in config:
 		MERGE["{}_{}".format(dataset, sample)] = config[dataset]["merge"]
 
 
+# construct arguments for postprocess.R script for each dataset
+POSTARGS = {}
+TOSORT = []
+SORTED = []
+for dataset in config:
+	POSTARGS[dataset] = []
+	if "post" in config[dataset]:
+		for element in config[dataset]["post"]:
+			# need to check if this element is a string or a dict
+			if type(element) is str:
+				# look for "filter"
+				if element == "filter":
+					POSTARGS[dataset].append("filter")
+				elif element == "dedup":
+					POSTARGS[dataset].append("dedup")
+			# postprocessing types with files specified will be in ordered dictionaries
+			elif type(element) is OrderedDict:
+				if "mask-exclude" in element.keys():
+					for bed in element["mask-exclude"]:
+						POSTARGS[dataset].append("mask-exclude")
+						POSTARGS[dataset].append(bed)	
+				elif "mask-include" in element.keys():
+					for bed in element["mask-include"]:
+						POSTARGS[dataset].append("mask-include")
+						POSTARGS[dataset].append(bed)
+				elif "nearest-gtf" in element.keys():
+					for gtf in element["nearest-gtf"]:
+						sortedgtf = os.path.splitext(gtf)[0] + ".sorted.gtf"
+						POSTARGS[dataset].append("nearest-gtf")
+						POSTARGS[dataset].append(sortedgtf)
+						if gtf not in TOSORT:
+							TOSORT.append(gtf)
+							SORTED.append(sortedgtf)
+				elif "nearest-bed" in element.keys():
+					for bed in element["nearest-bed"]:
+						sortedbed = os.path.splitext(bed)[0] + ".sorted.bed"
+						POSTARGS[dataset].append("nearest-bed")
+						POSTARGS[dataset].append(sortedbed)
+						if bed not in TOSORT:
+							TOSORT.append(bed)
+							SORTED.append(sortedbed)
+				elif "RNA-seq" in element.keys():
+					ref = element["genes"]
+					sortedref = os.path.splitext(ref)[0] + ".sorted" + os.path.splitext(ref)[1]
+					if ref not in TOSORT:
+						TOSORT.append(ref)
+						SORTED.append(sortedref)
+					for tsv in element["counts"]:
+						POSTARGS[dataset].append("RNA-seq-gtf")
+						POSTARGS[dataset].append(sortedref)
+						POSTARGS[dataset].append(element["col"])
+						POSTARGS[dataset].append(tsv)
+
+
 #### local rules ####
-localrules: all, combine, rename, copy, ucsc_bed
+localrules: all, combine, ucsc_bed
 
 #### target files ####
 rule all:
 	input: 
-		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt", zip, dset=DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES),
 		expand("../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.bam", zip, dset = DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES),
 		expand("../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.{virus}Mappedreads.bam", zip, dset = DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES),
 		expand("../out/{dset}/host_aligned/{samp}.{host}.bwaShort.{virus}Mappedreads.bam", zip, dset = DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES),
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),		
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),
-#		expand("../out/summary/{dset}.combined.xlsx", dset = DATASETS),
 		"../out/summary/num_sites.xlsx",
-		expand("../out/summary/ucsc_bed/{dset}.clean.bed", dset = DATASETS)
-		
-		
+		expand("../out/summary/ucsc_bed/{dset}.post.bed", dset = DATASETS)
 
+#### get reads from bam files if necesssary ####
+
+
+	
+		
 #### merging and dedup ###
 
-rule rename:
-	input:
-		r1 = "../data/reads/{dset}/{samp}_R1.fastq.gz",
-		r2 = "../data/reads/{dset}/{samp}_R2.fastq.gz"
-	output:
-		r1_out = temp("../out/reads/{dset}/{samp}_1.fastq.gz"),
-		r2_out = temp("../out/reads/{dset}/{samp}_2.fastq.gz")
-	shell:
-		"""
-		cp {input.r1} {output.r1_out}
-		cp {input.r2} {output.r2_out}
-		"""
-
-rule copy:
-	input:
-		r1 = "../data/reads/{dset}/{samp}_1.fastq.gz",
-		r2 = "../data/reads/{dset}/{samp}_2.fastq.gz"
-	output:
-		r1_out = temp("../out/reads/{dset}/{samp}_1.fastq.gz"),
-		r2_out = temp("../out/reads/{dset}/{samp}_2.fastq.gz")
-	shell:
-		"""
-		cp "{input.r1}" "{output.r1_out}"
-		cp "{input.r2}" "{output.r2_out}"
-		"""
-
 rule dedup:
+# remove exact duplicates (subs=0)
 	input:
-		r1 = "../out/reads/{dset}/{samp}_1.fastq.gz",
-		r2 = "../out/reads/{dset}/{samp}_2.fastq.gz"
+		r1 = lambda wildcards: f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['R1_suffix']}",
+		r2 = lambda wildcards: f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['R2_suffix']}"
 	output:
 		r1 = temp("../out/reads/{dset}/{samp}_1.dedup.fastq.gz"),
 		r2 = temp("../out/reads/{dset}/{samp}_2.dedup.fastq.gz")
-	params:
-		temp = lambda wildcards: f"../out/reads/{wildcards.dset}/{wildcards.samp}.temp.fq"
 	conda:
 		"envs/bbmap.yml"
 	shell:
@@ -154,11 +177,26 @@ rule dedup:
 		clumpify.sh -Xmx15g in1="{input.r1}" in2="{input.r2}" out1="{output.r1}" out2="{output.r2}" dedupe subs=0
 		"""
 
+# input functions for if we want to do deduplication or not
+def get_r1_for_seqprep(wildcards):
+	if config[wildcards.dset]['dedup'] == "True":
+		return f"../out/reads/{wildcards.dset}/{wildcards.samp}_1.dedup.fastq.gz"
+	else:
+		return f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['R1_suffix']}"
+
+
+def get_r2_for_seqprep(wildcards):
+	if config[wildcards.dset]['dedup'] == "True":
+		return f"../out/reads/{wildcards.dset}/{wildcards.samp}_2.dedup.fastq.gz"
+	else:
+		return f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['R2_suffix']}"
+
 
 rule seqPrep:
+# if we're doing it
 	input:
-		r1 = "../out/reads/{dset}/{samp}_1.dedup.fastq.gz",
-		r2 = "../out/reads/{dset}/{samp}_2.dedup.fastq.gz"
+		r1 = get_r1_for_seqprep,
+		r2 = get_r2_for_seqprep
 	output:
 		merged = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz"),
 		proc_r1 = temp("../out/{dset}/merged_reads/{samp}.SeqPrep_1.fastq.gz"),
@@ -176,9 +214,10 @@ rule seqPrep:
 		"""
 
 rule combine:
+# for if we don't want to do seqPrep
 	input:
-		r1 = "../out/reads/{dset}/{samp}_1.fastq.gz",
-		r2 = "../out/reads/{dset}/{samp}_2.fastq.gz"
+		r1 = get_r1_for_seqprep,
+		r2 = get_r2_for_seqprep
 	output:
 		proc_r1 = temp("../out/{dset}/processed_reads/{samp}.1.fastq.gz"),
 		proc_r2 = temp("../out/{dset}/processed_reads/{samp}.2.fastq.gz"),
@@ -190,15 +229,14 @@ rule combine:
 		cat {input.r1} {input.r2} > {output.all}
 		"""
 #functions for if we did seqPrep or not
-
-def get_all(wildcards):
+def get_all_for_align(wildcards):
 	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
 		folder = "merged_reads"
 	else:
 		folder = "processed_reads"
 	return "../out/{}/{}/{}.all.fastq.gz".format(wildcards.dset, folder, wildcards.samp)
 
-def get_r1(wildcards):
+def get_r1_for_align(wildcards):
 	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
 		typeRead = "SeqPrep_1"
 		folder = "merged_reads"
@@ -207,7 +245,7 @@ def get_r1(wildcards):
 		folder = "processed_reads"
 	return "../out/{}/{}/{}.{}.fastq.gz".format(wildcards.dset, folder, wildcards.samp, typeRead)
 
-def get_r2(wildcards):
+def get_r2_for_align(wildcards):
 	if MERGE["{}_{}".format(wildcards.dset, wildcards.samp)] == "True":
 		typeRead = "SeqPrep_2"
 		folder = "merged_reads"
@@ -242,9 +280,9 @@ rule align_bwa_virus:
 		bwt = "../data/references/{virus}.bwt",
 		pac = "../data/references/{virus}.pac",
 		sa = "../data/references/{virus}.sa",
-		all = get_all,
-		r1 = get_r1,
-		r2 = get_r2
+		all = get_all_for_align,
+		r1 = get_r1_for_align,
+		r2 = get_r2_for_align
 	output:
 		vPaired = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam"),
 		vSing = temp("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.sam"),
@@ -361,32 +399,23 @@ rule run_int_scripts:
 
 	output:
 		allInt = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
-		allBed = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.bed",
 		short = temp("../out/{dset}/ints/{samp}.{host}.{virus}.short.txt"),
 		soft = temp("../out/{dset}/ints/{samp}.{host}.{virus}.soft.txt"),
 		discord = temp("../out/{dset}/ints/{samp}.{host}.{virus}.discordant.txt"),
-		softBed = temp("../out/{dset}/ints/{samp}.{host}.{virus}.soft.bed"),
-		discordBed = temp("../out/{dset}/ints/{samp}.{host}.{virus}.discordant.bed"),
-		shortBed = temp("../out/{dset}/ints/{samp}.{host}.{virus}.short.bed"),
 		allIntTemp = temp("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp"),
-		allBedTemp = temp("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.bed.tmp")
 
 	shell:
 		"""
-		perl -I. ./softClip.pl --viral {input.vSing} --human {input.hSing} --output {output.soft} --bed {output.softBed} --tol 3
-		perl -I. ./discordant.pl --viral {input.vPaired} --human {input.hPaired} --output {output.discord} --bed {output.discordBed} --tol 3
-		perl -I. ./short.pl --viral {input.vShort} --human {input.hShort} --output {output.short} --bed {output.shortBed} --tol 3
+		perl -I. ./softClip.pl --viral {input.vSing} --human {input.hSing} --output {output.soft} --tol 3
+		perl -I. ./discordant.pl --viral {input.vPaired} --human {input.hPaired} --output {output.discord} --tol 3
+		perl -I. ./short.pl --viral {input.vShort} --human {input.hShort} --output {output.short} --tol 3
 		sed -e '2,${{/Chr/d' -e '}}' {output.soft} {output.discord} {output.short} > {output.allInt}
-		sed -i 's\chr\ \g' {output.allInt}
 		sort -n -k1,1 -k2,2n {output.allInt} > {output.allIntTemp}
 		cp {output.allIntTemp} {output.allInt}
-		cat {output.softBed} {output.discordBed} {output.shortBed} > {output.allBed}
-		sort -k1,1 -k2,2n {output.allBed} > {output.allBedTemp}
-		cp {output.allBedTemp} {output.allBed}
 		"""
 
 	
-#### visualization ####
+#### postprocessing ####
 
 rule count_mapped:
 	input:
@@ -401,33 +430,66 @@ rule count_mapped:
 	shell:
 		"./count_mapped.sh"
 
-#rule plot_mapped:
-#	input:
-#		"../out/summary/count_mapped.txt"
-#	output:
-#		"../out/summary/count_mapped.xlsx"
-#	conda:
-#		"envs/rscripts.yml"
-#	script:
-#		"count_reads.R"
+rule sortbed:
+	input:
+		TOSORT
+	output:
+		SORTED
+	run:
+		for i in range(len(TOSORT)):
+			print(f"sorting file {TOSORT[i]} into file {SORTED[i]}, file extension {os.path.splitext(TOSORT[i])[1]}")
+			
+			# if file is a bed file
+			if (os.path.splitext(TOSORT[i])[1] == ".bed"):
+				body = f"sort -k1,1 -k2,2n {TOSORT[i]} > {SORTED[i]}"
+				shell(body)
+				print(body)
+			# if file is a gtf file
+			elif (os.path.splitext(TOSORT[i])[1] == ".gtf"):
+				
+				body = f"awk '{{{{ if ($0 !~ /^#/) {{{{ print $0 }}}} }}}}' {TOSORT[i]} | sort -k1,1 -k4,4n > {SORTED[i]}"
+				shell(body)
+				print(body)
+			else:
+				raise ValueError("only gtf files and bed files are supported")
+
+rule post:
+	input:
+		"../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
+		SORTED
+	output:
+		"../out/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt"
+	conda:
+		"envs/rscripts.yml"
+	params:
+		lambda wildcards: " ".join(([f"../out/{wildcards.dset}/ints/{wildcards.samp}.{wildcards.host}.{wildcards.virus}.integrations.txt"] + POSTARGS[wildcards.dset]))
+	shell:
+		"""
+		Rscript post/postprocess.R {params}
+		wait
+		"""
+
 	
 rule summarise:
 	input:
-		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES)
+		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES)
 
 	output:
 		"../out/summary/num_sites.xlsx"
 	conda:
 		"envs/rscripts.yml"
-	script:
-		"summarise_ints.R"
+	shell:
+		"Rscript summarise_ints.R {input}"
 
 rule ucsc_bed:
 	input:
-		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES)
+		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt", zip, dset = DATASETS, samp = SAMPLES, host = HOSTS, virus = VIRUSES)
 	output:
-		expand("../out/summary/ucsc_bed/{dset}.clean.bed", dset = set(DATASETS)),
+		expand("../out/summary/ucsc_bed/{dset}.post.bed", dset = set(DATASETS)),
 	conda:
 		"envs/rscripts.yml"
 	shell:
-		"bash -e format_ucsc.sh"
+		"""
+		Rscript writeBed.R {input}
+		bash -e format_ucsc.sh
+		"""
