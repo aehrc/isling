@@ -4,6 +4,8 @@
 # identifying chimeric reads, discordant read pairs, and short insertions of virus 
 # flanked by host sequence on both sides
 
+# note that only paired-end reads are supported
+
 # the pipeline relies on a particular directory structure:
  
 # parent_folder/
@@ -74,10 +76,36 @@ VIRUSES = []
 #also make dictionary MERGE, with key dataset_sample and value True or False
 MERGE = {}
 
+# we need to know if input files are bam or fastq.  check for filename extensions
+# currently only support fastq (.fq.gz, .fq, .fastq.gz, .fastq)
+# and bam (.bam, .sam)
+
+
+
 for dataset in config:
-	#get files in directory and strip off suffix (specified in "R1_suffix" field)
-	suffix = config[dataset]["R1_suffix"]
-	samples = [os.path.basename(f)[:-len(suffix)] for f in glob.glob("../data/reads/{}/*{}".format(dataset, suffix))]
+	# get files in directory and strip off suffix (specified in "R1_suffix" field)
+	# for fastq files
+	if "R1_suffix" in config[dataset]:
+		suffix = config[dataset]["R1_suffix"]	
+		samples = [os.path.basename(f)[:-len(suffix)] for f in glob.glob(f"../data/reads/{dataset}/*{suffix}"]
+		if len(samples) == 0:
+			print(f"warning: no files found for dataset {dataset}")
+	# for bam/sam files
+	else:
+		samples = [os.path.basename(f)[:-len(suffix)] for f in glob.glob(f"../data/reads/dataset{}/*.bam"]
+		if len(samples) > 0:
+			config[wildcards.dset]['bam_suffix'] = ".bam"
+			config[dataset]["R1_suffix"] = "_1.fastq.gz"
+			config[dataset]["R2_suffix"] = "_2.fastq.gz"
+		else:
+			samples = [os.path.basename(f)[:-len(suffix)] for f in glob.glob(f"../data/reads/dataset{}/*.sam"]
+			if len(samples) > 0:
+				config[wildcards.dset]['bam_suffix'] = ".sam"
+				config[dataset]["R1_suffix"] = "_1.fastq.gz"
+				config[dataset]["R2_suffix"] = "_2.fastq.gz"
+			else:
+				print(f"warning: no files found for dataset {dataset}")
+			
 	for sample in samples:
 		DATASETS.append(dataset)
 		SAMPLES.append(sample)
@@ -141,7 +169,7 @@ for dataset in config:
 
 
 #### local rules ####
-localrules: all, combine, ucsc_bed
+localrules: all, combine, ucsc_bed, post
 
 #### target files ####
 rule all:
@@ -157,8 +185,25 @@ rule all:
 
 #### get reads from bam files if necesssary ####
 
-
-	
+rule bamtobed:
+	input: lambda wildcards: f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['bam_suffix']}"
+	output: 
+		r1 = temp("../out/reads/{dset}/{samp}_1.fastq.gz"),
+		r2 = temp("../out/reads/{dset}/{samp}_2.fastq.gz")
+	params:
+		sortedBam = lambda wildcards: f"../out/reads/{wildcards.dset}/{wildcards.samp}.sorted{config[wildcards.dset]['bam_suffix']}",
+		unzip_r1 = lambda wildcards: f"../out/reads/{wildcards.dset}/{wildcards.samp}_1.fastq",
+		unzip_r2 = lambda wildcards: f"../out/reads/{wildcards.dset}/{wildcards.samp}_2.fastq"
+	conda:
+		"envs/bwa.yml"
+	shell:
+		"""
+		samtools sort -n {input} {params.sortedBam}
+		bedtools bamtofastq -i {params.sortedBam} -fq {params.unzip_r1} -fq2 {params.unzip_r2}
+		rm {params.sortedBam}
+		gzip {params.unzip_r1}
+		gzip {params.unzip_r2}
+		"""
 		
 #### merging and dedup ###
 
@@ -453,6 +498,17 @@ rule sortbed:
 			else:
 				raise ValueError("only gtf files and bed files are supported")
 
+
+#this rule (post) sometimes causes issues with conda. The error is usually something to do with ldpaths:
+
+#Activating conda environment: /scratch1/sco305/intvi_cmri/intvi_pipeline/.snakemake/conda/586e76e5
+#/scratch1/sco305/intvi_cmri/intvi_pipeline/.snakemake/conda/586e76e5/lib/R/bin/R: line 238: /scratch1/sco305/intvi_cmri/#intvi_pipeline/.snakemake/conda/586e76e5/lib/R/etc/ldpaths: No such file or directory
+
+# however, sometimes this rule runs just fine.
+
+# this issue is descrived here: https://github.com/conda-forge/r-base-feedstock/issues/67
+# however, it doesn't appear to have been resolved.  temporarily get around this by re-attempting jobs
+# that failed using command line option --restart-times, but will need to come up with a better solution for this
 rule post:
 	input:
 		"../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
@@ -466,7 +522,6 @@ rule post:
 	shell:
 		"""
 		Rscript post/postprocess.R {params}
-		wait
 		"""
 
 	
