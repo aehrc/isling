@@ -61,9 +61,7 @@ import glob
 import os
 
 #### CONFIG FILE ####
-#which datasets are to be aligned to which hosts and viruses are specified in dsets.yaml
-#also whether or not to try to merge R1 and R2
-#configfile: "../proj-spcfc/dsets.yaml"
+# supply on command line
 
 references_path = "../data/references/"
 
@@ -80,29 +78,23 @@ MERGE = {}
 # currently only support fastq (.fq.gz, .fq, .fastq.gz, .fastq)
 # and bam (.bam, .sam)
 
-
-
 for dataset in config:
 	# get files in directory and strip off suffix (specified in "R1_suffix" field)
 	# for fastq files
 	if "R1_suffix" in config[dataset]:
 		suffix = config[dataset]["R1_suffix"]	
-		samples = [os.path.basename(f)[:-len(suffix)] for f in glob.glob(f"../data/reads/{dataset}/*{suffix}"]
+		samples = [os.path.basename(f)[:-len(suffix)] for f in glob.glob(f"../data/reads/{dataset}/*{suffix}")]
 		if len(samples) == 0:
 			print(f"warning: no files found for dataset {dataset}")
 	# for bam/sam files
 	else:
-		samples = [os.path.basename(f)[:-len(suffix)] for f in glob.glob(f"../data/reads/dataset{}/*.bam"]
+		samples = [os.path.basename(f)[:-4] for f in glob.glob(f"../data/reads/{dataset}/*.bam")]
 		if len(samples) > 0:
-			config[wildcards.dset]['bam_suffix'] = ".bam"
-			config[dataset]["R1_suffix"] = "_1.fastq.gz"
-			config[dataset]["R2_suffix"] = "_2.fastq.gz"
+			config[dataset]['bam_suffix'] = ".bam"
 		else:
-			samples = [os.path.basename(f)[:-len(suffix)] for f in glob.glob(f"../data/reads/dataset{}/*.sam"]
+			samples = [os.path.basename(f)[:-4] for f in glob.glob(f"../data/reads/{dataset}/*.sam")]
 			if len(samples) > 0:
-				config[wildcards.dset]['bam_suffix'] = ".sam"
-				config[dataset]["R1_suffix"] = "_1.fastq.gz"
-				config[dataset]["R2_suffix"] = "_2.fastq.gz"
+				config[dataset]['bam_suffix'] = ".sam"
 			else:
 				print(f"warning: no files found for dataset {dataset}")
 			
@@ -206,12 +198,24 @@ rule bamtobed:
 		"""
 		
 #### merging and dedup ###
+def dedup_r1(wildcards):
+	if "R1_suffix" in config[dataset]:
+		return f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['R1_suffix']}"
+	else:
+		return f"../out/reads/{wildcards.dset}/{wildcards.samp}_1.fastq.gz"
+
+def dedup_r2(wildcards):
+	if "R2_suffix" in config[dataset]:
+		return f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['R2_suffix']}"
+	else:
+		return f"../out/reads/{wildcards.dset}/{wildcards.samp}_2.fastq.gz"
+
 
 rule dedup:
 # remove exact duplicates (subs=0)
 	input:
-		r1 = lambda wildcards: f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['R1_suffix']}",
-		r2 = lambda wildcards: f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['R2_suffix']}"
+		r1 = dedup_r1,
+		r2 = dedup_r2
 	output:
 		r1 = temp("../out/reads/{dset}/{samp}_1.dedup.fastq.gz"),
 		r2 = temp("../out/reads/{dset}/{samp}_2.dedup.fastq.gz")
@@ -509,6 +513,7 @@ rule sortbed:
 # this issue is descrived here: https://github.com/conda-forge/r-base-feedstock/issues/67
 # however, it doesn't appear to have been resolved.  temporarily get around this by re-attempting jobs
 # that failed using command line option --restart-times, but will need to come up with a better solution for this
+
 rule post:
 	input:
 		"../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
@@ -518,7 +523,7 @@ rule post:
 	conda:
 		"envs/rscripts.yml"
 	params:
-		lambda wildcards: " ".join(([f"../out/{wildcards.dset}/ints/{wildcards.samp}.{wildcards.host}.{wildcards.virus}.integrations.txt"] + POSTARGS[wildcards.dset]))
+		lambda wildcards: " ".join([f"../out/{wildcards.dset}/ints/{wildcards.samp}.{wildcards.host}.{wildcards.virus}.integrations.txt"] + POSTARGS[wildcards.dset])
 	shell:
 		"""
 		Rscript post/postprocess.R {params}
