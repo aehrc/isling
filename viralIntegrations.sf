@@ -190,7 +190,7 @@ rule bamtobed:
 		"envs/bwa.yml"
 	shell:
 		"""
-		samtools sort -n {input} {params.sortedBam}
+		samtools sort -n -o {params.sortedBam} {input}
 		bedtools bamtofastq -i {params.sortedBam} -fq {params.unzip_r1} -fq2 {params.unzip_r2}
 		rm {params.sortedBam}
 		gzip {params.unzip_r1}
