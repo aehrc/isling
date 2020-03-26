@@ -11,6 +11,10 @@ our @EXPORT = qw(isRearrangeOrInt getEditDist processCIGAR processCIGAR2 extract
 
 our $warn_flag = 0;
 $SIG{__WARN__} = sub { $warn_flag = 1; CORE::warn(@_) };
+# to stop debugger on warning use 
+  # do_something_that_might_warn();
+  # $DB::single ||= $warn_flag;
+  # $warn_flag = 0;
 
 ##### subroutines #####
 
@@ -577,12 +581,16 @@ sub processCIGAR {
 
 	my ($clipped, $other, $order);
 
+	# assume that cigars contain a soft-clipped region on either end
+	# call everything else matched
+
 	# Order:
 	#	1 - clipped,matched
 	#	2 - matched,clipped
 
 	if ($oriCig =~ /^\d+[SH].+\d+[SH]$/) { return; } # skip if a double clipped read got through
 	if ($oriCig =~ /^\d+M$/) { return ($oriCig, 0); }
+	if ($oriCig !~ /[SH]/) { return ($oriCig, 0); } # if no soft-clipped region, we don't care about this cigar
 	elsif ($oriCig =~ /^(\d+)[SH](.+)$/) { ($clipped, $other, $order) = ($1,$2,1); }
 	elsif ($oriCig =~ /^(.+[MIDP])(\d+)[SH]$/) { ($other, $clipped, $order) = ($1,$2,2); }
 	# Note I don't save if it's hard/soft clipped, only the number of bases
@@ -604,7 +612,10 @@ sub processCIGAR {
 	# This will give the total amount of the read that was aligned (matched) and the part of the read that wasn't (clipped)
 	# The assumption is that everything else is either matched or inserted (and therefore should still be counted)
 
-	my $matched = length($seq) - $clipped;	
+
+	my $matched =  length($seq) - $clipped;
+	$DB::single ||= $warn_flag;
+    	$warn_flag = 0;
 	
 	# also calculate the number of bases added to the matched region, to add to the edit distance
 	#get the number of bases originally in the matched region
