@@ -86,6 +86,7 @@ for dataset in config:
 		samples = [os.path.basename(f)[:-len(suffix)] for f in glob.glob(f"../data/reads/{dataset}/*{suffix}")]
 		if len(samples) == 0:
 			print(f"warning: no files found for dataset {dataset}")
+		config[dataset]['bam_suffix'] = ""
 	# for bam/sam files
 	else:
 		samples = [os.path.basename(f)[:-4] for f in glob.glob(f"../data/reads/{dataset}/*.bam")]
