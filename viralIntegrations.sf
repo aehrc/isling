@@ -88,16 +88,15 @@ for dataset in config:
 			print(f"warning: no files found for dataset {dataset}")
 		config[dataset]['bam_suffix'] = ""
 	# for bam/sam files
+	elif "bam_suffix" in config[dataset]:
+		suffix = config[dataset]["bam_suffix"]
+		config[dataset]["R1_suffix"] = "_1.fq.gz"
+		config[dataset]["R2_suffix"] = "_2.fq.gz"
+		samples = [os.path.basename(f)[:-len(suffix)] for f in glob.glob(f"../data/reads/{dataset}/*{suffix}")]
+		if len(samples) == 0:
+			print(f"warning: no files found for dataset {dataset}")
 	else:
-		samples = [os.path.basename(f)[:-4] for f in glob.glob(f"../data/reads/{dataset}/*.bam")]
-		if len(samples) > 0:
-			config[dataset]['bam_suffix'] = ".bam"
-		else:
-			samples = [os.path.basename(f)[:-4] for f in glob.glob(f"../data/reads/{dataset}/*.sam")]
-			if len(samples) > 0:
-				config[dataset]['bam_suffix'] = ".sam"
-			else:
-				print(f"warning: no files found for dataset {dataset}")
+		raise InputError(f"please specify either bam_suffix or R1_suffix and R2_suffix for dataset {dataset}")
 			
 	for sample in samples:
 		DATASETS.append(dataset)
@@ -168,11 +167,7 @@ localrules: all, combine, ucsc_bed, post
 rule all:
 	input: 
 		expand("../out/{dset}/host_aligned/{samp}.{host}.bwa.{virus}Mappedreads.bam", zip, dset = DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES),
-		expand("../out/{dset}/host_aligned/{samp}.{host}.bwaPaired.{virus}Mappedreads.bam", zip, dset = DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES),
-		expand("../out/{dset}/host_aligned/{samp}.{host}.bwaShort.{virus}Mappedreads.bam", zip, dset = DATASETS, samp=SAMPLES, host=HOSTS, virus=VIRUSES),
 		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwa.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),		
-		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),
-		expand("../out/{dset}/virus_aligned/{samp}.{virus}.bwaShort.bam", zip, dset = DATASETS, samp=SAMPLES, virus=VIRUSES),
 		"../out/summary/num_sites.xlsx",
 		expand("../out/summary/ucsc_bed/{dset}.post.bed", dset = DATASETS)
 
@@ -181,8 +176,8 @@ rule all:
 rule bamtobed:
 	input: lambda wildcards: f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['bam_suffix']}"
 	output: 
-		r1 = temp("../out/reads/{dset}/{samp}_1.fastq.gz"),
-		r2 = temp("../out/reads/{dset}/{samp}_2.fastq.gz")
+		r1 = temp("../data/reads/{dset}/{samp}_1.fq.gz"),
+		r2 = temp("../data/reads/{dset}/{samp}_2.fq.gz")
 	params:
 		sortedBam = lambda wildcards: f"../out/reads/{wildcards.dset}/{wildcards.samp}.sorted{config[wildcards.dset]['bam_suffix']}",
 		unzip_r1 = lambda wildcards: f"../out/reads/{wildcards.dset}/{wildcards.samp}_1.fastq",
@@ -197,26 +192,12 @@ rule bamtobed:
 		gzip {params.unzip_r1}
 		gzip {params.unzip_r2}
 		"""
-		
-#### merging and dedup ###
-def dedup_r1(wildcards):
-	if "R1_suffix" in config[dataset]:
-		return f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['R1_suffix']}"
-	else:
-		return f"../out/reads/{wildcards.dset}/{wildcards.samp}_1.fastq.gz"
-
-def dedup_r2(wildcards):
-	if "R2_suffix" in config[dataset]:
-		return f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['R2_suffix']}"
-	else:
-		return f"../out/reads/{wildcards.dset}/{wildcards.samp}_2.fastq.gz"
-
 
 rule dedup:
 # remove exact duplicates (subs=0)
 	input:
-		r1 = dedup_r1,
-		r2 = dedup_r2
+		r1 = lambda wildcards: f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['R1_suffix']}",
+		r2 = lambda wildcards: f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['R2_suffix']}"
 	output:
 		r1 = temp("../out/reads/{dset}/{samp}_1.dedup.fastq.gz"),
 		r2 = temp("../out/reads/{dset}/{samp}_2.dedup.fastq.gz")
