@@ -5,59 +5,70 @@
 		"mail-user" : "suzanne.scott@csiro.au",
 		"time" : "12:00:00",
 		"ntasks-per-node" : "1",
-		"nodes" : "1",
 		"cpus-per-task" : "1",
 		"output" : "../logs/{rule}.{wildcards}.log"
 	},
 	"dedup":
 	{	
 		"cpus-per-task" : "8",
-		"time" : "24:00:00"
+		"time" : "24:00:00",
+		"job-name" : "viInt-dedup-clumpify"
+
 	},
 	"seqPrep":
 	{	
-		"time" : "12:00:00"
+		"time" : "12:00:00",
+		"job-name" : "viInt-seqPrep"
 	},
 	"extract_vAligedtoFastq":
 	{
-		"time" : "12:00:00"
+		"time" : "12:00:00",
+		"job-name" : "viInt-extract"
 	},
 	"align_bwa_host":
 	{	
 		"cpus-per-task" : "5",
-		"time" : "24:00:00"
+		"time" : "24:00:00",
+		"job-name" : "viInt-bwa-host"
 	},
 	"align_bwa_virus":
 	{	
 		"cpus-per-task" : "5",
-		"time" : "24:00:00"
+		"time" : "24:00:00",
+		"job-name" : "viInt-bwa-virus"
 	},
 	"merge_reads":
 	{	
-		"time" : "2:00:00"
+		"time" : "2:00:00",
+		"job-name" : "viInt-merge"
 	},
 	"index":
 	{
-		"time" : "2:00:00"
+		"time" : "2:00:00",
+		"job-name" : "viInt-bwa-index"
 	},
 	"run_int_scripts":
 	{
 		"time" : "12:00:00",
-		"cpus-per-task" : "1"
+		"cpus-per-task" : "1",
+		"job-name" : "viInt-int-scripts"
 	},
 	"extract_junction_reads_host":
 	{
 		"time" : "12:00:00",
-		"cpus-per-task" : "4"
+		"cpus-per-task" : "4",
+		"job-name" : "viInt-extract-junct-reads-host"
 	},
 	"count_mapped":
 	{
 		"time" : "24:00:00",
-		"cpus-per-task" : "3"
+		"cpus-per-task" : "3",
+		"job-name" : "viInt-count-mapped"
 	}	,
 	"summarise":
 	{
 		"time" : "12:00:00",
-		"cpus-per-task" : "10"
+		"cpus-per-task" : "10",
+		"job-name" : "summarise"
 	}
 }
