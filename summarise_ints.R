@@ -1,9 +1,8 @@
-#### Plot integration site FRG206 ####
+#### combine all integration sites in input files and write to excel spreadsheet ####
 
 #### Packages ####
 library(stringr)
 library(dplyr)
-library(ggplot2)
 library(purrr)
 library(tidyr)
 library(readr)
