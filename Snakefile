@@ -160,7 +160,7 @@ for dataset in config:
 
 wildcard_constraints:
 	virus="|".join(set(toDo.loc[:,'virus'])),
-	sample="|".join(set(toDo.loc[:,'sample'])),
+	samp="|".join(set(toDo.loc[:,'sample'])),
 	dset="|".join(set(toDo.loc[:,'dataset'])),
 	host="|".join(set(toDo.loc[:,'host'])),
 	align_type="bwaPaired|bwaSingle"
@@ -178,25 +178,28 @@ rule all:
 
 #### read preprocessing ####
 
-rule bamtobed:
+rule sort_input_bam:
 	input: lambda wildcards: f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['bam_suffix']}"
 	output: 
-		r1 = temp("../data/reads/{dset}/{samp}_1.fq"),
-		r2 = temp("../data/reads/{dset}/{samp}_2.fq"),
-	params:
-		sortedBam = lambda wildcards: f"../out/reads/{wildcards.dset}/{wildcards.samp}.sorted{config[wildcards.dset]['bam_suffix']}",
-		unzip_r1 = lambda wildcards: f"../data/reads/{wildcards.dset}/{wildcards.samp}_1.fastq",
-		unzip_r2 = lambda wildcards: f"../data/reads/{wildcards.dset}/{wildcards.samp}_2.fastq",
-		tmpfiles = lambda wildcards, output: f"{path.dirname(output.r1)}/*.tmp"
+		bam = temp("../out/reads/{dset}/{samp}.sorted.bam"),
 	conda:
 		"envs/bwa.yml"
 	shell:
 		"""
-		rm {params.tmpfiles}
-		dirname {params.sortedBam} | xargs mkdir -p
-		samtools sort -n -o {params.sortedBam} {input}
-		bedtools bamtofastq -i {params.sortedBam} -fq {params.unzip_r1} -fq2 {params.unzip_r2}
-		rm {params.sortedBam}
+		samtools sort -n -o {output.bam} {input}
+		"""
+
+rule bam_to_bed:
+	input:
+		bam = rules.sort_input_bam.output.bam
+	output:
+		r1 = temp("../data/reads/{dset}/{samp}_1.fq"),
+		r2 = temp("../data/reads/{dset}/{samp}_2.fq"),
+	conda:
+		"envs/bwa.yml"
+	shell:
+		"""
+		bedtools bamtofastq -i {input.bam} -fq {output.r1} -fq2 {output.r2}
 		"""
 
 rule dedup:
