@@ -1,39 +1,67 @@
 {
 	"__default__":
 	{
-		"mem-per-cpu" :"5GB",
+		"mem" :"5GB",
 		"mail-user" : "suzanne.scott@csiro.au",
-		"time" : "12:00:00",
-		"ntasks-per-node" : "1",
-		"cpus-per-task" : "1",
+		"time" : "15:00",
 		"output" : "../logs/{rule}.{wildcards}.log"
+	},
+	"bamtobed":
+	{	
+		"mem" : "20GB",
+		"time" : "2:00:00",
+		"job-name" : "viInt-bamtobed"
+
 	},
 	"dedup":
 	{	
-		"cpus-per-task" : "8",
-		"time" : "24:00:00",
+		"mem" : "20GB",
+		"time" : "2:00:00",
 		"job-name" : "viInt-dedup-clumpify"
 
 	},
 	"seqPrep":
 	{	
-		"time" : "12:00:00",
+		"time" : "2:00:00",
 		"job-name" : "viInt-seqPrep"
 	},
-	"extract_vAligedtoFastq":
+	"extract_to_fastq_paired":
 	{
-		"time" : "12:00:00",
+		"time" : "2:00:00",
 		"job-name" : "viInt-extract"
 	},
-	"align_bwa_host":
+	"extract_to_fastq_single":
+	{
+		"time" : "2:00:00",
+		"job-name" : "viInt-extract"
+	},
+	"extract_vAligned_paired":
+	{
+		"time" : "2:00:00",
+		"job-name" : "viInt-extract"
+	},
+	"extract_vAligned_single":
+	{
+		"time" : "2:00:00",
+		"job-name" : "viInt-extract"
+	},
+	"align_bwa_host_single":
 	{	
-		"cpus-per-task" : "5",
-		"time" : "24:00:00",
+		"time" : "2:00:00",
 		"job-name" : "viInt-bwa-host"
 	},
-	"align_bwa_virus":
+	"align_bwa_host_paired":
 	{	
-		"cpus-per-task" : "5",
+		"time" : "2:00:00",
+		"job-name" : "viInt-bwa-host"
+	},
+	"align_bwa_virus_single":
+	{	
+		"time" : "24:00:00",
+		"job-name" : "viInt-bwa-virus"
+	},
+	"align_bwa_virus_paired":
+	{	
 		"time" : "24:00:00",
 		"job-name" : "viInt-bwa-virus"
 	},
@@ -47,17 +75,20 @@
 		"time" : "2:00:00",
 		"job-name" : "viInt-bwa-index"
 	},
-	"run_int_scripts":
+	"run_soft":
 	{
-		"time" : "12:00:00",
-		"cpus-per-task" : "1",
-		"job-name" : "viInt-int-scripts"
+		"time" : "2:00:00",
+		"job-name" : "viInt-soft"
 	},
-	"extract_junction_reads_host":
+	"run_short":
 	{
-		"time" : "12:00:00",
-		"cpus-per-task" : "4",
-		"job-name" : "viInt-extract-junct-reads-host"
+		"time" : "2:00:00",
+		"job-name" : "viInt-short"
+	},
+	"run_discordant":
+	{
+		"time" : "2:00:00",
+		"job-name" : "viInt-discordant"
 	},
 	"count_mapped":
 	{
