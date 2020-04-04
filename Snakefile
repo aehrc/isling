@@ -36,7 +36,7 @@
 
 # the steps in the pipeline are as follows:
 # 1. preprocessing
-#   - rename all files for consistency (files may either be named "<sample>_1.fastq.gz" or "<sample>_R1.fastq.gz")
+#   - convert bam files to fastq, if necessary
 #   - either merge R1 and R2 using seqprep, or don't do merging 
 #     and just concatenate R1 and R2, as specified in the dsets.yaml config file
 # 2. alignments
@@ -66,22 +66,13 @@ import pandas as pd
 
 references_path = "../data/references/"
 
-#make four lists, with each entry in each list corresponding to one desired output file
+#### get information for wildcards ####
 
-DATASETS = []
-SAMPLES = []
-HOSTS = []
-VIRUSES = []
-#also make dictionary MERGE, with key dataset_sample and value True or False
-MERGE = {}
+# get the name of each sample in each dataset, and save information about 
+# how to process it in a dataframe
 
 rows = []
 
-# we need to know if input files are bam or fastq.  check for filename extensions
-# currently only support fastq (.fq.gz, .fq, .fastq.gz, .fastq)
-# and bam (.bam, .sam)
-
-# get files for each dataset, and save all paramters in a pandas dataframe
 for dataset in config:
 	# for fastq files
 	if "R1_suffix" in config[dataset]:
@@ -109,6 +100,7 @@ toDo = pd.DataFrame(rows, columns=['dataset', 'sample', 'host', 'virus', 'merge'
 # check that every combination of 'dataset', 'sample', 'host' and 'virus' is unique
 if len(set(toDo.loc[:,'unique'])) != len(toDo.loc[:,'unique']):
 	raise InputError("Every combination of 'dataset' and 'sample' must be unique! Check inputs and try again")
+
 
 # construct arguments for postprocess.R script for each dataset
 POSTARGS = {}
@@ -171,7 +163,7 @@ wildcard_constraints:
 	sample="|".join(set(toDo.loc[:,'sample'])),
 	dset="|".join(set(toDo.loc[:,'dataset'])),
 	host="|".join(set(toDo.loc[:,'host'])),
-	align_type="bwaShort|bwaPaired|bwaSoft"
+	align_type="bwaPaired|bwaSingle"
 
 
 #### local rules ####
@@ -180,15 +172,9 @@ localrules: all, combine,
 #### target files ####
 rule all:
 	input: 
-		#"../out/summary/count_mapped.txt",
+		"../out/summary/count_mapped.txt",
 		expand("../out/summary/{dset}.xlsx", dset=set(toDo.loc[:,'dataset'])),
-		#expand("../out/summary/ucsc_bed/{dset}.post.bed", dset=set(toDo.loc[:,'dataset'])),
-		#expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt", 
-		#	zip, 
-		#	dset=toDo.loc[:,'dataset'],
-		#	samp=toDo.loc[:,'sample'], 
-		#	host=toDo.loc[:,'host'], 
-		#	virus=toDo.loc[:,'virus'])
+		expand("../out/summary/ucsc_bed/{dset}.post.bed", dset=set(toDo.loc[:,'dataset'])),
 
 #### read preprocessing ####
 
@@ -315,52 +301,104 @@ rule index:
 		"bwa index -p {params.prefix} {input}"
 
 	
-rule align_bwa_virus:
+rule align_bwa_virus_single:
 	input:
 		idx = expand("../out/.references/{virus}/{virus}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
 		all = lambda wildcards: get_for_align(wildcards, "all"),
 	output:
-		sam = temp("../out/{dset}/.virus_aligned/{samp}.{virus}.{align_type}.sam")
+		sam = temp("../out/{dset}/.virus_aligned/{samp}.{virus}.bwaSingle.sam")
 	params:
 		index = lambda wildcards: references_path + wildcards.virus
+	conda:
+		"envs/bwa.yml"
 	threads: 5
 	shell:
 		"""
 		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.all} --output {output.sam} --threshold 10 --hflag 200 
 		"""
 
-		
-rule extract_vAligned:
+rule align_bwa_virus_paired:
 	input:
-		vSing = rules.align_bwa_virus.output.sam,
+		idx = expand("../out/.references/{virus}/{virus}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
+		r1 = lambda wildcards: get_for_align(wildcards, "1"),
+		r2 = lambda wildcards: get_for_align(wildcards, "2"),
 	output:
-		svSam = temp("../out/{dset}/.virus_aligned/{samp}.{virus}.{align_type}.mapped.sam"),
+		sam = temp("../out/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.sam")
+	params:
+		index = lambda wildcards: references_path + wildcards.virus
+	conda:
+		"envs/bwa.yml"
+	threads: 5
+	shell:
+		"""
+		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.r1} --read1 {input.r2} --output {output.sam} --threshold 10 --hflag 200 
+		"""
+
+		
+rule extract_vAligned_single:
+	input:
+		vSing = rules.align_bwa_virus_single.output[0],
+	output:
+		svSam = temp("../out/{dset}/.virus_aligned/{samp}.{virus}.bwaSingle.mapped.sam"),
 	conda:
 		"envs/bwa.yml"
 	shell:
 		"""
 		samtools view -h -F 0x4 -F 0x800 -o {output.svSam} {input.vSing} 
 		"""
-
-
-rule extract_to_fastq:
+rule extract_vAligned_paired:
 	input:
-		sam = rules.extract_vAligned.output
+		aligned = rules.align_bwa_virus_paired.output[0]
 	output:
-		fastq = temp("../out/{dset}/.virus_aligned/{samp}.{align_type}.mappedTo{virus}.fastq.gz")
+		sam = temp("../out/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam")
+	params:
+		pvBam_readMap_mateUnmap = lambda wildcards: f"../out/{wildcards.dset}/.virus_aligned/{wildcards.samp}.{wildcards.virus}.bwaPaired.mapped1.bam",
+		pvBam_readUnmap_mateMap = lambda wildcards: f"../out/{wildcards.dset}/.virus_aligned/{wildcards.samp}.{wildcards.virus}.bwaPaired.mapped2.bam",
+		pvBam_bothMapped = lambda wildcards: f"../out/{wildcards.dset}/.virus_aligned/{wildcards.samp}.{wildcards.virus}.bwaPaired.mapped3.bam",
+		allBam = lambda wildcards: f"../out/{wildcards.dset}/.virus_aligned/{wildcards.samp}.{wildcards.virus}.bwaPaired.mapped.bam"
+	conda:
+		"envs/bwa.yml"
+	shell:
+		"""
+		samtools view -hb -F 0x4 -f 0x8 -F 0x800 -o {params.pvBam_readMap_mateUnmap} {input.aligned}
+		samtools view -hb -f 0x4 -F 0x8 -F 0x800 -o {params.pvBam_readUnmap_mateMap} {input.aligned}
+		samtools view -hb -F 0x4 -F 0x8 -F 0x800 -o {params.pvBam_bothMapped} {input.aligned}
+		samtools merge {params.allBam} {params.pvBam_readMap_mateUnmap} {params.pvBam_bothMapped} {params.pvBam_readUnmap_mateMap}
+		samtools view -h -o {output.sam} {params.allBam}
+		rm {params}
+		"""
+
+rule extract_to_fastq_single:
+	input:
+		sam = rules.extract_vAligned_single.output[0]
+	output:
+		fastq = temp("../out/{dset}/.virus_aligned/{samp}.bwaSingle.mappedTo{virus}.fastq.gz")
 	conda:
 		"envs/picard.yml"
 	shell:
 		"""
 		picard SamToFastq I={input.sam} FASTQ={output.fastq}
 		"""
+		
+rule extract_to_fastq_paired:
+	input:
+		sam = rules.extract_vAligned_paired.output[0]
+	output:
+		fastq1 = temp("../out/{dset}/.virus_aligned/{samp}.bwaSingle.mappedTo{virus}.1.fastq.gz"),
+		fastq2 = temp("../out/{dset}/.virus_aligned/{samp}.bwaSingle.mappedTo{virus}.2.fastq.gz")
+	conda:
+		"envs/picard.yml"
+	shell:
+		"""
+		picard SamToFastq I={input.sam} FASTQ={output.fastq1} SECOND_END_FASTQ={output.fastq2}
+		"""
 
-rule align_bwa_host:
+rule align_bwa_host_single:
 	input:	
 		idx = expand("../out/.references/{host}/{host}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
-		all = rules.extract_to_fastq.output
+		all = rules.extract_to_fastq_single.output.fastq
 	output:
-		sam = temp("../out/{dset}/.host_aligned/{samp}.{host}.readsFrom{virus}.{align_type}.sam"),
+		sam = temp("../out/{dset}/.host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam"),
 	conda: 
 		"envs/bwa.yml"
 	params:
@@ -368,7 +406,23 @@ rule align_bwa_host:
 	threads: 5
 	shell:		
 		"""
-		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.all} --output {output.sam} --threshold 10 --hflag 200 --insert_extend 0
+		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.all} --output {output.sam} --threshold 10 --hflag 200 
+		"""
+rule align_bwa_host_paired:
+	input:	
+		idx = expand("../out/.references/{host}/{host}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
+		r1 = rules.extract_to_fastq_paired.output[0],
+		r2 = rules.extract_to_fastq_paired.output[1]
+	output:
+		sam = temp("../out/{dset}/.host_aligned/{samp}.{host}.readsFrom{virus}.bwaPaired.sam"),
+	conda: 
+		"envs/bwa.yml"
+	params:
+		index = lambda wildcards: references_path + wildcards.host
+	threads: 5
+	shell:		
+		"""
+		python ./alignReadsWithBWA.py --threads {threads} --index {params.index} --read1 {input.r1} --read2 {input.r2} --output {output.sam} --threshold 10 --hflag 200 
 		"""
 
 rule convert:
@@ -389,24 +443,48 @@ rule convert:
 
 rule run_soft:
 	input:
-		host ="../out/{dset}/.host_aligned/{samp}.{host}.readsFrom{virus}.bwaSoft.sam",
-		virus = "../out/{dset}/.virus_aligned/{samp}.{virus}.bwaSoft.sam",
+		host ="../out/{dset}/.host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam",
+		virus = "../out/{dset}/.virus_aligned/{samp}.{virus}.bwaSingle.sam",
 	output:
 		soft = temp("../out/{dset}/ints/{samp}.{host}.{virus}.soft.txt"),
 	shell:
 		"""
 		perl -I. ./softClip.pl --viral {input.virus} --human {input.host} --output {output.soft} --tol 3
 		"""
+		
+rule run_short:
+	input:
+		host ="../out/{dset}/.host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam",
+		virus = "../out/{dset}/.virus_aligned/{samp}.{virus}.bwaSingle.sam",
+	output:
+		short = temp("../out/{dset}/ints/{samp}.{host}.{virus}.short.txt"),
+	shell:
+		"""
+		perl -I. ./short.pl --viral {input.virus} --human {input.host} --output {output.short} --tol 3
+		"""
+		
+rule run_discordant:
+	input:
+		host ="../out/{dset}/.host_aligned/{samp}.{host}.readsFrom{virus}.bwaPaired.sam",
+		virus = "../out/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.sam",
+	output:
+		discord = temp("../out/{dset}/ints/{samp}.{host}.{virus}.discordant.txt"),
+	shell:
+		"""
+		perl -I. ./discordant.pl --viral {input.virus} --human {input.host} --output {output.discord} --tol 3
+		"""
 
 rule combine_ints:
 	input:
-		soft = "../out/{dset}/ints/{samp}.{host}.{virus}.soft.txt"
+		soft = rules.run_soft.output,
+		short = rules.run_short.output,
+		discordant = rules.run_discordant.output
 	output:
 		temp =  "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp",
 		all = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
 	shell:
 		"""
-		sed -e '2,${{/Chr/d' -e '}}' {input} > {output.all}
+		cat {input} > {output.all}
 		sort -n -k1,1 -k2,2n {output.all} > {output.temp}
 		cp {output.temp} {output.all}
 		"""
@@ -422,7 +500,7 @@ rule count_mapped:
 					samp = toDo.loc[:,'sample'], 
 					virus = toDo.loc[:,'virus'],
 					allow_missing=True),
-						align_type=['bwaSoft']),
+						align_type=['bwaSingle']),
 		#expand(expand("../out/{dset}/.host_aligned/{samp}.{host}.readsFrom{virus}.{align_type}.bam", 
 		#			zip, 
 		#			dset = toDo.loc[:,'dataset'], 
@@ -430,7 +508,7 @@ rule count_mapped:
 		#			virus = toDo.loc[:,'virus'],
 		#			host = toDo.loc[:,'host'],
 		#			allow_missing=True),
-		#				align_type=['bwaSoft']),
+		#				align_type=['bwaSingle']),
 						
 	output:
 		"../out/summary/count_mapped.txt"
@@ -492,13 +570,10 @@ rule post:
 	
 rule summarise:
 	input:
-		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt", 
-			zip, 
-			samp=toDo.loc[:,'sample'], 
-			host=toDo.loc[:,'host'], 
-			virus=toDo.loc[:,'virus'], 
-			allow_missing=True)
-
+		lambda wildcards: [f"../out/{wildcards.dset}/ints/{samp}.{host}.{virus}.integrations.post.txt" for samp, host, virus
+			in zip(toDo.loc[toDo['dataset'] == wildcards.dset,'sample'], 
+					toDo.loc[toDo['dataset'] == wildcards.dset,'host'], 
+					toDo.loc[toDo['dataset'] == wildcards.dset,'virus'])]
 	output:
 		"../out/summary/{dset}.xlsx"
 	conda:
