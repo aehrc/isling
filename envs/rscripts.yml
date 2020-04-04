@@ -5,9 +5,8 @@ channels:
   - defaults
   - conda-forge
 dependencies:
-  - r-tidyverse=1.2
-  - r-circlize=0.4
+  - r-tidyverse>1.2
   - r-writexl=1.2
-  - bedtools=2.29
+  - bedtools>2.29
 
 
