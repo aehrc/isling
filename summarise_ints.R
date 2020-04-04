@@ -47,7 +47,7 @@ for (i in unique(df$dataset)) {
     toWrite[[j]] <- data_filt  %>% 
       dplyr::filter(sample == j)
   }
-  writexl::write_xlsx(toWrite, path = paste(out_path, i, ".combined.xlsx", sep = ""))
+  writexl::write_xlsx(toWrite, path = paste(out_path, i, ".xlsx", sep = ""))
 }
 
 
