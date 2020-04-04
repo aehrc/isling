@@ -296,7 +296,7 @@ rule index:
 	conda: 
 		"envs/bwa.yml"
 	params:
-		prefix = lambda wildcards: references_path + wildcards.genome
+		prefix = lambda wildcards, output: path.splitext(output[0])[0]
 	shell:
 		"bwa index -p {params.prefix} {input}"
 

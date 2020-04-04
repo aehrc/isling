@@ -4,6 +4,39 @@ Inherited from Laurence Wilson.  He wrote it to detect AAV integration sites (ch
 
 Pipeline requires conda and snakemake.  Currently have conda environment called `snakemake`, which I'm activating in wrapper script `run_ints.sh`.  This runs the pipeline on the cluster (cluster config `cluster.json`), using conda to fufill dependencies (`envs/*.yml` contains specifications of conda environments).
 
+
+# Pipeline overview
+
+The pipeline performs several steps in order to identify integration sites.  It takes as input datasets consisting of either fastq files or bam files. It does some pre-processing of the reads (de-duplication and merging overlapping reads, both optional) and then aligns them to both a host and a viral sequence.  These alignments are used to identify possible viral integrations.
+
+## Inputs
+
+### Config file
+
+A config file is used to specify the data to be processed and parameters for processing.  The config file is organised into datasets, and specifies the paramters to be used for that dataset.  If multiple datasets are present in the config file, they will be processed simultaneously.  
+
+An example dataset from a config file:
+```
+dataset_name:
+  host: "GRCh38"
+  virus: "AAV_genomes"
+  merge: "True"
+  dedup: "True"
+  read1-adapt: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
+  read2-adapt: "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
+  R1_suffix: "_L001_R1.fastq.gz"
+  R2_suffix: "_L001_R2.fastq.gz"
+  post:
+    - filter
+    - dedup
+```
+
+### Reads
+
+Data should be paired-end.  Each dataset is processed with the same parameters (host, virus, postprocessing), and should be kept together in the same folder.
+
+
+
 # Types of integrations
 
 ## Soft-clipped
