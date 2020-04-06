@@ -435,10 +435,13 @@ rule convert:
 	output:
 		bam = "../out/{dset}/{host_virus}/{name}.bam",
 		bai = "../out/{dset}/{host_virus}/{name}.bam.bai"
+	params:
+		tmp_prefix = lambda wildcards, input: path.splitext(input[0])[0]
 	conda: 
 		"envs/bwa.yml"	
 	shell:
 		"""
+		rm -f {params.tmp_prefix}*tmp*
 		samtools view -bhS {input} | samtools sort - -o {output.bam}
 		samtools index {output.bam}
 		"""
