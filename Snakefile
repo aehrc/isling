@@ -154,6 +154,7 @@ for dataset in config:
 						POSTARGS[dataset].append(sortedref)
 						POSTARGS[dataset].append(element["col"])
 						POSTARGS[dataset].append(tsv)
+	POSTARGS[dataset] = " ".join(POSTARGS[dataset])
 
 
 #### global wildcard constraints ####
@@ -487,7 +488,7 @@ rule combine_ints:
 		all = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
 	shell:
 		"""
-		cat {input} > {output.all}
+		awk 'FNR>1 || NR==1' {input} > {output.all}
 		sort -n -k1,1 -k2,2n {output.all} > {output.temp}
 		cp {output.temp} {output.all}
 		"""
