@@ -1,6 +1,7 @@
 {
 	"__default__":
 	{
+		"nodes" : "1",
 		"mem" :"5GB",
 		"mail-user" : "suzanne.scott@csiro.au",
 		"time" : "15:00",
@@ -17,6 +18,7 @@
 	{	
 		"mem" : "20GB",
 		"time" : "2:00:00",
+		"ntasks" : "1",
 		"job-name" : "viInt-dedup-clumpify"
 
 	},
