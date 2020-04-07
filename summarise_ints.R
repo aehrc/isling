@@ -47,7 +47,22 @@ for (i in unique(df$dataset)) {
     toWrite[[j]] <- data_filt  %>% 
       dplyr::filter(sample == j)
   }
-  writexl::write_xlsx(toWrite, path = paste(out_path, i, ".xlsx", sep = ""))
+  writexl::write_xlsx(toWrite, path = paste(out_path, i, "_annotated.xlsx", sep = ""))
 }
 
+# also write an excel spreadsheet for each dataset that doesn't contain the annotations
+for (i in unique(df$dataset)) {
+  toWrite <- list()
+  data_filt <- df %>% 
+    dplyr::filter(dataset == i) %>%
+    dplyr::select(dataset, sample, host, Chr, IntStart, IntStop, VirusRef, VirusStart, VirusStop, OverlapType, Orientation,
+    				HostSeq, ViralSeq, AmbiguousSeq, HostEditDistance, ViralEditDistance, TotalEditDistance, 
+    				PossibleHostTranslocation, PossibleVectorRearrangement, HostPossibleAmbiguous, ViralPossibleAmbiguous,
+    				Type, ReadID, merged)
+  for (j in unique(data_filt$sample)) {
+    toWrite[[j]] <- data_filt  %>% 
+      dplyr::filter(sample == j)
+  }
+  writexl::write_xlsx(toWrite, path = paste(out_path, i, ".xlsx", sep = ""))
+}
 
