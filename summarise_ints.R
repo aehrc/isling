@@ -28,15 +28,10 @@ df <- df %>%
   dplyr::mutate(sample = stringr::str_extract(basename(filename), "^[\\w]+(?=\\.)")) %>% 
   dplyr::mutate( host = ifelse(stringr::str_detect(basename(filename), "mouse|mm10|GRCm38"), "mm10", ifelse(stringr::str_detect(basename(filename), "macaque|macaca|macFas5"), "macFas5", "hg38")))
 
-#write xls with summary of number of sites 
-df %>% 
-  dplyr::select(-integrations) %>% 
-  writexl::write_xlsx(path = paste0(out_path, "num_sites.xlsx"))
-
 #select all integrations
 df <- df %>% 
   dplyr::filter(flatten_lgl(purrr::map(integrations, ~ nrow(.) != 0))) %>% 
-  tidyr::unnest()
+  tidyr::unnest(cols = c(integrations))
 
 #write excel spreadsheets for each dataset with one sheet for each sample
 for (i in unique(df$dataset)) {
@@ -56,7 +51,7 @@ for (i in unique(df$dataset)) {
   data_filt <- df %>% 
     dplyr::filter(dataset == i) %>%
     dplyr::select(dataset, sample, host, Chr, IntStart, IntStop, VirusRef, VirusStart, VirusStop, OverlapType, Orientation,
-    				HostSeq, ViralSeq, AmbiguousSeq, HostEditDistance, ViralEditDistance, TotalEditDistance, 
+    				HostSeq, ViralSeq, AmbiguousSeq, HostEditDist, ViralEditDist, TotalEditDist, 
     				PossibleHostTranslocation, PossibleVectorRearrangement, HostPossibleAmbiguous, ViralPossibleAmbiguous,
     				Type, ReadID, merged)
   for (j in unique(data_filt$sample)) {

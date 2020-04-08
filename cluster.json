@@ -2,7 +2,6 @@
 	"__default__":
 	{
 		"nodes" : "1",
-		"mem" :"5GB",
 		"mail-user" : "suzanne.scott@csiro.au",
 		"time" : "15:00",
 		"output" : "../logs/{rule}.{wildcards}.log"
@@ -16,92 +15,109 @@
 	},
 	"dedup":
 	{	
-		"mem" : "20GB",
-		"time" : "2:00:00",
+		"mem-per-cpu" : "5GB",
 		"ntasks" : "1",
+		"cpus-per-task" : 4,
+		"time" : "2:00:00",
 		"job-name" : "viInt-dedup-clumpify"
 
 	},
 	"seqPrep":
 	{	
 		"time" : "2:00:00",
+		"mem" : "5GB",
 		"job-name" : "viInt-seqPrep"
 	},
 	"extract_to_fastq_paired":
 	{
 		"time" : "2:00:00",
+		"mem" : "20GB",
 		"job-name" : "viInt-extract"
 	},
 	"extract_to_fastq_single":
 	{
 		"time" : "2:00:00",
+		"mem" : "10GB",
 		"job-name" : "viInt-extract"
 	},
 	"extract_vAligned_paired":
 	{
 		"time" : "2:00:00",
+		"mem" : "10GB",
 		"job-name" : "viInt-extract"
 	},
 	"extract_vAligned_single":
 	{
 		"time" : "2:00:00",
+		"mem" : "10GB",
 		"job-name" : "viInt-extract"
 	},
 	"align_bwa_host_single":
 	{	
 		"time" : "2:00:00",
+		"mem" : "10GB",
 		"job-name" : "viInt-bwa-host"
 	},
 	"align_bwa_host_paired":
 	{	
 		"time" : "2:00:00",
+		"mem" : "10GB",
 		"job-name" : "viInt-bwa-host"
 	},
 	"align_bwa_virus_single":
 	{	
 		"time" : "24:00:00",
+		"mem" : "10GB",
 		"job-name" : "viInt-bwa-virus"
 	},
 	"align_bwa_virus_paired":
 	{	
 		"time" : "24:00:00",
+		"mem" : "10GB",
 		"job-name" : "viInt-bwa-virus"
 	},
 	"merge_reads":
 	{	
 		"time" : "2:00:00",
+		"mem" : "10GB",
 		"job-name" : "viInt-merge"
 	},
 	"index":
 	{
 		"time" : "2:00:00",
+		"mem" : "20GB",
 		"job-name" : "viInt-bwa-index"
 	},
 	"run_soft":
 	{
 		"time" : "2:00:00",
+		"mem" : "20GB",
 		"job-name" : "viInt-soft"
 	},
 	"run_short":
 	{
 		"time" : "2:00:00",
+		"mem" : "20GB",
 		"job-name" : "viInt-short"
 	},
 	"run_discordant":
 	{
 		"time" : "2:00:00",
+		"mem" : "20GB",
 		"job-name" : "viInt-discordant"
 	},
 	"count_mapped":
 	{
 		"time" : "24:00:00",
 		"cpus-per-task" : "3",
+		"mem" : "20GB",
 		"job-name" : "viInt-count-mapped"
 	}	,
 	"summarise":
 	{
 		"time" : "12:00:00",
 		"cpus-per-task" : "10",
+		"mem" : "20GB",
 		"job-name" : "summarise"
 	}
 }
