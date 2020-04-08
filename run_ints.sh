@@ -4,4 +4,7 @@ source ~/.bashrc
 eval "$(conda shell.bash hook)"
 conda activate snakemake
 
-snakemake --configfile $1 -j 100 -s viralIntegrations.sf --cluster-config cluster.json --rerun-incomplete --use-conda --cluster "sbatch --mem-per-cpu {cluster.mem-per-cpu}  -t {cluster.time} --mail-user {cluster.mail-user} --nodes {cluster.nodes} --cpus-per-task {cluster.cpus-per-task} --output {cluster.output}" $2
+snakemake --configfile $1 -j 100 --rerun-incomplete --cluster-config cluster.json --use-conda --profile slurm "${a[@]:1}"
+
+#snakemake --configfile ../config/test_pipeline.yml -j 100 --rerun-incomplete --cluster-config cluster.json --use-conda --profile slurm -np --until extract_to_fastq_paired
+

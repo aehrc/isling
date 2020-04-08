@@ -9,6 +9,7 @@ mask_exclude <- c("mask-exclude", "../data/references/GRCh38/hg38_homologoustoOT
 nearest_gtf <- c("nearest-gtf", "../data/references/GRCh38/GENCODE/GRChg38.gencode.v33.annotation.genes.sorted.gtf")
 nearest_bed <- c("nearest-bed", "../data/references/GRCh38/ENCODE/histone_ChIP-seq/ENCFF033CCP.sorted.bed")
 RNA_seq <- c("RNA-seq-gtf", "../data/references/GRCh38/GENCODE/GRChg38.gencode.v33.annotation.genes.sorted.gtf", "TPM", "../data/references/GRCh38/ENCODE/RNA-seq/ENCFF143IYG.tsv")
+RNA_seq2 <- c("RNA-seq-gtf", "../data/references/GRCh38/GENCODE/GRChg38.gencode.v33.annotation.genes.sorted.gtf", "TPM", "../data/references/GRCh38/ENCODE/RNA-seq/ENCFF973HRL.tsv")
 
 system_call <- paste(call, 
                       dedup,
@@ -17,7 +18,10 @@ system_call <- paste(call,
                       paste0(nearest_gtf, collapse = " "),
                       paste0(nearest_bed, collapse = " "),
                       paste0(RNA_seq, collapse = " "),
+                      paste0(RNA_seq2, collapse = " "),
                       collapse = " ")
+
+print(system_call)
 
 system(system_call)
 
