@@ -5,32 +5,8 @@
 # flanked by host sequence on both sides
 
 # note that only paired-end reads are supported
-
-# the pipeline relies on a particular directory structure:
- 
-# parent_folder/
-# ├── data
-# │   ├── metadata
-# │   │   └── dataset1
-# │   ├── reads
-# │   │   └── dataset1
-# │   │       ├── sample1_1.fastq.gz
-# │   │       ├── sample2_2.fastq.gz
-# │   │       ├── sample2_1.fastq.gz
-# │   │       └── sample2_2.fastq.gz
-# │   └── references
-# │       ├── host.fa
-# │       └── virus.fa
-# ├── intvi_pipeline 
-# │   └── all pipeline files from git repo
-# └── proj-spcfc
-#     └── dsets.yaml
 #
-# the folder data contains all the data necessary to run the pipeline
-# within the data folder, reads should be organised into folders representing
-# datasets, with gzipped paired fastq files for each sample named as above
-# references should be placed in data/references.  A yaml file in proj-spcfc
-# specifies which references are to be used with which datasets
+# A yaml file specifies which references are to be used with which datasets
 # the pipline lives in the intvi_pipeline folder which should be cloned
 # from the git repo
 
