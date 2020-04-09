@@ -53,16 +53,18 @@ rows = []
 for dataset in config:
 	# for fastq files
 	if "R1_suffix" in config[dataset]:
-		suffix = config[dataset]["R1_suffix"]	
-		samples = [path.basename(f)[:-len(suffix)] for f in glob(f"../data/reads/{dataset}/*{suffix}")]
+		suffix = config[dataset]["R1_suffix"]
+		folder = config[dataset]['read_folder']	
+		samples = [path.basename(f)[:-len(suffix)] for f in glob(path.normpath(f"{folder}/*{suffix}"))]
 		if len(samples) == 0:
 			print(f"warning: no files found for dataset {dataset}")
 	# for bam/sam files
 	elif "bam_suffix" in config[dataset]:
 		suffix = config[dataset]["bam_suffix"]
+		folder = config[dataset]['read_folder']	
 		config[dataset]["R1_suffix"] = "_1.fq.gz"
 		config[dataset]["R2_suffix"] = "_2.fq.gz"
-		samples = [path.basename(f)[:-len(suffix)] for f in glob(f"../data/reads/{dataset}/*{suffix}")]
+		samples = [path.basename(f)[:-len(suffix)] for f in glob(path.normpath(f"{folder}/*{suffix}"))]
 		if len(samples) == 0:
 			print(f"warning: no files found for dataset {dataset}")
 	else:
@@ -156,7 +158,7 @@ rule all:
 #### read preprocessing ####
 
 rule check_bam_input_is_paired:
-	input: lambda wildcards: f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['bam_suffix']}"
+	input: lambda wildcards: path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['bam_suffix']}")
 	output:
 		ok = temp("../out/{dset}/.reads/{samp}.tmp"),
 	conda:
@@ -180,7 +182,7 @@ rule check_bam_input_is_paired:
 
 rule sort_input_bam:
 	input: 
-		bam = lambda wildcards: f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['bam_suffix']}",
+		bam = lambda wildcards: path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['bam_suffix']}"),
 		ok = "../out/{dset}/.reads/{samp}.tmp"
 	output: 
 		bam = temp("../out/{dset}/.reads/{samp}.sorted.bam"),
@@ -210,9 +212,9 @@ def dedup_input(wildcards, read_type):
 		return f"../out/{wildcards.dset}/.reads/{wildcards.samp}_{read_type}.fq.gz"
 	else:
 		if read_type == "1":
-			 return f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['R1_suffix']}"
+			 return path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['R1_suffix']}")
 		else:
-			return f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['R2_suffix']}"
+			return path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['R2_suffix']}")
 
 
 rule dedup:
@@ -245,9 +247,9 @@ def get_for_seqprep(wildcards, read_type):
 		return f"../out/{wildcards.dset}/.dedup_reads/{wildcards.samp}.{read_type}.fastq.gz"
 	else:
 		if read_type == "1":
-			return f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['R1_suffix']}"
+			return path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['R1_suffix']}")
 		else:
-			return f"../data/reads/{wildcards.dset}/{wildcards.samp}{config[wildcards.dset]['R2_suffix']}"
+			return path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['R2_suffix']}")
 
 
 rule seqPrep:
