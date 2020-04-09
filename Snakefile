@@ -37,6 +37,23 @@ from glob import glob
 from os import path
 import pandas as pd
 
+
+#### custom errors ####
+
+class Error(Exception):
+    """Base class for exceptions in this module."""
+    pass
+
+class InputError(Error):
+    """Exception raised for errors in the input.
+
+    Attributes:
+        message -- explanation of the error
+    """
+
+    def __init__(self, message):
+        self.message = message
+
 #### CONFIG FILE ####
 # supply on command line
 
@@ -71,14 +88,28 @@ for dataset in config:
 		raise InputError(f"please specify either bam_suffix or R1_suffix and R2_suffix for dataset {dataset}")
 			
 	for sample in samples:
-		rows.append((dataset, sample, config[dataset]["host"], config[dataset]["virus"], config[dataset]["merge"], config[dataset]["dedup"], f"{dataset}+++{sample}"))
+		rows.append((dataset, sample, config[dataset]["host_name"], config[dataset]["host_fasta"], config[dataset]["virus_name"], config[dataset]["virus_fasta"], config[dataset]["merge"], config[dataset]["dedup"], f"{dataset}+++{sample}"))
 
-toDo = pd.DataFrame(rows, columns=['dataset', 'sample', 'host', 'virus', 'merge', 'dedup', 'unique'])
+toDo = pd.DataFrame(rows, columns=['dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'dedup', 'unique'])
 
 # check that every combination of 'dataset', 'sample', 'host' and 'virus' is unique
 if len(set(toDo.loc[:,'unique'])) != len(toDo.loc[:,'unique']):
 	raise InputError("Every combination of 'dataset' and 'sample' must be unique! Check inputs and try again")
 
+# construct dictionary with reference names as keys and reference fastas as values
+host_names = { config[dataset]['host_name']:config[dataset]['host_fasta'] for dataset in config }
+virus_names = { config[dataset]['virus_name']:config[dataset]['virus_fasta'] for dataset in config }
+ref_names = {**host_names, **virus_names}
+
+# check that each host/virus name refers to only one fasta
+for i, virus_name in enumerate(toDo.loc[:,'virus']):
+	if toDo.loc[i,'virus_fasta'] != ref_names[virus_name]:
+		raise InputError(f"Virus {virus_name} is used as a name in multiple datasets for different fasta files.  Please modify your configfile so that each unique virus/host name only refers to one fasta file")
+for i, host_name in enumerate(toDo.loc[:,'host']):
+	if toDo.loc[i,'host_fasta'] != ref_names[host_name]:
+		raise InputError(f"Host {host_name} is used as a name in multiple datasets for different fasta files.  Please modify your configfile so that each unique virus/host name only refers to one fasta file")
+
+print(toDo.head())
 
 # construct arguments for postprocess.R script for each dataset
 POSTARGS = {}
@@ -246,10 +277,16 @@ def get_for_seqprep(wildcards, read_type):
 	if (dedup_check == "True") or (dedup_check == "true") or (dedup_check is True):
 		return f"../out/{wildcards.dset}/.dedup_reads/{wildcards.samp}.{read_type}.fastq.gz"
 	else:
-		if read_type == "1":
-			return path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['R1_suffix']}")
+		if 'bam_suffix' in config[wildcards.dset]:
+			if read_type == "1":
+				return "../out/{dset}/.reads/{samp}_1.fq.gz"
+			else:
+				return "../out/{dset}/.reads/{samp}_2.fq.gz"
 		else:
-			return path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['R2_suffix']}")
+			if read_type == "1":
+				return path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['R1_suffix']}")
+			else:
+				return path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['R2_suffix']}")
 
 
 rule seqPrep:
@@ -310,7 +347,7 @@ def get_for_align(wildcards, read_type):
 
 rule index:
 	input:
-		"../data/references/{genome}.fa"
+		lambda wildcards: ref_names[wildcards.genome]
 	output:
 		expand("../out/.references/{genome}/{genome}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True)
 	conda: 
