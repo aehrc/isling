@@ -144,7 +144,7 @@ for dataset in config:
 
 toDo = pd.DataFrame(rows, columns=['dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'dedup', 'unique'])
 
-# check that every combination of 'dataset', 'sample', 'host' and 'virus' is unique
+# check that every combination of 'dataset' and 'sample' is unique
 if len(set(toDo.loc[:,'unique'])) != len(toDo.loc[:,'unique']):
 	raise InputError("Every combination of 'dataset' and 'sample' must be unique! Check inputs and try again")
 
@@ -257,9 +257,7 @@ rule check_bam_input_is_paired:
 			exit 1
 		fi
 		touch {output.ok}
-		"""
-		
-
+		"""	
 
 rule sort_input_bam:
 	input: 
@@ -317,13 +315,12 @@ rule dedup:
 		cat {output.r1} {output.r2} > {output.all}
 		"""
 
+
 # input functions for if we want to do deduplication or not
 def get_for_seqprep(wildcards, read_type):
-	key = f"{wildcards.dset}+++{wildcards.samp}"
-	# get row index for this key in toDo
-	row_idx = list(toDo.loc[:,'unique']).index(key)
+	row_idx = list(toDo.loc[:,'unique']).index(f"{wildcards.dset}+++{wildcards.samp}")
+	dedup_check = toDo.loc[toDo.index[row_idx], 'dedup']
 	# get true/True values for dedup
-	dedup_check = toDo.iloc[row_idx, 5]
 	if (dedup_check == "True") or (dedup_check == "true") or (dedup_check is True):
 		return f"../out/{wildcards.dset}/.dedup_reads/{wildcards.samp}.{read_type}.fastq.gz"
 	else:
@@ -370,6 +367,7 @@ def get_compression(input):
 	else:
 		return "cat"
 
+
 rule combine:
 # for if we don't want to do seqPrep
 	input:
@@ -392,12 +390,9 @@ rule combine:
 		
 #functions for if we did seqPrep and deduplication or not
 def get_for_align(wildcards, read_type):
-	key = f"{wildcards.dset}+++{wildcards.samp}"
-	# get row index for this key in toDo
-	row_idx = list(toDo.loc[:,'unique']).index(key)
-	# get true/True values for merge and dedup
-	merge_check = toDo.iloc[row_idx, 4]
-	dedup_check = toDo.iloc[row_idx, 5]
+	row_idx = list(toDo.loc[:,'unique']).index(f"{wildcards.dset}+++{wildcards.samp}")
+	dedup_check = toDo.loc[toDo.index[row_idx], 'dedup']
+	merge_check = toDo.loc[toDo.index[row_idx], 'merge']
 	if (merge_check == "True") or (merge_check == "true") or (merge_check is True):
 		folder = ".merged_reads"
 	elif (dedup_check == "True") or (dedup_check == "true") or (dedup_check is True):
