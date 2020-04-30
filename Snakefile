@@ -60,6 +60,58 @@ class InputError(Error):
 references_path = "../data/references/"
 bwa_mem_params="-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
 
+
+#### check file extensions ####
+
+# supported file extensions for fastq files are .fastq and .fq, and compression with .gz and .bz2
+# supported file extensions for bam/sam files are .bam, .sam
+
+for dataset in config:
+
+	if "R1_suffix" in config[dataset]:
+		# check R1_suffix for compression and fastq file extension
+		first_extension = path.splitext(config[dataset]["R1_suffix"])[1]
+		remaining_suffix = path.splitext(config[dataset]["R1_suffix"])[0]
+		# if uncompressed
+		if first_extension == ".fq" or first_extension == ".fastq":
+			# check read2 extension is the same as read1 extension
+			if "R2_suffix" not in config[dataset]:
+				raise InputError("If R1_suffix is specified (for fastq input), R2_suffix must also be specified")
+			else:
+				second_extension = path.splitext(config[dataset]["R2_suffix"])[1]
+				if first_extension != second_extension:
+					raise InputError("R1 and R2 file extensions must match")
+		#bz2 compression
+		elif first_extension == ".bz2":
+			if "R2_suffix" not in config[dataset]:
+				raise InputError("If R1_suffix is specified (for fastq input), R2_suffix must also be specified")
+			# check read2 extension is the same as read1 extension
+			else:
+				second_extension = path.splitext(config[dataset]["R2_suffix"])[1]
+				if first_extension != second_extension:
+					raise InputError("R1 and R2 file extensions must match")
+		#gzip compression
+		elif first_extension == ".gz":
+			if "R2_suffix" not in config[dataset]:
+				raise InputError("If R1_suffix is specified (for fastq input), R2_suffix must also be specified")
+			# check read2 extension is the same as read1 extension
+			else:
+				second_extension = path.splitext(config[dataset]["R2_suffix"])[1]
+				if first_extension != second_extension:
+					raise InputError("R1 and R2 file extensions must match")
+		# unrecgonised file extension
+		else:
+			raise InputError("Only uncompressed ('.fq', '.fastq'), bzip2 ('.bz2') or gzip ('.gz') fastq files are currently supported")
+	elif "bam_suffix" in config[dataset]:
+		extension = path.splitext(config[dataset]["bam_suffix"])[1]
+		if extension != ".bam" and extension != ".sam":
+			raise InputError("For aligned input, only '.bam' and '.sam' files are currently supported")
+	else:
+		raise InputError("Please specify either 'R1_suffix' and 'R2_suffix' or 'bam_suffix' in the config file")
+		
+
+
+
 #### get information for wildcards ####
 
 # get the name of each sample in each dataset, and save information about 
@@ -108,8 +160,6 @@ for i, virus_name in enumerate(toDo.loc[:,'virus']):
 for i, host_name in enumerate(toDo.loc[:,'host']):
 	if toDo.loc[i,'host_fasta'] != ref_names[host_name]:
 		raise InputError(f"Host {host_name} is used as a name in multiple datasets for different fasta files.  Please modify your configfile so that each unique virus/host name only refers to one fasta file")
-
-print(toDo.head())
 
 # construct arguments for postprocess.R script for each dataset
 POSTARGS = {}
@@ -310,6 +360,16 @@ rule seqPrep:
 		cat {output.proc_r1} {output.proc_r2} {output.merged} > {output.all}
 		"""
 
+# helper function to figure out which cat to use for rule combine (depending on compression)
+def get_compression(input):
+	ext = path.splitext(input.r1)[1]
+	if ext == ".bz2":
+		return "bzcat"
+	elif ext == ".gz":
+		return "zcat"
+	else:
+		return "cat"
+
 rule combine:
 # for if we don't want to do seqPrep
 	input:
@@ -319,11 +379,15 @@ rule combine:
 		proc_r1 = "../out/{dset}/.combined_reads/{samp}.1.fastq.gz",
 		proc_r2 = "../out/{dset}/.combined_reads/{samp}.2.fastq.gz",
 		all = "../out/{dset}/.combined_reads/{samp}.all.fastq.gz"
+	params:
+		test = lambda wildcards, input: print(get_compression(input)),
+		cat = lambda wildcards, input: get_compression(input),
+		
 	shell:
 		"""
-		cp {input.r1} {output.proc_r1}
-		cp {input.r2} {output.proc_r2}
-		cat {input.r1} {input.r2} > {output.all}
+		{params.cat} {input.r1} | gzip > {output.proc_r1}
+		{params.cat} {input.r2} | gzip > {output.proc_r2}
+		{params.cat} {input.r1} {input.r2} | gzip > {output.all}
 		"""
 		
 #functions for if we did seqPrep and deduplication or not
