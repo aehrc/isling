@@ -139,8 +139,29 @@ for dataset in config:
 	else:
 		raise InputError(f"please specify either bam_suffix or R1_suffix and R2_suffix for dataset {dataset}")
 			
+	# figure out if 'dedup' and 'merge' are true or false
+	if isinstance(config[dataset]["dedup"], bool):
+		dedup = int(config[dataset]["dedup"])
+	elif isinstance(config[dataset]["dedup"], str):
+		if config[dataset]["dedup"].lower() == "true":
+			dedup = 1
+		else:
+			dedup = 0
+	else:
+		raise InputError(f"Please specify True or False for 'dedup' in dataset {dataset}")
+	if isinstance(config[dataset]["merge"], bool):
+		merge = int(config[dataset]["merge"])
+	elif isinstance(config[dataset]["merge"], str):
+		if config[dataset]["merge"].lower() == "true":
+			merge = 1
+		else:
+			merge = 0
+	else:
+		raise InputError(f"Please specify True or False for 'merge' in dataset {dataset}")
+	
+	
 	for sample in samples:
-		rows.append((dataset, sample, config[dataset]["host_name"], config[dataset]["host_fasta"], config[dataset]["virus_name"], config[dataset]["virus_fasta"], config[dataset]["merge"], config[dataset]["dedup"], f"{dataset}+++{sample}"))
+		rows.append((dataset, sample, config[dataset]["host_name"], config[dataset]["host_fasta"], config[dataset]["virus_name"], config[dataset]["virus_fasta"], merge, dedup, f"{dataset}+++{sample}"))
 
 toDo = pd.DataFrame(rows, columns=['dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'dedup', 'unique'])
 
@@ -273,7 +294,7 @@ rule sort_input_bam:
 		samtools sort -n -o {output.bam} {input.bam}
 		"""
 
-rule bam_to_bed:
+rule bam_to_fastq:
 	input:
 		bam = rules.sort_input_bam.output.bam
 	output:
@@ -319,9 +340,9 @@ rule dedup:
 # input functions for if we want to do deduplication or not
 def get_for_seqprep(wildcards, read_type):
 	row_idx = list(toDo.loc[:,'unique']).index(f"{wildcards.dset}+++{wildcards.samp}")
-	dedup_check = toDo.loc[toDo.index[row_idx], 'dedup']
+	dedup_check = bool(toDo.loc[toDo.index[row_idx], 'dedup'])
 	# get true/True values for dedup
-	if (dedup_check == "True") or (dedup_check == "true") or (dedup_check is True):
+	if dedup_check is True:
 		return f"../out/{wildcards.dset}/.dedup_reads/{wildcards.samp}.{read_type}.fastq.gz"
 	else:
 		if 'bam_suffix' in config[wildcards.dset]:
@@ -391,11 +412,11 @@ rule combine:
 #functions for if we did seqPrep and deduplication or not
 def get_for_align(wildcards, read_type):
 	row_idx = list(toDo.loc[:,'unique']).index(f"{wildcards.dset}+++{wildcards.samp}")
-	dedup_check = toDo.loc[toDo.index[row_idx], 'dedup']
-	merge_check = toDo.loc[toDo.index[row_idx], 'merge']
-	if (merge_check == "True") or (merge_check == "true") or (merge_check is True):
+	dedup_check = bool(toDo.loc[toDo.index[row_idx], 'dedup'])
+	merge_check = bool(toDo.loc[toDo.index[row_idx], 'merge'])
+	if merge_check is True:
 		folder = ".merged_reads"
-	elif (dedup_check == "True") or (dedup_check == "true") or (dedup_check is True):
+	elif dedup_check is True:
 		folder = ".dedup_reads"
 	else:
 		folder = ".combined_reads"
