@@ -256,6 +256,13 @@ rule all:
 		#"../out/summary/count_mapped.txt",
 		expand("../out/summary/{dset}.xlsx", dset=set(toDo.loc[:,'dataset'])),
 		expand("../out/summary/ucsc_bed/{dset}.post.bed", dset=set(toDo.loc[:,'dataset'])),
+		expand("../out/{dset}/.host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.bam", 
+					zip,
+					dset=toDo.loc[:,'dataset'],
+					samp=toDo.loc[:,'sample'],
+					host=toDo.loc[:,'host'],
+					virus=toDo.loc[:,'virus']
+			   )
 
 #### read preprocessing ####
 
@@ -280,81 +287,37 @@ rule check_bam_input_is_paired:
 		touch {output.ok}
 		"""	
 
-rule sort_input_bam:
-	input: 
-		bam = lambda wildcards: path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['bam_suffix']}"),
-		ok = "../out/{dset}/.reads/{samp}.tmp"
-	output: 
-		bam = temp("../out/{dset}/.reads/{samp}.sorted.bam"),
-		
-	conda:
-		"envs/bwa.yml"
-	shell:
-		"""
-		samtools sort -n -o {output.bam} {input.bam}
-		"""
-
 rule bam_to_fastq:
 	input:
-		bam = rules.sort_input_bam.output.bam
+		bam = lambda wildcards: path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['bam_suffix']}"),
+		ok = "../out/{dset}/.reads/{samp}.tmp"
 	output:
+		sorted_bam = temp("../out/{dset}/.reads/{samp}.sorted.bam"),
 		r1 = temp("../out/{dset}/.reads/{samp}_1.fq.gz"),
 		r2 = temp("../out/{dset}/.reads/{samp}_2.fq.gz"),
 	conda:
 		"envs/picard.yml"
 	shell:
 		"""
-		picard SamToFastq I={input.bam} FASTQ={output.r1} SECOND_END_FASTQ={output.r2}
-		"""
-
-def dedup_input(wildcards, read_type):
-	if 'bam_suffix' in config[wildcards.dset]:
-		return f"../out/{wildcards.dset}/.reads/{wildcards.samp}_{read_type}.fq.gz"
-	else:
-		if read_type == "1":
-			 return path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['R1_suffix']}")
-		else:
-			return path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['R2_suffix']}")
-
-
-rule dedup:
-# remove exact duplicates (subs=0)
-	input:
-		r1 = lambda wildcards: dedup_input(wildcards, "1"),
-		r2 = lambda wildcards: dedup_input(wildcards, "2")
-	output:
-		r1 = "../out/{dset}/.dedup_reads/{samp}.1.fastq.gz",
-		r2 = "../out/{dset}/.dedup_reads/{samp}.2.fastq.gz",
-		all = "../out/{dset}/.dedup_reads/{samp}.all.fastq.gz"
-	conda:
-		"envs/bbmap.yml"
-	params:
-		cluster_memory = "20G"
-	shell:
-		"""
-		clumpify.sh -eoom -Xmx15g in1="{input.r1}" in2="{input.r2}" out1="{output.r1}" out2="{output.r2}" dedupe subs=0
-		cat {output.r1} {output.r2} > {output.all}
+		picard SortSam I={input.bam} O={output.sorted_bam} SORT_ORDER=queryname
+		picard SamToFastq I={output.sorted_bam} FASTQ={output.r1} SECOND_END_FASTQ={output.r2}
 		"""
 
 
-# input functions for if we want to do deduplication or not
+# input functions for if had a bam or fastq as input
 def get_for_seqprep(wildcards, read_type):
 	row_idx = list(toDo.loc[:,'unique']).index(f"{wildcards.dset}+++{wildcards.samp}")
-	dedup_check = bool(toDo.loc[toDo.index[row_idx], 'dedup'])
 	# get true/True values for dedup
-	if dedup_check is True:
-		return f"../out/{wildcards.dset}/.dedup_reads/{wildcards.samp}.{read_type}.fastq.gz"
-	else:
-		if 'bam_suffix' in config[wildcards.dset]:
-			if read_type == "1":
-				return "../out/{dset}/.reads/{samp}_1.fq.gz"
-			else:
-				return "../out/{dset}/.reads/{samp}_2.fq.gz"
+	if 'bam_suffix' in config[wildcards.dset]:
+		if read_type == "1":
+			return "../out/{dset}/.reads/{samp}_1.fq.gz"
 		else:
-			if read_type == "1":
-				return path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['R1_suffix']}")
-			else:
-				return path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['R2_suffix']}")
+			return "../out/{dset}/.reads/{samp}_2.fq.gz"
+	else:
+		if read_type == "1":
+			return path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['R1_suffix']}")
+		else:
+			return path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['R2_suffix']}")
 
 
 rule seqPrep:
@@ -409,15 +372,12 @@ rule combine:
 		{params.cat} {input.r1} {input.r2} | gzip > {output.all}
 		"""
 		
-#functions for if we did seqPrep and deduplication or not
+#functions for if we did seqPrep or not
 def get_for_align(wildcards, read_type):
 	row_idx = list(toDo.loc[:,'unique']).index(f"{wildcards.dset}+++{wildcards.samp}")
-	dedup_check = bool(toDo.loc[toDo.index[row_idx], 'dedup'])
 	merge_check = bool(toDo.loc[toDo.index[row_idx], 'merge'])
 	if merge_check is True:
 		folder = ".merged_reads"
-	elif dedup_check is True:
-		folder = ".dedup_reads"
 	else:
 		folder = ".combined_reads"
 	return f"../out/{wildcards.dset}/{folder}/{wildcards.samp}.{read_type}.fastq.gz"
@@ -443,7 +403,7 @@ rule align_bwa_virus_single:
 		idx = expand("../out/.references/{virus}/{virus}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
 		all = lambda wildcards: get_for_align(wildcards, "all"),
 	output:
-		sam = "../out/{dset}/.virus_aligned/{samp}.{virus}.bwaSingle.sam"
+		sam = temp("../out/{dset}/.virus_aligned/{samp}.{virus}.bwaSingle.sam")
 	params:
 		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
 		mapping = bwa_mem_params
@@ -461,7 +421,7 @@ rule align_bwa_virus_paired:
 		r1 = lambda wildcards: get_for_align(wildcards, "1"),
 		r2 = lambda wildcards: get_for_align(wildcards, "2"),
 	output:
-		sam = "../out/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.sam"
+		sam = temp("../out/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.sam")
 	params:
 		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
 		mapping = bwa_mem_params
@@ -472,28 +432,64 @@ rule align_bwa_virus_paired:
 		"""
 		bwa mem -t {threads} {params.mapping} -o {output.sam} {params.index} {input.r1} {input.r2} 
 		"""
+		
 
+def get_sam(wildcards, readType, genome):
+	row_idx = list(toDo.loc[:,'unique']).index(f"{wildcards.dset}+++{wildcards.samp}")
+	dedup_check = bool(toDo.loc[toDo.index[row_idx], 'dedup'])
+	# if we want host alignment
+	if genome == "virus":
+		# if we're doing deduplication
+		if dedup_check is True:
+			# if we want single reads
+			if readType == "single":
+				return path.splitext(rules.align_bwa_virus_single.output[0])[0] + ".rmdup.sam"
+			else:
+				return path.splitext(rules.align_bwa_virus_paired.output[0])[0] + ".rmdup.sam"
+		# if we're not doing deduplication
+		else:
+			if readType == "single":
+				return path.splitext(rules.align_bwa_virus_single.output[0])[0] + ".dups.sam"
+			else:
+				return path.splitext(rules.align_bwa_virus_paired.output[0])[0] + ".dups.sam"
+	# if we want the host alignment
+	else:
+		# if we're doing deduplication
+		if dedup_check is True:
+			# if we want single reads
+			if readType == "single":
+				return path.splitext(rules.align_bwa_host_single.output[0])[0] + ".rmdup.sam"
+			else:
+				return path.splitext(rules.align_bwa_host_paired.output[0])[0] + ".rmdup.sam"
+		# if we're not doing deduplication
+		else:
+			if readType == "single":
+				return path.splitext(rules.align_bwa_host_single.output[0])[0] + ".dups.sam"
+			else:
+				return path.splitext(rules.align_bwa_host_paired.output[0])[0] + ".dups.sam"	
+				
+		
 		
 rule extract_vAligned_single:
 	input:
-		vSing = rules.align_bwa_virus_single.output[0],
+		aligned = lambda wildcards: get_sam(wildcards, "single", "virus"),
 	output:
 		sam = temp("../out/{dset}/.virus_aligned/{samp}.{virus}.bwaSingle.mapped.sam"),
 	conda:
 		"envs/bwa.yml"
 	shell:
 		"""
-		samtools view -h -F 0x4 -F 0x800 -o - {input.vSing} | samtools sort - -n -o {output.sam}
+		samtools view -h -F 0x4 -F 0x800 -o - {input.aligned} | samtools sort - -n -o {output.sam}
 		"""
+
 rule extract_vAligned_paired:
 	input:
-		aligned = rules.align_bwa_virus_paired.output[0]
+		aligned = lambda wildcards: get_sam(wildcards, "paired", "virus")
 	output:
-		pvBam_readMap_mateUnmap = "../out/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.mapped1.bam",
-		pvBam_readUnmap_mateMap = "../out/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.mapped2.bam",
-		pvBam_bothMapped = "../out/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.mapped3.bam",
-		sam ="../out/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam"
-	params:
+		pvBam_readMap_mateUnmap = temp("../out/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.L.bam"),
+		pvBam_readUnmap_mateMap = temp("../out/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.R.bam"),
+		pvBam_bothMapped = temp("../out/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.B.bam"),
+		sam = temp("../out/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam"),
 	conda:
 		"envs/bwa.yml"
 	shell:
@@ -503,12 +499,13 @@ rule extract_vAligned_paired:
 		samtools view -hb -F 0x4 -F 0x8 -F 0x800 -o {output.pvBam_bothMapped} {input.aligned}
 		samtools merge - {output.pvBam_readMap_mateUnmap} {output.pvBam_bothMapped} {output.pvBam_readUnmap_mateMap} | samtools sort - -n -o {output.sam}
 		"""
+		
 
 rule extract_to_fastq_single:
 	input:
 		sam = rules.extract_vAligned_single.output.sam
 	output:
-		fastq = "../out/{dset}/.virus_aligned/{samp}.bwaSingle.mappedTo{virus}.fastq.gz"
+		fastq = temp("../out/{dset}/.virus_aligned/{samp}.bwaSingle.mappedTo{virus}.fastq.gz")
 	conda:
 		"envs/picard.yml"
 	shell:
@@ -520,8 +517,8 @@ rule extract_to_fastq_paired:
 	input:
 		sam = rules.extract_vAligned_paired.output.sam
 	output:
-		fastq1 = "../out/{dset}/.virus_aligned/{samp}.bwaSingle.mappedTo{virus}.1.fastq.gz",
-		fastq2 = "../out/{dset}/.virus_aligned/{samp}.bwaSingle.mappedTo{virus}.2.fastq.gz"
+		fastq1 = temp("../out/{dset}/.virus_aligned/{samp}.bwaSingle.mappedTo{virus}.1.fastq.gz"),
+		fastq2 = temp("../out/{dset}/.virus_aligned/{samp}.bwaSingle.mappedTo{virus}.2.fastq.gz")
 	conda:
 		"envs/picard.yml"
 	shell:
@@ -534,45 +531,47 @@ rule align_bwa_host_single:
 		idx = expand("../out/.references/{host}/{host}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
 		all = rules.extract_to_fastq_single.output.fastq
 	output:
-		sam = "../out/{dset}/.host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam",
+		sam = temp("../out/{dset}/.host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam"),
 	conda: 
 		"envs/bwa.yml"
 	params:
 		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
 		mapping = bwa_mem_params
-	threads: 5
+	threads: 4
 	shell:		
 		"""
 		bwa mem -t {threads} {params.mapping} -o {output.sam} {params.index} {input.all}
 		"""
+		
 rule align_bwa_host_paired:
 	input:	
 		idx = expand("../out/.references/{host}/{host}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
 		r1 = rules.extract_to_fastq_paired.output[0],
 		r2 = rules.extract_to_fastq_paired.output[1]
 	output:
-		sam = "../out/{dset}/.host_aligned/{samp}.{host}.readsFrom{virus}.bwaPaired.sam",
+		sam = temp("../out/{dset}/.host_aligned/{samp}.{host}.readsFrom{virus}.bwaPaired.sam"),
 	conda: 
 		"envs/bwa.yml"
 	params:
 		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
 		mapping = bwa_mem_params
-	threads: 5
+	threads: 4
 	shell:		
 		"""
 		bwa mem -t {threads} {params.mapping} -o {output.sam} {params.index} {input.r1} {input.r2}
 		"""
 
-rule convert:
+#### sam file manipulations ####
+
+rule convert_to_bam:
 	input:
-		"../out/{dset}/{folder}/{samp}.{host}.{readsFrom}{virus}.{alignType}.sam"
+		"../out/{dset}/{folder}/{alignment}.sam"
 	output:
-		bam = "../out/{dset}/{folder}{samp}.{host}.{readsFrom}{virus}.{alignType}.bam",
-		bai = "../out/{dset}/{folder}/{samp}.{host}.{readsFrom}{virus}.{alignType}.bam.bai"
+		bam = "../out/{dset}/{folder}/{alignment}.bam",
+		bai = "../out/{dset}/{folder}/{alignment}.bam.bai"
 	params:
 		tmp_prefix = lambda wildcards, input: path.splitext(input[0])[0]
 	wildcard_constraints:
-		readsFrom = "|readsFrom",
 		folder = "\.host_aligned|\.virus_aligned"
 	conda: 
 		"envs/bwa.yml"	
@@ -582,15 +581,49 @@ rule convert:
 		samtools view -bhS {input} | samtools sort - -o {output.bam}
 		samtools index {output.bam}
 		"""
+		
+rule markdup:
+	input:
+		sam = "../out/{dset}/{folder}/{alignment}.sam"
+	output:
+		sorted =  temp("../out/{dset}/{folder}/{alignment}.qsort.bam"),
+		fixmate = temp("../out/{dset}/{folder}/{alignment}.fixmate.bam"),
+		markdup = temp("../out/{dset}/{folder}/{alignment}.dups.sam"),
+		metrics = temp("../out/{dset}/{folder}/{alignment}.dups.txt")
+	wildcard_constraints:
+		folder = "\.host_aligned|\.virus_aligned"
+	conda: 
+		"envs/picard.yml"	
+	shell:
+		"""
+		picard SortSam I={input.sam} O={output.sorted} SORT_ORDER=queryname
+		picard FixMateInformation I={output.sorted} O={output.fixmate} ADD_MATE_CIGAR=true 
+		picard MarkDuplicates I={output.fixmate} O={output.markdup} METRICS_FILE={output.metrics}
+		"""
+		
+rule rmdup:
+	input:
+		sam = "../out/{dset}/{folder}/{alignment}.dups.sam"	
+	output:
+		sam = temp("../out/{dset}/{folder}/{alignment}.rmdup.sam")	
+	wildcard_constraints:
+		folder = "\.host_aligned|\.virus_aligned"
+	conda: 
+		"envs/bwa.yml"	
+	shell:
+		"""
+		samtools view -h -F 1024 {input.sam} > {output.sam}
+		"""
+	
 
 #### perl scripts ####
 
 rule run_soft:
 	input:
-		host ="../out/{dset}/.host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam",
-		virus = "../out/{dset}/.virus_aligned/{samp}.{virus}.bwaSingle.sam",
+		host = lambda wildcards: get_sam(wildcards, "single", "host"),
+		virus = rules.extract_vAligned_single.output[0],
 	output:
-		soft = "../out/{dset}/ints/{samp}.{host}.{virus}.soft.txt",
+		soft = temp("../out/{dset}/ints/{samp}.{host}.{virus}.soft.txt"),
 	shell:
 		"""
 		perl -I. ./softClip.pl --viral {input.virus} --human {input.host} --output {output.soft} --tol 3
@@ -598,10 +631,10 @@ rule run_soft:
 		
 rule run_short:
 	input:
-		host ="../out/{dset}/.host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam",
-		virus = "../out/{dset}/.virus_aligned/{samp}.{virus}.bwaSingle.sam",
+		host = lambda wildcards: get_sam(wildcards, "single", "host"),
+		virus = rules.extract_vAligned_single.output[0],
 	output:
-		short = "../out/{dset}/ints/{samp}.{host}.{virus}.short.txt",
+		short = temp("../out/{dset}/ints/{samp}.{host}.{virus}.short.txt"),
 	shell:
 		"""
 		perl -I. ./short.pl --viral {input.virus} --human {input.host} --output {output.short} --tol 3
@@ -609,10 +642,10 @@ rule run_short:
 		
 rule run_discordant:
 	input:
-		host ="../out/{dset}/.host_aligned/{samp}.{host}.readsFrom{virus}.bwaPaired.sam",
-		virus = "../out/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.sam",
+		host = lambda wildcards: get_sam(wildcards, "paired", "host"),
+		virus = rules.extract_vAligned_paired.output[3],
 	output:
-		discord = "../out/{dset}/ints/{samp}.{host}.{virus}.discordant.txt",
+		discord = temp("../out/{dset}/ints/{samp}.{host}.{virus}.discordant.txt"),
 	shell:
 		"""
 		perl -I. ./discordant.pl --viral {input.virus} --human {input.host} --output {output.discord} --tol 3
@@ -624,7 +657,7 @@ rule combine_ints:
 		short = rules.run_short.output,
 		discordant = rules.run_discordant.output
 	output:
-		temp =  "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp",
+		temp =  temp("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp"),
 		all = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
 	shell:
 		"""
@@ -635,31 +668,6 @@ rule combine_ints:
 
 	
 #### postprocessing ####
-
-#rule count_mapped:
-#	input:
-#		expand(expand("../out/{dset}/.virus_aligned/{samp}.{virus}.{align_type}.bam", 
-#					zip, 
-#					dset = toDo.loc[:,'dataset'], 
-#					samp = toDo.loc[:,'sample'], 
-#					virus = toDo.loc[:,'virus'],
-#					allow_missing=True),
-#						align_type=['bwaSingle']),
-#		#expand(expand("../out/{dset}/.host_aligned/{samp}.{host}.readsFrom{virus}.{align_type}.bam", 
-#		#			zip, 
-#		#			dset = toDo.loc[:,'dataset'], 
-#		#			samp = toDo.loc[:,'sample'], 
-#		#			virus = toDo.loc[:,'virus'],
-#		#			host = toDo.loc[:,'host'],
-#		#			allow_missing=True),
-#		#				align_type=['bwaSingle']),
-#						
-#	output:
-#		"../out/summary/count_mapped.txt"
-#	conda: 
-#		"envs/bwa.yml"
-#	shell:
-#		"./count_mapped.sh"
 
 rule sortbed:
 	input:

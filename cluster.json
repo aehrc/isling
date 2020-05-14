@@ -19,7 +19,8 @@
 		"ntasks" : "1",
 		"cpus-per-task" : 1,
 		"time" : "24:00:00",
-		"job-name" : "viInt-dedup-clumpify"
+		"job-name" : "viInt-dedup-clumpify",
+		"exclusive" : ""
 
 	},
 	"seqPrep":
