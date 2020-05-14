@@ -8,9 +8,9 @@ overlaps <- function(chr, start, stop, rchr, rstart, rstop)
 {
   overlap <- dplyr::case_when(
   chr != rchr ~ FALSE,
-  (stop >= rstart) & (stop <= rstop) ~ TRUE,
-  (start >= rstart) & (start <= rstop) ~ TRUE,
-  (start <= rstart) & (stop >= rstop) ~ TRUE,
+  (stop >= rstart) & (stop <= rstop) ~ TRUE, # stop is between rstart and rstop
+  (start >= rstart) & (start <= rstop) ~ TRUE, # start is between rstart and rstop
+  (start <= rstart) & (stop >= rstop) ~ TRUE, # start is after rstart and stop is after rstart
   TRUE ~ FALSE
   )
 return(overlap)
@@ -31,7 +31,7 @@ for (bed in mask_exclude)
   # check that there is some overlap between chromosome names in bed_regions and ints
   if (sum(unique(bed_regions$X1) %in% unique(ints$Chr)) == 0)
   {
-    stop(paste0("no overlap between chromosome names in ints file and ", bed))
+    cat("no overlap between chromosome names in ints file and ", bed)
   }
   
   # for each line, filter integrations that are in this region
