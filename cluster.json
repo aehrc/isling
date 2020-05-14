@@ -13,15 +13,18 @@
 		"job-name" : "viInt-bamtobed"
 
 	},
-	"dedup":
+	"markdup":
 	{	
-		"mem-per-cpu" : "20GB",
-		"ntasks" : "1",
-		"cpus-per-task" : 1,
+		"mem" : "10GB",
 		"time" : "24:00:00",
-		"job-name" : "viInt-dedup-clumpify",
-		"exclusive" : ""
+		"job-name" : "viInt-mkdup"
 
+	},
+	"rmdup":
+	{	
+		"mem" : "10GB",
+		"time" : "24:00:00",
+		"job-name" : "viInt-rmdup"
 	},
 	"seqPrep":
 	{	
