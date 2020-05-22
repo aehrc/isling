@@ -22,18 +22,23 @@ library(readr)
 
 args <- commandArgs(trailingOnly=TRUE)
 
-data_path = "../out/"
+data_files <- args[1:(length(args) - 1)]
 
-out_path = "../out/summary/ucsc_bed/"
+out_path <- args[length(args)]
+out_path <- file.path(out_path)
+out_path <- paste0(out_path, "/")
+
 dir.create(file.path(out_path), showWarnings = FALSE)
 
 
+
 #import all datasets
-df <- tibble::tibble(filename = args) %>% # create a data frame holding the file names
-  dplyr::mutate(integrations = purrr::map(filename, ~ readr::read_tsv(file.path(data_path, .), 
+df <- tibble::tibble(filename = data_files) %>% # create a data frame holding the file names
+  dplyr::mutate(integrations = purrr::map(filename, ~ readr::read_tsv(file.path(.), 
 						na = c("", "NA", "?"),
 						col_types = cols(Chr = col_character(), NoAmbiguousBases = col_integer(), .default =col_guess())))) %>%
   dplyr::mutate(total_count = purrr::flatten_int(purrr::map(integrations, ~nrow(.)))) 
+
 
 #add extra columns with sample name, dataset, host
 df <- df %>% 

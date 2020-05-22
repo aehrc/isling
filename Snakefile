@@ -721,7 +721,6 @@ rule post:
 		"""
 		Rscript post/postprocess.R {params}
 		"""
-
 	
 rule summarise:
 	input:
@@ -734,8 +733,14 @@ rule summarise:
 		"{outpath}/summary/{dset}_annotated.xlsx"
 	conda:
 		"envs/rscripts.yml"
+	params:
+		outdir = lambda wildcards, output: path.dirname(output[0])
 	shell:
-		"Rscript summarise_ints.R {input}"
+		"Rscript summarise_ints.R {input} {params.outdir}"
+
+rule write_bed:
+	input:
+		
 
 rule ucsc_bed:
 	input:
@@ -745,10 +750,14 @@ rule ucsc_bed:
 					toDo.loc[toDo['dataset'] == wildcards.dset,'virus'])]
 	output:
 		"{outpath}/summary/ucsc_bed/{dset}.post.bed"
+	params:
+		outdir = lambda wildcards, output: f"{path.dirname(output[0])}/{wildcards.dset}"
 	conda:
 		"envs/rscripts.yml"
 	shell:
 		"""
-		Rscript writeBed.R {input}
-		bash -e format_ucsc.sh
+		Rscript writeBed.R {input} {params.outdir}
+		bash -e format_ucsc.sh {params.outdir}
+		mv {params.outdir}/*bed {params.outdir}/..
+		rmdir {params.outdir}
 		"""
