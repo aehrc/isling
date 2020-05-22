@@ -65,10 +65,14 @@ zcat *.fa.gz > ../macaque.fa
 
 cd ..
 
-wget ftp://ftp.ensembl.org/pub/release-97/gff3/macaca_fascicularis/Macaca_fascicularis.Macaca_fascicularis_5.0.97.gff3.gz
-gunzip Macaca_fascicularis.Macaca_fascicularis_5.0.97.gff3.gz
+#wget ftp://ftp.ensembl.org/pub/release-97/gff3/macaca_fascicularis/Macaca_fascicularis.Macaca_fascicularis_5.0.97.gff3.gz
+#gunzip Macaca_fascicularis.Macaca_fascicularis_5.0.97.gff3.gz
 #sed s/^/chr/g Macaca_fascicularis.Macaca_fascicularis_5.0.97.gff3 | sed 's/^chr##/##/g' > Macaca_fascicularis_5.0.97.gff
-mv Macaca_fascicularis.Macaca_fascicularis_5.0.97.gff3 Macaca_fascicularis_5.0.97.gff
+#mv Macaca_fascicularis.Macaca_fascicularis_5.0.97.gff3 Macaca_fascicularis_5.0.97.gff
+wget ftp://ftp.ensembl.org/pub/release-97/gtf/macaca_fascicularis/Macaca_fascicularis.Macaca_fascicularis_5.0.97.gtf.gz
+gunzip Macaca_fascicularis.Macaca_fascicularis_5.0.97.gtf.gz
+awk -F'\t' '{if (($1 ~ /^#/) || ($3 ~ /gene/)) { print } }' Macaca_fascicularis.Macaca_fascicularis_5.0.97.gtf > Macaca_fascicularis.Macaca_fascicularis_5.0.97.genes.gtf
+
 
 ## to compare against sunando's results, use MacFas5 from genbank
 wget ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank/vertebrate_mammalian/Macaca_fascicularis/latest_assembly_versions/GCA_000364345.1_Macaca_fascicularis_5.0/GCA_000364345.1_Macaca_fascicularis_5.0_genomic.fna.gz
