@@ -255,14 +255,7 @@ rule all:
 	input: 
 		#"../out/summary/count_mapped.txt",
 		expand("../out/summary/{dset}.xlsx", dset=set(toDo.loc[:,'dataset'])),
-		expand("../out/summary/ucsc_bed/{dset}.post.bed", dset=set(toDo.loc[:,'dataset'])),
-		expand("../out/{dset}/.host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.bam", 
-					zip,
-					dset=toDo.loc[:,'dataset'],
-					samp=toDo.loc[:,'sample'],
-					host=toDo.loc[:,'host'],
-					virus=toDo.loc[:,'virus']
-			   )
+		expand("../out/summary/ucsc_bed/{dset}.post.bed", dset=set(toDo.loc[:,'dataset']))
 
 #### read preprocessing ####
 
@@ -326,10 +319,10 @@ rule seqPrep:
 		r1 = lambda wildcards: get_for_seqprep(wildcards, "1"),
 		r2 = lambda wildcards: get_for_seqprep(wildcards, "2")
 	output:
-		merged = "../out/{dset}/.merged_reads/{samp}.SeqPrep_merged.fastq.gz",
-		proc_r1 = "../out/{dset}/.merged_reads/{samp}.1.fastq.gz",
-		proc_r2 = "../out/{dset}/.merged_reads/{samp}.2.fastq.gz",
-		all = "../out/{dset}/.merged_reads/{samp}.all.fastq.gz"
+		merged = temp("../out/{dset}/.merged_reads/{samp}.SeqPrep_merged.fastq.gz"),
+		proc_r1 = temp("../out/{dset}/.merged_reads/{samp}.1.fastq.gz"),
+		proc_r2 = temp("../out/{dset}/.merged_reads/{samp}.2.fastq.gz"),
+		all = temp("../out/{dset}/.merged_reads/{samp}.all.fastq.gz")
 	conda:	
 		"envs/seqprep.yml"
 	params:
@@ -358,9 +351,9 @@ rule combine:
 		r1 = lambda wildcards: get_for_seqprep(wildcards, "1"),
 		r2 = lambda wildcards: get_for_seqprep(wildcards, "2")
 	output:
-		proc_r1 = "../out/{dset}/.combined_reads/{samp}.1.fastq.gz",
-		proc_r2 = "../out/{dset}/.combined_reads/{samp}.2.fastq.gz",
-		all = "../out/{dset}/.combined_reads/{samp}.all.fastq.gz"
+		proc_r1 = temp("../out/{dset}/.combined_reads/{samp}.1.fastq.gz"),
+		proc_r2 = temp("../out/{dset}/.combined_reads/{samp}.2.fastq.gz"),
+		all = temp("../out/{dset}/.combined_reads/{samp}.all.fastq.gz")
 	params:
 		test = lambda wildcards, input: print(get_compression(input)),
 		cat = lambda wildcards, input: get_compression(input),
@@ -586,9 +579,8 @@ rule markdup:
 	input:
 		sam = "../out/{dset}/{folder}/{alignment}.sam"
 	output:
-		sorted =  temp("../out/{dset}/{folder}/{alignment}.qsort.bam"),
 		fixmate = temp("../out/{dset}/{folder}/{alignment}.fixmate.bam"),
-		markdup = temp("../out/{dset}/{folder}/{alignment}.dups.sam"),
+		markdup = "../out/{dset}/{folder}/{alignment}.dups.sam",
 		metrics = temp("../out/{dset}/{folder}/{alignment}.dups.txt")
 	wildcard_constraints:
 		folder = "\.host_aligned|\.virus_aligned"
@@ -596,8 +588,7 @@ rule markdup:
 		"envs/picard.yml"	
 	shell:
 		"""
-		picard SortSam I={input.sam} O={output.sorted} SORT_ORDER=queryname
-		picard FixMateInformation I={output.sorted} O={output.fixmate} ADD_MATE_CIGAR=true 
+		picard FixMateInformation I={input.sam} O={output.fixmate} ADD_MATE_CIGAR=true SORT_ORDER=queryname
 		picard MarkDuplicates I={output.fixmate} O={output.markdup} METRICS_FILE={output.metrics}
 		"""
 		
