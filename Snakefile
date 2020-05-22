@@ -246,11 +246,12 @@ for dataset in config:
 #### global wildcard constraints ####
 
 wildcard_constraints:
-	virus="|".join(set(toDo.loc[:,'virus'])),
-	samp="|".join(set(toDo.loc[:,'sample'])),
-	dset="|".join(set(toDo.loc[:,'dataset'])),
-	host="|".join(set(toDo.loc[:,'host'])),
-	align_type="bwaPaired|bwaSingle"
+	virus = "|".join(set(toDo.loc[:,'virus'])),
+	samp = "|".join(set(toDo.loc[:,'sample'])),
+	dset = "|".join(set(toDo.loc[:,'dataset'])),
+	host = "|".join(set(toDo.loc[:,'host'])),
+	align_type = "bwaPaired|bwaSingle",
+	outpath = "|".join(set(toDo.loc[:,'outdir']))
 
 
 #### local rules ####
@@ -738,12 +739,10 @@ rule summarise:
 
 rule ucsc_bed:
 	input:
-		expand("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt", 
-					zip, 
-					samp = toDo.loc[:,'sample'], 
-					host = toDo.loc[:,'host'], 
-					virus = toDo.loc[:,'virus'], 
-					allow_missing=True),
+		lambda wildcards: [f"{wildcards.outpath}/{wildcards.dset}/ints/{samp}.{host}.{virus}.integrations.post.txt" for samp, host, virus
+			in zip(toDo.loc[toDo['dataset'] == wildcards.dset,'sample'], 
+					toDo.loc[toDo['dataset'] == wildcards.dset,'host'], 
+					toDo.loc[toDo['dataset'] == wildcards.dset,'virus'])]
 	output:
 		"{outpath}/summary/ucsc_bed/{dset}.post.bed"
 	conda:
