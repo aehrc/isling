@@ -260,11 +260,16 @@ localrules: all, combine, check_bam_input_is_paired
 rule all:
 	input: 
 		#"{outpath}/summary/count_mapped.txt",
-		expand("{outpath}/summary/{dset}.xlsx", zip, outpath = toDo.loc[:, 'outdir'], dset=toDo.loc[:,'dataset']),
-		expand("{outpath}/summary/ucsc_bed/{dset}.post.bed", zip, outpath = toDo.loc[:, 'outdir'], dset=toDo.loc[:,'dataset'])
+		expand("{outpath}/summary/{dset}.xlsx", 
+			zip, 
+			outpath = [config[dataset]['out_dir'] for dataset in config], 
+			dset = [dataset for dataset in config]),
+		expand("{outpath}/summary/ucsc_bed/{dset}.post.bed", 
+			zip, 
+			outpath = [config[dataset]['out_dir'] for dataset in config], 
+			dset = [dataset for dataset in config])
 
 #### read preprocessing ####
-
 rule check_bam_input_is_paired:
 	input: lambda wildcards: path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['bam_suffix']}")
 	output:
@@ -735,14 +740,12 @@ rule ucsc_bed:
 	input:
 		expand("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt", 
 					zip, 
-					outpath = toDo.loc[:,'outdir'],
-					dset = toDo.loc[:,'dataset'], 
 					samp = toDo.loc[:,'sample'], 
 					host = toDo.loc[:,'host'], 
 					virus = toDo.loc[:,'virus'], 
 					allow_missing=True),
 	output:
-		expand("{outpath}/summary/ucsc_bed/{dset}.post.bed", zip, outpath = toDo.loc[:, 'outdir'], dset = toDo.loc[:,'dataset']),
+		"{outpath}/summary/ucsc_bed/{dset}.post.bed"
 	conda:
 		"envs/rscripts.yml"
 	shell:
