@@ -65,46 +65,46 @@ bwa_mem_params="-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
 # supported file extensions for fastq files are .fastq and .fq, and compression with .gz and .bz2
 # supported file extensions for bam/sam files are .bam, .sam
 
+fastq_extensions = [".fq", ".fastq"]
+sam_extensions = [".sam", ".bam"]
+compression_extensions = [".gz", ".bz2"]
+
 for dataset in config:
 
+	# if input is fastq
 	if "R1_suffix" in config[dataset]:
+	
+		# check that R2_suffix is also specified
+		if "R2_suffix" not in config[dataset]:
+			raise InputError("If R1_suffix is specified (for fastq input), R2_suffix must also be specified")
+	
 		# check R1_suffix for compression and fastq file extension
-		first_extension = path.splitext(config[dataset]["R1_suffix"])[1]
-		remaining_suffix = path.splitext(config[dataset]["R1_suffix"])[0]
-		# if uncompressed
-		if first_extension == ".fq" or first_extension == ".fastq":
-			# check read2 extension is the same as read1 extension
-			if "R2_suffix" not in config[dataset]:
-				raise InputError("If R1_suffix is specified (for fastq input), R2_suffix must also be specified")
-			else:
-				second_extension = path.splitext(config[dataset]["R2_suffix"])[1]
-				if first_extension != second_extension:
-					raise InputError("R1 and R2 file extensions must match")
-		#bz2 compression
-		elif first_extension == ".bz2":
-			if "R2_suffix" not in config[dataset]:
-				raise InputError("If R1_suffix is specified (for fastq input), R2_suffix must also be specified")
-			# check read2 extension is the same as read1 extension
-			else:
-				second_extension = path.splitext(config[dataset]["R2_suffix"])[1]
-				if first_extension != second_extension:
-					raise InputError("R1 and R2 file extensions must match")
-		#gzip compression
-		elif first_extension == ".gz":
-			if "R2_suffix" not in config[dataset]:
-				raise InputError("If R1_suffix is specified (for fastq input), R2_suffix must also be specified")
-			# check read2 extension is the same as read1 extension
-			else:
-				second_extension = path.splitext(config[dataset]["R2_suffix"])[1]
-				if first_extension != second_extension:
-					raise InputError("R1 and R2 file extensions must match")
-		# unrecgonised file extension
-		else:
-			raise InputError("Only uncompressed ('.fq', '.fastq'), bzip2 ('.bz2') or gzip ('.gz') fastq files are currently supported")
+		R1_first_extension = path.splitext(config[dataset]["R1_suffix"])[1]
+		R2_first_extension = path.splitext(config[dataset]["R2_suffix"])[1]
+		
+		#bz2 or gz compression
+		if R1_first_extension in compression_extensions:
+		
+			# get second extensions
+			R1_second_extension = path.splitext(path.splitext(config[dataset]["R1_suffix"])[0])[1]
+			R2_second_extension = path.splitext(path.splitext(config[dataset]["R2_suffix"])[0])[1]
+		
+			# check that input looks like a fastq files
+			if R1_second_extension not in fastq_extensions or R2_second_extension not in fastq_extensions:
+				raise InputError("input files do not look like fastq files (extension is not '.fq' or '.fastq'")
+
+			
+		# if uncompressed, check file looks like fastq file
+		elif R1_first_extension not in fastq_extensions or R2_first_extension not in fastq_extensions:
+			raise InputError("for fastq files, input file extensions must be '.fastq' or '.fq'")
+
+	# if input is bam
 	elif "bam_suffix" in config[dataset]:
 		extension = path.splitext(config[dataset]["bam_suffix"])[1]
-		if extension != ".bam" and extension != ".sam":
+		if extension not in sam_extensions:
 			raise InputError("For aligned input, only '.bam' and '.sam' files are currently supported")
+	
+	# if nether R1/R2 suffix or bam suffix specified
 	else:
 		raise InputError("Please specify either 'R1_suffix' and 'R2_suffix' or 'bam_suffix' in the config file")
 		
