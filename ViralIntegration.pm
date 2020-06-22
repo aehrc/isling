@@ -155,12 +155,12 @@ sub getGenomicCoords {
 			#calculate gStart and gStop
 			#coordinates relative to read are 1-based, but output 0-based 
 			
-			if ($sense eq 'f') {
+			if (($sense eq 'f') or ($sense eq '+')) {
 				$gStart = $pos - 1 + (eval join("+", @gNumbers[0..($i-1)]) || 0);
-				$gStop = $pos + eval join("+", @gNumbers[0..$i]);
+				$gStop = $pos - 1 + eval join("+", @gNumbers[0..$i]);
 			}
 			else {
-				$gStart = $pos + eval join("+", @gNumbers[0..$i]);
+				$gStart = $pos - 1 + eval join("+", @gNumbers[0..$i]);
 				$gStop = $pos - 1 + (eval join("+", @gNumbers[0..($i-1)]) || 0);
 				
 			}
@@ -497,7 +497,7 @@ sub isRearrange {
 	
 	#get start and stop 
 	
-	return ($isRearrange, $gapBP, $gaps, $NM, @aligns);
+	return ($isRearrange, $gapBP, $gaps, $NM, @sorted);
 	
 	
 }
