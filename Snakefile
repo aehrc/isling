@@ -36,6 +36,7 @@
 from glob import glob
 from os import path
 import pandas as pd
+import pdb
 
 
 #### custom errors ####
@@ -103,9 +104,11 @@ for dataset in config:
 		else:
 			raise InputError("Only uncompressed ('.fq', '.fastq'), bzip2 ('.bz2') or gzip ('.gz') fastq files are currently supported")
 	elif "bam_suffix" in config[dataset]:
-		extension = path.splitext(config[dataset]["bam_suffix"])[1]
+		extension = config[dataset]["bam_suffix"]
 		if extension != ".bam" and extension != ".sam":
-			raise InputError("For aligned input, only '.bam' and '.sam' files are currently supported")
+			extension = path.splitext(config[dataset]["bam_suffix"])[1]
+			if extension != ".bam" and extension != ".sam":
+				raise InputError("For aligned input, only '.bam' and '.sam' files are currently supported")
 	else:
 		raise InputError("Please specify either 'R1_suffix' and 'R2_suffix' or 'bam_suffix' in the config file")
 		
