@@ -92,12 +92,13 @@ sub getCigarParts {
 
 sub getGenomicCoords {
 	#get genomic coordinates (0-based) of cigar operation (specified by start and stop relative to the read)
+	
 	#using cigar, direction and POS (1-based leftmost mapping position of first CIGAR operation that consumes a reference base [M, D, N])
+	
 	#need to consider CIGAR operations that consume read [MIS=X] or not [DNHP], 
 	#and those that consume reference [MDN] or not [ISHP]
 	
 	#without processing the cigar, might have more than one matched region per alignment so want to get coordinates for one that is specified
-	
 	my ($start, $stop, $pos, $sense, $cig) = @_;
 	
 	#need to know what the coordinate of the start of the read is, given the left-most mapping position of M, D or N cigar operation
@@ -124,7 +125,6 @@ sub getGenomicCoords {
 		}
 	}
 	
-	
 	#make arrays with info about start and stop position relative to read of each CIGAR operation
 	#also genomic position (start and stop) for each CIGAR operation
 	my ($rStart, $rStop, $gStart, $gStop);
@@ -137,14 +137,14 @@ sub getGenomicCoords {
 		if (($sense eq 'f') or ($sense eq '+')) {
 			#rStart for this position is 1 + (sum of @numbers up to but not including this position)
 			
-			$rStart = 1 + eval join("+", @rNumbers[0..($i-1)]);
+			$rStart = 1 + (eval join("+", @rNumbers[0..($i-1)]) || 0);
 			#rStop for this position is (sum of @numbers up to and including this position)
 			$rStop = eval join("+", @rNumbers[0..$i]);
 		}
 		#read is reverse, need to sum from $i to end of array
 		else {
-			#rStart is 1+ sum from next element to end of array
-			$rStart = 1 + eval join("+", @rNumbers[$i+1..$#rNumbers]);
+			#rStart is 1 + sum from next element to end of array
+			$rStart = 1 + (eval join("+", @rNumbers[$i+1..$#rNumbers]) || 0);
 			
 			#rStop is sum from this element to end of array
 			$rStop = eval join("+", @rNumbers[$i..$#rNumbers]);
@@ -155,13 +155,13 @@ sub getGenomicCoords {
 			#calculate gStart and gStop
 			#coordinates relative to read are 1-based, but output 0-based 
 			
-			if ($sense eq 'f') {
-				$gStart = $pos - 1 + eval join("+", @gNumbers[0..($i-1)]);
-				$gStop = $pos + eval join("+", @gNumbers[0..$i]);
+			if (($sense eq 'f') or ($sense eq '+')) {
+				$gStart = $pos - 1 + (eval join("+", @gNumbers[0..($i-1)]) || 0);
+				$gStop = $pos - 1 + eval join("+", @gNumbers[0..$i]);
 			}
 			else {
-				$gStart = $pos + eval join("+", @gNumbers[0..$i]);
-				$gStop = $pos - 1 + eval join("+", @gNumbers[0..($i-1)]);
+				$gStart = $pos - 1 + eval join("+", @gNumbers[0..$i]);
+				$gStop = $pos - 1 + (eval join("+", @gNumbers[0..($i-1)]) || 0);
 				
 			}
 			return  ($gStart, $gStop) ;
@@ -361,6 +361,7 @@ sub isRearrange {
 	# $pDir is the direction of the primary alignment 
 	# $sup are the secondary and supplementary alignments
 	# $thresh is the fraction of the read that must be accounted for by alignments to be considered a rearrangement
+	# $pNM is the edit distance of the primary alignment
 	
 	#get location in read of matched regions and their lengths
 	#make array of start of matched regions and their lengths in format startxxxend
@@ -496,7 +497,7 @@ sub isRearrange {
 	
 	#get start and stop 
 	
-	return ($isRearrange, $gapBP, $gaps, $NM, @aligns);
+	return ($isRearrange, $gapBP, $gaps, $NM, @sorted);
 	
 	
 }

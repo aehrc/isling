@@ -1,6 +1,6 @@
-#!/bon/bash
+#!/bin/bash
 
-cd ../out/summary/ucsc_bed
+cd $1
 
 #write header to each file containing name of sample and datatset
 FILES=*.bed
@@ -13,7 +13,6 @@ do
 done
 
 #combine samples for each dataset into one bed file
-module load parallel
 ls *.bed.tmp |  perl -ne '/(.+)(?=\..+\.post\.bed)/; print "$&\n"' | sort | uniq | parallel 'cat {}*.bed.tmp > {}.post.bed'
 
 #clean up temp files

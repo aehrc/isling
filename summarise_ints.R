@@ -10,14 +10,16 @@ library(writexl)
 library(tibble)
 
 #### import data ####
-data_path = "../out/"
-out_path = "../out/summary/"
-
 args <- commandArgs(trailingOnly=TRUE)
 
+data_files <- args[1:(length(args) - 1)]
+out_path <- args[length(args)]
+out_path <- file.path(out_path)
+out_path <- paste0(out_path, "/")
+
 #import all datasets
-df <- tibble::tibble(filename = args) %>% # create a data frame holding the file names
-  dplyr::mutate(integrations = purrr::map(filename, ~ readr::read_tsv(file.path(data_path, .), 
+df <- tibble::tibble(filename = data_files) %>% # create a data frame holding the file names
+  dplyr::mutate(integrations = purrr::map(filename, ~ readr::read_tsv(file.path(.), 
 						na = c("", "NA", "?"),
 						col_types = cols(Chr = col_character(), NoAmbiguousBases = col_integer(), .default =col_guess())))) %>%
   dplyr::mutate(total_count = flatten_int(map(integrations, ~nrow(.)))) 

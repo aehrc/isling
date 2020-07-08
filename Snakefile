@@ -34,7 +34,7 @@
 #### python modules ####
 
 from glob import glob
-from os import path
+from os import path, getcwd
 import pandas as pd
 import pdb
 
@@ -58,7 +58,6 @@ class InputError(Error):
 #### CONFIG FILE ####
 # supply on command line
 
-references_path = "../data/references/"
 bwa_mem_params="-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
 
 
@@ -67,48 +66,48 @@ bwa_mem_params="-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
 # supported file extensions for fastq files are .fastq and .fq, and compression with .gz and .bz2
 # supported file extensions for bam/sam files are .bam, .sam
 
+fastq_extensions = [".fq", ".fastq"]
+sam_extensions = [".sam", ".bam"]
+compression_extensions = [".gz", ".bz2"]
+
 for dataset in config:
 
+	# if input is fastq
 	if "R1_suffix" in config[dataset]:
+	
+		# check that R2_suffix is also specified
+		if "R2_suffix" not in config[dataset]:
+			raise InputError("If R1_suffix is specified (for fastq input), R2_suffix must also be specified")
+	
 		# check R1_suffix for compression and fastq file extension
-		first_extension = path.splitext(config[dataset]["R1_suffix"])[1]
-		remaining_suffix = path.splitext(config[dataset]["R1_suffix"])[0]
-		# if uncompressed
-		if first_extension == ".fq" or first_extension == ".fastq":
-			# check read2 extension is the same as read1 extension
-			if "R2_suffix" not in config[dataset]:
-				raise InputError("If R1_suffix is specified (for fastq input), R2_suffix must also be specified")
-			else:
-				second_extension = path.splitext(config[dataset]["R2_suffix"])[1]
-				if first_extension != second_extension:
-					raise InputError("R1 and R2 file extensions must match")
-		#bz2 compression
-		elif first_extension == ".bz2":
-			if "R2_suffix" not in config[dataset]:
-				raise InputError("If R1_suffix is specified (for fastq input), R2_suffix must also be specified")
-			# check read2 extension is the same as read1 extension
-			else:
-				second_extension = path.splitext(config[dataset]["R2_suffix"])[1]
-				if first_extension != second_extension:
-					raise InputError("R1 and R2 file extensions must match")
-		#gzip compression
-		elif first_extension == ".gz":
-			if "R2_suffix" not in config[dataset]:
-				raise InputError("If R1_suffix is specified (for fastq input), R2_suffix must also be specified")
-			# check read2 extension is the same as read1 extension
-			else:
-				second_extension = path.splitext(config[dataset]["R2_suffix"])[1]
-				if first_extension != second_extension:
-					raise InputError("R1 and R2 file extensions must match")
-		# unrecgonised file extension
-		else:
-			raise InputError("Only uncompressed ('.fq', '.fastq'), bzip2 ('.bz2') or gzip ('.gz') fastq files are currently supported")
+		R1_first_extension = path.splitext(config[dataset]["R1_suffix"])[1]
+		R2_first_extension = path.splitext(config[dataset]["R2_suffix"])[1]
+		
+		#bz2 or gz compression
+		if R1_first_extension in compression_extensions:
+		
+			# get second extensions
+			R1_second_extension = path.splitext(path.splitext(config[dataset]["R1_suffix"])[0])[1]
+			R2_second_extension = path.splitext(path.splitext(config[dataset]["R2_suffix"])[0])[1]
+		
+			# check that input looks like a fastq files
+			if R1_second_extension not in fastq_extensions or R2_second_extension not in fastq_extensions:
+				raise InputError("input files do not look like fastq files (extension is not '.fq' or '.fastq'")
+
+			
+		# if uncompressed, check file looks like fastq file
+		elif R1_first_extension not in fastq_extensions or R2_first_extension not in fastq_extensions:
+			raise InputError("for fastq files, input file extensions must be '.fastq' or '.fq'")
+
+	# if input is bam
 	elif "bam_suffix" in config[dataset]:
 		extension = config[dataset]["bam_suffix"]
 		if extension != ".bam" and extension != ".sam":
 			extension = path.splitext(config[dataset]["bam_suffix"])[1]
 			if extension != ".bam" and extension != ".sam":
 				raise InputError("For aligned input, only '.bam' and '.sam' files are currently supported")
+	
+	# if nether R1/R2 suffix or bam suffix specified
 	else:
 		raise InputError("Please specify either 'R1_suffix' and 'R2_suffix' or 'bam_suffix' in the config file")
 		
@@ -123,20 +122,27 @@ for dataset in config:
 rows = []
 
 for dataset in config:
-	# for fastq files
+	# get output directory
+	if "out_dir" not in config[dataset]:
+		print(f"output directory not specified for dataset {dataset}, using current directory")
+		config[dataset]["out_dir"] = getcwd()
+	else:
+		config[dataset]["out_dir"] = path.normpath(config[dataset]["out_dir"])
+	# get fastq files for input
 	if "R1_suffix" in config[dataset]:
 		suffix = config[dataset]["R1_suffix"]
+		config[dataset]['read_folder'] = path.normpath(config[dataset]['read_folder'])
 		folder = config[dataset]['read_folder']	
-		samples = [path.basename(f)[:-len(suffix)] for f in glob(path.normpath(f"{folder}/*{suffix}"))]
+		samples = [path.basename(f)[:-len(suffix)] for f in glob(f"{folder}/*{suffix}")]
 		if len(samples) == 0:
 			print(f"warning: no files found for dataset {dataset}")
-	# for bam/sam files
+	# get bam/sam files for input
 	elif "bam_suffix" in config[dataset]:
 		suffix = config[dataset]["bam_suffix"]
 		folder = config[dataset]['read_folder']	
 		config[dataset]["R1_suffix"] = "_1.fq.gz"
 		config[dataset]["R2_suffix"] = "_2.fq.gz"
-		samples = [path.basename(f)[:-len(suffix)] for f in glob(path.normpath(f"{folder}/*{suffix}"))]
+		samples = [path.basename(f)[:-len(suffix)] for f in glob(f"{folder}/*{suffix}")]
 		if len(samples) == 0:
 			print(f"warning: no files found for dataset {dataset}")
 	else:
@@ -164,9 +170,9 @@ for dataset in config:
 	
 	
 	for sample in samples:
-		rows.append((dataset, sample, config[dataset]["host_name"], config[dataset]["host_fasta"], config[dataset]["virus_name"], config[dataset]["virus_fasta"], merge, dedup, f"{dataset}+++{sample}"))
+		rows.append((dataset, sample, config[dataset]["host_name"], config[dataset]["host_fasta"], config[dataset]["virus_name"], config[dataset]["virus_fasta"], merge, dedup, f"{dataset}+++{sample}", config[dataset]['out_dir']))
 
-toDo = pd.DataFrame(rows, columns=['dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'dedup', 'unique'])
+toDo = pd.DataFrame(rows, columns=['dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'dedup', 'unique', 'outdir'])
 
 # check that every combination of 'dataset' and 'sample' is unique
 if len(set(toDo.loc[:,'unique'])) != len(toDo.loc[:,'unique']):
@@ -243,11 +249,12 @@ for dataset in config:
 #### global wildcard constraints ####
 
 wildcard_constraints:
-	virus="|".join(set(toDo.loc[:,'virus'])),
-	samp="|".join(set(toDo.loc[:,'sample'])),
-	dset="|".join(set(toDo.loc[:,'dataset'])),
-	host="|".join(set(toDo.loc[:,'host'])),
-	align_type="bwaPaired|bwaSingle"
+	virus = "|".join(set(toDo.loc[:,'virus'])),
+	samp = "|".join(set(toDo.loc[:,'sample'])),
+	dset = "|".join(set(toDo.loc[:,'dataset'])),
+	host = "|".join(set(toDo.loc[:,'host'])),
+	align_type = "bwaPaired|bwaSingle",
+	outpath = "|".join(set(toDo.loc[:,'outdir']))
 
 
 #### local rules ####
@@ -256,23 +263,21 @@ localrules: all, combine, check_bam_input_is_paired
 #### target files ####
 rule all:
 	input: 
-		#"../out/summary/count_mapped.txt",
-		expand("../out/summary/{dset}.xlsx", dset=set(toDo.loc[:,'dataset'])),
-		expand("../out/summary/ucsc_bed/{dset}.post.bed", dset=set(toDo.loc[:,'dataset'])),
-		expand("../out/{dset}/.host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.bam", 
-					zip,
-					dset=toDo.loc[:,'dataset'],
-					samp=toDo.loc[:,'sample'],
-					host=toDo.loc[:,'host'],
-					virus=toDo.loc[:,'virus']
-			   )
+		#"{outpath}/summary/count_mapped.txt",
+		expand("{outpath}/summary/{dset}.xlsx", 
+			zip, 
+			outpath = [config[dataset]['out_dir'] for dataset in config], 
+			dset = [dataset for dataset in config]),
+		expand("{outpath}/summary/ucsc_bed/{dset}.post.bed", 
+			zip, 
+			outpath = [config[dataset]['out_dir'] for dataset in config], 
+			dset = [dataset for dataset in config])
 
 #### read preprocessing ####
-
 rule check_bam_input_is_paired:
 	input: lambda wildcards: path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['bam_suffix']}")
 	output:
-		ok = temp("../out/{dset}/.reads/{samp}.tmp"),
+		ok = temp("{outpath}/{dset}/.reads/{samp}.tmp"),
 	conda:
 		"envs/bwa.yml"
 	shell:
@@ -293,11 +298,11 @@ rule check_bam_input_is_paired:
 rule bam_to_fastq:
 	input:
 		bam = lambda wildcards: path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['bam_suffix']}"),
-		ok = "../out/{dset}/.reads/{samp}.tmp"
+		ok = lambda wildcards: f"{wildcards.outpath}/{wildcards.dset}/.reads/{wildcards.samp}.tmp"
 	output:
-		sorted_bam = temp("../out/{dset}/.reads/{samp}.sorted.bam"),
-		r1 = temp("../out/{dset}/.reads/{samp}_1.fq.gz"),
-		r2 = temp("../out/{dset}/.reads/{samp}_2.fq.gz"),
+		sorted_bam = temp("{outpath}/{dset}/.reads/{samp}.sorted.bam"),
+		r1 = temp("{outpath}/{dset}/.reads/{samp}_1.fq.gz"),
+		r2 = temp("{outpath}/{dset}/.reads/{samp}_2.fq.gz"),
 	conda:
 		"envs/picard.yml"
 	shell:
@@ -313,9 +318,9 @@ def get_for_seqprep(wildcards, read_type):
 	# get true/True values for dedup
 	if 'bam_suffix' in config[wildcards.dset]:
 		if read_type == "1":
-			return "../out/{dset}/.reads/{samp}_1.fq.gz"
+			return "{outpath}/{dset}/.reads/{samp}_1.fq.gz"
 		else:
-			return "../out/{dset}/.reads/{samp}_2.fq.gz"
+			return "{outpath}/{dset}/.reads/{samp}_2.fq.gz"
 	else:
 		if read_type == "1":
 			return path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['R1_suffix']}")
@@ -329,10 +334,10 @@ rule seqPrep:
 		r1 = lambda wildcards: get_for_seqprep(wildcards, "1"),
 		r2 = lambda wildcards: get_for_seqprep(wildcards, "2")
 	output:
-		merged = "../out/{dset}/.merged_reads/{samp}.SeqPrep_merged.fastq.gz",
-		proc_r1 = "../out/{dset}/.merged_reads/{samp}.1.fastq.gz",
-		proc_r2 = "../out/{dset}/.merged_reads/{samp}.2.fastq.gz",
-		all = "../out/{dset}/.merged_reads/{samp}.all.fastq.gz"
+		merged = temp("{outpath}/{dset}/.merged_reads/{samp}.SeqPrep_merged.fastq.gz"),
+		proc_r1 = temp("{outpath}/{dset}/.merged_reads/{samp}.1.fastq.gz"),
+		proc_r2 = temp("{outpath}/{dset}/.merged_reads/{samp}.2.fastq.gz"),
+		all = temp("{outpath}/{dset}/.merged_reads/{samp}.all.fastq.gz")
 	conda:	
 		"envs/seqprep.yml"
 	params:
@@ -361,9 +366,9 @@ rule combine:
 		r1 = lambda wildcards: get_for_seqprep(wildcards, "1"),
 		r2 = lambda wildcards: get_for_seqprep(wildcards, "2")
 	output:
-		proc_r1 = "../out/{dset}/.combined_reads/{samp}.1.fastq.gz",
-		proc_r2 = "../out/{dset}/.combined_reads/{samp}.2.fastq.gz",
-		all = "../out/{dset}/.combined_reads/{samp}.all.fastq.gz"
+		proc_r1 = temp("{outpath}/{dset}/.combined_reads/{samp}.1.fastq.gz"),
+		proc_r2 = temp("{outpath}/{dset}/.combined_reads/{samp}.2.fastq.gz"),
+		all = temp("{outpath}/{dset}/.combined_reads/{samp}.all.fastq.gz")
 	params:
 		test = lambda wildcards, input: print(get_compression(input)),
 		cat = lambda wildcards, input: get_compression(input),
@@ -383,7 +388,7 @@ def get_for_align(wildcards, read_type):
 		folder = ".merged_reads"
 	else:
 		folder = ".combined_reads"
-	return f"../out/{wildcards.dset}/{folder}/{wildcards.samp}.{read_type}.fastq.gz"
+	return f"{wildcards.outpath}/{wildcards.dset}/{folder}/{wildcards.samp}.{read_type}.fastq.gz"
 
 
 #### alignments ####
@@ -392,7 +397,7 @@ rule index:
 	input:
 		lambda wildcards: ref_names[wildcards.genome]
 	output:
-		expand("../out/.references/{genome}/{genome}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True)
+		expand("{outpath}/.references/{genome}/{genome}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True)
 	conda: 
 		"envs/bwa.yml"
 	params:
@@ -403,10 +408,10 @@ rule index:
 	
 rule align_bwa_virus_single:
 	input:
-		idx = expand("../out/.references/{virus}/{virus}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
+		idx = expand("{outpath}/.references/{virus}/{virus}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
 		all = lambda wildcards: get_for_align(wildcards, "all"),
 	output:
-		sam = temp("../out/{dset}/.virus_aligned/{samp}.{virus}.bwaSingle.sam")
+		sam = temp("{outpath}/{dset}/.virus_aligned/{samp}.{virus}.bwaSingle.sam")
 	params:
 		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
 		mapping = bwa_mem_params
@@ -420,11 +425,11 @@ rule align_bwa_virus_single:
 
 rule align_bwa_virus_paired:
 	input:
-		idx = expand("../out/.references/{virus}/{virus}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
+		idx = expand("{outpath}/.references/{virus}/{virus}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
 		r1 = lambda wildcards: get_for_align(wildcards, "1"),
 		r2 = lambda wildcards: get_for_align(wildcards, "2"),
 	output:
-		sam = temp("../out/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.sam")
+		sam = temp("{outpath}/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.sam")
 	params:
 		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
 		mapping = bwa_mem_params
@@ -477,7 +482,7 @@ rule extract_vAligned_single:
 	input:
 		aligned = lambda wildcards: get_sam(wildcards, "single", "virus"),
 	output:
-		sam = temp("../out/{dset}/.virus_aligned/{samp}.{virus}.bwaSingle.mapped.sam"),
+		sam = temp("{outpath}/{dset}/.virus_aligned/{samp}.{virus}.bwaSingle.mapped.sam"),
 	conda:
 		"envs/bwa.yml"
 	shell:
@@ -489,10 +494,10 @@ rule extract_vAligned_paired:
 	input:
 		aligned = lambda wildcards: get_sam(wildcards, "paired", "virus")
 	output:
-		pvBam_readMap_mateUnmap = temp("../out/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.L.bam"),
-		pvBam_readUnmap_mateMap = temp("../out/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.R.bam"),
-		pvBam_bothMapped = temp("../out/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.B.bam"),
-		sam = temp("../out/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam"),
+		pvBam_readMap_mateUnmap = temp("{outpath}/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.L.bam"),
+		pvBam_readUnmap_mateMap = temp("{outpath}/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.R.bam"),
+		pvBam_bothMapped = temp("{outpath}/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.B.bam"),
+		sam = temp("{outpath}/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam"),
 	conda:
 		"envs/bwa.yml"
 	shell:
@@ -508,7 +513,7 @@ rule extract_to_fastq_single:
 	input:
 		sam = rules.extract_vAligned_single.output.sam
 	output:
-		fastq = temp("../out/{dset}/.virus_aligned/{samp}.bwaSingle.mappedTo{virus}.fastq.gz")
+		fastq = temp("{outpath}/{dset}/.virus_aligned/{samp}.bwaSingle.mappedTo{virus}.fastq.gz")
 	conda:
 		"envs/picard.yml"
 	shell:
@@ -520,8 +525,8 @@ rule extract_to_fastq_paired:
 	input:
 		sam = rules.extract_vAligned_paired.output.sam
 	output:
-		fastq1 = temp("../out/{dset}/.virus_aligned/{samp}.bwaSingle.mappedTo{virus}.1.fastq.gz"),
-		fastq2 = temp("../out/{dset}/.virus_aligned/{samp}.bwaSingle.mappedTo{virus}.2.fastq.gz")
+		fastq1 = temp("{outpath}/{dset}/.virus_aligned/{samp}.bwaSingle.mappedTo{virus}.1.fastq.gz"),
+		fastq2 = temp("{outpath}/{dset}/.virus_aligned/{samp}.bwaSingle.mappedTo{virus}.2.fastq.gz")
 	conda:
 		"envs/picard.yml"
 	shell:
@@ -531,10 +536,10 @@ rule extract_to_fastq_paired:
 
 rule align_bwa_host_single:
 	input:	
-		idx = expand("../out/.references/{host}/{host}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
+		idx = expand("{outpath}/.references/{host}/{host}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
 		all = rules.extract_to_fastq_single.output.fastq
 	output:
-		sam = temp("../out/{dset}/.host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam"),
+		sam = temp("{outpath}/{dset}/.host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam"),
 	conda: 
 		"envs/bwa.yml"
 	params:
@@ -548,11 +553,11 @@ rule align_bwa_host_single:
 		
 rule align_bwa_host_paired:
 	input:	
-		idx = expand("../out/.references/{host}/{host}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
+		idx = expand("{outpath}/.references/{host}/{host}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
 		r1 = rules.extract_to_fastq_paired.output[0],
 		r2 = rules.extract_to_fastq_paired.output[1]
 	output:
-		sam = temp("../out/{dset}/.host_aligned/{samp}.{host}.readsFrom{virus}.bwaPaired.sam"),
+		sam = temp("{outpath}/{dset}/.host_aligned/{samp}.{host}.readsFrom{virus}.bwaPaired.sam"),
 	conda: 
 		"envs/bwa.yml"
 	params:
@@ -568,10 +573,10 @@ rule align_bwa_host_paired:
 
 rule convert_to_bam:
 	input:
-		"../out/{dset}/{folder}/{alignment}.sam"
+		"{outpath}/{dset}/{folder}/{alignment}.sam"
 	output:
-		bam = "../out/{dset}/{folder}/{alignment}.bam",
-		bai = "../out/{dset}/{folder}/{alignment}.bam.bai"
+		bam = "{outpath}/{dset}/{folder}/{alignment}.bam",
+		bai = "{outpath}/{dset}/{folder}/{alignment}.bam.bai"
 	params:
 		tmp_prefix = lambda wildcards, input: path.splitext(input[0])[0]
 	wildcard_constraints:
@@ -587,28 +592,26 @@ rule convert_to_bam:
 		
 rule markdup:
 	input:
-		sam = "../out/{dset}/{folder}/{alignment}.sam"
+		sam = "{outpath}/{dset}/{folder}/{alignment}.sam"
 	output:
-		sorted =  temp("../out/{dset}/{folder}/{alignment}.qsort.bam"),
-		fixmate = temp("../out/{dset}/{folder}/{alignment}.fixmate.bam"),
-		markdup = temp("../out/{dset}/{folder}/{alignment}.dups.sam"),
-		metrics = temp("../out/{dset}/{folder}/{alignment}.dups.txt")
+		fixmate = temp("{outpath}/{dset}/{folder}/{alignment}.fixmate.bam"),
+		markdup = "{outpath}/{dset}/{folder}/{alignment}.dups.sam",
+		metrics = temp("{outpath}/{dset}/{folder}/{alignment}.dups.txt")
 	wildcard_constraints:
 		folder = "\.host_aligned|\.virus_aligned"
 	conda: 
 		"envs/picard.yml"	
 	shell:
 		"""
-		picard SortSam I={input.sam} O={output.sorted} SORT_ORDER=queryname
-		picard FixMateInformation I={output.sorted} O={output.fixmate} ADD_MATE_CIGAR=true 
+		picard FixMateInformation I={input.sam} O={output.fixmate} ADD_MATE_CIGAR=true SORT_ORDER=queryname
 		picard MarkDuplicates I={output.fixmate} O={output.markdup} METRICS_FILE={output.metrics}
 		"""
 		
 rule rmdup:
 	input:
-		sam = "../out/{dset}/{folder}/{alignment}.dups.sam"	
+		sam = "{outpath}/{dset}/{folder}/{alignment}.dups.sam"	
 	output:
-		sam = temp("../out/{dset}/{folder}/{alignment}.rmdup.sam")	
+		sam = temp("{outpath}/{dset}/{folder}/{alignment}.rmdup.sam")	
 	wildcard_constraints:
 		folder = "\.host_aligned|\.virus_aligned"
 	conda: 
@@ -626,7 +629,7 @@ rule run_soft:
 		host = lambda wildcards: get_sam(wildcards, "single", "host"),
 		virus = rules.extract_vAligned_single.output[0],
 	output:
-		soft = temp("../out/{dset}/ints/{samp}.{host}.{virus}.soft.txt"),
+		soft = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.soft.txt"),
 	shell:
 		"""
 		perl -I. ./softClip.pl --viral {input.virus} --human {input.host} --output {output.soft} --tol 3
@@ -637,7 +640,7 @@ rule run_short:
 		host = lambda wildcards: get_sam(wildcards, "single", "host"),
 		virus = rules.extract_vAligned_single.output[0],
 	output:
-		short = temp("../out/{dset}/ints/{samp}.{host}.{virus}.short.txt"),
+		short = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.short.txt"),
 	shell:
 		"""
 		perl -I. ./short.pl --viral {input.virus} --human {input.host} --output {output.short} --tol 3
@@ -648,7 +651,7 @@ rule run_discordant:
 		host = lambda wildcards: get_sam(wildcards, "paired", "host"),
 		virus = rules.extract_vAligned_paired.output[3],
 	output:
-		discord = temp("../out/{dset}/ints/{samp}.{host}.{virus}.discordant.txt"),
+		discord = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.discordant.txt"),
 	shell:
 		"""
 		perl -I. ./discordant.pl --viral {input.virus} --human {input.host} --output {output.discord} --tol 3
@@ -660,8 +663,8 @@ rule combine_ints:
 		short = rules.run_short.output,
 		discordant = rules.run_discordant.output
 	output:
-		temp =  temp("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp"),
-		all = "../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
+		temp =  temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp"),
+		all = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
 	shell:
 		"""
 		awk 'FNR>1 || NR==1' {input} > {output.all}
@@ -699,7 +702,7 @@ rule sortbed:
 #this rule (post) sometimes causes issues with conda. The error is usually something to do with ldpaths:
 
 #Activating conda environment: /scratch1/sco305/intvi_cmri/intvi_pipeline/.snakemake/conda/586e76e5
-#/scratch1/sco305/intvi_cmri/intvi_pipeline/.snakemake/conda/586e76e5/lib/R/bin/R: line 238: /scratch1/sco305/intvi_cmri/#intvi_pipeline/.snakemake/conda/586e76e5/lib/R/etc/ldpaths: No such file or directory
+#/scratch1/sco305/intvi_cmri/intvi_pipeline/.snakemake/conda/586e76e5/lib/R/bin/R: line 238: /scratch1/sco305/intvi_cmri/#intvi_pipeline/.snakemake/conda/586e76e5/lib/R/etc/ldoutpaths: No such file or directory
 
 # however, sometimes this rule runs just fine.
 
@@ -709,10 +712,10 @@ rule sortbed:
 
 rule post:
 	input:
-		"../out/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
+		"{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
 		rules.sortbed.output
 	output:
-		"../out/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt"
+		"{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt"
 	conda:
 		"envs/rscripts.yml"
 	params:
@@ -721,36 +724,43 @@ rule post:
 		"""
 		Rscript post/postprocess.R {params}
 		"""
-
 	
 rule summarise:
 	input:
-		lambda wildcards: [f"../out/{wildcards.dset}/ints/{samp}.{host}.{virus}.integrations.post.txt" for samp, host, virus
+		lambda wildcards: [f"{wildcards.outpath}/{wildcards.dset}/ints/{samp}.{host}.{virus}.integrations.post.txt" for samp, host, virus
 			in zip(toDo.loc[toDo['dataset'] == wildcards.dset,'sample'], 
 					toDo.loc[toDo['dataset'] == wildcards.dset,'host'], 
 					toDo.loc[toDo['dataset'] == wildcards.dset,'virus'])]
 	output:
-		"../out/summary/{dset}.xlsx",
-		"../out/summary/{dset}_annotated.xlsx"
+		"{outpath}/summary/{dset}.xlsx",
+		"{outpath}/summary/{dset}_annotated.xlsx"
 	conda:
 		"envs/rscripts.yml"
+	params:
+		outdir = lambda wildcards, output: path.dirname(output[0])
 	shell:
-		"Rscript summarise_ints.R {input}"
+		"Rscript summarise_ints.R {input} {params.outdir}"
+
+rule write_bed:
+	input:
+		
 
 rule ucsc_bed:
 	input:
-		expand("../out/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt", 
-					zip, 
-					dset = toDo.loc[:,'dataset'], 
-					samp = toDo.loc[:,'sample'], 
-					host = toDo.loc[:,'host'], 
-					virus = toDo.loc[:,'virus']),
+		lambda wildcards: [f"{wildcards.outpath}/{wildcards.dset}/ints/{samp}.{host}.{virus}.integrations.post.txt" for samp, host, virus
+			in zip(toDo.loc[toDo['dataset'] == wildcards.dset,'sample'], 
+					toDo.loc[toDo['dataset'] == wildcards.dset,'host'], 
+					toDo.loc[toDo['dataset'] == wildcards.dset,'virus'])]
 	output:
-		expand("../out/summary/ucsc_bed/{dset}.post.bed", dset = set(toDo.loc[:,'dataset'])),
+		"{outpath}/summary/ucsc_bed/{dset}.post.bed"
+	params:
+		outdir = lambda wildcards, output: f"{path.dirname(output[0])}/{wildcards.dset}"
 	conda:
 		"envs/rscripts.yml"
 	shell:
 		"""
-		Rscript writeBed.R {input}
-		bash -e format_ucsc.sh
+		Rscript writeBed.R {input} {params.outdir}
+		bash -e format_ucsc.sh {params.outdir}
+		mv {params.outdir}/*bed {params.outdir}/..
+		rmdir {params.outdir}
 		"""
