@@ -1,0 +1,165 @@
+#### import modules ####
+from glob import glob
+from os import path, getcwd
+import pandas as pd
+from snakemake_rules import make_reference_dict
+
+
+#### custom errors ####
+
+class Error(Exception):
+    """Base class for exceptions in this module."""
+    pass
+
+class InputError(Error):
+    """Exception raised for errors in the input.
+
+    Attributes:
+        message -- explanation of the error
+    """
+
+    def __init__(self, message):
+        self.message = message
+
+
+#### defaults ####
+bwa_mem_params="-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+
+
+#### check file extensions ####
+
+# supported file extensions for fastq files are .fastq and .fq, and compression with .gz and .bz2
+# supported file extensions for bam/sam files are .bam, .sam
+
+fastq_extensions = [".fq", ".fastq"]
+sam_extensions = [".sam", ".bam"]
+compression_extensions = [".gz", ".bz2"]
+
+def check_input_files(config):
+
+	for dataset in config:
+
+		# if input is fastq
+		if "R1_suffix" in config[dataset]:
+	
+			# check that R2_suffix is also specified
+			if "R2_suffix" not in config[dataset]:
+				raise InputError("If R1_suffix is specified (for fastq input), R2_suffix must also be specified")
+	
+			# check R1_suffix for compression and fastq file extension
+			R1_first_extension = path.splitext(config[dataset]["R1_suffix"])[1]
+			R2_first_extension = path.splitext(config[dataset]["R2_suffix"])[1]
+		
+			#bz2 or gz compression
+			if R1_first_extension in compression_extensions:
+		
+				# get second extensions
+				R1_second_extension = path.splitext(path.splitext(config[dataset]["R1_suffix"])[0])[1]
+				R2_second_extension = path.splitext(path.splitext(config[dataset]["R2_suffix"])[0])[1]
+		
+				# check that input looks like a fastq files
+				if R1_second_extension not in fastq_extensions or R2_second_extension not in fastq_extensions:
+					raise InputError("input files do not look like fastq files (extension is not '.fq' or '.fastq'")
+
+			
+			# if uncompressed, check file looks like fastq file
+			elif R1_first_extension not in fastq_extensions or R2_first_extension not in fastq_extensions:
+				raise InputError("for fastq files, input file extensions must be '.fastq' or '.fq'")
+
+		# if input is bam
+		elif "bam_suffix" in config[dataset]:
+			extension = config[dataset]["bam_suffix"]
+			if extension != ".bam" and extension != ".sam":
+				extension = path.splitext(config[dataset]["bam_suffix"])[1]
+				if extension != ".bam" and extension != ".sam":
+					raise InputError("For aligned input, only '.bam' and '.sam' files are currently supported")
+	
+		# if nether R1/R2 suffix or bam suffix specified
+		else:
+			raise InputError("Please specify either 'R1_suffix' and 'R2_suffix' or 'bam_suffix' in the config file")
+		
+
+#### get information for wildcards ####
+
+# get the name of each sample in each dataset, and save information about 
+# how to process it in a dataframe
+
+def make_df(config):
+
+	rows = []
+
+	for dataset in config:
+		# get output directory
+		if "out_dir" not in config[dataset]:
+			print(f"output directory not specified for dataset {dataset}, using current directory")
+			config[dataset]["out_dir"] = getcwd()
+		else:
+			config[dataset]["out_dir"] = path.normpath(config[dataset]["out_dir"])
+		# get fastq files for input
+		if "R1_suffix" in config[dataset]:
+			suffix = config[dataset]["R1_suffix"]
+			config[dataset]['read_folder'] = path.normpath(config[dataset]['read_folder'])
+			folder = config[dataset]['read_folder']	
+			samples = [path.basename(f)[:-len(suffix)] for f in glob(f"{folder}/*{suffix}")]
+			if len(samples) == 0:
+				print(f"warning: no files found for dataset {dataset}")
+		# get bam/sam files for input
+		elif "bam_suffix" in config[dataset]:
+			suffix = config[dataset]["bam_suffix"]
+			folder = config[dataset]['read_folder']	
+			config[dataset]["R1_suffix"] = "_1.fq.gz"
+			config[dataset]["R2_suffix"] = "_2.fq.gz"
+			samples = [path.basename(f)[:-len(suffix)] for f in glob(f"{folder}/*{suffix}")]
+			if len(samples) == 0:
+				print(f"warning: no files found for dataset {dataset}")
+		else:
+			raise InputError(f"please specify either bam_suffix or R1_suffix and R2_suffix for dataset {dataset}")
+			
+		# figure out if 'dedup' and 'merge' are true or false
+		if isinstance(config[dataset]["dedup"], bool):
+			dedup = int(config[dataset]["dedup"])
+		elif isinstance(config[dataset]["dedup"], str):
+			if config[dataset]["dedup"].lower() == "true":
+				dedup = 1
+			else:
+				dedup = 0
+		else:
+			raise InputError(f"Please specify True or False for 'dedup' in dataset {dataset}")
+		if isinstance(config[dataset]["merge"], bool):
+			merge = int(config[dataset]["merge"])
+		elif isinstance(config[dataset]["merge"], str):
+			if config[dataset]["merge"].lower() == "true":
+				merge = 1
+			else:
+				merge = 0
+		else:
+			raise InputError(f"Please specify True or False for 'merge' in dataset {dataset}")
+	
+	
+		for sample in samples:
+			rows.append((dataset, sample, config[dataset]["host_name"], config[dataset]["host_fasta"], config[dataset]["virus_name"], config[dataset]["virus_fasta"], merge, dedup, f"{dataset}+++{sample}", config[dataset]['out_dir'], bwa_mem_params))
+
+	toDo = pd.DataFrame(rows, columns=['dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'dedup', 'unique', 'outdir', 'bwa_mem_params'])
+	
+	# do checks on dataframe
+	check_dataset_sample_unique(toDo)
+	
+	ref_names = make_reference_dict(config)
+	check_fastas_unique(toDo, ref_names)
+	
+	return toDo
+
+
+def check_dataset_sample_unique(toDo):
+	# check that every combination of 'dataset' and 'sample' is unique
+	if len(set(toDo.loc[:,'unique'])) != len(toDo.loc[:,'unique']):
+		raise InputError("Every combination of 'dataset' and 'sample' must be unique! Check inputs and try again")
+
+def check_fastas_unique(toDo, ref_names):
+	# check that each host/virus name refers to only one fasta
+	for i, virus_name in enumerate(toDo.loc[:,'virus']):
+		if toDo.loc[i,'virus_fasta'] != ref_names[virus_name]:
+			raise InputError(f"Virus {virus_name} is used as a name in multiple datasets for different fasta files.  Please modify your configfile so that each unique virus/host name only refers to one fasta file")
+	for i, host_name in enumerate(toDo.loc[:,'host']):
+		if toDo.loc[i,'host_fasta'] != ref_names[host_name]:
+			raise InputError(f"Host {host_name} is used as a name in multiple datasets for different fasta files.  Please modify your configfile so that each unique virus/host name only refers to one fasta file")
