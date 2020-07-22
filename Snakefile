@@ -47,6 +47,7 @@ from snakemake_rules import make_post_args
 # construct dataframe with wildcards and other information about how to run analysis
 
 toDo = make_df(config)
+toDo.to_csv("analysis.tsv", sep = "\t")
 
 # construct dictionary with reference names as keys and reference fastas as values
 
