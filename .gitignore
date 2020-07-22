@@ -17,3 +17,4 @@ benchmarking/example.bam
 benchmarking/notebooks/Trace.ipynb
 Trace.ipynb
 *.Rproj
+snakemake_rules/__pycache__
