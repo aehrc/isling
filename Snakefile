@@ -271,15 +271,48 @@ rule all:
 		expand("{outpath}/summary/ucsc_bed/{dset}.post.bed", 
 			zip, 
 			outpath = [config[dataset]['out_dir'] for dataset in config], 
-			dset = [dataset for dataset in config])
+			dset = [dataset for dataset in config]),
+		expand("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaSingle.mapped.bam",
+			zip,
+			outpath = toDo.loc[:,'outdir'],
+			dset = toDo.loc[:,'dataset'],
+			samp = toDo.loc[:,'sample'],
+			virus = toDo.loc[:,'virus']
+			),
+		expand("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.bam",
+			zip,
+			outpath = toDo.loc[:,'outdir'],
+			dset = toDo.loc[:,'dataset'],
+			samp = toDo.loc[:,'sample'],
+			virus = toDo.loc[:,'virus']
+			),
+		expand("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaPaired.dups.bam",
+			zip,
+			outpath = toDo.loc[:,'outdir'],
+			dset = toDo.loc[:,'dataset'],
+			samp = toDo.loc[:,'sample'],
+			virus = toDo.loc[:,'virus'],
+			host = toDo.loc[:,'host']
+			),
+		expand("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.dups.bam",
+			zip,
+			outpath = toDo.loc[:,'outdir'],
+			dset = toDo.loc[:,'dataset'],
+			samp = toDo.loc[:,'sample'],
+			virus = toDo.loc[:,'virus'],
+			host = toDo.loc[:,'host']
+			)
+			
 
 #### read preprocessing ####
 rule check_bam_input_is_paired:
 	input: lambda wildcards: path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['bam_suffix']}")
 	output:
-		ok = temp("{outpath}/{dset}/.reads/{samp}.tmp"),
+		ok = temp("{outpath}/{dset}/reads/{samp}.tmp"),
 	conda:
 		"envs/bwa.yml"
+	container:
+		"docker://szsctt/bwa:1"
 	shell:
 		"""
 		FWD=$(samtools view -c -f 0x40 {input})
@@ -298,13 +331,15 @@ rule check_bam_input_is_paired:
 rule bam_to_fastq:
 	input:
 		bam = lambda wildcards: path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['bam_suffix']}"),
-		ok = lambda wildcards: f"{wildcards.outpath}/{wildcards.dset}/.reads/{wildcards.samp}.tmp"
+		ok = lambda wildcards: f"{wildcards.outpath}/{wildcards.dset}/reads/{wildcards.samp}.tmp"
 	output:
-		sorted_bam = temp("{outpath}/{dset}/.reads/{samp}.sorted.bam"),
-		r1 = temp("{outpath}/{dset}/.reads/{samp}_1.fq.gz"),
-		r2 = temp("{outpath}/{dset}/.reads/{samp}_2.fq.gz"),
+		sorted_bam = temp("{outpath}/{dset}/reads/{samp}.sorted.bam"),
+		r1 = temp("{outpath}/{dset}/reads/{samp}_1.fq.gz"),
+		r2 = temp("{outpath}/{dset}/reads/{samp}_2.fq.gz"),
 	conda:
 		"envs/picard.yml"
+	container:
+		"docker://szsctt/picard:1"
 	shell:
 		"""
 		picard SortSam I={input.bam} O={output.sorted_bam} SORT_ORDER=queryname
@@ -318,9 +353,9 @@ def get_for_seqprep(wildcards, read_type):
 	# get true/True values for dedup
 	if 'bam_suffix' in config[wildcards.dset]:
 		if read_type == "1":
-			return "{outpath}/{dset}/.reads/{samp}_1.fq.gz"
+			return "{outpath}/{dset}/reads/{samp}_1.fq.gz"
 		else:
-			return "{outpath}/{dset}/.reads/{samp}_2.fq.gz"
+			return "{outpath}/{dset}/reads/{samp}_2.fq.gz"
 	else:
 		if read_type == "1":
 			return path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['R1_suffix']}")
@@ -334,12 +369,14 @@ rule seqPrep:
 		r1 = lambda wildcards: get_for_seqprep(wildcards, "1"),
 		r2 = lambda wildcards: get_for_seqprep(wildcards, "2")
 	output:
-		merged = temp("{outpath}/{dset}/.merged_reads/{samp}.SeqPrep_merged.fastq.gz"),
-		proc_r1 = temp("{outpath}/{dset}/.merged_reads/{samp}.1.fastq.gz"),
-		proc_r2 = temp("{outpath}/{dset}/.merged_reads/{samp}.2.fastq.gz"),
-		all = temp("{outpath}/{dset}/.merged_reads/{samp}.all.fastq.gz")
+		merged = temp("{outpath}/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz"),
+		proc_r1 = temp("{outpath}/{dset}/merged_reads/{samp}.1.fastq.gz"),
+		proc_r2 = temp("{outpath}/{dset}/merged_reads/{samp}.2.fastq.gz"),
+		all = temp("{outpath}/{dset}/merged_reads/{samp}.all.fastq.gz")
 	conda:	
 		"envs/seqprep.yml"
+	container:
+		"docker://szsctt/seqprep:1"
 	params:
 		A = lambda wildcards: config[wildcards.dset]["read1-adapt"],
 		B = lambda wildcards: config[wildcards.dset]["read2-adapt"]
@@ -366,13 +403,14 @@ rule combine:
 		r1 = lambda wildcards: get_for_seqprep(wildcards, "1"),
 		r2 = lambda wildcards: get_for_seqprep(wildcards, "2")
 	output:
-		proc_r1 = temp("{outpath}/{dset}/.combined_reads/{samp}.1.fastq.gz"),
-		proc_r2 = temp("{outpath}/{dset}/.combined_reads/{samp}.2.fastq.gz"),
-		all = temp("{outpath}/{dset}/.combined_reads/{samp}.all.fastq.gz")
+		proc_r1 = temp("{outpath}/{dset}/combined_reads/{samp}.1.fastq.gz"),
+		proc_r2 = temp("{outpath}/{dset}/combined_reads/{samp}.2.fastq.gz"),
+		all = temp("{outpath}/{dset}/combined_reads/{samp}.all.fastq.gz")
 	params:
 		test = lambda wildcards, input: print(get_compression(input)),
 		cat = lambda wildcards, input: get_compression(input),
-		
+	container:
+		"docker://ubuntu:18.04"	
 	shell:
 		"""
 		{params.cat} {input.r1} | gzip > {output.proc_r1}
@@ -385,9 +423,9 @@ def get_for_align(wildcards, read_type):
 	row_idx = list(toDo.loc[:,'unique']).index(f"{wildcards.dset}+++{wildcards.samp}")
 	merge_check = bool(toDo.loc[toDo.index[row_idx], 'merge'])
 	if merge_check is True:
-		folder = ".merged_reads"
+		folder = "merged_reads"
 	else:
-		folder = ".combined_reads"
+		folder = "combined_reads"
 	return f"{wildcards.outpath}/{wildcards.dset}/{folder}/{wildcards.samp}.{read_type}.fastq.gz"
 
 
@@ -397,9 +435,11 @@ rule index:
 	input:
 		lambda wildcards: ref_names[wildcards.genome]
 	output:
-		expand("{outpath}/.references/{genome}/{genome}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True)
+		expand("{outpath}/references/{genome}/{genome}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True)
 	conda: 
 		"envs/bwa.yml"
+	container:
+		"docker://szsctt/bwa:1"
 	params:
 		prefix = lambda wildcards, output: path.splitext(output[0])[0]
 	shell:
@@ -408,15 +448,17 @@ rule index:
 	
 rule align_bwa_virus_single:
 	input:
-		idx = expand("{outpath}/.references/{virus}/{virus}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
+		idx = expand("{outpath}/references/{virus}/{virus}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
 		all = lambda wildcards: get_for_align(wildcards, "all"),
 	output:
-		sam = temp("{outpath}/{dset}/.virus_aligned/{samp}.{virus}.bwaSingle.sam")
+		sam = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaSingle.sam")
 	params:
 		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
 		mapping = bwa_mem_params
 	conda:
 		"envs/bwa.yml"
+	container:
+		"docker://szsctt/bwa:1"
 	threads: 5
 	shell:
 		"""
@@ -425,16 +467,18 @@ rule align_bwa_virus_single:
 
 rule align_bwa_virus_paired:
 	input:
-		idx = expand("{outpath}/.references/{virus}/{virus}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
+		idx = expand("{outpath}/references/{virus}/{virus}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
 		r1 = lambda wildcards: get_for_align(wildcards, "1"),
 		r2 = lambda wildcards: get_for_align(wildcards, "2"),
 	output:
-		sam = temp("{outpath}/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.sam")
+		sam = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam")
 	params:
 		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
 		mapping = bwa_mem_params
 	conda:
 		"envs/bwa.yml"
+	container:
+		"docker://szsctt/bwa:1"
 	threads: 5
 	shell:
 		"""
@@ -482,9 +526,11 @@ rule extract_vAligned_single:
 	input:
 		aligned = lambda wildcards: get_sam(wildcards, "single", "virus"),
 	output:
-		sam = temp("{outpath}/{dset}/.virus_aligned/{samp}.{virus}.bwaSingle.mapped.sam"),
+		sam = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaSingle.mapped.sam"),
 	conda:
 		"envs/bwa.yml"
+	container:
+		"docker://szsctt/bwa:1"
 	shell:
 		"""
 		samtools view -h -F 0x4 -F 0x800 -o - {input.aligned} | samtools sort - -n -o {output.sam}
@@ -494,12 +540,14 @@ rule extract_vAligned_paired:
 	input:
 		aligned = lambda wildcards: get_sam(wildcards, "paired", "virus")
 	output:
-		pvBam_readMap_mateUnmap = temp("{outpath}/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.L.bam"),
-		pvBam_readUnmap_mateMap = temp("{outpath}/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.R.bam"),
-		pvBam_bothMapped = temp("{outpath}/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.B.bam"),
-		sam = temp("{outpath}/{dset}/.virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam"),
+		pvBam_readMap_mateUnmap = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.L.bam"),
+		pvBam_readUnmap_mateMap = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.R.bam"),
+		pvBam_bothMapped = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.B.bam"),
+		sam = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam"),
 	conda:
 		"envs/bwa.yml"
+	container:
+		"docker://szsctt/bwa:1"
 	shell:
 		"""
 		samtools view -hb -F 0x4 -f 0x8 -F 0x800 -o {output.pvBam_readMap_mateUnmap} {input.aligned}
@@ -513,9 +561,11 @@ rule extract_to_fastq_single:
 	input:
 		sam = rules.extract_vAligned_single.output.sam
 	output:
-		fastq = temp("{outpath}/{dset}/.virus_aligned/{samp}.bwaSingle.mappedTo{virus}.fastq.gz")
+		fastq = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaSingle.mappedTo{virus}.fastq.gz")
 	conda:
 		"envs/picard.yml"
+	container:
+		"docker://szsctt/picard:1"
 	shell:
 		"""
 		picard SamToFastq I={input.sam} FASTQ={output.fastq}
@@ -525,10 +575,12 @@ rule extract_to_fastq_paired:
 	input:
 		sam = rules.extract_vAligned_paired.output.sam
 	output:
-		fastq1 = temp("{outpath}/{dset}/.virus_aligned/{samp}.bwaSingle.mappedTo{virus}.1.fastq.gz"),
-		fastq2 = temp("{outpath}/{dset}/.virus_aligned/{samp}.bwaSingle.mappedTo{virus}.2.fastq.gz")
+		fastq1 = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaSingle.mappedTo{virus}.1.fastq.gz"),
+		fastq2 = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaSingle.mappedTo{virus}.2.fastq.gz")
 	conda:
 		"envs/picard.yml"
+	container:
+		"docker://szsctt/picard:1"
 	shell:
 		"""
 		picard SamToFastq I={input.sam} FASTQ={output.fastq1} SECOND_END_FASTQ={output.fastq2}
@@ -536,12 +588,14 @@ rule extract_to_fastq_paired:
 
 rule align_bwa_host_single:
 	input:	
-		idx = expand("{outpath}/.references/{host}/{host}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
+		idx = expand("{outpath}/references/{host}/{host}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
 		all = rules.extract_to_fastq_single.output.fastq
 	output:
-		sam = temp("{outpath}/{dset}/.host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam"),
+		sam = temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam"),
 	conda: 
 		"envs/bwa.yml"
+	container:
+		"docker://szsctt/bwa:1"
 	params:
 		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
 		mapping = bwa_mem_params
@@ -553,13 +607,15 @@ rule align_bwa_host_single:
 		
 rule align_bwa_host_paired:
 	input:	
-		idx = expand("{outpath}/.references/{host}/{host}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
+		idx = expand("{outpath}/references/{host}/{host}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
 		r1 = rules.extract_to_fastq_paired.output[0],
 		r2 = rules.extract_to_fastq_paired.output[1]
 	output:
-		sam = temp("{outpath}/{dset}/.host_aligned/{samp}.{host}.readsFrom{virus}.bwaPaired.sam"),
+		sam = temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaPaired.sam"),
 	conda: 
 		"envs/bwa.yml"
+	container:
+		"docker://szsctt/bwa:1"
 	params:
 		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
 		mapping = bwa_mem_params
@@ -580,9 +636,11 @@ rule convert_to_bam:
 	params:
 		tmp_prefix = lambda wildcards, input: path.splitext(input[0])[0]
 	wildcard_constraints:
-		folder = "\.host_aligned|\.virus_aligned"
+		folder = "host_aligned|virus_aligned"
 	conda: 
 		"envs/bwa.yml"	
+	container:
+		"docker://szsctt/bwa:1"
 	shell:
 		"""
 		rm -f {params.tmp_prefix}*tmp*
@@ -598,9 +656,11 @@ rule markdup:
 		markdup = "{outpath}/{dset}/{folder}/{alignment}.dups.sam",
 		metrics = temp("{outpath}/{dset}/{folder}/{alignment}.dups.txt")
 	wildcard_constraints:
-		folder = "\.host_aligned|\.virus_aligned"
+		folder = "host_aligned|virus_aligned"
 	conda: 
 		"envs/picard.yml"	
+	container:
+		"docker://szsctt/picard:1"
 	shell:
 		"""
 		picard FixMateInformation I={input.sam} O={output.fixmate} ADD_MATE_CIGAR=true SORT_ORDER=queryname
@@ -613,9 +673,11 @@ rule rmdup:
 	output:
 		sam = temp("{outpath}/{dset}/{folder}/{alignment}.rmdup.sam")	
 	wildcard_constraints:
-		folder = "\.host_aligned|\.virus_aligned"
+		folder = "host_aligned|virus_aligned"
 	conda: 
 		"envs/bwa.yml"	
+	container:
+		"docker://szsctt/bwa:1"
 	shell:
 		"""
 		samtools view -h -F 1024 {input.sam} > {output.sam}
@@ -630,6 +692,8 @@ rule run_soft:
 		virus = rules.extract_vAligned_single.output[0],
 	output:
 		soft = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.soft.txt"),
+	container:
+		"docker://ubuntu:18.04"	
 	shell:
 		"""
 		perl -I. ./softClip.pl --viral {input.virus} --human {input.host} --output {output.soft} --tol 3
@@ -641,6 +705,8 @@ rule run_short:
 		virus = rules.extract_vAligned_single.output[0],
 	output:
 		short = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.short.txt"),
+	container:
+		"docker://ubuntu:18.04"
 	shell:
 		"""
 		perl -I. ./short.pl --viral {input.virus} --human {input.host} --output {output.short} --tol 3
@@ -652,6 +718,8 @@ rule run_discordant:
 		virus = rules.extract_vAligned_paired.output[3],
 	output:
 		discord = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.discordant.txt"),
+	container:
+		"docker://ubuntu:18.04"
 	shell:
 		"""
 		perl -I. ./discordant.pl --viral {input.virus} --human {input.host} --output {output.discord} --tol 3
@@ -665,6 +733,8 @@ rule combine_ints:
 	output:
 		temp =  temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp"),
 		all = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
+	container:
+		"docker://ubuntu:18.04"
 	shell:
 		"""
 		awk 'FNR>1 || NR==1' {input} > {output.all}
@@ -718,6 +788,8 @@ rule post:
 		"{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt"
 	conda:
 		"envs/rscripts.yml"
+	container:
+		"docker://szsctt/rscripts:2"
 	params:
 		lambda wildcards, input: f"{input[0]} {POSTARGS[wildcards.dset]}"
 	shell:
@@ -736,6 +808,8 @@ rule summarise:
 		"{outpath}/summary/{dset}_annotated.xlsx"
 	conda:
 		"envs/rscripts.yml"
+	container:
+		"docker://szsctt/rscripts:2"
 	params:
 		outdir = lambda wildcards, output: path.dirname(output[0])
 	shell:
@@ -757,6 +831,8 @@ rule ucsc_bed:
 		outdir = lambda wildcards, output: f"{path.dirname(output[0])}/{wildcards.dset}"
 	conda:
 		"envs/rscripts.yml"
+	container:
+		"docker://szsctt/rscripts:2"
 	shell:
 		"""
 		Rscript writeBed.R {input} {params.outdir}
