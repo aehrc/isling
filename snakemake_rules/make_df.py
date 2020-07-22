@@ -4,7 +4,6 @@ from os import path, getcwd
 import pandas as pd
 from snakemake_rules import make_reference_dict
 
-
 #### custom errors ####
 
 class Error(Exception):
@@ -95,16 +94,20 @@ def make_df(config):
 			config[dataset]["out_dir"] = getcwd()
 		else:
 			config[dataset]["out_dir"] = path.normpath(config[dataset]["out_dir"])
+		
 		# get fastq files for input
 		if "R1_suffix" in config[dataset]:
+			is_bam = False
 			suffix = config[dataset]["R1_suffix"]
 			config[dataset]['read_folder'] = path.normpath(config[dataset]['read_folder'])
 			folder = config[dataset]['read_folder']	
 			samples = [path.basename(f)[:-len(suffix)] for f in glob(f"{folder}/*{suffix}")]
 			if len(samples) == 0:
 				print(f"warning: no files found for dataset {dataset}")
+		
 		# get bam/sam files for input
 		elif "bam_suffix" in config[dataset]:
+			is_bam = True
 			suffix = config[dataset]["bam_suffix"]
 			folder = config[dataset]['read_folder']	
 			config[dataset]["R1_suffix"] = "_1.fq.gz"
@@ -115,7 +118,7 @@ def make_df(config):
 		else:
 			raise InputError(f"please specify either bam_suffix or R1_suffix and R2_suffix for dataset {dataset}")
 			
-		# figure out if 'dedup' and 'merge' are true or false
+		# figure out if 'dedup' and 'merge' are true or false for this dataset
 		if isinstance(config[dataset]["dedup"], bool):
 			dedup = int(config[dataset]["dedup"])
 		elif isinstance(config[dataset]["dedup"], str):
@@ -134,12 +137,39 @@ def make_df(config):
 				merge = 0
 		else:
 			raise InputError(f"Please specify True or False for 'merge' in dataset {dataset}")
-	
-	
+		
+		# get host and virus 
+		host = config[dataset]["host_name"]
+		virus = config[dataset]["virus_name"]
+		
+		adapter_1 = config[dataset]["read1-adapt"]
+		adapter_2 = config[dataset]["read2-adapt"]
+		
+		# make one row for each sample
 		for sample in samples:
-			rows.append((dataset, sample, config[dataset]["host_name"], config[dataset]["host_fasta"], config[dataset]["virus_name"], config[dataset]["virus_fasta"], merge, dedup, f"{dataset}+++{sample}", config[dataset]['out_dir'], bwa_mem_params))
-
-	toDo = pd.DataFrame(rows, columns=['dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'dedup', 'unique', 'outdir', 'bwa_mem_params'])
+		
+			# make sample-specific information
+			unique = f"{dataset}+++{sample}"
+			
+			if is_bam:
+				bam_file = f"{path.normpath(config[dataset]['read_folder'])}/{sample}{config[dataset]['bam_suffix']}"
+				R1_file = f"{path.normpath(config[dataset]['out_dir'])}/{dataset}/reads/{sample}{config[dataset]['R1_suffix']}"
+				R2_file = f"{path.normpath(config[dataset]['out_dir'])}/{dataset}/reads/{sample}{config[dataset]['R2_suffix']}"
+			else:
+				bam_file = ""	
+				R1_file = f"{path.normpath(config[dataset]['read_folder'])}/{sample}{config[dataset]['R1_suffix']}"
+				R2_file = f"{path.normpath(config[dataset]['read_folder'])}/{sample}{config[dataset]['R2_suffix']}"
+			
+			# append 
+			rows.append((dataset, sample, host, config[dataset]["host_fasta"], virus, config[dataset]["virus_fasta"], merge, dedup, unique, config[dataset]['out_dir'], bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2))
+			
+	# check there aren't any duplicate rows
+	if len(set(rows)) != len(rows):
+		raise ValueError("Error - configfile results in duplicate analyses, check samples and dataset names are unique")
+			
+	
+	# make dataframe
+	toDo = pd.DataFrame(rows, columns=['dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2'])
 	
 	# do checks on dataframe
 	check_dataset_sample_unique(toDo)
