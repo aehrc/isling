@@ -19,3 +19,4 @@ Trace.ipynb
 *.Rproj
 snakemake_rules/__pycache__
 analysis.tsv
+.parallel/
