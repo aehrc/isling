@@ -227,10 +227,12 @@ rule convert_to_bam:
 		"../envs/bwa.yml"	
 	container:
 		"docker://szsctt/bwa:1"
+	resources:
+		mem_mb=lambda wildcards, attempt: attempt * 4000
 	shell:
 		"""
 		rm -f {params.tmp_prefix}*tmp*
-		samtools view -bhS {input} | samtools sort - -o {output.bam}
+		samtools sort -o {output.bam} {input}
 		samtools index {output.bam}
 		"""
 		

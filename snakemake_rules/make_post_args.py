@@ -1,4 +1,5 @@
 from os import path
+import collections
 
 # construct arguments for postprocess.R script for each dataset
 def make_post_args(config):
@@ -11,14 +12,14 @@ def make_post_args(config):
 		if "post" in config[dataset]:
 			for element in config[dataset]["post"]:
 				# need to check if this element is a string or a dict
-				if type(element) is str:
+				if isinstance(element, str):
 					# look for keys to be 'filter' or 'dedup'
 					if element == "filter":
 						POSTARGS[dataset].append("filter")
 					elif element == "dedup":
 						POSTARGS[dataset].append("dedup")
 				# postprocessing types with files specified will be in ordered dictionaries
-				elif type(element) is OrderedDict:
+				elif isinstance(element, collections.OrderedDict):
 					if "mask-exclude" in element.keys():
 						for bed in element["mask-exclude"]:
 							POSTARGS[dataset].append("mask-exclude")
@@ -54,7 +55,7 @@ def make_post_args(config):
 							POSTARGS[dataset].append(sortedref)
 							POSTARGS[dataset].append(element["col"])
 							POSTARGS[dataset].append(tsv)
-		POSTARGS[dataset] = " ".join(POSTARGS[dataset])
+			POSTARGS[dataset] = " ".join(POSTARGS[dataset])
 		
-		return POSTARGS, TOSORT, SORTED
+	return POSTARGS, TOSORT, SORTED
 

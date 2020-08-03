@@ -57,7 +57,6 @@ ref_names = make_reference_dict(config)
 
 POSTARGS, TOSORT, SORTED = make_post_args(config)
 
-print(toDo.columns)
 
 #### global wildcard constraints ####
 
