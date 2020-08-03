@@ -43,7 +43,7 @@ rule post:
 	output:
 		"{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt"
 	conda:
-		"../envs.rscripts.yml"
+		"../envs/rscripts.yml"
 	container:
 		"docker://szsctt/rscripts:2"
 	params:
@@ -63,7 +63,7 @@ rule summarise:
 		"{outpath}/summary/{dset}.xlsx",
 		"{outpath}/summary/{dset}_annotated.xlsx"
 	conda:
-		"../envs.rscripts.yml"
+		"../envs/rscripts.yml"
 	container:
 		"docker://szsctt/rscripts:2"
 	params:
@@ -86,7 +86,7 @@ rule ucsc_bed:
 	params:
 		outdir = lambda wildcards, output: f"{path.dirname(output[0])}/{wildcards.dset}"
 	conda:
-		"../envs.rscripts.yml"
+		"../envs/rscripts.yml"
 	container:
 		"docker://szsctt/rscripts:2"
 	shell:

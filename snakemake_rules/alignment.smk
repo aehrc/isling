@@ -164,7 +164,7 @@ rule extract_to_fastq_paired:
 		fastq1 = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaSingle.mappedTo{virus}.1.fastq.gz"),
 		fastq2 = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaSingle.mappedTo{virus}.2.fastq.gz")
 	conda:
-		"../envs.picard.yml"
+		"../envs/picard.yml"
 	container:
 		"docker://szsctt/picard:1"
 	shell:
@@ -179,7 +179,7 @@ rule align_bwa_host_single:
 	output:
 		sam = temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam"),
 	conda: 
-		"../envs.bwa.yml"
+		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
 	params:
@@ -199,7 +199,7 @@ rule align_bwa_host_paired:
 	output:
 		sam = temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaPaired.sam"),
 	conda: 
-		"../envs.bwa.yml"
+		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
 	params:
@@ -224,7 +224,7 @@ rule convert_to_bam:
 	wildcard_constraints:
 		folder = "host_aligned|virus_aligned"
 	conda: 
-		"../envs.bwa.yml"	
+		"../envs/bwa.yml"	
 	container:
 		"docker://szsctt/bwa:1"
 	shell:
@@ -244,7 +244,7 @@ rule markdup:
 	wildcard_constraints:
 		folder = "host_aligned|virus_aligned"
 	conda: 
-		"../envs.picard.yml"	
+		"../envs/picard.yml"	
 	container:
 		"docker://szsctt/picard:1"
 	shell:
@@ -261,7 +261,7 @@ rule rmdup:
 	wildcard_constraints:
 		folder = "host_aligned|virus_aligned"
 	conda: 
-		"../envs.bwa.yml"	
+		"../envs/bwa.yml"	
 	container:
 		"docker://szsctt/bwa:1"
 	shell:

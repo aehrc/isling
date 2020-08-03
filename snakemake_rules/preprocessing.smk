@@ -6,7 +6,7 @@ rule check_bam_input_is_paired:
 	output:
 		ok = temp("{outpath}/{dset}/reads/{samp}.tmp"),
 	conda:
-		"../envs.bwa.yml"
+		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
 	shell:
@@ -33,7 +33,7 @@ rule bam_to_fastq:
 		r1 = temp("{outpath}/{dset}/reads/{samp}_1.fq.gz"),
 		r2 = temp("{outpath}/{dset}/reads/{samp}_2.fq.gz"),
 	conda:
-		"../envs.picard.yml"
+		"../envs/picard.yml"
 	container:
 		"docker://szsctt/picard:1"
 	shell:
