@@ -23,7 +23,7 @@ rule index:
 	output:
 		expand("{outpath}/references/{genome}/{genome}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True)
 	conda: 
-		"envs/bwa.yml"
+		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
 	params:
@@ -42,7 +42,7 @@ rule align_bwa_virus_single:
 		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params')
 	conda:
-		"envs/bwa.yml"
+		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
 	threads: 5
@@ -62,7 +62,7 @@ rule align_bwa_virus_paired:
 		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params')
 	conda:
-		"envs/bwa.yml"
+		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
 	threads: 5
@@ -114,7 +114,7 @@ rule extract_vAligned_single:
 	output:
 		sam = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaSingle.mapped.sam"),
 	conda:
-		"envs/bwa.yml"
+		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
 	shell:
@@ -131,7 +131,7 @@ rule extract_vAligned_paired:
 		pvBam_bothMapped = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.B.bam"),
 		sam = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam"),
 	conda:
-		"envs/bwa.yml"
+		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
 	shell:
@@ -149,7 +149,7 @@ rule extract_to_fastq_single:
 	output:
 		fastq = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaSingle.mappedTo{virus}.fastq.gz")
 	conda:
-		"envs/picard.yml"
+		"../envs/picard.yml"
 	container:
 		"docker://szsctt/picard:1"
 	shell:
@@ -164,7 +164,7 @@ rule extract_to_fastq_paired:
 		fastq1 = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaSingle.mappedTo{virus}.1.fastq.gz"),
 		fastq2 = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaSingle.mappedTo{virus}.2.fastq.gz")
 	conda:
-		"envs/picard.yml"
+		"../envs.picard.yml"
 	container:
 		"docker://szsctt/picard:1"
 	shell:
@@ -179,7 +179,7 @@ rule align_bwa_host_single:
 	output:
 		sam = temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam"),
 	conda: 
-		"envs/bwa.yml"
+		"../envs.bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
 	params:
@@ -199,7 +199,7 @@ rule align_bwa_host_paired:
 	output:
 		sam = temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaPaired.sam"),
 	conda: 
-		"envs/bwa.yml"
+		"../envs.bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
 	params:
@@ -224,7 +224,7 @@ rule convert_to_bam:
 	wildcard_constraints:
 		folder = "host_aligned|virus_aligned"
 	conda: 
-		"envs/bwa.yml"	
+		"../envs.bwa.yml"	
 	container:
 		"docker://szsctt/bwa:1"
 	shell:
@@ -244,7 +244,7 @@ rule markdup:
 	wildcard_constraints:
 		folder = "host_aligned|virus_aligned"
 	conda: 
-		"envs/picard.yml"	
+		"../envs.picard.yml"	
 	container:
 		"docker://szsctt/picard:1"
 	shell:
@@ -261,7 +261,7 @@ rule rmdup:
 	wildcard_constraints:
 		folder = "host_aligned|virus_aligned"
 	conda: 
-		"envs/bwa.yml"	
+		"../envs.bwa.yml"	
 	container:
 		"docker://szsctt/bwa:1"
 	shell:
