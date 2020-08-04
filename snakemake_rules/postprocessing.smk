@@ -45,7 +45,7 @@ rule post:
 	conda:
 		"../envs/rscripts.yml"
 	container:
-		"docker://szsctt/rscripts:2"
+		"docker://szsctt/rscripts:4"
 	params:
 		lambda wildcards, input: f"{input[0]} {POSTARGS[wildcards.dset]}"
 	shell:
@@ -65,7 +65,7 @@ rule summarise:
 	conda:
 		"../envs/rscripts.yml"
 	container:
-		"docker://szsctt/rscripts:2"
+		"docker://szsctt/rscripts:4"
 	params:
 		outdir = lambda wildcards, output: path.dirname(output[0])
 	shell:
@@ -88,7 +88,7 @@ rule ucsc_bed:
 	conda:
 		"../envs/rscripts.yml"
 	container:
-		"docker://szsctt/rscripts:2"
+		"docker://szsctt/rscripts:4"
 	shell:
 		"""
 		Rscript writeBed.R {input} {params.outdir}
