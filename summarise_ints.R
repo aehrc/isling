@@ -27,7 +27,7 @@ df <- tibble::tibble(filename = data_files) %>% # create a data frame holding th
 #add extra columns with sample name, dataset, host
 df <- df %>% 
   dplyr::mutate(dataset = basename(dirname(dirname(filename)))) %>% 
-  dplyr::mutate(sample = stringr::str_extract(basename(filename), "^[\\w]+(?=\\.)")) %>% 
+  dplyr::mutate(sample = stringr::str_extract(basename(filename), "^[\\w-_]+(?=\\.)")) %>% 
   dplyr::mutate( host = ifelse(stringr::str_detect(basename(filename), "mouse|mm10|GRCm38"), "mm10", ifelse(stringr::str_detect(basename(filename), "macaque|macaca|macFas5"), "macFas5", "hg38")))
 
 #select all integrations
