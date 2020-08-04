@@ -18,12 +18,18 @@ bed <- ints %>%
   dplyr::arrange(Chr, IntStart)
 
 # generate file names for saving
+bed_file <- paste0(tools::file_path_sans_ext(args[1]), ".filt.bed")
 sorted_file <- paste0(tools::file_path_sans_ext(args[1]), ".filt.sorted.bed")
 
 # save bed file
 readr::write_tsv(bed, 
-                 path = sorted_file,
+                 path = bed_file,
                  col_names = FALSE)
+                 
+# sort bed file
+cmd <- paste0("bedtools sort -i ", bed_file, " > ", sorted_file)
+system(cmd)
+
 
 #### loop over gtf, tsv files and annotate count of nearest feature ####
 
