@@ -1,9 +1,6 @@
 #### this script takes the output from the viral integration pipeline, and outputs a bed file for display in the UCSC browser
-#### it filters the data according to the criteria below:
-#### - exclude vector rearrangments
-#### - exclude host translocations
-#### - exclude any integrations with a gap or overlap of more than 20 bp (unless they are discordant)
-#### - exclude any integrations with a host or virus edit distance of more than 5 bp
+
+# usage: Rscript writeBed.R [<bed1> <bed2> ... <bedn>] <out_path>
 
 #### load libraries ####
 library(stringr)
@@ -75,10 +72,14 @@ for (i in unique(df$dataset)) {
   data_filt <- df %>% 
     dplyr::filter(dataset == i)
   for (j in unique(data_filt$sample)) {
-    df %>%
+  df %>%
 	dplyr::filter(sample == j) %>%
-        dplyr::mutate(Chr = ifelse(Chr == "MT", "M", Chr)) %>%
-	dplyr::mutate(Chr = ifelse(sum(stringr::str_detect(Chr, "chr")), Chr, paste0("chr", Chr))) %>%
+	dplyr::mutate(Chr = case_when(
+		!str_detect(Chr, "chr") ~ paste0("chr", Chr),
+		Chr == "chrMT" ~ "chrM",
+		TRUE ~ Chr
+		)) %>%
+  dplyr::mutate(Chr = ifelse(Chr == "chrMT", "chrM", Chr)) %>%
 	dplyr::select(Chr, IntStart, IntStop, ReadID) %>%
 	dplyr::filter(str_detect(Chr, chroms)) %>%
 	dplyr::rename(`#chrom` = Chr) %>%
