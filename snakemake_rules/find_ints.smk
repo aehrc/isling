@@ -1,8 +1,8 @@
 
 rule run_soft:
 	input:
-		host = lambda wildcards: get_sam(wildcards, "single", "host"),
-		virus = rules.extract_vAligned_single.output[0],
+		host = lambda wildcards: get_sam(wildcards, "combined", "host"),
+		virus = lambda wildcards: get_sam(wildcards, "combined", "virus")
 	output:
 		soft = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.soft.txt"),
 	container:
@@ -14,8 +14,8 @@ rule run_soft:
 		
 rule run_short:
 	input:
-		host = lambda wildcards: get_sam(wildcards, "single", "host"),
-		virus = rules.extract_vAligned_single.output[0],
+		host = lambda wildcards: get_sam(wildcards, "combined", "host"),
+		virus = lambda wildcards: get_sam(wildcards, "combined", "virus"),
 	output:
 		short = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.short.txt"),
 	container:
@@ -28,7 +28,7 @@ rule run_short:
 rule run_discordant:
 	input:
 		host = lambda wildcards: get_sam(wildcards, "paired", "host"),
-		virus = rules.extract_vAligned_paired.output[3],
+		virus = lambda wildcards: get_sam(wildcards, "paired", "virus"),
 	output:
 		discord = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.discordant.txt"),
 	container:

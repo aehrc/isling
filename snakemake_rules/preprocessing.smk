@@ -65,10 +65,9 @@ rule seqPrep:
 		r1 = lambda wildcards: get_for_seqprep(wildcards, "1"),
 		r2 = lambda wildcards: get_for_seqprep(wildcards, "2")
 	output:
-		merged = temp("{outpath}/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz"),
-		proc_r1 = temp("{outpath}/{dset}/merged_reads/{samp}.1.fastq.gz"),
-		proc_r2 = temp("{outpath}/{dset}/merged_reads/{samp}.2.fastq.gz"),
-		all = temp("{outpath}/{dset}/merged_reads/{samp}.all.fastq.gz")
+		merged = "{outpath}/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz",
+		proc_r1 = "{outpath}/{dset}/merged_reads/{samp}.1.fastq.gz",
+		proc_r2 = "{outpath}/{dset}/merged_reads/{samp}.2.fastq.gz"
 	conda:	
 		"../envs/seqprep.yml"
 	container:
@@ -79,37 +78,20 @@ rule seqPrep:
 	shell:
 		"""
 		SeqPrep -A {params.A} -B {params.B} -f {input.r1} -r {input.r2} -1 {output.proc_r1} -2 {output.proc_r2} -s {output.merged}
-		cat {output.proc_r1} {output.proc_r2} {output.merged} > {output.all}
 		"""
 
-# helper function to figure out which cat to use for rule combine (depending on compression)
-def get_compression(input):
-	ext = path.splitext(input.r1)[1]
-	if ext == ".bz2":
-		return "bzcat"
-	elif ext == ".gz":
-		return "zcat"
-	else:
-		return "cat"
-
-
-rule combine:
-# for if we don't want to do seqPrep
+rule touch_merged:
+# if we don't want to do seqPrep, we still need to have an empty file of unmerged reads
 	input:
 		r1 = lambda wildcards: get_for_seqprep(wildcards, "1"),
 		r2 = lambda wildcards: get_for_seqprep(wildcards, "2")
 	output:
-		proc_r1 = temp("{outpath}/{dset}/combined_reads/{samp}.1.fastq.gz"),
-		proc_r2 = temp("{outpath}/{dset}/combined_reads/{samp}.2.fastq.gz"),
-		all = temp("{outpath}/{dset}/combined_reads/{samp}.all.fastq.gz")
-	params:
-		test = lambda wildcards, input: print(get_compression(input)),
-		cat = lambda wildcards, input: get_compression(input),
+		merged = temp("{outpath}/{dset}/combined_reads/{samp}.mockMerged.fastq.gz")
 	container:
 		"docker://ubuntu:18.04"	
 	shell:
 		"""
-		{params.cat} {input.r1} | gzip > {output.proc_r1}
-		{params.cat} {input.r2} | gzip > {output.proc_r2}
-		{params.cat} {input.r1} {input.r2} | gzip > {output.all}
+		touch {output.merged}
 		"""
+		
+		

@@ -1,19 +1,32 @@
-		
-#functions for if we did seqPrep or not
-def get_for_align(wildcards, read_type):
-	row_idx = list(toDo.loc[:,'unique']).index(f"{wildcards.dset}+++{wildcards.samp}")
-	merge_check = bool(toDo.loc[toDo.index[row_idx], 'merge'])
-	if merge_check is True:
-		folder = "merged_reads"
-	else:
-		folder = "combined_reads"
-	return f"{wildcards.outpath}/{wildcards.dset}/{folder}/{wildcards.samp}.{read_type}.fastq.gz"
 
 def get_value_from_df(wildcards, column_name):
 	# get a value from the row of the df corresponding to this sample and dataset
 	row_idx = list(toDo.loc[:,'unique']).index(f"{wildcards.dset}+++{wildcards.samp}")
-	return toDo.loc[toDo.index[row_idx], column_name]
+	return toDo.loc[toDo.index[row_idx], column_name]	
+	
+#functions for if we did seqPrep or not
+def get_for_align(wildcards, read_type):
 
+	assert read_type in ['unmerged_r1', 'unmerged_r2', 'merged']	
+
+	merge = bool(get_value_from_df(wildcards, 'merge'))
+	
+	# did we merge R1 and R2?
+	if merge is True:
+		if read_type == 'unmerged_r1':
+			return rules.seqPrep.output.proc_r1
+		if read_type == 'unmerged_r2':
+			return rules.seqPrep.output.proc_r2
+		else:
+			return rules.seqPrep.output.merged
+			
+	else:
+		if read_type == 'unmerged_r1':
+			return  get_for_seqprep(wildcards, "1")
+		if read_type == 'unmerged_r2':
+			return  get_for_seqprep(wildcards, "2")
+		else:
+			return rules.touch_merged.output.merged
 
 #### alignments ####
 
@@ -31,16 +44,25 @@ rule index:
 	shell:
 		"bwa index -p {params.prefix} {input}"
 
-	
-rule align_bwa_virus_single:
+
+rule align_bwa_virus:
 	input:
 		idx = expand("{outpath}/references/{virus}/{virus}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
-		all = lambda wildcards: get_for_align(wildcards, "all"),
+		merged = lambda wildcards: get_for_align(wildcards, "merged"),
+		r1 = lambda wildcards: get_for_align(wildcards, "unmerged_r1"),
+		r2 = lambda wildcards: get_for_align(wildcards, "unmerged_r2"),
+	
 	output:
-		sam = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaSingle.sam")
+		single = "{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaSingle.sam",
+		paired = "{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam",
+		combined = "{outpath}/{dset}/virus_aligned/{samp}.{virus}.sam",
+	
 	params:
 		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
-		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params')
+		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
+		single_RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.virus}_merged\\tSM:{wildcards.samp}\\tPM:merged'",
+		paired_RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.virus}_unmerged\\tSM:{wildcards.samp}\\tPM:unmerged'"
+	
 	resources:
 		mem_mb=lambda wildcards, attempt: attempt * 4000
 	conda:
@@ -50,67 +72,63 @@ rule align_bwa_virus_single:
 	threads: 5
 	shell:
 		"""
-		bwa mem -t {threads} {params.mapping} -o {output.sam} {params.index} {input.all}
-		"""
-
-rule align_bwa_virus_paired:
-	input:
-		idx = expand("{outpath}/references/{virus}/{virus}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
-		r1 = lambda wildcards: get_for_align(wildcards, "1"),
-		r2 = lambda wildcards: get_for_align(wildcards, "2"),
-	output:
-		sam = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam")
-	params:
-		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
-		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params')
-	resources:
-		mem_mb=lambda wildcards, attempt: attempt * 4000	
-	conda:
-		"../envs/bwa.yml"
-	container:
-		"docker://szsctt/bwa:1"
-	threads: 5
-	shell:
-		"""
-		bwa mem -t {threads} {params.mapping} -o {output.sam} {params.index} {input.r1} {input.r2} 
+		bwa mem -t {threads} {params.mapping} {params.single_RG} -o {output.single} {params.index} {input.merged}
+		
+		bwa mem -t {threads} {params.mapping} {params.paired_RG} -o {output.paired} {params.index} {input.r1} {input.r2} 
+		
+		samtools merge {output.combined} {output.single} {output.paired}
 		"""
 		
 
 def get_sam(wildcards, readType, genome):
+
+	#pdb.set_trace()
+	
+	assert readType in ['single', 'paired', 'combined']
+	assert genome in ['host', 'virus']
 	row_idx = list(toDo.loc[:,'unique']).index(f"{wildcards.dset}+++{wildcards.samp}")
 	dedup_check = bool(toDo.loc[toDo.index[row_idx], 'dedup'])
+	
 	# if we want host alignment
 	if genome == "virus":
 		# if we're doing deduplication
 		if dedup_check is True:
 			# if we want single reads
 			if readType == "single":
-				return path.splitext(rules.align_bwa_virus_single.output[0])[0] + ".rmdup.sam"
+				return path.splitext(rules.align_bwa_virus.output.single)[0] + ".rmdup.sam"
+			# if we want paired reads
+			elif readType == 'paired':
+				return path.splitext(rules.align_bwa_virus.output.paired)[0] + ".rmdup.sam"
+			# if we want combined reads
 			else:
-				return path.splitext(rules.align_bwa_virus_paired.output[0])[0] + ".rmdup.sam"
+				return path.splitext(rules.align_bwa_virus.output.combined)[0] + ".rmdup.sam"
 		# if we're not doing deduplication
 		else:
 			if readType == "single":
-				return path.splitext(rules.align_bwa_virus_single.output[0])[0] + ".dups.sam"
+				return rules.align_bwa_virus.output.single
+			elif readType == "paired":
+				return rules.align_bwa_virus.output.paired
 			else:
-				return path.splitext(rules.align_bwa_virus_paired.output[0])[0] + ".dups.sam"
+				return rules.align_bwa_virus.output.combined
 	# if we want the host alignment
 	else:
 		# if we're doing deduplication
 		if dedup_check is True:
 			# if we want single reads
 			if readType == "single":
-				return path.splitext(rules.align_bwa_host_single.output[0])[0] + ".rmdup.sam"
+				return path.splitext(rules.align_bwa_host_single.output.sam)[0] + ".rmdup.sam"
+			elif readType == "paired":
+				return path.splitext(rules.align_bwa_host_paired.output.sam)[0] + ".rmdup.sam"
 			else:
-				return path.splitext(rules.align_bwa_host_paired.output[0])[0] + ".rmdup.sam"
+				return path.splitext(rules.combine_host.output.combined)[0] + ".rmdup.sam"
 		# if we're not doing deduplication
 		else:
 			if readType == "single":
-				return path.splitext(rules.align_bwa_host_single.output[0])[0] + ".dups.sam"
+				return rules.align_bwa_host_single.output.sam
+			elif readType == "paired":
+				return rules.align_bwa_host_paired.output.sam
 			else:
-				return path.splitext(rules.align_bwa_host_paired.output[0])[0] + ".dups.sam"	
-				
-		
+				return rules.combine_host.output.combined
 		
 rule extract_vAligned_single:
 	input:
@@ -145,7 +163,6 @@ rule extract_vAligned_paired:
 		samtools view -hb -F 0x4 -F 0x8 -F 0x800 -o {output.pvBam_bothMapped} {input.aligned}
 		samtools merge - {output.pvBam_readMap_mateUnmap} {output.pvBam_bothMapped} {output.pvBam_readUnmap_mateMap} | samtools sort - -n -o {output.sam}
 		"""
-		
 
 rule extract_to_fastq_single:
 	input:
@@ -165,8 +182,8 @@ rule extract_to_fastq_paired:
 	input:
 		sam = rules.extract_vAligned_paired.output.sam
 	output:
-		fastq1 = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaSingle.mappedTo{virus}.1.fastq.gz"),
-		fastq2 = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaSingle.mappedTo{virus}.2.fastq.gz")
+		fastq1 = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaPaired.mappedTo{virus}.1.fastq.gz"),
+		fastq2 = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaPaired.mappedTo{virus}.2.fastq.gz")
 	conda:
 		"../envs/picard.yml"
 	container:
@@ -179,7 +196,7 @@ rule extract_to_fastq_paired:
 rule align_bwa_host_single:
 	input:	
 		idx = expand("{outpath}/references/{host}/{host}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
-		all = rules.extract_to_fastq_single.output.fastq
+		all = rules.extract_to_fastq_single.output.fastq,
 	output:
 		sam = temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam"),
 	conda: 
@@ -190,11 +207,12 @@ rule align_bwa_host_single:
 		mem_mb=lambda wildcards, attempt: attempt * 4000
 	params:
 		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
-		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params')
+		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
+		RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.host}_merged\\tSM:{wildcards.samp}\\tPM:merged'"
 	threads: 4
 	shell:		
 		"""
-		bwa mem -t {threads} {params.mapping} -o {output.sam} {params.index} {input.all}
+		bwa mem -t {threads} {params.mapping} {params.RG} -o {output.sam} {params.index} {input.all}
 		"""
 		
 rule align_bwa_host_paired:
@@ -212,12 +230,31 @@ rule align_bwa_host_paired:
 		mem_mb=lambda wildcards, attempt: attempt * 4000	
 	params:
 		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
-		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params')
+		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
+		RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.host}_unmerged\\tSM:{wildcards.samp}\\tPM:unmerged'"
 	threads: 4
 	shell:		
 		"""
-		bwa mem -t {threads} {params.mapping} -o {output.sam} {params.index} {input.r1} {input.r2}
+		bwa mem -t {threads} {params.mapping} {params.RG} -o {output.sam} {params.index} {input.r1} {input.r2}
 		"""
+		
+rule combine_host:
+	input:
+		paired = rules.align_bwa_host_paired.output.sam,
+		single = rules.align_bwa_host_single.output.sam
+	output:
+		combined = "{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.sam"
+	conda: 
+		"../envs/bwa.yml"
+	container:
+		"docker://szsctt/bwa:1"
+	resources:
+		mem_mb=lambda wildcards, attempt: attempt * 4000	
+	shell:		
+		"""
+		samtools merge {output.combined} {input.single} {input.paired}
+		"""
+	
 
 #### sam file manipulations ####
 

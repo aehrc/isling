@@ -70,7 +70,7 @@ wildcard_constraints:
 
 
 #### local rules ####
-localrules: all, combine, check_bam_input_is_paired
+localrules: all, touch_merged, check_bam_input_is_paired
 
 #### target files ####
 rule all:
@@ -84,21 +84,14 @@ rule all:
 			zip, 
 			outpath = [config[dataset]['out_dir'] for dataset in config], 
 			dset = [dataset for dataset in config]),
-		expand("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaSingle.mapped.bam",
+		expand("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bam",
 			zip,
 			outpath = toDo.loc[:,'outdir'],
 			dset = toDo.loc[:,'dataset'],
 			samp = toDo.loc[:,'sample'],
 			virus = toDo.loc[:,'virus']
 			),
-		expand("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.bam",
-			zip,
-			outpath = toDo.loc[:,'outdir'],
-			dset = toDo.loc[:,'dataset'],
-			samp = toDo.loc[:,'sample'],
-			virus = toDo.loc[:,'virus']
-			),
-		expand("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaPaired.dups.bam",
+		expand("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bam",
 			zip,
 			outpath = toDo.loc[:,'outdir'],
 			dset = toDo.loc[:,'dataset'],
@@ -106,7 +99,7 @@ rule all:
 			virus = toDo.loc[:,'virus'],
 			host = toDo.loc[:,'host']
 			),
-		expand("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.dups.bam",
+		expand("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bam",
 			zip,
 			outpath = toDo.loc[:,'outdir'],
 			dset = toDo.loc[:,'dataset'],
