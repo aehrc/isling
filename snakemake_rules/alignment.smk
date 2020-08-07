@@ -41,6 +41,8 @@ rule align_bwa_virus_single:
 	params:
 		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params')
+	resources:
+		mem_mb=lambda wildcards, attempt: attempt * 4000
 	conda:
 		"../envs/bwa.yml"
 	container:
@@ -61,6 +63,8 @@ rule align_bwa_virus_paired:
 	params:
 		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params')
+	resources:
+		mem_mb=lambda wildcards, attempt: attempt * 4000	
 	conda:
 		"../envs/bwa.yml"
 	container:
@@ -182,6 +186,8 @@ rule align_bwa_host_single:
 		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
+	resources:
+		mem_mb=lambda wildcards, attempt: attempt * 4000
 	params:
 		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params')
@@ -202,6 +208,8 @@ rule align_bwa_host_paired:
 		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
+	resources:
+		mem_mb=lambda wildcards, attempt: attempt * 4000	
 	params:
 		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params')
@@ -245,6 +253,8 @@ rule markdup:
 		metrics = temp("{outpath}/{dset}/{folder}/{alignment}.dups.txt")
 	wildcard_constraints:
 		folder = "host_aligned|virus_aligned"
+	resources:
+		mem_mb=lambda wildcards, attempt: attempt * 4000
 	conda: 
 		"../envs/picard.yml"	
 	container:
