@@ -70,7 +70,6 @@ while (my $vl = <VIRAL>) {
 
 	if ($parts[1] & 0x800) { next(); } # skip supplementary alignments
 	if ($parts[1] & 0x4) {next; } #skip unmapped alignments
-
 	if ($parts[2] eq "*") { next; } # skip unaligned reads
 
 	my ($cig, $combinedBases) = processCIGAR2($parts[5], $tol); # Process the CIGAR string to account for small insertions/deletions
@@ -95,13 +94,17 @@ while (my $vl = <VIRAL>) {
 	}
 
 	#get read ID, aligned viral reference, alignment start
-	my ($ID, $ref, $start) = ($parts[0], $parts[2], $parts[3]);
+	my ($readID, $ref, $start) = ($parts[0], $parts[2], $parts[3]);
+	
+	# append R1 or R2 to $readID if flag is set
+	if ($parts[1] & 0x40) { $readID = $readID."/1"; }
+	if ($parts[1] & 0x80) { $readID = $readID."/2"; }
 	
 	#get supplementary (SA) and secondary (XA) alignments in order to check for possible vector rearrangements
 	my ($vSec, $vSup) = getSecSup($vl);
 	my $editDist = getEditDist($vl);
 	
-	$viralIntegrations{join("xxx",($parts[0],$seq))} = join("xxx", $seq, $dir, $ref, $start, $cig, $vSec, $vSup, ($editDist+$combinedBases)); 
+	$viralIntegrations{join("xxx",($readID,$seq))} = join("xxx", $seq, $dir, $ref, $start, $cig, $vSec, $vSup, ($editDist+$combinedBases)); 
 }
 close VIRAL;
 
@@ -144,9 +147,13 @@ while (my $hl = <HUMAN>) {
 	}
 	
 	#get read ID, aligned viral reference, alignment pos
-	my ($ID, $ref, $start) = ($parts[0], $parts[2], $parts[3]);
+	my ($readID, $ref, $start) = ($parts[0], $parts[2], $parts[3]);
+	
+	# append R1 or R2 to $readID if flag is set
+	if ($parts[1] & 0x40) { $readID = $readID."/1"; }
+	if ($parts[1] & 0x80) { $readID = $readID."/2"; }
 
-	if (exists $viralIntegrations{join("xxx",($parts[0],$seq))}) { # only consider reads that were tagged from the viral alignment, no need to consider excess reads
+	if (exists $viralIntegrations{join("xxx",($readID,$seq))}) { # only consider reads that were tagged from the viral alignment, no need to consider excess reads
 	
 		my ($hSec, $hSup) = getSecSup($hl);
 		
@@ -165,7 +172,7 @@ while (my $hl = <HUMAN>) {
 		
 		$editDist -= $insertedBases;
 		
-		$humanIntegrations{join("xxx",($parts[0],$seq))} = join("xxx", $seq, $Dir, $ref, $start, $cig, $hSec, $hSup, ($editDist+$combinedBases));
+		$humanIntegrations{join("xxx",($readID,$seq))} = join("xxx", $seq, $Dir, $ref, $start, $cig, $hSec, $hSup, ($editDist+$combinedBases));
 	}
 }
 close HUMAN;

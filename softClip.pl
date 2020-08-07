@@ -93,6 +93,10 @@ while (my $vl = <VIRAL>) {
 	#get readID
 	my $readID = $parts[0];
 	
+	# append R1 or R2 to $ID if flag is set
+	if ($parts[1] & 0x40) { $readID = $readID."/1"; }
+	if ($parts[1] & 0x80) { $readID = $readID."/2"; }
+	
 	#get 1-based mapping position:
 	#from SAM format: 1-based leftmost mapping POSition of the first CIGAR operation that “consumes” a reference
 	#base (see table below).  The first base in a reference sequence has coordinate 1. POS is set as 0 for
@@ -130,8 +134,15 @@ while (my $hl = <HUMAN>) {
 		$seq = $parts[9]; 
 		$dir = 'f';
 	}
+	
+	#get readID
+	my $readID = $parts[0];
+	
+	# append R1 or R2 to $readID if flag is set
+	if ($parts[1] & 0x40) { $readID = $readID."/1"; }
+	if ($parts[1] & 0x80) { $readID = $readID."/2"; }
 
-	if (exists $viralIntegrations{join("xxx",($parts[0],$seq))}) { # only consider reads that were tagged from the viral alignment, no need to consider excess reads
+	if (exists $viralIntegrations{join("xxx",($readID,$seq))}) { # only consider reads that were tagged from the viral alignment, no need to consider excess reads
 		
 		#get cigar
 		my ($cig1, $editDist2) = processCIGAR2($parts[5], $tol); # Note that could be a cigar or * if unmapped
@@ -149,9 +160,6 @@ while (my $hl = <HUMAN>) {
 		
 		#get 1-based mapping position
 		my $pos = $parts[3];
-		
-		#get readID
-		my $readID = $parts[0];
 
 		$humanIntegrations{join("xxx",($readID,$seq))} = join("\t",($parts[2], $pos, $dir, $cig, $hSec, $hSup, $editDist)); 
 	}
