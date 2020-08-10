@@ -38,19 +38,19 @@ rule sortbed:
 
 rule post:
 	input:
-		"{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
-		rules.sortbed.output
+		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
+		sorted_beds = rules.sortbed.output
 	output:
-		"{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt"
+		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt"
 	conda:
 		"../envs/rscripts.yml"
 	container:
 		"docker://szsctt/rscripts:4"
 	params:
-		lambda wildcards, input: f"{input[0]} {POSTARGS[wildcards.dset]}"
+		lambda wildcards: get_value_from_df(wildcards, 'postargs')
 	shell:
 		"""
-		Rscript post/postprocess.R {params}
+		Rscript post/postprocess.R {input.ints} {params}
 		"""
 	
 rule summarise:

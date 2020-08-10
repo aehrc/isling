@@ -47,11 +47,13 @@ from snakemake_rules import make_post_args
 # construct dataframe with wildcards and other information about how to run analysis
 
 toDo = make_df(config)
-toDo.to_csv("analysis.tsv", sep = "\t")
+
+for outdir in set(toDo.loc[:,'outdir']):
+	toDo.to_csv(os.path.join(outdir, "analysis_parameters.tsv"), sep = "\t")
 
 # construct dictionary with reference names as keys and reference fastas as values
 
-ref_names = make_reference_dict(config)
+ref_names = make_reference_dict(toDo)
 
 # construct arguments for postprocess.R script for each dataset
 
@@ -68,36 +70,27 @@ wildcard_constraints:
 	align_type = "bwaPaired|bwaSingle",
 	outpath = "|".join(set(toDo.loc[:,'outdir']))
 
-
 #### local rules ####
 localrules: all, touch_merged, check_bam_input_is_paired
 
 #### target files ####
+summary_files = set()
+ucsc_files = set()
+for i, row in toDo.iterrows():
+	summary_files.add(f"{row['outdir']}/summary/{row['dataset']}.xlsx")
+	ucsc_files.add(f"{row['outdir']}/summary/ucsc_bed/{row['dataset']}.post.bed")
+
+
 rule all:
 	input: 
-		#"{outpath}/summary/count_mapped.txt",
-		expand("{outpath}/summary/{dset}.xlsx", 
-			zip, 
-			outpath = [config[dataset]['out_dir'] for dataset in config], 
-			dset = [dataset for dataset in config]),
-		expand("{outpath}/summary/ucsc_bed/{dset}.post.bed", 
-			zip, 
-			outpath = [config[dataset]['out_dir'] for dataset in config], 
-			dset = [dataset for dataset in config]),
+		summary_files,
+		ucsc_files,
 		expand("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bam",
 			zip,
 			outpath = toDo.loc[:,'outdir'],
 			dset = toDo.loc[:,'dataset'],
 			samp = toDo.loc[:,'sample'],
 			virus = toDo.loc[:,'virus']
-			),
-		expand("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bam",
-			zip,
-			outpath = toDo.loc[:,'outdir'],
-			dset = toDo.loc[:,'dataset'],
-			samp = toDo.loc[:,'sample'],
-			virus = toDo.loc[:,'virus'],
-			host = toDo.loc[:,'host']
 			),
 		expand("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bam",
 			zip,

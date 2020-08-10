@@ -3,6 +3,9 @@ from glob import glob
 from os import path, getcwd
 import pandas as pd
 from snakemake_rules import make_reference_dict
+from snakemake_rules import make_post_args
+import itertools
+import pdb
 
 #### custom errors ####
 
@@ -85,6 +88,8 @@ def check_input_files(config):
 
 def make_df(config):
 
+	check_input_files(config)
+
 	rows = []
 
 	for dataset in config:
@@ -139,17 +144,34 @@ def make_df(config):
 			raise InputError(f"Please specify True or False for 'merge' in dataset {dataset}")
 		
 		# get host and virus 
-		host = config[dataset]["host_name"]
-		virus = config[dataset]["virus_name"]
+		# host and virus can either be spcified as 'host_name' and 'host_fasta' ('virus_name' and 'virus_fasta'), 
+		# or in 'host'/'virus', where the key is the name of the host/virus and the value is the path the the fasta
+		if 'host' in config[dataset]:
+			
+			# check at least one host was specified
+			if len(config[dataset]['host']) == 0:
+				raise ValueError(f"At least one host must be specified for dataset {dataset}")
+			
+		else:
+			config[dataset]['host'] = {config[dataset]["host_name"] : config[dataset]["host_fasta"]}
+			
+		if 'virus' in config[dataset]:
+			
+			# check at least one virus was specified
+			if len(config[dataset]['virus']) == 0:
+				raise ValueError(f"At least one virus must be specified for dataset {dataset}")
+			
+		else:
+			config[dataset]['virus'] = {config[dataset]["virus_name"] : config[dataset]["virus_fasta"]}
 		
 		adapter_1 = config[dataset]["read1-adapt"]
 		adapter_2 = config[dataset]["read2-adapt"]
 		
-		# make one row for each sample
-		for sample in samples:
+		# get arguments for running postprocessing scripts
+		postargs = make_post_args({dataset : config[dataset]})[0][dataset]
 		
-			# make sample-specific information
-			unique = f"{dataset}+++{sample}"
+		# make one row for each sample
+		for sample, host, virus in itertools.product(samples,config[dataset]['host'].keys(), config[dataset]['virus']):
 			
 			if is_bam:
 				bam_file = f"{path.normpath(config[dataset]['read_folder'])}/{sample}{config[dataset]['bam_suffix']}"
@@ -160,8 +182,18 @@ def make_df(config):
 				R1_file = f"{path.normpath(config[dataset]['read_folder'])}/{sample}{config[dataset]['R1_suffix']}"
 				R2_file = f"{path.normpath(config[dataset]['read_folder'])}/{sample}{config[dataset]['R2_suffix']}"
 			
-			# append 
-			rows.append((dataset, sample, host, config[dataset]["host_fasta"], virus, config[dataset]["virus_fasta"], merge, dedup, unique, config[dataset]['out_dir'], bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2))
+			# if there is more than one virus or host, append these to the dataset name
+			if len(config[dataset]['host'].keys()) > 1 or len(config[dataset]['virus'].keys()) > 1:
+				dataset_name = f"{dataset}_{host}_{virus}"
+			else:
+				dataset_name = dataset
+				
+			# make sample-specific information
+			unique = f"{dataset_name}+++{sample}"
+			
+			# append combinations of each sample, host and virus		
+			rows.append((dataset_name, dataset, sample, host, config[dataset]["host"][host], virus, config[dataset]["virus"][virus], merge, dedup, unique,  config[dataset]["out_dir"], bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs))
+
 			
 	# check there aren't any duplicate rows
 	if len(set(rows)) != len(rows):
@@ -169,12 +201,12 @@ def make_df(config):
 			
 	
 	# make dataframe
-	toDo = pd.DataFrame(rows, columns=['dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2'])
+	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs'])
 	
 	# do checks on dataframe
 	check_dataset_sample_unique(toDo)
 	
-	ref_names = make_reference_dict(config)
+	ref_names = make_reference_dict(toDo)
 	check_fastas_unique(toDo, ref_names)
 	
 	return toDo
@@ -193,3 +225,4 @@ def check_fastas_unique(toDo, ref_names):
 	for i, host_name in enumerate(toDo.loc[:,'host']):
 		if toDo.loc[i,'host_fasta'] != ref_names[host_name]:
 			raise InputError(f"Host {host_name} is used as a name in multiple datasets for different fasta files.  Please modify your configfile so that each unique virus/host name only refers to one fasta file")
+			

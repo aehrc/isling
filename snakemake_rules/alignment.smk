@@ -1,8 +1,5 @@
 
-def get_value_from_df(wildcards, column_name):
-	# get a value from the row of the df corresponding to this sample and dataset
-	row_idx = list(toDo.loc[:,'unique']).index(f"{wildcards.dset}+++{wildcards.samp}")
-	return toDo.loc[toDo.index[row_idx], column_name]	
+
 	
 #functions for if we did seqPrep or not
 def get_for_align(wildcards, read_type):
@@ -86,13 +83,14 @@ def get_sam(wildcards, readType, genome):
 	
 	assert readType in ['single', 'paired', 'combined']
 	assert genome in ['host', 'virus']
-	row_idx = list(toDo.loc[:,'unique']).index(f"{wildcards.dset}+++{wildcards.samp}")
-	dedup_check = bool(toDo.loc[toDo.index[row_idx], 'dedup'])
+
+	merge = bool(get_value_from_df(wildcards, 'merge'))
+	dedup = bool(get_value_from_df(wildcards, 'dedup'))
 	
 	# if we want host alignment
 	if genome == "virus":
 		# if we're doing deduplication
-		if dedup_check is True:
+		if dedup is True:
 			# if we want single reads
 			if readType == "single":
 				return path.splitext(rules.align_bwa_virus.output.single)[0] + ".rmdup.sam"
@@ -113,7 +111,7 @@ def get_sam(wildcards, readType, genome):
 	# if we want the host alignment
 	else:
 		# if we're doing deduplication
-		if dedup_check is True:
+		if dedup is True:
 			# if we want single reads
 			if readType == "single":
 				return path.splitext(rules.align_bwa_host_single.output.sam)[0] + ".rmdup.sam"

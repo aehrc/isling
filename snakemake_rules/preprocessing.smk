@@ -1,8 +1,14 @@
 #### preprocessing rules ####
 
+def get_value_from_df(wildcards, column_name):
+	# get a value from the row of the df corresponding to this sample and dataset
+
+	row_idx =  toDo.index[toDo['unique'] == f"{wildcards.dset}+++{wildcards.samp}"][0]
+	return toDo.loc[toDo.index[row_idx], column_name]	
+
 
 rule check_bam_input_is_paired:
-	input: lambda wildcards: path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['bam_suffix']}")
+	input: lambda wildcards:  get_value_from_df(wildcards, 'bam_file')
 	output:
 		ok = temp("{outpath}/{dset}/reads/{samp}.tmp"),
 	conda:
@@ -26,7 +32,7 @@ rule check_bam_input_is_paired:
 
 rule bam_to_fastq:
 	input:
-		bam = lambda wildcards: path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['bam_suffix']}"),
+		bam = lambda wildcards:  get_value_from_df(wildcards, 'bam_file'),
 		ok = lambda wildcards: f"{wildcards.outpath}/{wildcards.dset}/reads/{wildcards.samp}.tmp"
 	output:
 		sorted_bam = temp("{outpath}/{dset}/reads/{samp}.sorted.bam"),
@@ -45,18 +51,20 @@ rule bam_to_fastq:
 
 # input functions for if had a bam or fastq as input
 def get_for_seqprep(wildcards, read_type):
-	row_idx = list(toDo.loc[:,'unique']).index(f"{wildcards.dset}+++{wildcards.samp}")
+
+	bam_suffix = get_value_from_df(wildcards, 'bam_file')
+	
 	# get true/True values for dedup
-	if 'bam_suffix' in config[wildcards.dset]:
+	if bam_suffix != "":
 		if read_type == "1":
-			return "{outpath}/{dset}/reads/{samp}_1.fq.gz"
+			return rules.bam_to_fastq.output.r1
 		else:
-			return "{outpath}/{dset}/reads/{samp}_2.fq.gz"
+			return rules.bam_to_fastq.output.r2
 	else:
 		if read_type == "1":
-			return path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['R1_suffix']}")
+			return get_value_from_df(wildcards, 'R1_file')
 		else:
-			return path.normpath(f"{config[wildcards.dset]['read_folder']}/{wildcards.samp}{config[wildcards.dset]['R2_suffix']}")
+			return get_value_from_df(wildcards, 'R2_file')
 
 
 rule seqPrep:
