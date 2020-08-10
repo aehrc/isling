@@ -2,8 +2,7 @@
 from glob import glob
 from os import path, getcwd
 import pandas as pd
-from snakemake_rules import make_reference_dict
-from snakemake_rules import make_post_args
+import collections
 import itertools
 import pdb
 
@@ -225,4 +224,73 @@ def check_fastas_unique(toDo, ref_names):
 	for i, host_name in enumerate(toDo.loc[:,'host']):
 		if toDo.loc[i,'host_fasta'] != ref_names[host_name]:
 			raise InputError(f"Host {host_name} is used as a name in multiple datasets for different fasta files.  Please modify your configfile so that each unique virus/host name only refers to one fasta file")
-			
+	
+	
+def make_reference_dict(toDo):
+	# construct dictionary with reference names as keys and reference fastas as values
+	
+	ref_names = {}
+	for index, row in toDo.iterrows():
+		ref_names[row['host']] = row['host_fasta']
+		ref_names[row['virus']] = row['virus_fasta']
+	
+	return ref_names
+	
+# construct arguments for postprocess.R script for each dataset
+def make_post_args(config):
+
+	POSTARGS = {}
+	TOSORT = []
+	SORTED = []
+	for dataset in config:
+		POSTARGS[dataset] = []
+		if "post" in config[dataset]:
+			for element in config[dataset]["post"]:
+				# need to check if this element is a string or a dict
+				if isinstance(element, str):
+					# look for keys to be 'filter' or 'dedup'
+					if element == "filter":
+						POSTARGS[dataset].append("filter")
+					elif element == "dedup":
+						POSTARGS[dataset].append("dedup")
+				# postprocessing types with files specified will be in ordered dictionaries
+				elif isinstance(element, collections.OrderedDict):
+					if "mask-exclude" in element.keys():
+						for bed in element["mask-exclude"]:
+							POSTARGS[dataset].append("mask-exclude")
+							POSTARGS[dataset].append(bed)	
+					elif "mask-include" in element.keys():
+						for bed in element["mask-include"]:
+							POSTARGS[dataset].append("mask-include")
+							POSTARGS[dataset].append(bed)
+					elif "nearest-gtf" in element.keys():
+						for gtf in element["nearest-gtf"]:
+							sortedgtf = path.splitext(gtf)[0] + ".sorted.gtf"
+							POSTARGS[dataset].append("nearest-gtf")
+							POSTARGS[dataset].append(sortedgtf)
+							if gtf not in TOSORT:
+								TOSORT.append(gtf)
+								SORTED.append(sortedgtf)
+					elif "nearest-bed" in element.keys():
+						for bed in element["nearest-bed"]:
+							sortedbed = path.splitext(bed)[0] + ".sorted.bed"
+							POSTARGS[dataset].append("nearest-bed")
+							POSTARGS[dataset].append(sortedbed)
+							if bed not in TOSORT:
+								TOSORT.append(bed)
+								SORTED.append(sortedbed)
+					elif "RNA-seq" in element.keys():
+						ref = element["genes"]
+						sortedref = path.splitext(ref)[0] + ".sorted" + path.splitext(ref)[1]
+						if ref not in TOSORT:
+							TOSORT.append(ref)
+							SORTED.append(sortedref)
+						for tsv in element["counts"]:
+							POSTARGS[dataset].append("RNA-seq-gtf")
+							POSTARGS[dataset].append(sortedref)
+							POSTARGS[dataset].append(element["col"])
+							POSTARGS[dataset].append(tsv)
+			POSTARGS[dataset] = " ".join(POSTARGS[dataset])
+		
+	return POSTARGS, TOSORT, SORTED
+		
