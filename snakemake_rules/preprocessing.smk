@@ -8,7 +8,7 @@ def get_value_from_df(wildcards, column_name):
 
 
 rule check_bam_input_is_paired:
-	input: lambda wildcards:  get_value_from_df(wildcards, 'bam_file')
+	input: lambda wildcards: get_value_from_df(wildcards, 'bam_file')
 	output:
 		ok = temp("{outpath}/{dset}/reads/{samp}.tmp"),
 	conda:
