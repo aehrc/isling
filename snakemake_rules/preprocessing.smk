@@ -8,7 +8,8 @@ def get_value_from_df(wildcards, column_name):
 
 
 rule check_bam_input_is_paired:
-	input: lambda wildcards: get_value_from_df(wildcards, 'bam_file')
+	input: 
+		bam = lambda wildcards: get_value_from_df(wildcards, 'bam_file')
 	output:
 		ok = temp("{outpath}/{dset}/reads/{samp}.tmp"),
 	conda:
@@ -32,8 +33,8 @@ rule check_bam_input_is_paired:
 
 rule bam_to_fastq:
 	input:
-		bam = lambda wildcards:  get_value_from_df(wildcards, 'bam_file'),
-		ok = lambda wildcards: f"{wildcards.outpath}/{wildcards.dset}/reads/{wildcards.samp}.tmp"
+		bam = lambda wildcards: get_value_from_df(wildcards, 'bam_file'),
+		ok = rules.check_bam_input_is_paired.output.ok
 	output:
 		sorted_bam = temp("{outpath}/{dset}/reads/{samp}.sorted.bam"),
 		r1 = temp("{outpath}/{dset}/reads/{samp}_1.fq.gz"),
@@ -70,8 +71,8 @@ def get_for_seqprep(wildcards, read_type):
 rule seqPrep:
 # if we're doing it
 	input:
-		r1 = lambda wildcards: get_value_from_df(wildcards, 'R1_file'),
-		r2 = lambda wildcards: get_value_from_df(wildcards, 'R2_file')
+		r1 = lambda wildcards: get_for_seqprep(wildcards, '1'),
+		r2 = lambda wildcards: get_for_seqprep(wildcards, '2')
 	output:
 		merged = "{outpath}/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz",
 		proc_r1 = "{outpath}/{dset}/merged_reads/{samp}.1.fastq.gz",
@@ -81,8 +82,8 @@ rule seqPrep:
 	container:
 		"docker://szsctt/seqprep:1"
 	params:
-		A = lambda wildcards: config[wildcards.dset]["read1-adapt"],
-		B = lambda wildcards: config[wildcards.dset]["read2-adapt"]
+		A = lambda wildcards: get_value_from_df(wildcards, "read1-adapt"),
+		B = lambda wildcards: get_value_from_df(wildcards, "read2-adapt")
 	shell:
 		"""
 		SeqPrep -A {params.A} -B {params.B} -f {input.r1} -r {input.r2} -1 {output.proc_r1} -2 {output.proc_r2} -s {output.merged}
@@ -91,8 +92,8 @@ rule seqPrep:
 rule touch_merged:
 # if we don't want to do seqPrep, we still need to have an empty file of unmerged reads
 	input:
-		r1 = lambda wildcards: get_value_from_df(wildcards, 'R1_file'),
-		r2 = lambda wildcards: get_value_from_df(wildcards, 'R2_file')
+		r1 = lambda wildcards: get_for_seqprep(wildcards, '1'),
+		r2 = lambda wildcards: get_for_seqprep(wildcards, '2')
 	output:
 		merged = temp("{outpath}/{dset}/combined_reads/{samp}.mockMerged.fastq.gz")
 	container:
