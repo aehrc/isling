@@ -1,10 +1,10 @@
 #### preprocessing rules ####
 
 def get_value_from_df(wildcards, column_name):
+	
 	# get a value from the row of the df corresponding to this sample and dataset
-
-	row_idx =  toDo.index[toDo['unique'] == f"{wildcards.dset}+++{wildcards.samp}"][0]
-	return toDo.loc[toDo.index[row_idx], column_name]	
+	unqiue = f"{wildcards.dset}+++{wildcards.samp}"
+	return toDo.loc[(toDo['unique'] == unique).idxmax(), column_name]
 
 
 rule check_bam_input_is_paired:
@@ -54,7 +54,7 @@ def get_for_seqprep(wildcards, read_type):
 
 	bam_suffix = get_value_from_df(wildcards, 'bam_file')
 	
-	# get true/True values for dedup
+	# pass either reads extracted from bam or 
 	if bam_suffix != "":
 		if read_type == "1":
 			return rules.bam_to_fastq.output.r1
@@ -70,8 +70,8 @@ def get_for_seqprep(wildcards, read_type):
 rule seqPrep:
 # if we're doing it
 	input:
-		r1 = lambda wildcards: get_for_seqprep(wildcards, "1"),
-		r2 = lambda wildcards: get_for_seqprep(wildcards, "2")
+		r1 = lambda wildcards: get_value_from_df(wildcards, 'R1_file'),
+		r2 = lambda wildcards: get_value_from_df(wildcards, 'R2_file')
 	output:
 		merged = "{outpath}/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz",
 		proc_r1 = "{outpath}/{dset}/merged_reads/{samp}.1.fastq.gz",
@@ -91,8 +91,8 @@ rule seqPrep:
 rule touch_merged:
 # if we don't want to do seqPrep, we still need to have an empty file of unmerged reads
 	input:
-		r1 = lambda wildcards: get_for_seqprep(wildcards, "1"),
-		r2 = lambda wildcards: get_for_seqprep(wildcards, "2")
+		r1 = lambda wildcards: get_value_from_df(wildcards, 'R1_file'),
+		r2 = lambda wildcards: get_value_from_df(wildcards, 'R2_file')
 	output:
 		merged = temp("{outpath}/{dset}/combined_reads/{samp}.mockMerged.fastq.gz")
 	container:
