@@ -3,8 +3,9 @@
 def get_value_from_df(wildcards, column_name):
 	
 	# get a value from the row of the df corresponding to this sample and dataset
-	unqiue = f"{wildcards.dset}+++{wildcards.samp}"
-	return toDo.loc[(toDo['unique'] == unique).idxmax(), column_name]
+	unique = f"{wildcards.dset}+++{wildcards.samp}"
+
+	return toDo.loc[(toDo['unique'] == unique).idxmax(), column_name] 
 
 
 rule check_bam_input_is_paired:
@@ -82,8 +83,8 @@ rule seqPrep:
 	container:
 		"docker://szsctt/seqprep:1"
 	params:
-		A = lambda wildcards: get_value_from_df(wildcards, "read1-adapt"),
-		B = lambda wildcards: get_value_from_df(wildcards, "read2-adapt")
+		A = lambda wildcards: get_value_from_df(wildcards, "adapter_1"),
+		B = lambda wildcards: get_value_from_df(wildcards, "adapter_2")
 	shell:
 		"""
 		SeqPrep -A {params.A} -B {params.B} -f {input.r1} -r {input.r2} -1 {output.proc_r1} -2 {output.proc_r2} -s {output.merged}
