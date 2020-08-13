@@ -3,8 +3,9 @@
 def get_value_from_df(wildcards, column_name):
 	
 	# get a value from the row of the df corresponding to this sample and dataset
-	unqiue = f"{wildcards.dset}+++{wildcards.samp}"
-	return toDo.loc[(toDo['unique'] == unique).idxmax(), column_name]
+	unique = f"{wildcards.dset}+++{wildcards.samp}"
+
+	return toDo.loc[(toDo['unique'] == unique).idxmax(), column_name] 
 
 
 rule check_bam_input_is_paired:
