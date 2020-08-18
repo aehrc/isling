@@ -281,14 +281,14 @@ cat(nrow(ints), "integrations imported\n")
 
 #### de-duplicating ####
 
-if (dedup)
+if (dedup & nrow(ints) != 0)
 {
   source("post/dedup.R")
 }
 
 #### filtering ####
 
-if (filt)
+if (filt & nrow(ints) != 0 & nrow(ints) != 0)
 {
   source("post/filter.R")
 }
@@ -296,13 +296,13 @@ if (filt)
 #### masking ####
 
 # do exluding based on intersect with bed file
-if (mask_exclude[1] != "")
+if (mask_exclude[1] != "" & nrow(ints) != 0)
 {
   source("post/mask-exclude.R")
 }
 
 # do excluding based on lack of intersect with bed file
-if (mask_include[1] != "")
+if (mask_include[1] != "" & nrow(ints) != 0)
 {
   source("post/mask-include.R")
 }
@@ -310,20 +310,20 @@ if (mask_include[1] != "")
 #### annotating ####
 
 # annotate nearest feature from gtf file(s)
-if (nearest_gtf[1] != "")
+if (nearest_gtf[1] != "" & nrow(ints) != 0)
 {
   source("post/nearest-gtf.R")
 }
 
 #annotate nearest feature from bed file(s)
-if (nearest_bed[1] != "")
+if (nearest_bed[1] != "" & nrow(ints) != 0)
 {
   source("post/nearest-bed.R")
 }
 
 #annotate nearest feature from bed file(s)
 
-if (nearest_gtf_RNA[1] != "")
+if (nearest_gtf_RNA[1] != "" & nrow(ints) != 0)
 {
   source("post/RNA-seq-gtf-tsv.R")
 }
