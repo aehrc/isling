@@ -37,17 +37,17 @@ rule bam_to_fastq:
 		bam = lambda wildcards: get_value_from_df(wildcards, 'bam_file'),
 		ok = rules.check_bam_input_is_paired.output.ok
 	output:
-		sorted_bam = temp("{outpath}/{dset}/reads/{samp}.sorted.bam"),
 		r1 = temp("{outpath}/{dset}/reads/{samp}_1.fq.gz"),
 		r2 = temp("{outpath}/{dset}/reads/{samp}_2.fq.gz"),
 	conda:
-		"../envs/picard.yml"
+		"../envs/bwa.yml"
 	container:
-		"docker://szsctt/picard:1"
+		"docker://szsctt/bwa:1"
 	shell:
 		"""
-		picard SortSam I={input.bam} O={output.sorted_bam} SORT_ORDER=queryname
-		picard SamToFastq I={output.sorted_bam} FASTQ={output.r1} SECOND_END_FASTQ={output.r2}
+		samtools view -b -F '0x900' {input.bam} |\
+		samtools collate -O - |\
+		samtools fastq -1 {output.r1} -2 {output.r2} -0 /dev/null -
 		"""
 
 
