@@ -14,7 +14,7 @@ my $thresh = 0.95; #default amount of read that must be covered by alignments fo
 my $tol = 5; #when processing CIGARS, combine any IDPN elements between matched regions with this number of bases or less
 my $n_estimate_tlen = 10000; #  maximum number of pairs to use to estimate mean fragment length
 my $viral;
-my $human;
+my $host;
 my $output = "integrationSites.txt";
 my $bed;
 my $merged;
@@ -24,7 +24,7 @@ my $help;
 
 GetOptions('cutoff=i' => \$cutoff,
 		   'viral=s'  => \$viral,
-		   'human=s'  => \$human,
+		   'host=s'  => \$host,
 		   'output=s' => \$output,
 		   'bed=s'    => \$bed,
 		   'merged=s' => \$merged,
@@ -35,19 +35,14 @@ GetOptions('cutoff=i' => \$cutoff,
 
 if ($help) { printHelp(); }
 
-unless ($viral and $human) { printHelp(); }
+unless ($viral and $host) { printHelp(); }
 
 ### hash arrays will store putative discordant pairs from both alignments
-### make one array for R1 and R2, and one for viral and human (four total)
+### make one array for R1 and R2, and one for viral and host (four total)
 my %viralR1;
 my %viralR2;
-my %humanR1;
-my %humanR2;
-
-my $virus_tlen;
-my %virus_tlen_reads;
-my $host_tlen;
-my %host_tlen_reads;
+my %hostR1;
+my %hostR2;
 
 ### Collect junction reads from viral genome
 ### Junctions are defined by the CIGAR string: SM or MS
@@ -60,12 +55,32 @@ my %host_tlen_reads;
 ### XA is the secondary alignments in the XA field (from BWA)
 ### SA is the supplementary alignments in the SA field (from BWA)
 
+# sum template lengths from host and virus alignments, and use hash table to 
+# keep track of reads that have already been added (to avoid double-counting)
+my $virus_tlen;
+my $host_tlen;
+my %virus_tlen_reads;
+my %host_tlen_reads;
+
+# keep track of length of each reference for later when outputting locations in the host/virus genome
+my %hostRlen;
+my %virusRlen;
+
+# to keep count of template lengths
 my $counter = 0;
 
 open (VIRAL, $viral) || die "Could not open viral alignment file: $viral\n";
 if ($verbose) { print "Processing viral alignment...\n"; }
 while (my $vl = <VIRAL>) {
-	if ($vl =~ /^@/) { next; } # skip header lines
+	if ($vl =~ /^@/) { 
+		if ($vl =~ /\@SQ/) {
+		my @parts = split(' ', $vl);
+		my ($ref) = ($parts[1] =~ /^SN:(.+)/);
+		my ($len) = ($parts[2] =~ /^LN:(\d+)/);
+		$virusRlen{$ref} = $len
+		}
+	next; 
+	}
 
 	my @parts = split(' ', $vl);
 	
@@ -80,7 +95,6 @@ while (my $vl = <VIRAL>) {
 
 	if ($parts[1] & 0x800) { next(); } # skip supplementary alignments
 	if ($parts[1] & 0x100) { next(); } # skip alignments that are not primary
-	
 	
 	# if read is proper pair, get template length
 	if ($parts[1] & 0x2) {
@@ -136,12 +150,20 @@ close VIRAL;
 my $virus_counter = $counter;
 $counter = 0;
 
-### Collect discordant reads from human genome
+### Collect discordant reads from host genome
 ### This is the same process as for viral junctions
-open (HUMAN, $human) || die "Could not open human alignment file: $human\n";
-if ($verbose) { print "Processing human alignment...\n"; }
+open (HUMAN, $host) || die "Could not open host alignment file: $host\n";
+if ($verbose) { print "Processing host alignment...\n"; }
 while (my $hl = <HUMAN>) {
-	if ($hl =~ /^@/) { next; } # skip header lines
+	if ($hl =~ /^@/) { 
+		if ($hl =~ /\@SQ/) {
+		my @parts = split(' ', $hl);
+		my ($ref) = ($parts[1] =~ /^SN:(.+)/);
+		my ($len) = ($parts[2] =~ /^LN:(\d+)/);
+		$hostRlen{$ref} = $len
+		}
+	next; 
+	}
 
 	my @parts = split(' ', $hl); #get fields from each alignment
 	
@@ -183,8 +205,8 @@ while (my $hl = <HUMAN>) {
 	unless ($editDist) { $editDist = 0; $editDist2 = 0; } 
 	
 	#get if first or second in pair and add to appropriate array
-	if ($parts[1] & 0x40) 		{ $humanR1{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $hSec, $hSup, ($editDist+$editDist2));}
-	elsif ($parts[1] & 0x80)  	{ $humanR2{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $hSec, $hSup, ($editDist+$editDist2)); }
+	if ($parts[1] & 0x40) 		{ $hostR1{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $hSec, $hSup, ($editDist+$editDist2));}
+	elsif ($parts[1] & 0x80)  	{ $hostR2{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $hSec, $hSup, ($editDist+$editDist2)); }
 
 }
 close HUMAN;
@@ -196,19 +218,19 @@ $tlen = int($tlen + 0.5);
 print("template length estimated to be $tlen from host and virus alignments\n");
 
 ### Look for evidence of integration sites by identifying discordant read-pairs
-### Need to compare the junction sites in the viral and human genomes to see if there is any overlap (ambiguous bases)
-### Integration coordinates are not exact, but assigned to the middle part of the human read
+### Need to compare the junction sites in the viral and host genomes to see if there is any overlap (ambiguous bases)
+### Integration coordinates are not exact, but assigned to the middle part of the host read
 my @outLines;
 if ($verbose) { print "Finding discordant read-pairs...\n"; }
-foreach my $key (keys %humanR1) {
+foreach my $key (keys %hostR1) {
 
 	#check that read ID is found for all hashes
 	unless ( exists $viralR1{$key} ) { next; } 
 	unless ( exists $viralR2{$key} ) { next; }
-	unless ( exists $humanR2{$key} ) { next; }
+	unless ( exists $hostR2{$key} ) { next; }
 
 	# Find discordant read pairs
-	my @intData = findDiscordant($key, $viralR1{$key}, $viralR2{$key}, $humanR1{$key}, $humanR2{$key}, $tlen);
+	my @intData = findDiscordant($key, $viralR1{$key}, $viralR2{$key}, $hostR1{$key}, $hostR2{$key}, $tlen, \%hostRlen, \%virusRlen);
 	unless (@intData) { next; }	
 
 	# Once the positions are collected, put together the output	
@@ -238,11 +260,11 @@ exit;
 
 sub findDiscordant {
 ### Check if there is overlap between the integration sites
-### in human and viral integration sites
+### in host and viral integration sites
 ### returns integration start/stop relative to read sequence
 
 ### BWA Alignments are 1-based
-	my ($key, $vR1, $vR2, $hR1, $hR2, $tlen) = @_;
+	my ($key, $vR1, $vR2, $hR1, $hR2, $tlen, $hostRlen, $virusRlen) = @_;
 	
 	my ($seq1, $vR1ori, $vR1ref, $vR1start, $vR1cig, $vR1sec, $vR1sup, $vNM1) = (split('xxx', $vR1))[0, 1, 2, 3, 4, 5, 6, -1];
 	my ($seq2, $vR2ori, $vR2ref, $vR2start, $vR2cig, $vR2sec, $vR2sup, $vNM2) = (split('xxx', $vR2))[0, 1, 2, 3, 4, 5, 6, -1];
@@ -258,7 +280,7 @@ sub findDiscordant {
 	my ($hR1map, $hR1mapBP) = isMapped($hR1cig, $cutoff);
 	my ($hR2map, $hR2mapBP) = isMapped($hR2cig, $cutoff);
 	
-	#check that we do have complementary discordant read-pairs in human and viral alignments
+	#check that we do have complementary discordant read-pairs in host and viral alignments
 	#check that both reads are not either both mapped or unmapped in each alignment
 	unless (($vR1map ne $vR2map) and ($hR1map ne $hR2map)) { return; }
 	unless (($vR1map eq $hR2map) and ($hR2map eq $vR1map)) { return; }
@@ -271,9 +293,9 @@ sub findDiscordant {
 	my $readlen1 = length($seq1);
 	my $readlen2 = length($seq2);
 	
-	#get reference for virus and human based on which is mapped
+	#get reference for virus and host based on which is mapped
 	my ($hRef, $vRef, $hSeq, $vSeq, $hNM, $vNM, $intNM);
-	if ($hR1map eq "map") { #if human matched R1
+	if ($hR1map eq "map") { #if host matched R1
 		unless (($readlen1 - $hR1mapBP) < $cutoff) { return; } #check unmapped bases is less than cutoff
 		unless (($readlen2 - $vR2mapBP) < $cutoff) { return; } #check unmapped bases is less than cutoff
 		$hRef = $hR1ref; 
@@ -284,7 +306,7 @@ sub findDiscordant {
 		$vNM = $vNM2;
 		$intNM = $vNM + $hNM;
 	}
-	else { #if human matched R2
+	else { #if host matched R2
 		unless (($readlen2 - $hR2mapBP) < $cutoff) { return; } #check unmapped bases is less than cutoff
 		unless (($readlen1 - $vR1mapBP) < $cutoff) { return; } #check unmapped bases is less than cutoff
 		$hRef = $hR2ref; 
@@ -296,24 +318,24 @@ sub findDiscordant {
 		$intNM = $vNM + $hNM;
 	}	
 	
-	#find if junction is human/virus or virus/human
-	#find approximate location of junction on both human and virus side (assign to end of read closest to junction)
+	# get length of reference to which read is aligned for host and virus
+	my $hRefLen = $hostRlen->{$hRef};
+	my $vRefLen = $virusRlen->{$vRef};
+	
+	#find if junction is host/virus or virus/host
+	#find approximate location of junction on both host and virus side (assign to end of read closest to junction)
 	#position indicated in SAM file is left-most mapping base: for forward reads this is 5' end, for reverse it's 3'
 	my ($junct, $hIntStart, $hIntStop, $vIntStart, $vIntStop, $isVecRearrange, $isHumRearrange, $isHumAmbig, $isVirAmbig, $nHAmbig, $nVAmbig, $hJunctSide, $vJunctSide);
-	
-	# determine orientation
-	# if host mapped read is in forward orientation, orientation is 'hv'
-	
-	# otherwise it's 'vh'
+
+
 	if ($hR1map eq 'map') {
 		#get type of junction
-		if ($hR1ori eq 'f') 	{ $junct = 'hv'; $hJunctSide = 'left'; $vJunctSide = 'right';} #if human R1 is forward, orientation is hv
+		if ($hR1ori eq 'f') 	{ $junct = 'hv'; $hJunctSide = 'left'; $vJunctSide = 'right';} #if host R1 is forward, orientation is hv
 		elsif ($hR1ori eq 'r') 	{ $junct = 'vh'; $hJunctSide = 'right'; $vJunctSide = 'left';} #otherwise orientation is vh
 		
 		# get location of integration in host and virus
-		
-		($hIntStart, $hIntStop, $nHAmbig) = getIntPos($hR1cig, $hR1start, $readlen1, $vR2cig, $readlen2, $hJunctSide, $tlen);
-		($vIntStart, $vIntStop, $nVAmbig) = getIntPos($vR2cig, $vR2start, $readlen2, $hR1cig, $readlen1, $vJunctSide, $tlen);
+		($hIntStart, $hIntStop, $nHAmbig) = getIntPos($hR1cig, $hR1start, $readlen1, $vR2cig, $readlen2, $hJunctSide, $tlen, $hRefLen);
+		($vIntStart, $vIntStop, $nVAmbig) = getIntPos($vR2cig, $vR2start, $readlen2, $hR1cig, $readlen1, $vJunctSide, $tlen, $vRefLen);
 		
 		#check for ambiguities
 		if ((join(";", $vR2sup, $vR2sec)) eq "NA;NA") { $isVecRearrange = "no"; }
@@ -322,7 +344,7 @@ sub findDiscordant {
 		if ((join(";", $hR1sec, $hR1sup)) eq "NA;NA") { $isHumRearrange = "no"; }
 		else { $isHumRearrange = isRearrangeOrInt($hR1cig, $hR1ori, $hR1ref, $hR1start, $hR1sup, $hR1sec, $seq1, $thresh, $hNM, $intNM);}
 	 
-		#check to see if location of human alignment is ambiguous: multiple equivalent alignments accounting for human part of read
+		#check to see if location of host alignment is ambiguous: multiple equivalent alignments accounting for host part of read
 		if ($hR1sec eq "NA") { $isHumAmbig = "no";}
 		else { $isHumAmbig = isAmbigLoc($hR1ori, $hR1cig, $hR1sec, 'discordant', $seq1, $tol);}
 	
@@ -332,13 +354,13 @@ sub findDiscordant {
 		
 	
 	}
-	elsif ($hR2map eq 'map') { #if R2 is matched in human
-		if ($hR2ori eq 'f') 	{ $junct = 'hv'; $hJunctSide = 'left'; $vJunctSide = 'right'; } #if human R1 is forward, orientation is hv
+	elsif ($hR2map eq 'map') { #if R2 is matched in host
+		if ($hR2ori eq 'f') 	{ $junct = 'hv'; $hJunctSide = 'left'; $vJunctSide = 'right'; } #if host R1 is forward, orientation is hv
 		elsif ($hR2ori eq 'r') 	{ $junct = 'vh'; $hJunctSide = 'right'; $vJunctSide = 'left';} #otherwise orientation is vh
 	
 		# get location of integration in host and virus
-		($hIntStart, $hIntStop, $nHAmbig) = getIntPos($hR2cig, $hR2start, $readlen2, $vR1cig, $readlen1, $hJunctSide, $tlen);
-		($vIntStart, $vIntStop, $nVAmbig) = getIntPos($vR1cig, $vR1start, $readlen1, $hR2cig, $readlen2, $vJunctSide, $tlen);
+		($hIntStart, $hIntStop, $nHAmbig) = getIntPos($hR2cig, $hR2start, $readlen2, $vR1cig, $readlen1, $hJunctSide, $tlen, $hRefLen);
+		($vIntStart, $vIntStop, $nVAmbig) = getIntPos($vR1cig, $vR1start, $readlen1, $hR2cig, $readlen2, $vJunctSide, $tlen, $vRefLen);
 	
 		#check for ambiguities
 		if ((join(";", $vR1sup, $vR1sec)) eq "NA;NA") { $isVecRearrange = "no"; }
@@ -347,7 +369,7 @@ sub findDiscordant {
 		if ((join(";", $hR2sup, $hR2sec)) eq "NA;NA") { $isHumRearrange = "no"; }
 		else { $isHumRearrange = isRearrangeOrInt($hR2cig, $hR2ori, $hR2ref, $hR2start, $hR2sup, $hR2sec, $seq2, $thresh, $hNM, $intNM);}
 	 	
-		#check to see if location of human alignment is ambiguous: multiple equivalent alignments accounting for human part of read
+		#check to see if location of host alignment is ambiguous: multiple equivalent alignments accounting for host part of read
 		if ($hR2sec eq "NA") { $isHumAmbig = "no";}
 		else { $isHumAmbig = isAmbigLoc($hR2ori, $hR2cig, $hR2sec, 'discordant', $seq2, $tol);}
 	
@@ -360,7 +382,7 @@ sub findDiscordant {
 	}
 
 		return($hRef, $hIntStart, $hIntStop, $vRef, $vIntStart, $vIntStop, 
-				"$nHAmbig/$nVAmbig", 'discordant', $junct, $hSeq, $vSeq, '-', $hNM, $vNM, $intNM, 
+				"$nHAmbig", 'discordant', $junct, $hSeq, $vSeq, '-', $hNM, $vNM, $intNM, 
 				$isHumRearrange, $isVecRearrange, $isVirAmbig, $isHumAmbig, 'discordant');
 
 }
@@ -368,10 +390,10 @@ sub findDiscordant {
 sub printHelp {
 	print "Pipeline for detection of viral integration sites within a genome\n\n";
 	print "Usage:\n";
-	print "\tperl discordant.pl --viral <sam> --human <sam> --cutoff <n> --output <out> --bed <bed> --tol <tol> --help\n\n";
+	print "\tperl discordant.pl --viral <sam> --host <sam> --cutoff <n> --output <out> --bed <bed> --tol <tol> --help\n\n";
 	print "Arguments:\n";
 	print "\t--viral:   Alignment of reads to viral genomes (sam)\n";
-	print "\t--human:   Alignment of reads to human genome (sam)\n";
+	print "\t--host:   Alignment of reads to host genome (sam)\n";
 	print "\t--cutoff:  Minimum number of clipped reads to be considered (default = 20)\n";
 	print "\t--tol:     Tolerance when combining short elements with neigbouring matched regions (default = 5)\n";
 	print "\t--n-estimate-tlen: Number of pairs to use for estimating template length (default = 10000)\n";
@@ -415,7 +437,7 @@ sub getIntPos {
 
 	#my ($mapR1cig, $mapR1ori, $mapR1start, $readlen1, $mapR2cig, $mapR2ori, $mapR2start, $readlen2, $tlen, $junct) = @_;
 	
-	my ($cig, $pos, $rlen, $mateCig, $mateRlen, $junctionSide, $tlen) = @_;
+	my ($cig, $pos, $rlen, $mateCig, $mateRlen, $junctionSide, $tlen, $reflen) = @_;
 	
 	#get positions of last mapped base facing in towards junction
 	# output 0-based coordinates
@@ -477,6 +499,9 @@ sub getIntPos {
 		
 	}
 	
+	# make sure that start isn't less than zero, and stop isn't more than the reference length
+	if ($start < 0) { $start = 0; }
+	if ($stop > $reflen) { $stop = $reflen; }
 
 	return ($start, $stop, $ambig);
 	
