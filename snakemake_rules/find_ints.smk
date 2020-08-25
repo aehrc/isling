@@ -9,7 +9,7 @@ rule run_soft:
 		"docker://ubuntu:18.04"	
 	shell:
 		"""
-		perl -I. ./softClip.pl --viral {input.virus} --human {input.host} --output {output.soft} --tol 3
+		perl -I. ./softClip.pl --viral {input.virus} --host {input.host} --output {output.soft} --tol 3
 		"""
 		
 rule run_short:
@@ -22,7 +22,7 @@ rule run_short:
 		"docker://ubuntu:18.04"
 	shell:
 		"""
-		perl -I. ./short.pl --viral {input.virus} --human {input.host} --output {output.short} --tol 3
+		perl -I. ./short.pl --viral {input.virus} --host {input.host} --output {output.short} --tol 3
 		"""
 		
 rule run_discordant:
@@ -35,7 +35,7 @@ rule run_discordant:
 		"docker://ubuntu:18.04"
 	shell:
 		"""
-		perl -I. ./discordant.pl --viral {input.virus} --human {input.host} --output {output.discord} --tol 3
+		perl -I. ./discordant.pl --viral {input.virus} --host {input.host} --output {output.discord} --tol 3
 		"""
 
 rule combine_ints:
