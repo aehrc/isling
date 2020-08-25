@@ -19,7 +19,7 @@ my $cutoff = 20; # default clipping cutoff
 my $thresh = 0.95; #default amount of read that must be covered by alignments for rearrangement
 my $tol = 5; #when processing CIGARS, combine any IDPN elements between M regions with this number of bases or less
 my $viral;
-my $human;
+my $host;
 my $output = "short.txt";
 my $bed;
 my $merged;
@@ -30,7 +30,7 @@ my $help;
 GetOptions('cutoff=i' => \$cutoff,
 		   'thresh=f' => \$thresh,
 		   'viral=s'  => \$viral,
-		   'human=s'  => \$human,
+		   'host=s'  => \$host,
 		   'output=s' => \$output,
 		   'bed=s'    => \$bed,
 		   'merged=s' => \$merged,
@@ -40,10 +40,10 @@ GetOptions('cutoff=i' => \$cutoff,
 
 if ($help) { printHelp(); }
 
-unless ($viral and $human) { printHelp(); }
+unless ($viral and $host) { printHelp(); }
 
 my %viralIntegrations;
-my %humanIntegrations;
+my %hostIntegrations;
 ### These hashes contain the information about the integration sites within the resepctive genomes
 ### Data is saved as a tab seperated string
 ### Read name => Chr intStart intStop relStart relStop orientation readSeqeunce
@@ -108,11 +108,11 @@ while (my $vl = <VIRAL>) {
 }
 close VIRAL;
 
-### Collect junction reads from human genome
+### Collect junction reads from host genome
 ### This is the same process as for viral junctions
-open (HUMAN, $human) || die "Could not open human alignment file: $human\n";
-if ($verbose) { print "Processing human alignment...\n"; }
-while (my $hl = <HUMAN>) {
+open (HOST, $host) || die "Could not open host alignment file: $host\n";
+if ($verbose) { print "Processing host alignment...\n"; }
+while (my $hl = <HOST>) {
 	if ($hl =~ /^@/) { next; } # skip header lines
 
 	my @parts = split("\t", $hl); #get fields from each alignment
@@ -172,20 +172,20 @@ while (my $hl = <HUMAN>) {
 		
 		$editDist -= $insertedBases;
 		
-		$humanIntegrations{join("xxx",($readID,$seq))} = join("xxx", $seq, $Dir, $ref, $start, $cig, $hSec, $hSup, ($editDist+$combinedBases));
+		$hostIntegrations{join("xxx",($readID,$seq))} = join("xxx", $seq, $Dir, $ref, $start, $cig, $hSec, $hSup, ($editDist+$combinedBases));
 	}
 }
-close HUMAN;
+close HOST;
 
 
 ### Look for evidence of integration sites by identifying chimeric reads
-### Need to compare the junction sites in the viral and human genomes to see if there is any overlap (ambiguous bases)
+### Need to compare the junction sites in the viral and host genomes to see if there is any overlap (ambiguous bases)
 ### Adjust integration coordinates appropriately
 my $count = 0;
 my @outLines;
 if ($verbose) { print "Detecting chimeric reads...\n"; }
 foreach my $key (keys %viralIntegrations) {
-	if (exists $humanIntegrations{$key}) { # only consider reads that are flagged in both human and viral alignments
+	if (exists $hostIntegrations{$key}) { # only consider reads that are flagged in both host and viral alignments
 	
 		$count += 1;
 		
@@ -193,7 +193,7 @@ foreach my $key (keys %viralIntegrations) {
 		my ($ID, $seq) = split('xxx', $key);
 		
 		#analyse short integration
-		my ($int1Data, $int2Data) = analyseShort($viralIntegrations{$key}, $humanIntegrations{$key}, $ID, $seq);
+		my ($int1Data, $int2Data) = analyseShort($viralIntegrations{$key}, $hostIntegrations{$key}, $ID, $seq);
 		#push to array of data
 		if ($int1Data) {
 			push(@outLines, $int1Data);
@@ -225,10 +225,10 @@ exit;
 sub printHelp {
 	print "Pipeline for detection of viral integration sites within a genome\n\n";
 	print "Usage:\n";
-	print "\tperl short.pl --viral <sam> --human <sam> --cutoff <n> --thresh <n> --output <out> --bed <bed> --help\n\n";
+	print "\tperl short.pl --viral <sam> --host <sam> --cutoff <n> --thresh <n> --output <out> --bed <bed> --help\n\n";
 	print "Arguments:\n";
 	print "\t--viral:   Alignment of reads to viral genomes (sam)\n";
-	print "\t--human:   Alignment of reads to human genome (sam)\n";
+	print "\t--host:   Alignment of reads to host genome (sam)\n";
 	print "\t--cutoff:  Minimum number of clipped reads to be considered (default = 20)\n";
 	print "\t--thresh:	Amount of read that must be covered by one alignment to be considered rearrangement (default = 0.95)\n";
 	print "\t--output:  Output file for results (default = short.txt\n";
@@ -260,9 +260,9 @@ sub analyseShort{
 	#5 - Viral stop
 	#6 - no. ambigouous bases
 	#7 - overlap type (gap, overlap, none)
-	#8 - host seq (matched region in human alignment from end of read)
+	#8 - host seq (matched region in host alignment from end of read)
 	#9 - viral seq (matched region in viral alignment)
-	#10 - ambig seq (matched in both human and viral alignments)
+	#10 - ambig seq (matched in both host and viral alignments)
 	#11 - host secondary alignments
 	#12 - viral secondary alignments
 	#13 - possible translocation?
@@ -285,7 +285,7 @@ sub analyseShort{
 	#get inserted region in viral read
 	my $hInsert = getInserted($hCig, $hDir);
 	
-	#make sure that inserted bases in human alignment are in the same part of read as matched region in viral alignment
+	#make sure that inserted bases in host alignment are in the same part of read as matched region in viral alignment
 	#since matched regions can break up inserted region, if there is more than one inserted region, 
 	#consider from the start of the first inserted region to the end of the last inserted region
 	
@@ -317,7 +317,7 @@ sub analyseShort{
 	#number of inserted bases:
 	my $inserted = $hInsertStop - $hInsertStart + 1;
 
-	#get number of aligned bases for virus, first and second human alignment
+	#get number of aligned bases for virus, first and second host alignment
 	my ($hMatch1Len, $hMatch2Len, $vMatchLen);
 	$hMatch1Len = $hMatch1Stop - $hMatch1Start + 1; #coords relative to read are 1-based
 	$hMatch2Len = $hMatch2Stop - $hMatch2Start + 1; 
@@ -385,7 +385,7 @@ sub analyseShort{
 	else 										{ $hRe = isRearrangeOrInt($hCig, $hDir, $hRef, $hPos, $hSec, $hSup, $seq, $thresh, $hNM, $intNM);}
 	
 	
-	#check to see if location of human alignment is ambiguous: multiple equivalent alignments accounting for human part of read
+	#check to see if location of host alignment is ambiguous: multiple equivalent alignments accounting for host part of read
 	my $hAmbig;
 	if ($hSec eq "NA") 	{ $hAmbig = "no";}
 	else				{ $hAmbig = isAmbigLoc($hDir, $hCig, $hSec, 'short', $seq, $tol);}
