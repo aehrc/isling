@@ -152,9 +152,9 @@ $counter = 0;
 
 ### Collect discordant reads from host genome
 ### This is the same process as for viral junctions
-open (HUMAN, $host) || die "Could not open host alignment file: $host\n";
+open (HOST, $host) || die "Could not open host alignment file: $host\n";
 if ($verbose) { print "Processing host alignment...\n"; }
-while (my $hl = <HUMAN>) {
+while (my $hl = <HOST>) {
 	if ($hl =~ /^@/) { 
 		if ($hl =~ /\@SQ/) {
 		my @parts = split(' ', $hl);
@@ -209,7 +209,7 @@ while (my $hl = <HUMAN>) {
 	elsif ($parts[1] & 0x80)  	{ $hostR2{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $hSec, $hSup, ($editDist+$editDist2)); }
 
 }
-close HUMAN;
+close HOST;
 
 # need to keep track of how many host alignments we used for estimating template length
 my $tlen = ($host_tlen + $virus_tlen) / ($counter + $virus_counter);

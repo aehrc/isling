@@ -15,7 +15,7 @@ my $cutoff = 20; # each alignment must contain this number of aligned bases and 
 my $thresh = 0.95; #default amount of read that must be covered by alignments for rearrangement
 my $tol = 5; #when processing CIGARS, combine any SHp IDPN elements between M regions with this number of bases or less
 my $viral;
-my $human;
+my $host;
 my $output = "integrationSites.txt";
 my $bed;
 my $merged;
@@ -28,7 +28,7 @@ my $help;
 GetOptions('cutoff=i' => \$cutoff,
 		   'thresh=f' => \$thresh,
 		   'viral=s'  => \$viral,
-		   'human=s'  => \$human,
+		   'host=s'  => \$host,
 		   'output=s' => \$output,
 		   'bed=s'    => \$bed,
 		   'merged=s' => \$merged,
@@ -38,10 +38,10 @@ GetOptions('cutoff=i' => \$cutoff,
 
 if ($help) { printHelp(); }
 
-unless ($viral and $human) { printHelp(); }
+unless ($viral and $host) { printHelp(); }
 
 my %viralIntegrations;
-my %humanIntegrations;
+my %hostIntegrations;
 ### These hashes contain the information about the integration sites within the resepctive genomes
 ### Data is saved as a tab seperated string
 ### Read name => Chr intStart intStop relStart relStop orientation readSeqeunce
@@ -108,11 +108,11 @@ while (my $vl = <VIRAL>) {
 }
 close VIRAL;
 
-### Collect junction reads from human genome
+### Collect junction reads from host genome
 ### This is the same process as for viral junctions
-open (HUMAN, $human) || die "Could not open human alignment file: $human\n";
-if ($verbose) { print "Processing human alignment...\n"; }
-while (my $hl = <HUMAN>) {
+open (HOST, $host) || die "Could not open host alignment file: $host\n";
+if ($verbose) { print "Processing host alignment...\n"; }
+while (my $hl = <HOST>) {
 	if ($hl =~ /^@/) { next; } # skip header lines
 
 	my @parts = split("\t", $hl); #get fields from each alignment
@@ -161,21 +161,21 @@ while (my $hl = <HUMAN>) {
 		#get 1-based mapping position
 		my $pos = $parts[3];
 
-		$humanIntegrations{join("xxx",($readID,$seq))} = join("\t",($parts[2], $pos, $dir, $cig, $hSec, $hSup, $editDist)); 
+		$hostIntegrations{join("xxx",($readID,$seq))} = join("\t",($parts[2], $pos, $dir, $cig, $hSec, $hSup, $editDist)); 
 	}
 }
-close HUMAN;
+close HOST;
 
 ### Look for evidence of integration sites by identifying chimeric reads
-### Need to compare the junction sites in the viral and human genomes to see if there is any overlap (ambiguous bases)
+### Need to compare the junction sites in the viral and host genomes to see if there is any overlap (ambiguous bases)
 ### Adjust integration coordinates appropriately
 my @outLines;
 if ($verbose) { print "Detecting chimeric reads...\n"; }
 foreach my $key (keys %viralIntegrations) {
-	if (exists $humanIntegrations{$key}) { # only consider reads that are flagged in both human and viral alignments
+	if (exists $hostIntegrations{$key}) { # only consider reads that are flagged in both host and viral alignments
 		#for each putative integration, check that soft-clipped regions are complementary and calculate things for output
-		my $outLine = collectIntersect($viralIntegrations{$key}, $humanIntegrations{$key}, $key, $thresh);
-		#if (@intData) { $outLine = extractOutput($viralIntegrations{$key}, $humanIntegrations{$key}, @intData); }
+		my $outLine = collectIntersect($viralIntegrations{$key}, $hostIntegrations{$key}, $key, $thresh);
+		#if (@intData) { $outLine = extractOutput($viralIntegrations{$key}, $hostIntegrations{$key}, @intData); }
 		if ($outLine) { push(@outLines, join("\t", ($outLine, (split("xxx",$key))[0],(split("xxx",$key))[1]))) };
 	}
 }
@@ -200,10 +200,10 @@ exit;
 sub printHelp {
 	print "Pipeline for detection of viral integration sites within a genome\n\n";
 	print "Usage:\n";
-	print "\tperl softClip.pl --viral <sam> --human <sam> --cutoff <n> --thresh <n> --output <out> --bed <bed> --help\n\n";
+	print "\tperl softClip.pl --viral <sam> --host <sam> --cutoff <n> --thresh <n> --output <out> --bed <bed> --help\n\n";
 	print "Arguments:\n";
 	print "\t--viral:   Alignment of reads to viral genomes (sam)\n";
-	print "\t--human:   Alignment of reads to human genome (sam)\n";
+	print "\t--host:   Alignment of reads to host genome (sam)\n";
 	print "\t--cutoff:  Minimum number of clipped reads to be considered (default = 20)\n";
 	print "\t--thresh:	Amount of read that must be covered by one alignment to be considered rearrangement";
 	print "\t--output:  Output file for results (default = integrationSite.txt\n";
@@ -217,14 +217,14 @@ sub printHelp {
 
 sub collectIntersect {
 ### Check if there is overlap between the integration sites
-### in human and viral integration sites
+### in host and viral integration sites
 ### returns integration start/stop relative to read sequence
 
 ### BWA Alignments are 1-based
-	my ($viralData, $humanData, $key, $thresh) = @_;
+	my ($viralData, $hostData, $key, $thresh) = @_;
 
 	my ($vRef, $vPos, $vDir, $vCig, $vSec, $vSup, $vNM)  = (split("\t",$viralData));
-	my ($hRef, $hPos, $hDir, $hCig, $hSec, $hSup, $hNM)  = (split("\t",$humanData));
+	my ($hRef, $hPos, $hDir, $hCig, $hSec, $hSup, $hNM)  = (split("\t",$hostData));
 	
 	my ($readID, $seq) = split("xxx", $key);
 	
@@ -242,7 +242,7 @@ sub collectIntersect {
 	#if both reads have same part of read clipped/mapped, this can't be an integration
 	if	($vOri eq $hOri) { return; } 
 
-	### First find if there is any overlap between the human and viral junctions
+	### First find if there is any overlap between the host and viral junctions
 	### Do so by comparing the CIGAR strings
 	### Can calculate by subtracting aligned of one from clipped of other	
 	my ($hClip) = ($hCig =~ /(\d+)S/);
@@ -265,7 +265,7 @@ sub collectIntersect {
 	my $overlap = abs($overlap1);
 	
 	#ambigous bases may result from either an overlap of aligned regions, or a gap
-	#if the total number of aligned bases (from human and viral alignments) are greater than the read length, then it's an overlap
+	#if the total number of aligned bases (from host and viral alignments) are greater than the read length, then it's an overlap
 	#otherwise it's a gap
 	my ($overlaptype, $readlen);
 	$readlen = length($seq);
@@ -293,7 +293,7 @@ sub collectIntersect {
 	my ($isHumRearrange);
 	$isHumRearrange = isRearrangeOrInt($hCig, $hDir, $hRef, $hPos, $hSec, $hSup, $seq, $thresh, $hNM, $totalNM);
 	
-	#check to see if location of human alignment is ambiguous: multiple equivalent alignments accounting for human part of read
+	#check to see if location of host alignment is ambiguous: multiple equivalent alignments accounting for host part of read
 	my $isHumAmbig;
 	if ($hSec eq "NA") { $isHumAmbig = "no";}
 	else { $isHumAmbig = isAmbigLoc($hDir, $hCig, $hSec, 'soft', $seq, $tol);}
@@ -303,7 +303,7 @@ sub collectIntersect {
 	if ($vSec eq "NA") { $isVirAmbig = "no";}
 	else { $isVirAmbig = isAmbigLoc($vDir, $vCig, $vSec, 'soft', $seq, $tol);}
 
-	### Calculate the start and stop positions of the viral and human sequences relative to the read
+	### Calculate the start and stop positions of the viral and host sequences relative to the read
 	my ($hRStart,$hRStop) = extractSeqCoords($hOri, $hAlig, $overlap, $readlen, $overlaptype);
 	my ($vRStart,$vRStop) = extractSeqCoords($vOri, $vAlig, $overlap, $readlen, $overlaptype);
 	
@@ -319,15 +319,15 @@ sub collectIntersect {
 		return;
 	}
 	
-	### Extract viral and human sequence componenets of the read
-	### Account for overlap, this won't be included in either the human or viral segments
+	### Extract viral and host sequence componenets of the read
+	### Account for overlap, this won't be included in either the host or viral segments
 	
 	my $viralSeq = substr($seq, $vRStart-1, $vRStop-$vRStart+1);
-	my $humanSeq = substr($seq, $hRStart-1, $hRStop-$hRStart+1);
+	my $hostSeq = substr($seq, $hRStart-1, $hRStop-$hRStart+1);
 	my $overlapSeq = substr($seq, $intRStart, $overlap);	
 	
 	#check that we have extracted the right number of bases (sum of three regions should be whole read)
-	if ((length($viralSeq) + length($humanSeq) + length($overlapSeq)) != $readlen) { print "wrong number of bases extracted\n"; }
+	if ((length($viralSeq) + length($hostSeq) + length($overlapSeq)) != $readlen) { print "wrong number of bases extracted\n"; }
 
 	### Extract junction coordinates relative to the target sequence
 	
@@ -339,7 +339,7 @@ sub collectIntersect {
 	#generate output
 	my $outline = join("\t", ($hRef, $hgStart, $hgStop, $vRef, 
 				  $vgStart, $vgStop, $overlap, $overlaptype, $order, 
-				  $humanSeq, $viralSeq, $overlapSeq, $hNM, $vNM, $totalNM, $isHumRearrange, 
+				  $hostSeq, $viralSeq, $overlapSeq, $hNM, $vNM, $totalNM, $isHumRearrange, 
 				  $isVecRearrange, $isHumAmbig, $isVirAmbig, 'chimeric'));
 
 }
@@ -347,19 +347,19 @@ sub collectIntersect {
 sub extractOutput {
 ### Construct the output line
 ### Output line is a tab seperated string with the following information
-### humanChr humanStart humanStop viralChr viralStar viralStop AmbiguousBases OverlapType Orientation(human) humanSeq viralSeq AmbiguousSeq HumanSecAlign ViralSecAlign
+### hostChr hostStart hostStop viralChr viralStar viralStop AmbiguousBases OverlapType Orientation(host) hostSeq viralSeq AmbiguousSeq HumanSecAlign ViralSecAlign
 	my ($viralData) = shift @_;
-	my ($humanData) = shift @_;
+	my ($hostData) = shift @_;
 	my @intData     = @_;
 	
-	#viralData and $humanData have the following fields:
+	#viralData and $hostData have the following fields:
 	#$refName, $pos, $dir, $cig, $vSec, $vSup, $editDist
 	
 	#intData has the fields
 	#$intRStart, $intRStop, $hRStart, $hRStop, $vRStart, $vRStop, $overlap1, $order, $overlaptype, $isVecRearrange, $isHumRearrange, $isHumAmbig, $isVirAmbig
 	
 	my @viral = split("\t",$viralData);
-	my @human = split("\t",$humanData);
+	my @host = split("\t",$hostData);
 
 	my $overlap = $intData[6];
 	my $overlaptype = $intData[8];
@@ -371,19 +371,19 @@ sub extractOutput {
 	my $vAmbig = $intData[12];
 	
 	my $vNM = $viral[-1];
-	my $hNM = $human[-1];
+	my $hNM = $host[-1];
 	
 	my $totalNM = $hNM + $vNM;
 	if ($overlaptype eq 'gap') { $totalNM += $overlap; }
 
 	### Extract junction coordinates relative to the target sequence
 	my ($viralStart, $viralStop) = extractCoords($viral[1], $viral[2], $viral[5], $overlap);
-	my ($humanStart, $humanStop) = extractCoords($human[1], $human[2], $human[5], $overlap);
+	my ($hostStart, $hostStop) = extractCoords($host[1], $host[2], $host[5], $overlap);
 
-	### Extract viral and human sequence componenets of the read
-	### Account for overlap, this won't be included in either the human or viral segments
+	### Extract viral and host sequence componenets of the read
+	### Account for overlap, this won't be included in either the host or viral segments
 	my $viralSeq = substr($viral[6], $intData[4]-1, ($intData[5]-$intData[4]+1));
-	my $humanSeq = substr($human[6], $intData[2]-1, ($intData[3]-$intData[2]+1));
+	my $hostSeq = substr($host[6], $intData[2]-1, ($intData[3]-$intData[2]+1));
 
 	my $overlapSeq;
 	if ($overlap > 0) { # only extract overlap sequence if there is one
@@ -393,9 +393,9 @@ sub extractOutput {
 	else { $overlapSeq = ''; }# leave overlapSeq undefined
 
 
-	my $outline = join("\t", ($human[0], $humanStart, $humanStop, $viral[0], 
+	my $outline = join("\t", ($host[0], $hostStart, $hostStop, $viral[0], 
 				  $viralStart, $viralStop, $overlap, $overlaptype, $intData[7], 
-				  $humanSeq, $viralSeq, $overlapSeq, $hNM, $vNM, $totalNM, $hRearrange, $vRearrange, $hAmbig, $vAmbig, 'chimeric'));
+				  $hostSeq, $viralSeq, $overlapSeq, $hNM, $vNM, $totalNM, $hRearrange, $vRearrange, $hAmbig, $vAmbig, 'chimeric'));
 
 	return($outline);
 }
