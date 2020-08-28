@@ -251,7 +251,7 @@ sub collectIntersect {
 	my ($vAlig) = ($vCig =~ /(\d+)M/);
 
 	#check that host and viral aligned regions meet cutoff
-	unless (($hAlig > $cutoff) and ($vAlig > $cutoff)) { return; }
+	unless (($hAlig >= $cutoff) and ($vAlig >= $cutoff)) { return; }
 	
 	### Overlap should be the same regardless of how it's calculated so double check
 	my $overlap1 = abs($hAlig - $vClip);
@@ -277,7 +277,7 @@ sub collectIntersect {
 	#that is, if there is an overlap, the number of mapped bases excluding the overlapped region must still
 	#be more than the cutoff
 	if ($overlaptype eq "gap") {
-		unless ((($vAlig - $overlap) > $cutoff) and (($hAlig - $overlap) > $cutoff)) { return; }		
+		unless ((($vAlig - $overlap) >= $cutoff) and (($hAlig - $overlap) >= $cutoff)) { return; }		
 	}
 	
 	#caculate total edit distance - sum of host and virus edit distance, and gap if there is one
