@@ -239,7 +239,7 @@ sub collectIntersect {
 	
 	unless 	($vOri and $hOri) { return; } # Catch a weird case where an orientation isn't found. Appears to happen when both ends are clipped
 	
-	#if both reads have same part of read clipped/mapped, this can't be an integration
+	# if both reads have same part of read clipped/mapped, this can't be an integration
 	if	($vOri eq $hOri) { return; } 
 
 	### First find if there is any overlap between the host and viral junctions
@@ -250,50 +250,50 @@ sub collectIntersect {
 	my ($vClip) = ($vCig =~ /(\d+)S/);
 	my ($vAlig) = ($vCig =~ /(\d+)M/);
 
-	#check that host and viral aligned regions meet cutoff
+	# check that host and viral aligned regions meet cutoff
 	unless (($hAlig >= $cutoff) and ($vAlig >= $cutoff)) { return; }
 	
 	### Overlap should be the same regardless of how it's calculated so double check
 	my $overlap1 = abs($hAlig - $vClip);
 	my $overlap2 = abs($vAlig - $hClip);
 
-	#here check that absolute values of overlap are the same
+	# here check that absolute values of overlap are the same
 	unless (abs($overlap1) == abs($overlap2)) { 
 		print "Impossible overlap found\n";
 		return;
 	}
 	my $overlap = abs($overlap1);
 	
-	#ambigous bases may result from either an overlap of aligned regions, or a gap
-	#if the total number of aligned bases (from host and viral alignments) are greater than the read length, then it's an overlap
-	#otherwise it's a gap
+	# ambigous bases may result from either an overlap of aligned regions, or a gap
+	# if the total number of aligned bases (from host and viral alignments) are greater than the read length, then it's an overlap
+	# otherwise it's a gap
 	my ($overlaptype, $readlen);
 	$readlen = length($seq);
 	if 		(($hAlig + $vAlig) > ($readlen))  {	$overlaptype = "overlap";	} #overlap
 	elsif 	(($hAlig + $vAlig) == ($readlen)) {	$overlaptype = "none";		} #no gap or overlap
 	else 									  {	$overlaptype = "gap";		} #gap
 
-	#also enforce a cutoff on the number of unambiguously mapped bases
-	#that is, if there is an overlap, the number of mapped bases excluding the overlapped region must still
-	#be more than the cutoff
+	# also enforce a cutoff on the number of unambiguously mapped bases
+	# that is, if there is an overlap, the number of mapped bases excluding the overlapped region must still
+	# be more than the cutoff
 	if ($overlaptype eq "gap") {
 		unless ((($vAlig - $overlap) >= $cutoff) and (($hAlig - $overlap) >= $cutoff)) { return; }		
 	}
 	
-	#caculate total edit distance - sum of host and virus edit distance, and gap if there is one
+	# caculate total edit distance - sum of host and virus edit distance, and gap if there is one
 	my $totalNM = $hNM + $vNM;
 	if ($overlaptype eq 'gap') { $totalNM += $overlap; }
 	
-	#check to see is whole read can be accounted for by alignments to the vector
+	# check to see is whole read can be accounted for by alignments to the vector
 	my ($isVecRearrange);
-	#decide if read is more likely a rearrangement or integration based on edit distance
-	#if edit distances are the same, err on the side of caution and assign it as a rearrangement
+	# decide if read is more likely a rearrangement or integration based on edit distance
+	# if edit distances are the same, err on the side of caution and assign it as a rearrangement
 	$isVecRearrange = isRearrangeOrInt($vCig, $vDir, $vRef, $vPos, $vSec, $vSup, $seq, $thresh, $vNM, $totalNM);
 
 	my ($isHumRearrange);
 	$isHumRearrange = isRearrangeOrInt($hCig, $hDir, $hRef, $hPos, $hSec, $hSup, $seq, $thresh, $hNM, $totalNM);
 	
-	#check to see if location of host alignment is ambiguous: multiple equivalent alignments accounting for host part of read
+	# check to see if location of host alignment is ambiguous: multiple equivalent alignments accounting for host part of read
 	my $isHumAmbig;
 	if ($hSec eq "NA") { $isHumAmbig = "no";}
 	else { $isHumAmbig = isAmbigLoc($hDir, $hCig, $hSec, 'soft', $seq, $tol);}
@@ -310,14 +310,26 @@ sub collectIntersect {
 	### Collect integration start/stop positions relative to read
 	### These are the bases that flank the bond that is broken by insertion of the virus
 	### Takes any overlap into account	
-	my ($intRStart, $intRStop, $order);
+	my ($intRStart, $intRStop);
 
-	if    ($hOri eq "+") { ($intRStart,$intRStop,$order) = ($hRStop+1,$vRStart,"hv"); } # Orientation is Human -> Virus
-	elsif ($hOri eq "-") { ($intRStart,$intRStop,$order) = ($vRStop+1,$hRStart,"vh"); } # Orientation is Virus -> Human
+	if    ($hOri eq "+") { ($intRStart,$intRStop) = ($hRStop+1,$vRStart); } 
+	elsif ($hOri eq "-") { ($intRStart,$intRStop) = ($vRStop+1,$hRStart); } 
 	else 			   { 
 		print "Something weird has happened";
 		return;
 	}
+	
+	### Assign an orientation - host-virus or virus-host
+	my $order;
+	# host/virus junction if mapped part is first and read is forward
+	# or if mapped part is second and read is reverse
+	if    ($hOri eq '+' and $hDir eq 'f') { $order = 'hv'; }
+	elsif ($hOri eq '-' and $hDir eq 'r') { $order = 'hv'; }
+	
+	# vice versa for virus/host
+	elsif ($hOri eq '+' and $hDir eq 'r') { $order = 'vh'; }
+	elsif ($hOri eq '-' and $hDir eq 'f') { $order = 'vh'; }
+	
 	
 	### Extract viral and host sequence componenets of the read
 	### Account for overlap, this won't be included in either the host or viral segments
@@ -332,8 +344,9 @@ sub collectIntersect {
 	### Extract junction coordinates relative to the target sequence
 	
 	#first get start and stop genomic coordinates of integration
-	my ($hgStart, $hgStop) = extractCoords($hAlig, $overlap, $overlaptype, $hPos, $hOri);
-	my ($vgStart, $vgStop) = extractCoords($vAlig, $overlap, $overlaptype, $vPos, $vOri);
+	
+	my ($hgStart, $hgStop) = extractCoords($hAlig, $overlap, $overlaptype, $hPos, $order);
+	my ($vgStart, $vgStop) = extractCoords($vAlig, $overlap, $overlaptype, $vPos, $order);
 	
 
 	#generate output
@@ -404,6 +417,7 @@ sub extractOutput {
 sub getOri {
 	#get orientation of soft-clipped alignment from CIGAR
 	
+	
 	## orientation = orientation of integration site: + is after aligned sequence, - is before aligned sequence
 	### ie if CIGAR is mapped/clipped orientation is +
 	### and if CIGAR is clipped/mapped orientation is -
@@ -416,14 +430,14 @@ sub getOri {
 	
 	#if read is forward
 	if ($dir eq 'f') {
-		if ($cig =~ /(^\d+)[SH]/)   	  { $ori = "-"; }  # integration site is before the viral sequence
-		elsif ($cig =~ /(\d+)[SH]$/) 	  { $ori = "+"; } # integration site is after the viral sequence
+		if ($cig =~ /(^\d+)[SH]/)   	  { $ori = "-"; }  # clipped bases first, mapped second
+		elsif ($cig =~ /(\d+)[SH]$/) 	  { $ori = "+"; }  # mapped bases first, clipped second
 	}
 	
 	#if read is reverse
 	elsif ($dir eq 'r') {
-		if ($cig =~ /(^\d+)[SH]/)   	  { $ori = "+"; }  # integration site is before the viral sequence
-		elsif ($cig =~ /(\d+)[SH]$/) 	  { $ori = "-"; } # integration site is after the viral sequence
+		if ($cig =~ /(^\d+)[SH]/)   	  { $ori = "+"; } 
+		elsif ($cig =~ /(\d+)[SH]$/) 	  { $ori = "-"; }
 
 	}
 	
