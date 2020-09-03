@@ -49,12 +49,12 @@ sub extractCoords {
 	
 	if ($order eq 'hv') { # '+' means virus-host (ie right junction)
 		$intGStart = $pos + $alig - 1;
-		$intGStop = $pos + $alig;
+		$intGStop = $pos + $alig - 1;
 		if ($overlaptype eq "overlap") { $intGStart -= $overlap; }
 	}
 	else { # '-' means virus-host (ie right junction)
 		$intGStart = $pos - 1;
-		$intGStop = $pos;
+		$intGStop = $pos - 1;
 		if ($overlaptype eq "overlap") { $intGStop += $overlap; }
 	}
 	
