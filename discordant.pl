@@ -335,6 +335,12 @@ sub findDiscordant {
 		
 		# get location of integration in host and virus
 		($hIntStart, $hIntStop, $nHAmbig) = getIntPos($hR1cig, $hR1start, $readlen1, $vR2cig, $readlen2, $hJunctSide, $tlen, $hRefLen);
+		
+		# if host and virus mapped reads have opposite directions, need to pretend that the virus junction side is opposite
+		if ($hR1ori eq $vR2ori) {
+			if ($vJunctSide eq 'left') { $vJunctSide = 'right'; }
+			else { $vJunctSide = 'left'; }
+		}
 		($vIntStart, $vIntStop, $nVAmbig) = getIntPos($vR2cig, $vR2start, $readlen2, $hR1cig, $readlen1, $vJunctSide, $tlen, $vRefLen);
 		
 		# check for ambiguities
@@ -360,6 +366,12 @@ sub findDiscordant {
 	
 		# get location of integration in host and virus
 		($hIntStart, $hIntStop, $nHAmbig) = getIntPos($hR2cig, $hR2start, $readlen2, $vR1cig, $readlen1, $hJunctSide, $tlen, $hRefLen);
+		
+		# if host and virus mapped reads have opposite directions, need to pretend that the virus junction side is opposite
+		if ($hR2ori eq $vR1ori) {
+			if ($vJunctSide eq 'left') { $vJunctSide = 'right'; }
+			else { $vJunctSide = 'left'; }
+		}
 		($vIntStart, $vIntStop, $nVAmbig) = getIntPos($vR1cig, $vR1start, $readlen1, $hR2cig, $readlen2, $vJunctSide, $tlen, $vRefLen);
 	
 		# check for ambiguities
