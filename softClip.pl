@@ -346,7 +346,12 @@ sub collectIntersect {
 	#first get start and stop genomic coordinates of integration
 	
 	my ($hgStart, $hgStop) = extractCoords($hAlig, $overlap, $overlaptype, $hPos, $order);
-	my ($vgStart, $vgStop) = extractCoords($vAlig, $overlap, $overlaptype, $vPos, $order);
+	
+	# for viral coordinates, we need to pretend the order is opposite
+	my $viralOrder;
+	if ($order eq 'hv') { $viralOrder = 'vh'; }
+	if ($order eq 'vh') { $viralOrder = 'hv'; }
+	my ($vgStart, $vgStop) = extractCoords($vAlig, $overlap, $overlaptype, $vPos, $viralOrder);
 	
 
 	#generate output
