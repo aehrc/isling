@@ -20,3 +20,5 @@ Trace.ipynb
 snakemake_rules/__pycache__
 analysis.tsv
 .parallel/
+*tsv
+*txt
