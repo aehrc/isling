@@ -347,10 +347,15 @@ sub collectIntersect {
 	
 	my ($hgStart, $hgStop) = extractCoords($hAlig, $overlap, $overlaptype, $hPos, $order);
 	
-	# for viral coordinates, we need to pretend the order is opposite
+	# for viral coordinates, we need to pretend the order is opposite (unless virus and host have opposite directions)
 	my $viralOrder;
-	if ($order eq 'hv') { $viralOrder = 'vh'; }
-	if ($order eq 'vh') { $viralOrder = 'hv'; }
+	if ($hDir eq $vDir) {
+		if ($order eq 'hv') { $viralOrder = 'vh'; }
+		if ($order eq 'vh') { $viralOrder = 'hv'; }
+	}
+	else {
+		$viralOrder = $order;
+	}
 	my ($vgStart, $vgStop) = extractCoords($vAlig, $overlap, $overlaptype, $vPos, $viralOrder);
 	
 
