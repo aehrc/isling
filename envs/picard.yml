@@ -5,4 +5,4 @@ channels:
   - defaults
   - conda-forge
 dependencies:
-  - picard=2.21
+  - picard=2.23
