@@ -276,7 +276,7 @@ sub collectIntersect {
 	# also enforce a cutoff on the number of unambiguously mapped bases
 	# that is, if there is an overlap, the number of mapped bases excluding the overlapped region must still
 	# be more than the cutoff
-	if ($overlaptype eq "gap") {
+	if ($overlaptype eq "overlap") {
 		unless ((($vAlig - $overlap) >= $cutoff) and (($hAlig - $overlap) >= $cutoff)) { return; }		
 	}
 	
