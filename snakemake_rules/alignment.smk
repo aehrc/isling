@@ -50,8 +50,8 @@ rule align_bwa_virus:
 		r2 = lambda wildcards: get_for_align(wildcards, "unmerged_r2"),
 	
 	output:
-		single = "{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaSingle.sam",
-		paired = "{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam",
+		single = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaSingle.sam"),
+		paired = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam"),
 		combined = "{outpath}/{dset}/virus_aligned/{samp}.{virus}.sam",
 	
 	params:
