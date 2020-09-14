@@ -59,7 +59,6 @@ rule align_bwa_virus:
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
 		single_RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.virus}_merged\\tSM:{wildcards.samp}\\tPM:merged'",
 		paired_RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.virus}_unmerged\\tSM:{wildcards.samp}\\tPM:unmerged'"
-	
 	resources:
 		mem_mb=lambda wildcards, attempt: attempt * 4000
 	conda:
