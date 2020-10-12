@@ -299,7 +299,7 @@ rule rmdup:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: attempt * 3 * int(os.stat(input.sam)/1e6)
+		mem_mb=lambda wildcards, attempt, input: attempt * 3 * int(os.stat(input.sam).st_size/1e6)
 	shell:
 		"""
 		samtools view -h -F 1024 {input.sam} > {output.sam}
