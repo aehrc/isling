@@ -36,7 +36,7 @@ sub extractSeqCoords {
 
 sub extractCoords {
 ### Extract 0-based genomic coordinates for matched region based on start and stop relative to read
-	my ($alig, $overlap, $overlaptype, $pos, $ori) = @_;
+	my ($alig, $overlap, $overlaptype, $pos, $order) = @_;
 	
 	#$alig is number of aligned bases 
 	#$overlap is number of ambigous bases (gap or overlap)
@@ -45,14 +45,16 @@ sub extractCoords {
 	#$dir is 'f' for reads mapped in the forward direction and 'r' for reads mapped in the reverse direction
 	my ($intGStart, $intGStop);
 	
-	if ($ori eq '+') {
+	if ($order ne 'hv' and $order ne 'vh') { die "unrecgonised orientiation $order in extractCoords"}
+	
+	if ($order eq 'hv') { # '+' means virus-host (ie right junction)
 		$intGStart = $pos + $alig - 1;
-		$intGStop = $pos + $alig;
+		$intGStop = $pos + $alig - 1;
 		if ($overlaptype eq "overlap") { $intGStart -= $overlap; }
 	}
-	else {
+	else { # '-' means virus-host (ie right junction)
 		$intGStart = $pos - 1;
-		$intGStop = $pos;
+		$intGStop = $pos - 1;
 		if ($overlaptype eq "overlap") { $intGStop += $overlap; }
 	}
 	
@@ -450,8 +452,6 @@ sub isRearrange {
 			$sorted[$i-1] = $sorted[$i];
 			splice(@sorted, $i, 1);
 		}
-
-		
 	}	
 	
 	#check if alignments can account for whole read

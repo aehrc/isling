@@ -50,8 +50,8 @@ rule align_bwa_virus:
 		r2 = lambda wildcards: get_for_align(wildcards, "unmerged_r2"),
 	
 	output:
-		single = "{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaSingle.sam",
-		paired = "{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam",
+		single = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaSingle.sam"),
+		paired = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam"),
 		combined = "{outpath}/{dset}/virus_aligned/{samp}.{virus}.sam",
 	
 	params:
@@ -59,7 +59,6 @@ rule align_bwa_virus:
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
 		single_RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.virus}_merged\\tSM:{wildcards.samp}\\tPM:merged'",
 		paired_RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.virus}_unmerged\\tSM:{wildcards.samp}\\tPM:unmerged'"
-	
 	resources:
 		mem_mb=lambda wildcards, attempt: attempt * 4000
 	conda:
@@ -128,18 +127,19 @@ def get_sam(wildcards, readType, genome):
 			else:
 				return rules.combine_host.output.combined
 		
-rule extract_vAligned_single:
+rule extract_to_fastq_single:
 	input:
 		aligned = lambda wildcards: get_sam(wildcards, "single", "virus"),
 	output:
-		sam = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaSingle.mapped.sam"),
+		fastq = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaSingle.mappedTo{virus}.fastq.gz"),
 	conda:
 		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
 	shell:
 		"""
-		samtools view -h -F 0x4 -F 0x800 -o - {input.aligned} | samtools sort - -n -o {output.sam}
+		samtools view -h -F 0x4 -F 0x800 -o - {input.aligned} |\
+		samtools fastq -0 /dev/null - > {output.fastq}
 		"""
 
 rule extract_vAligned_paired:
@@ -149,7 +149,7 @@ rule extract_vAligned_paired:
 		pvBam_readMap_mateUnmap = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.L.bam"),
 		pvBam_readUnmap_mateMap = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.R.bam"),
 		pvBam_bothMapped = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.B.bam"),
-		sam = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.sam"),
+		bam = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.bam"),
 	conda:
 		"../envs/bwa.yml"
 	container:
@@ -159,36 +159,23 @@ rule extract_vAligned_paired:
 		samtools view -hb -F 0x4 -f 0x8 -F 0x800 -o {output.pvBam_readMap_mateUnmap} {input.aligned}
 		samtools view -hb -f 0x4 -F 0x8 -F 0x800 -o {output.pvBam_readUnmap_mateMap} {input.aligned}
 		samtools view -hb -F 0x4 -F 0x8 -F 0x800 -o {output.pvBam_bothMapped} {input.aligned}
-		samtools merge - {output.pvBam_readMap_mateUnmap} {output.pvBam_bothMapped} {output.pvBam_readUnmap_mateMap} | samtools sort - -n -o {output.sam}
-		"""
-
-rule extract_to_fastq_single:
-	input:
-		sam = rules.extract_vAligned_single.output.sam
-	output:
-		fastq = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaSingle.mappedTo{virus}.fastq.gz")
-	conda:
-		"../envs/picard.yml"
-	container:
-		"docker://szsctt/picard:1"
-	shell:
-		"""
-		picard SamToFastq I={input.sam} FASTQ={output.fastq}
+		samtools merge {output.bam} {output.pvBam_readMap_mateUnmap} {output.pvBam_bothMapped} {output.pvBam_readUnmap_mateMap}
 		"""
 		
 rule extract_to_fastq_paired:
 	input:
-		sam = rules.extract_vAligned_paired.output.sam
+		bam = rules.extract_vAligned_paired.output.bam
 	output:
 		fastq1 = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaPaired.mappedTo{virus}.1.fastq.gz"),
 		fastq2 = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaPaired.mappedTo{virus}.2.fastq.gz")
 	conda:
-		"../envs/picard.yml"
+		"../envs/bwa.yml"
 	container:
-		"docker://szsctt/picard:1"
+		"docker://szsctt/bwa:1"
 	shell:
 		"""
-		picard SamToFastq I={input.sam} FASTQ={output.fastq1} SECOND_END_FASTQ={output.fastq2}
+		samtools collate -O {input.bam} |\
+		samtools fastq -1 {output.fastq1} -2 {output.fastq2} -
 		"""
 
 rule align_bwa_host_single:

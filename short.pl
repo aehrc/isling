@@ -311,7 +311,7 @@ sub analyseShort{
 	#always calculate as right - left (relative to read)
 	## ie for $ambig1, orientation is host-virus, so right is virus and left is host
 	
-	my $ambig1 = abs($hMatch1Stop - $vMatchStart) + 1; #1-based, so need to subtract 1
+	my $ambig1 = abs($hMatch1Stop - $vMatchStart) + 1; # 1-based
 	my $ambig2 = abs($hMatch2Start - $vMatchStop) + 1;
 	
 	#number of inserted bases:
@@ -319,7 +319,7 @@ sub analyseShort{
 
 	#get number of aligned bases for virus, first and second host alignment
 	my ($hMatch1Len, $hMatch2Len, $vMatchLen);
-	$hMatch1Len = $hMatch1Stop - $hMatch1Start + 1; #coords relative to read are 1-based
+	$hMatch1Len = $hMatch1Stop - $hMatch1Start + 1; # coords relative to read are 1-based
 	$hMatch2Len = $hMatch2Stop - $hMatch2Start + 1; 
 	$vMatchLen = $vMatchStop - $vMatchStart + 1; 
 	
