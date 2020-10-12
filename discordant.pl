@@ -10,6 +10,8 @@ use ViralIntegration;
 use Getopt::Long;
 
 my $cutoff = 20; # default clipping cutoff
+# mapped reads must have this number or more mapped bases
+# unmapped reads must have fewer than this number of mapped bases
 my $thresh = 0.95; #default amount of read that must be covered by alignments for rearrangement
 my $tol = 5; #when processing CIGARS, combine any IDPN elements between matched regions with this number of bases or less
 my $n_estimate_tlen = 10000; #  maximum number of pairs to use to estimate mean fragment length
@@ -21,6 +23,9 @@ my $merged;
 my $verbose;
 
 my $help;
+
+our $warn_flag = 0;
+$SIG{__WARN__} = sub { $warn_flag = 1; CORE::warn(@_) };
 
 GetOptions('cutoff=i' => \$cutoff,
 		   'viral=s'  => \$viral,
@@ -146,6 +151,12 @@ while (my $vl = <VIRAL>) {
 }
 close VIRAL;
 
+# make sure that we found at least one reference length in the sam header, otherwise we don't have the information we'd need
+unless (scalar keys %virusRlen > 0) {
+	die "couldn't get length of reference viruses from sam header.  please check that header is intact";
+}
+
+
 # need to keep track of how many host alignments we used for estimating template length
 my $virus_counter = $counter;
 $counter = 0;
@@ -211,11 +222,27 @@ while (my $hl = <HOST>) {
 }
 close HOST;
 
+# make sure that we found at least one reference length in the sam header, otherwise we don't have the information we'd need
+unless (scalar keys %hostRlen > 0) {
+	die "couldn't get length of host chromosomes from sam header.  please check that header is intact";
+}
+
 # need to keep track of how many host alignments we used for estimating template length
+#first check that there was at least one proper pair of each
+my $host_pairs = keys %host_tlen_reads;
+if ($host_pairs < 1) {
+	die "didn't find any proper pairs in the host alignment - can't estimate template length";
+}
+my $virus_pairs = keys %virus_tlen_reads;
+if ($virus_pairs < 1) {
+	die "didn't find any proper pairs in the viral alignment - can't estimate template length";
+}
+
 my $tlen = ($host_tlen + $virus_tlen) / ($counter + $virus_counter);
 #https://stackoverflow.com/questions/178539/how-do-you-round-a-floating-point-number-in-perl
 $tlen = int($tlen + 0.5);
 print("template length estimated to be $tlen from host and virus alignments\n");
+
 
 ### Look for evidence of integration sites by identifying discordant read-pairs
 ### Need to compare the junction sites in the viral and host genomes to see if there is any overlap (ambiguous bases)
@@ -428,7 +455,7 @@ sub isMapped{
 		if ($letters[$i] =~ /M/) { $mappedBP += $numbers[$i]; }
 	}
 
-	if ($mappedBP > $cutoff) { return ('map', $mappedBP); }
+	if ($mappedBP >= $cutoff) { return ('map', $mappedBP); }
 	return ('unmap', $mappedBP);
 	
 }
@@ -531,8 +558,8 @@ sub getLeftOrRightMapped {
 	getCigarParts($cig, \@letters, \@numbers);
 	
 	#remove any operations that don't consume query
-	for my $i (0..$#letters) {
-			if ($letters[$i] !~ /[MIS]/) {
+	for my $i (reverse 0..$#letters) {
+		if ($letters[$i] !~ /[MIS]/) {
 			splice(@letters, $i, 1);
 			splice(@numbers, $i, 1);
 		}
