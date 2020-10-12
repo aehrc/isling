@@ -321,107 +321,120 @@ sub findDiscordant {
 	my $readlen2 = length($seq2);
 	
 	# get reference for virus and host based on which is mapped
-	my ($hRef, $vRef, $hSeq, $vSeq, $hNM, $vNM, $intNM);
-	if ($hR1map eq "map") { #if host matched R1
-		unless (($readlen1 - $hR1mapBP) < $cutoff) { return; } #check unmapped bases is less than cutoff
-		unless (($readlen2 - $vR2mapBP) < $cutoff) { return; } #check unmapped bases is less than cutoff
+	my ($vRef, $vSeq, $vCig, $vOri, $vPos, $vSec, $vSup, $vNM);
+	my ($hRef, $hSeq, $hCig, $hOri, $hPos, $hSec, $hSup, $hNM);
+	my $intNM;
+	
+	#if host mapped R1, virus mapped R2
+	if ($hR1map eq "map") { 
+		#check unmapped bases is less than cutoff
+		unless (($readlen1 - $hR1mapBP) < $cutoff) { return; } 
+		unless (($readlen2 - $vR2mapBP) < $cutoff) { return; } 
+		
 		$hRef = $hR1ref; 
 		$hSeq = $seq1; 
 		$hNM = $hNM1;
+		$hCig = $hR1cig;
+		$hOri = $hR1ori;
+		$hPos = $hR1start;
+		$hSec = $hR1sec;
+		$hSup = $hR1sup;
+		
 		$vRef = $vR2ref;
 		$vSeq = $seq2;
 		$vNM = $vNM2;
+		$vCig = $vR2cig;
+		$vOri = $vR2ori;
+		$vPos = $vR2start;
+		$vSec = $vR2sec;
+		$vSup = $vR2sup;
+		
 		$intNM = $vNM + $hNM;
+		
+
 	}
-	else { #if host matched R2
-		unless (($readlen2 - $hR2mapBP) < $cutoff) { return; } #check unmapped bases is less than cutoff
-		unless (($readlen1 - $vR1mapBP) < $cutoff) { return; } #check unmapped bases is less than cutoff
+	#if host mapped R2, virus mapped R1
+	else { 
+		
+		#check unmapped bases is less than cutoff
+		unless (($readlen2 - $hR2mapBP) < $cutoff) { return; } 
+		unless (($readlen1 - $vR1mapBP) < $cutoff) { return; } 
+		
 		$hRef = $hR2ref; 
-		$hSeq = $seq2;
+		$hSeq = $seq2; 
 		$hNM = $hNM2;
+		$hCig = $hR2cig;
+		$hOri = $hR2ori;
+		$hPos = $hR2start;
+		$hSec = $hR2sec;
+		$hSup = $hR2sup;
+		
 		$vRef = $vR1ref;
-		$vSeq = $seq1; 
+		$vSeq = $seq1;
 		$vNM = $vNM1;
+		$vCig = $vR1cig;
+		$vOri = $vR1ori;
+		$vPos = $vR1start;
+		$vSec = $vR1sec;
+		$vSup = $vR1sup;
+		
 		$intNM = $vNM + $hNM;
 	}	
+
+	# get properties of integration
+	my ($junct, $hIntStart, $hIntStop, $vIntStart, $vIntStop, $isVecRearrange, $isHumRearrange, $isHumAmbig, $isVirAmbig, $nHAmbig, $nVAmbig, $hJunctSide, $vJunctSide);	
+	
+	#if host read is forward direction, orientation is hv
+	if ($hOri eq 'f') 	{ 
+		$junct = 'hv'; 
+		$hJunctSide = 'left'; 
+		$vJunctSide = 'right';
+		} 
+	#otherwise orientation is vh
+	elsif ($hOri eq 'r') 	{ 
+		$junct = 'vh'; 
+		$hJunctSide = 'right'; 
+		$vJunctSide = 'left';
+		} 
+
+	# find if junction is host/virus or virus/host
+	# find approximate location of junction on both host and virus side (assign to end of read closest to junction)
+	# position indicated in SAM file is left-most mapping base: for forward reads this is 5' end, for reverse it's 3'
 	
 	# get length of reference to which read is aligned for host and virus
 	my $hRefLen = $hostRlen->{$hRef};
 	my $vRefLen = $virusRlen->{$vRef};
-	
-	# find if junction is host/virus or virus/host
-	# find approximate location of junction on both host and virus side (assign to end of read closest to junction)
-	# position indicated in SAM file is left-most mapping base: for forward reads this is 5' end, for reverse it's 3'
-	my ($junct, $hIntStart, $hIntStop, $vIntStart, $vIntStop, $isVecRearrange, $isHumRearrange, $isHumAmbig, $isVirAmbig, $nHAmbig, $nVAmbig, $hJunctSide, $vJunctSide);
 
+	# get location of integration in host and virus
+	($hIntStart, $hIntStop, $nHAmbig) = getIntPos($hCig, $hPos, length($hSeq), $vCig, length($vSeq), $hJunctSide, $tlen, $hRefLen);
+		
+	# if host and virus mapped reads have opposite directions, need to pretend that the virus junction side is opposite
+	if ($hOri eq $vOri) {
+		if ($vJunctSide eq 'left') { $vJunctSide = 'right'; }
+		else { $vJunctSide = 'left'; }
+	}
+		
+	($vIntStart, $vIntStop, $nVAmbig) = getIntPos($vCig, $vPos, length($vSeq), $hCig, length($hSeq), $vJunctSide, $tlen, $vRefLen);
 
-	if ($hR1map eq 'map') {
-		# get type of junction
-		if ($hR1ori eq 'f') 	{ $junct = 'hv'; $hJunctSide = 'left'; $vJunctSide = 'right';} #if host R1 is forward, orientation is hv
-		elsif ($hR1ori eq 'r') 	{ $junct = 'vh'; $hJunctSide = 'right'; $vJunctSide = 'left';} #otherwise orientation is vh
-		
-		# get location of integration in host and virus
-		($hIntStart, $hIntStop, $nHAmbig) = getIntPos($hR1cig, $hR1start, $readlen1, $vR2cig, $readlen2, $hJunctSide, $tlen, $hRefLen);
-		
-		# if host and virus mapped reads have opposite directions, need to pretend that the virus junction side is opposite
-		if ($hR1ori eq $vR2ori) {
-			if ($vJunctSide eq 'left') { $vJunctSide = 'right'; }
-			else { $vJunctSide = 'left'; }
-		}
-		($vIntStart, $vIntStop, $nVAmbig) = getIntPos($vR2cig, $vR2start, $readlen2, $hR1cig, $readlen1, $vJunctSide, $tlen, $vRefLen);
-		
-		# check for ambiguities
-		if ((join(";", $vR2sup, $vR2sec)) eq "NA;NA") { $isVecRearrange = "no"; }
-		else { $isVecRearrange = isRearrangeOrInt($vR2cig, $vR2ori, $vR2ref, $vR2start, $vR2sup, $vR2sec, $seq2, $thresh, $vNM, $intNM);}
+	# check for ambiguities
+	if ((join(";", $vSup, $vSec)) eq "NA;NA") { $isVecRearrange = "no"; }
+	else { $isVecRearrange = isRearrangeOrInt($vCig, $vOri, $vRef, $vPos, $vSup, $vSec, $vSeq, $thresh, $vNM, $intNM);}
 
-		if ((join(";", $hR1sec, $hR1sup)) eq "NA;NA") { $isHumRearrange = "no"; }
-		else { $isHumRearrange = isRearrangeOrInt($hR1cig, $hR1ori, $hR1ref, $hR1start, $hR1sup, $hR1sec, $seq1, $thresh, $hNM, $intNM);}
+	if ((join(";", $hSec, $hSup)) eq "NA;NA") { $isHumRearrange = "no"; }
+	else { $isHumRearrange = isRearrangeOrInt($hCig, $hOri, $hRef, $hPos, $hSup, $hSec, $hSeq, $thresh, $hNM, $intNM);}
 	 
-		# check to see if location of host alignment is ambiguous: multiple equivalent alignments accounting for host part of read
-		if ($hR1sec eq "NA") { $isHumAmbig = "no";}
-		else { $isHumAmbig = isAmbigLoc($hR1ori, $hR1cig, $hR1sec, 'discordant', $seq1, $tol);}
+	# check to see if location of host alignment is ambiguous: multiple equivalent alignments accounting for host part of read
+	if ($hR1sec eq "NA") { $isHumAmbig = "no";}
+	else { $isHumAmbig = isAmbigLoc($hOri, $hCig, $hSec, 'discordant', $hSeq, $tol);}
 	
-		# check to see if location of viral alignment is ambiguous: multiple equivalent alignments accounting for viral part of read
-		if ($vR2sec eq "NA") { $isVirAmbig = "no";}
-		else { $isVirAmbig = isAmbigLoc($vR2ori, $vR2cig, $vR2sec, 'discordant', $seq2, $tol);}
-		
+	# check to see if location of viral alignment is ambiguous: multiple equivalent alignments accounting for viral part of read
+	if ($vSec eq "NA") { $isVirAmbig = "no";}
+	else { $isVirAmbig = isAmbigLoc($vOri, $vCig, $vSec, 'discordant', $vSeq, $tol);}		
 	
-	}
-	elsif ($hR2map eq 'map') { #if R2 is matched in host
-		if ($hR2ori eq 'f') 	{ $junct = 'hv'; $hJunctSide = 'left'; $vJunctSide = 'right'; } #if host R1 is forward, orientation is hv
-		elsif ($hR2ori eq 'r') 	{ $junct = 'vh'; $hJunctSide = 'right'; $vJunctSide = 'left';} #otherwise orientation is vh
-	
-		# get location of integration in host and virus
-		($hIntStart, $hIntStop, $nHAmbig) = getIntPos($hR2cig, $hR2start, $readlen2, $vR1cig, $readlen1, $hJunctSide, $tlen, $hRefLen);
-		
-		# if host and virus mapped reads have opposite directions, need to pretend that the virus junction side is opposite
-		if ($hR2ori eq $vR1ori) {
-			if ($vJunctSide eq 'left') { $vJunctSide = 'right'; }
-			else { $vJunctSide = 'left'; }
-		}
-		($vIntStart, $vIntStop, $nVAmbig) = getIntPos($vR1cig, $vR1start, $readlen1, $hR2cig, $readlen2, $vJunctSide, $tlen, $vRefLen);
-	
-		# check for ambiguities
-		if ((join(";", $vR1sup, $vR1sec)) eq "NA;NA") { $isVecRearrange = "no"; }
-		else { $isVecRearrange = isRearrangeOrInt($vR1cig, $vR1ori, $vR1ref, $vR1start, $vR1sup, $vR1sec, $seq1, $thresh, $vNM, $intNM);}
-		
-		if ((join(";", $hR2sup, $hR2sec)) eq "NA;NA") { $isHumRearrange = "no"; }
-		else { $isHumRearrange = isRearrangeOrInt($hR2cig, $hR2ori, $hR2ref, $hR2start, $hR2sup, $hR2sec, $seq2, $thresh, $hNM, $intNM);}
-	 	
-		# check to see if location of host alignment is ambiguous: multiple equivalent alignments accounting for host part of read
-		if ($hR2sec eq "NA") { $isHumAmbig = "no";}
-		else { $isHumAmbig = isAmbigLoc($hR2ori, $hR2cig, $hR2sec, 'discordant', $seq2, $tol);}
-	
-		# check to see if location of viral alignment is ambiguous: multiple equivalent alignments accounting for viral part of read
-		if ($vR1sec eq "NA") { $isVirAmbig = "no";}
-		else { $isVirAmbig = isAmbigLoc($vR1ori, $vR1cig, $vR1sec, 'discordant', $seq1, $tol);}
-	
-	
-	
-	}
 
-		return($hRef, $hIntStart, $hIntStop, $vRef, $vIntStart, $vIntStop, 
-				"$nHAmbig", 'discordant', $junct, $hSeq, $vSeq, '-', $hNM, $vNM, $intNM, 
+
+	return($hRef, $hIntStart, $hIntStop, $vRef, $vIntStart, $vIntStop, 
+				"", 'discordant', $junct, $hSeq, $vSeq, '-', $hNM, $vNM, $intNM, 
 				$isHumRearrange, $isVecRearrange, $isVirAmbig, $isHumAmbig, 'discordant');
 
 }
