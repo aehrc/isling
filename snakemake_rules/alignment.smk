@@ -258,7 +258,7 @@ rule combine_host:
 
 rule convert_to_bam:
 	input:
-		"{outpath}/{dset}/{folder}/{alignment}.sam"
+		sam = "{outpath}/{dset}/{folder}/{alignment}.sam"
 	output:
 		bam = "{outpath}/{dset}/{folder}/{alignment}.bam",
 		bai = "{outpath}/{dset}/{folder}/{alignment}.bam.bai"
@@ -271,7 +271,7 @@ rule convert_to_bam:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt: attempt * 4000
+		mem_mb=lambda wildcards, attempt, input: attempt * 3 * int(os.stat(input.sam)/1e6)
 	shell:
 		"""
 		rm -f {params.tmp_prefix}*tmp*
@@ -289,7 +289,7 @@ rule markdup:
 	wildcard_constraints:
 		folder = "host_aligned|virus_aligned"
 	resources:
-		mem_mb=lambda wildcards, attempt: attempt * 4000
+		mem_mb=lambda wildcards, attempt, input: attempt * 3 * int(os.stat(input.sam)/1e6)
 	conda: 
 		"../envs/picard.yml"	
 	container:
@@ -311,6 +311,8 @@ rule rmdup:
 		"../envs/bwa.yml"	
 	container:
 		"docker://szsctt/bwa:1"
+	resources:
+		mem_mb=lambda wildcards, attempt, input: attempt * 3 * int(os.stat(input.sam)/1e6)
 	shell:
 		"""
 		samtools view -h -F 1024 {input.sam} > {output.sam}
