@@ -258,7 +258,7 @@ rule convert_to_bam:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: attempt * 3 * int(os.stat(input.sam)/1e6)
+		mem_mb=lambda wildcards, attempt, input: attempt * 3 * int(os.stat(input.sam).st_size/1e6)
 	shell:
 		"""
 		rm -f {params.tmp_prefix}*tmp*
@@ -276,7 +276,7 @@ rule markdup:
 	wildcard_constraints:
 		folder = "host_aligned|virus_aligned"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: attempt * 3 * int(os.stat(input.sam)/1e6)
+		mem_mb=lambda wildcards, attempt, input: attempt * 3 * int(os.stat(input.sam).st_size/1e6)
 	conda: 
 		"../envs/picard.yml"	
 	container:
