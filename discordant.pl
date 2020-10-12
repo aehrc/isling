@@ -496,8 +496,10 @@ sub getIntPos {
 	# base after the hypothetical last mapped base of the mate, and the stop is the base before
 	# the first mapped base of the read
 	
-	
+	# cacluate insert length as template length minus sum of read lengths
 	my $insert = $tlen - $rlen - $mateRlen;
+	# insert length can't be less than 0
+	if ($insert < 0) { $insert = 0; }
 	
 	my ($start, $stop, $ambig);
 	
