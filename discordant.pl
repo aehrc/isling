@@ -229,19 +229,21 @@ unless (scalar keys %hostRlen > 0) {
 
 # need to keep track of how many host alignments we used for estimating template length
 #first check that there was at least one proper pair of each
+my $tlen;
 my $host_pairs = keys %host_tlen_reads;
-if ($host_pairs < 1) {
-	die "didn't find any proper pairs in the host alignment - can't estimate template length";
-}
 my $virus_pairs = keys %virus_tlen_reads;
-if ($virus_pairs < 1) {
-	die "didn't find any proper pairs in the viral alignment - can't estimate template length";
+# if we didn't find any proper pairs, then we can't estimate template length
+# assume most pairs were merged, so set to 0
+if ($host_pairs < 1 and $virus_pairs < 1) {
+	$tlen = 0;
+	print("no proper pairs found: setting template length to 0\n");
 }
-
-my $tlen = ($host_tlen + $virus_tlen) / ($counter + $virus_counter);
-#https://stackoverflow.com/questions/178539/how-do-you-round-a-floating-point-number-in-perl
-$tlen = int($tlen + 0.5);
-print("template length estimated to be $tlen from host and virus alignments\n");
+else {
+	$tlen = ($host_tlen + $virus_tlen) / ($counter + $virus_counter);
+	#https://stackoverflow.com/questions/178539/how-do-you-round-a-floating-point-number-in-perl
+	$tlen = int($tlen + 0.5);
+	print("template length estimated to be $tlen from host and virus alignments\n");
+}
 
 
 ### Look for evidence of integration sites by identifying discordant read-pairs
