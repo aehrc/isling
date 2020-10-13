@@ -325,7 +325,7 @@ sub findDiscordant {
 	# get reference for virus and host based on which is mapped
 	my ($vRef, $vSeq, $vCig, $vOri, $vPos, $vSec, $vSup, $vNM);
 	my ($hRef, $hSeq, $hCig, $hOri, $hPos, $hSec, $hSup, $hNM);
-	my $intNM;
+	my ($intNM, $junct);
 	
 	#if host mapped R1, virus mapped R2
 	if ($hR1map eq "map") { 
@@ -352,6 +352,15 @@ sub findDiscordant {
 		$vSup = $vR2sup;
 		
 		$intNM = $vNM + $hNM;
+		
+		#if host orientation is forward, junction is host/virus
+		# otherwise it's virus/host
+		if ($hOri eq 'f') {
+			$junct = 'hv'; 
+		}
+		else {
+			$junct = 'vh'; 
+		}
 		
 
 	}
@@ -381,23 +390,20 @@ sub findDiscordant {
 		$vSup = $vR1sup;
 		
 		$intNM = $vNM + $hNM;
+		
+		#if host orientation is reverse, junction is host/virus
+		# otherwise it's virus/host
+		if ($hOri eq 'r') {
+			$junct = 'hv';
+		}
+		else {
+			$junct = 'vh'; 
+		}
 	}	
 
 	# get properties of integration
-	my ($junct, $hIntStart, $hIntStop, $vIntStart, $vIntStop, $isVecRearrange, $isHumRearrange, $isHumAmbig, $isVirAmbig, $nHAmbig, $nVAmbig, $hJunctSide, $vJunctSide);	
+	my ($hIntStart, $hIntStop, $vIntStart, $vIntStop, $isVecRearrange, $isHumRearrange, $isHumAmbig, $isVirAmbig, $nHAmbig, $nVAmbig, $hJunctSide, $vJunctSide);	
 	
-	#if host read is forward direction, orientation is hv
-	if ($hOri eq 'f') 	{ 
-		$junct = 'hv'; 
-		$hJunctSide = 'left'; 
-		$vJunctSide = 'right';
-		} 
-	#otherwise orientation is vh
-	elsif ($hOri eq 'r') 	{ 
-		$junct = 'vh'; 
-		$hJunctSide = 'right'; 
-		$vJunctSide = 'left';
-		} 
 
 	# find if junction is host/virus or virus/host
 	# find approximate location of junction on both host and virus side (assign to end of read closest to junction)
@@ -408,13 +414,16 @@ sub findDiscordant {
 	my $vRefLen = $virusRlen->{$vRef};
 
 	# get location of integration in host and virus
-	($hIntStart, $hIntStop, $nHAmbig) = getIntPos($hCig, $hPos, length($hSeq), $vCig, length($vSeq), $hJunctSide, $tlen, $hRefLen);
-		
-	# if host and virus mapped reads have opposite directions, need to pretend that the virus junction side is opposite
-	if ($hOri eq $vOri) {
-		if ($vJunctSide eq 'left') { $vJunctSide = 'right'; }
-		else { $vJunctSide = 'left'; }
+	if ($hR1map eq 'map') {
+			$hJunctSide = 'left'; 
+			$vJunctSide = 'right';
 	}
+	else {
+			$hJunctSide = 'right'; 
+			$vJunctSide = 'left'
+	}
+	
+	($hIntStart, $hIntStop, $nHAmbig) = getIntPos($hCig, $hPos, length($hSeq), $vCig, length($vSeq), $hJunctSide, $tlen, $hRefLen);
 		
 	($vIntStart, $vIntStop, $nVAmbig) = getIntPos($vCig, $vPos, length($vSeq), $hCig, length($hSeq), $vJunctSide, $tlen, $vRefLen);
 
@@ -545,7 +554,7 @@ sub getIntPos {
 		my $leftClipped = getLeftOrRightMapped($cig, 'left') - 1;
 		
 		# get the number of soft-clipped bases on the right of the mate
-		my $rightClippedMate = $mateRlen - getLeftOrRightMapped($cig, 'right');
+		my $rightClippedMate = $mateRlen - getLeftOrRightMapped($mateCig, 'right');
 		
 		# start is stop - insert - clipped bases
 		$start = $stop - $insert - $leftClipped - $rightClippedMate;
