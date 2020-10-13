@@ -184,7 +184,7 @@ rule align_bwa_host_single:
 		idx = expand("{outpath}/references/{host}/{host}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
 		all = rules.extract_to_fastq_single.output.fastq,
 	output:
-		sam = "{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam",
+		sam = temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam"),
 	conda: 
 		"../envs/bwa.yml"
 	container:
@@ -207,7 +207,7 @@ rule align_bwa_host_paired:
 		r1 = rules.extract_to_fastq_paired.output[0],
 		r2 = rules.extract_to_fastq_paired.output[1]
 	output:
-		sam = "{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaPaired.sam",
+		sam = temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaPaired.sam"),
 	conda: 
 		"../envs/bwa.yml"
 	container:
@@ -229,7 +229,7 @@ rule combine_host:
 		paired = rules.align_bwa_host_paired.output.sam,
 		single = rules.align_bwa_host_single.output.sam
 	output:
-		combined = "{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.sam"
+		combined = temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.sam")
 	conda: 
 		"../envs/bwa.yml"
 	container:
