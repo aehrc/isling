@@ -19,9 +19,9 @@ def get_for_align(wildcards, read_type):
 			
 	else:
 		if read_type == 'unmerged_r1':
-			return  get_for_seqprep(wildcards, "1")
+			return get_for_seqprep(wildcards, "1")
 		if read_type == 'unmerged_r2':
-			return  get_for_seqprep(wildcards, "2")
+			return get_for_seqprep(wildcards, "2")
 		else:
 			return rules.touch_merged.output.merged
 
@@ -131,15 +131,17 @@ rule extract_to_fastq_single:
 	input:
 		aligned = lambda wildcards: get_sam(wildcards, "single", "virus"),
 	output:
-		fastq = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaSingle.mappedTo{virus}.fastq.gz"),
+		fastq = "{outpath}/{dset}/virus_aligned/{samp}.bwaSingle.mappedTo{virus}.fastq.gz",
 	conda:
 		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
 	shell:
 		"""
-		samtools view -h -F 0x4 -F 0x800 -o - {input.aligned} |\
-		samtools fastq -0 /dev/null - > {output.fastq}
+		# 0x4 - read unmapped
+		# 0x100 - not primary alignment
+		# 0x800 - secondary alignment
+		samtools view -h -F 0x4 -F 0x800 -F 0x100 -o - {input.aligned} | samtools fastq -0 {output.fastq} - 
 		"""
 
 rule extract_vAligned_paired:
@@ -174,8 +176,7 @@ rule extract_to_fastq_paired:
 		"docker://szsctt/bwa:1"
 	shell:
 		"""
-		samtools collate -O {input.bam} |\
-		samtools fastq -1 {output.fastq1} -2 {output.fastq2} -
+		samtools collate -O {input.bam} | samtools fastq -1 {output.fastq1} -2 {output.fastq2} -
 		"""
 
 rule align_bwa_host_single:
@@ -183,7 +184,7 @@ rule align_bwa_host_single:
 		idx = expand("{outpath}/references/{host}/{host}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
 		all = rules.extract_to_fastq_single.output.fastq,
 	output:
-		sam = temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam"),
+		sam = "{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam",
 	conda: 
 		"../envs/bwa.yml"
 	container:
@@ -206,7 +207,7 @@ rule align_bwa_host_paired:
 		r1 = rules.extract_to_fastq_paired.output[0],
 		r2 = rules.extract_to_fastq_paired.output[1]
 	output:
-		sam = temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaPaired.sam"),
+		sam = "{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaPaired.sam",
 	conda: 
 		"../envs/bwa.yml"
 	container:
