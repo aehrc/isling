@@ -353,16 +353,6 @@ sub findDiscordant {
 		
 		$intNM = $vNM + $hNM;
 		
-		#if host orientation is forward, junction is host/virus
-		# otherwise it's virus/host
-		if ($hOri eq 'f') {
-			$junct = 'hv'; 
-		}
-		else {
-			$junct = 'vh'; 
-		}
-		
-
 	}
 	#if host mapped R2, virus mapped R1
 	else { 
@@ -391,19 +381,35 @@ sub findDiscordant {
 		
 		$intNM = $vNM + $hNM;
 		
-		#if host orientation is reverse, junction is host/virus
-		# otherwise it's virus/host
-		if ($hOri eq 'r') {
-			$junct = 'hv';
-		}
-		else {
-			$junct = 'vh'; 
-		}
 	}	
+
 
 	# get properties of integration
 	my ($hIntStart, $hIntStop, $vIntStart, $vIntStop, $isVecRearrange, $isHumRearrange, $isHumAmbig, $isVirAmbig, $nHAmbig, $nVAmbig, $hJunctSide, $vJunctSide);	
-	
+		
+	#if host orientation is forward, junction is host/virus
+	# otherwise it's virus/host
+	if ($hOri eq 'f') {
+		$junct = 'hv'; 
+		$hJunctSide = 'left';
+		# if the host and virus are mapped in the same orientation, need to reverse sides
+		if ($vOri eq 'f') {
+			$vJunctSide = 'left';
+		}
+		else {
+			$vJunctSide = 'right';
+		}
+	}
+	else {
+		$junct = 'vh'; 
+		$hJunctSide = 'right';
+		if ($vOri eq 'f') {
+			$vJunctSide = 'left';
+		}
+		else {
+			$vJunctSide = 'right';
+		}
+	}
 
 	# find if junction is host/virus or virus/host
 	# find approximate location of junction on both host and virus side (assign to end of read closest to junction)
@@ -412,16 +418,6 @@ sub findDiscordant {
 	# get length of reference to which read is aligned for host and virus
 	my $hRefLen = $hostRlen->{$hRef};
 	my $vRefLen = $virusRlen->{$vRef};
-
-	# get location of integration in host and virus
-	if ($hR1map eq 'map') {
-			$hJunctSide = 'left'; 
-			$vJunctSide = 'right';
-	}
-	else {
-			$hJunctSide = 'right'; 
-			$vJunctSide = 'left'
-	}
 	
 	($hIntStart, $hIntStop, $nHAmbig) = getIntPos($hCig, $hPos, length($hSeq), $vCig, length($vSeq), $hJunctSide, $tlen, $hRefLen);
 		
