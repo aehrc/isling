@@ -128,7 +128,6 @@ while (my $vl = <VIRAL>) {
 	#get cigar
 	my ($cig, $editDist2) = processCIGAR2($parts[5], $tol); # Note that could be a cigar or * if unmapped
 	
-	
 	#get sequence and orientation
 	my ($seq, $seqOri);	
 	if ($parts[1] & 0x10) { $seq = reverseComp($parts[9]); $seqOri = 'r'; }
@@ -292,7 +291,7 @@ sub findDiscordant {
 ### in host and viral integration sites
 ### returns integration start/stop relative to read sequence
 
-### BWA Alignments are 1-based
+### sam format specifies 1-based numbering
 	my ($key, $vR1, $vR2, $hR1, $hR2, $tlen, $hostRlen, $virusRlen) = @_;
 	
 	my ($seq1, $vR1ori, $vR1ref, $vR1start, $vR1cig, $vR1sec, $vR1sup, $vNM1) = (split('xxx', $vR1))[0, 1, 2, 3, 4, 5, 6, -1];
@@ -329,7 +328,8 @@ sub findDiscordant {
 	
 	#if host mapped R1, virus mapped R2
 	if ($hR1map eq "map") { 
-		#check unmapped bases is less than cutoff
+		
+		#check unmapped bases in mapped reads is less than cutoff
 		unless (($readlen1 - $hR1mapBP) < $cutoff) { return; } 
 		unless (($readlen2 - $vR2mapBP) < $cutoff) { return; } 
 		
