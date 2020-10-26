@@ -252,15 +252,19 @@ sub getSecSup {
 	
 	#get supplementary alignments from SA field
 	my ($sup, $sec);
-	if ($line =~ /SA:.:.*;/) 	{ 
-		($sup) = ($line =~ /SA:.:(.*?);\s/);
+	if ($line =~ /\sSA:.:.*;\s/) 	{ 
+		($sup) = ($line =~ /\sSA:.:(.*?);\s/);
 	
 	}
 	else 						{ $sup = "NA"; }	
 	
+	if ($sup =~ /pAAV2-OTC,3064,-,172S134M,60,0/) {
+		$DB::single = 1;
+	}
+	
 	#Add get secondary alignment information from XA field
-	if ($line =~ /XA:.:.*;/) 	{ 
-		($sec) = ($line =~ /XA:.:(.*);\s/); 
+	if ($line =~ /\sXA:.:.*;\s/) 	{ 
+		($sec) = ($line =~ /\sXA:.:(.*);\s/); 
 		
 		#two different fields have different formats: 
 		#SA has /(chr,pos,strand,CIGAR,PHRED,NM;)*/ but XA has only /(chr,pos,CIGAR,NM;)*/ where pos starts with + or - to indicate strand
@@ -275,6 +279,8 @@ sub getSecSup {
 			#join elements to make new alignment string
 			#note that XA doesen't contain phred info, so just put 0 here
 			my $newSec = join(",", $chr, $newPos, $strand, $cig, "0", $nm);
+			$DB::single ||= $warn_flag;
+    	 $warn_flag = 0;
 			
 			$newSecs = join(";", $newSec, $newSecs)
 		}
