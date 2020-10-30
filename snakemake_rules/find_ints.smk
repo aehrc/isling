@@ -6,8 +6,8 @@ rule run_soft:
 	output:
 		soft = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.soft.txt"),
 	params:
-		cutoff = lambda wildcards: f"--cutoff {get_value_from_df(wildcards, 'clip_cutoff')}",
-		tol = lambda wildcards: f"--tol {get_value_from_df(wildcards, 'cigar_tol')}"
+		cutoff = lambda wildcards: f"--cutoff {int(get_value_from_df(wildcards, 'clip_cutoff'))}",
+		tol = lambda wildcards: f"--tol {int(get_value_from_df(wildcards, 'cigar_tol'))}"
 	container:
 		"docker://ubuntu:18.04"	
 	shell:
@@ -22,8 +22,8 @@ rule run_short:
 	output:
 		short = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.short.txt"),
 	params:
-		cutoff = lambda wildcards: f"--cutoff {get_value_from_df(wildcards, 'clip_cutoff')}",
-		tol = lambda wildcards: f"--tol {get_value_from_df(wildcards, 'cigar_tol')}"
+		cutoff = lambda wildcards: f"--cutoff {int(get_value_from_df(wildcards, 'clip_cutoff'))}",
+		tol = lambda wildcards: f"--tol {int(get_value_from_df(wildcards, 'cigar_tol'))}"
 	container:
 		"docker://ubuntu:18.04"
 	shell:
@@ -38,8 +38,8 @@ rule run_discordant:
 	output:
 		discord = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.discordant.txt"),
 	params:
-		cutoff = lambda wildcards: f"--cutoff {get_value_from_df(wildcards, 'clip_cutoff')}",
-		tol = lambda wildcards: f"--tol {get_value_from_df(wildcards, 'cigar_tol')}"
+		cutoff = lambda wildcards: f"--cutoff {int(get_value_from_df(wildcards, 'clip_cutoff'))}",
+		tol = lambda wildcards: f"--tol {int(get_value_from_df(wildcards, 'cigar_tol'))}"
 	container:
 		"docker://ubuntu:18.04"
 	shell:
