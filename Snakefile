@@ -76,6 +76,7 @@ localrules: all, touch_merged, check_bam_input_is_paired
 #### target files ####
 summary_files = set()
 ucsc_files = set()
+merged_bed = set()
 for i, row in toDo.iterrows():
 	summary_files.add(f"{row['outdir']}/summary/{row['dataset']}.xlsx")
 	ucsc_files.add(f"{row['outdir']}/summary/ucsc_bed/{row['dataset']}.post.bed")
@@ -93,6 +94,14 @@ rule all:
 			virus = toDo.loc[:,'virus']
 			),
 		expand("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bam",
+			zip,
+			outpath = toDo.loc[:,'outdir'],
+			dset = toDo.loc[:,'dataset'],
+			samp = toDo.loc[:,'sample'],
+			virus = toDo.loc[:,'virus'],
+			host = toDo.loc[:,'host']
+			),
+		expand("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.merged.bed",
 			zip,
 			outpath = toDo.loc[:,'outdir'],
 			dset = toDo.loc[:,'dataset'],

@@ -24,7 +24,10 @@ class InputError(Error):
 
 
 #### defaults ####
-bwa_mem_params="-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+bwa_mem_params = "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+merge_dist_default = 100
+tol_default = 3
+cutoff_default = 20
 
 
 #### check file extensions ####
@@ -163,8 +166,26 @@ def make_df(config):
 		else:
 			config[dataset]['virus'] = {config[dataset]["virus_name"] : config[dataset]["virus_fasta"]}
 		
+		if "read1-adapt" not in config[dataset] or "read2-adapt" not in config[dataset]:
+			raise ValueError("one or more adapters not specified for dataset {dataset}: please specify with 'read1-adapt' and 'read2-adapt'")
 		adapter_1 = config[dataset]["read1-adapt"]
 		adapter_2 = config[dataset]["read2-adapt"]
+		
+		if "merge-dist" not in config[dataset]:
+			print(f'merge-dist not specified for dataset {dataset}: using default {merge_dist_default}')
+			config[dataset]["merge-dist"] = merge_dist_default
+		
+		if "clip-cutoff" not in config[dataset]:
+			print(f'clip-cutoff not specified for dataset {dataset}: using default {cutoff_default}')
+			config[dataset]["clip-cutoff"] = cutoff_default
+			
+		if "cigar-tol" not in config[dataset]:
+			print(f'cigar-tol not specified for dataset {dataset}: using default {tol_default}')
+			config[dataset]["cigar-tol"] = tol_default
+			
+		merge_dist = config[dataset]["merge-dist"]
+		clip_cutoff = config[dataset]["clip-cutoff"]
+		cigar_tol = config[dataset]["cigar-tol"]
 		
 		# get arguments for running postprocessing scripts
 		postargs = make_post_args({dataset : config[dataset]})[0][dataset]
@@ -191,7 +212,7 @@ def make_df(config):
 			unique = f"{dataset_name}+++{sample}"
 			
 			# append combinations of each sample, host and virus		
-			rows.append((dataset_name, dataset, sample, host, config[dataset]["host"][host], virus, config[dataset]["virus"][virus], merge, dedup, unique,  config[dataset]["out_dir"], bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs))
+			rows.append((dataset_name, dataset, sample, host, config[dataset]["host"][host], virus, config[dataset]["virus"][virus], merge, dedup, unique,  config[dataset]["out_dir"], bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, clip_cutoff, cigar_tol))
 
 			
 	# check there aren't any duplicate rows
@@ -200,7 +221,7 @@ def make_df(config):
 			
 	
 	# make dataframe
-	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs'])
+	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'clip_cutoff', 'cigar_tol'])
 	
 	# do checks on dataframe
 	check_dataset_sample_unique(toDo)

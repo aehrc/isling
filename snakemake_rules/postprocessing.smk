@@ -96,3 +96,25 @@ rule ucsc_bed:
 		mv {params.outdir}/*bed {params.outdir}/..
 		rmdir {params.outdir}
 		"""
+		
+rule merged_bed:
+	input:
+		txt = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.txt"
+	output:
+		bed = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.bed",
+		merged_bed = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.merged.bed"
+	params:
+		d = lambda wildcards: f"-d {get_value_from_df(wildcards, 'merge_dist')}"
+	container:
+		"docker://szsctt/bedtools:1"
+	shell:
+		"""
+		awk -F"\t" -v OFS="\t" '(NR != 1) {{print $1,$2,$3,$21}}' {input.txt} | sort -k1,1 -k2,2n > {output.bed}
+		bedtools merge -i {output.bed} {params} -c 4,4 -o count,collapse > {output.merged_bed}
+		"""
+		
+		
+		
+		
+		
+		

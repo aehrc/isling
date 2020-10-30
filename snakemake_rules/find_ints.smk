@@ -5,11 +5,14 @@ rule run_soft:
 		virus = lambda wildcards: get_sam(wildcards, "combined", "virus")
 	output:
 		soft = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.soft.txt"),
+	params:
+		cutoff = lambda wildcards: f"--cutoff {get_value_from_df(wildcards, 'clip_cutoff')}",
+		tol = lambda wildcards: f"--tol {get_value_from_df(wildcards, 'cigar_tol')}"
 	container:
 		"docker://ubuntu:18.04"	
 	shell:
 		"""
-		perl -I. ./softClip.pl --viral {input.virus} --host {input.host} --output {output.soft} --tol 3
+		perl -I. ./softClip.pl --viral {input.virus} --host {input.host} --output {output.soft} {params}
 		"""
 		
 rule run_short:
@@ -18,11 +21,14 @@ rule run_short:
 		virus = lambda wildcards: get_sam(wildcards, "combined", "virus"),
 	output:
 		short = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.short.txt"),
+	params:
+		cutoff = lambda wildcards: f"--cutoff {get_value_from_df(wildcards, 'clip_cutoff')}",
+		tol = lambda wildcards: f"--tol {get_value_from_df(wildcards, 'cigar_tol')}"
 	container:
 		"docker://ubuntu:18.04"
 	shell:
 		"""
-		perl -I. ./short.pl --viral {input.virus} --host {input.host} --output {output.short} --tol 3
+		perl -I. ./short.pl --viral {input.virus} --host {input.host} --output {output.short} {params}
 		"""
 		
 rule run_discordant:
@@ -31,11 +37,14 @@ rule run_discordant:
 		virus = lambda wildcards: get_sam(wildcards, "paired", "virus"),
 	output:
 		discord = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.discordant.txt"),
+	params:
+		cutoff = lambda wildcards: f"--cutoff {get_value_from_df(wildcards, 'clip_cutoff')}",
+		tol = lambda wildcards: f"--tol {get_value_from_df(wildcards, 'cigar_tol')}"
 	container:
 		"docker://ubuntu:18.04"
 	shell:
 		"""
-		perl -I. ./discordant.pl --viral {input.virus} --host {input.host} --output {output.discord} --tol 3
+		perl -I. ./discordant.pl --viral {input.virus} --host {input.host} --output {output.discord} {params}
 		"""
 
 rule combine_ints:
