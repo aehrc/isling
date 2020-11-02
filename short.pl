@@ -24,7 +24,7 @@ my $output = "short.txt";
 my $bed;
 my $merged;
 my $verbose;
-
+my $min_mapq = 0;
 my $help;
 
 GetOptions('cutoff=i' => \$cutoff,
@@ -36,11 +36,18 @@ GetOptions('cutoff=i' => \$cutoff,
 		   'merged=s' => \$merged,
 		   'verbose'  => \$verbose,
 		   'tol=i'    => \$tol,
+		   'min-mapq=i'    => \$min_mapq,
 		   'help',    => \$help);
 
 if ($help) { printHelp(); }
 
 unless ($viral and $host) { printHelp(); }
+
+# check inputs
+if ($cutoff < 0) { die "Cutoff must be greater than zero"; }
+if ($tol < 0) { die "Tolerance must be greater than zero"; }
+if ($min_mapq < 0) { die "Minimum mapping quality must be greater than zero"; }
+if ($min_mapq > 60) { die "Minimum mapping quality must be less than 60"; }
 
 my %viralIntegrations;
 my %hostIntegrations;
@@ -71,6 +78,9 @@ while (my $vl = <VIRAL>) {
 	if ($parts[1] & 0x800) { next(); } # skip supplementary alignments
 	if ($parts[1] & 0x4) {next; } #skip unmapped alignments
 	if ($parts[2] eq "*") { next; } # skip unaligned reads
+	
+	# check mapping quality
+	if ($parts[4] < $min_mapq) { next; }
 
 	my ($cig, $combinedBases) = processCIGAR2($parts[5], $tol); # Process the CIGAR string to account for small insertions/deletions
 	unless ($cig) { next; } # keep checking to make sure double clipped reads don't sneak through
@@ -119,6 +129,9 @@ while (my $hl = <HOST>) {
 	
 	if ($parts[1] & 0x800) { next(); } # skip supplementary alignments
 	if ($parts[1] & 0x4) {next; } #skip unmapped alignments
+	
+	# check mapping quality
+	if ($parts[4] < $min_mapq) { next; }
 	
 	unless ($parts[5]) { next; }
 
@@ -225,12 +238,14 @@ exit;
 sub printHelp {
 	print "Pipeline for detection of viral integration sites within a genome\n\n";
 	print "Usage:\n";
-	print "\tperl short.pl --viral <sam> --host <sam> --cutoff <n> --thresh <n> --output <out> --bed <bed> --help\n\n";
+	print "\tperl short.pl --viral <sam> --host <sam> --cutoff <n> --thresh <n> --tol <n> --min-mapq <n> --output <out> --bed <bed> --help\n\n";
 	print "Arguments:\n";
 	print "\t--viral:   Alignment of reads to viral genomes (sam)\n";
 	print "\t--host:   Alignment of reads to host genome (sam)\n";
 	print "\t--cutoff:  Minimum number of clipped reads to be considered (default = 20)\n";
 	print "\t--thresh:	Amount of read that must be covered by one alignment to be considered rearrangement (default = 0.95)\n";
+	print "\t--tol:	Soft-clipped regions at either end of the read shorter than this will be absorbed into the nearest mapped region";
+	print "\t--min-maqp:	Minimum mapping quality to consider a read";	
 	print "\t--output:  Output file for results (default = short.txt\n";
 	print "\t--bed:     Print integrations sites to indicated bed file (default = NA)\n";
 	print "\t--merged:  Merge bedfile into overlapping integration sites (default = NA)\n";
