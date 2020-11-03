@@ -283,14 +283,14 @@ cat(nrow(ints), "integrations imported\n")
 
 if (dedup & nrow(ints) != 0)
 {
-  source("post/dedup.R")
+  source("scripts/post/dedup.R")
 }
 
 #### filtering ####
 
 if (filt & nrow(ints) != 0 & nrow(ints) != 0)
 {
-  source("post/filter.R")
+  source("scripts/post/filter.R")
 }
 
 #### masking ####
@@ -298,13 +298,13 @@ if (filt & nrow(ints) != 0 & nrow(ints) != 0)
 # do exluding based on intersect with bed file
 if (mask_exclude[1] != "" & nrow(ints) != 0)
 {
-  source("post/mask-exclude.R")
+  source("scripts/post/mask-exclude.R")
 }
 
 # do excluding based on lack of intersect with bed file
 if (mask_include[1] != "" & nrow(ints) != 0)
 {
-  source("post/mask-include.R")
+  source("scripts/post/mask-include.R")
 }
 
 #### annotating ####
@@ -312,20 +312,20 @@ if (mask_include[1] != "" & nrow(ints) != 0)
 # annotate nearest feature from gtf file(s)
 if (nearest_gtf[1] != "" & nrow(ints) != 0)
 {
-  source("post/nearest-gtf.R")
+  source("scripts/post/nearest-gtf.R")
 }
 
 #annotate nearest feature from bed file(s)
 if (nearest_bed[1] != "" & nrow(ints) != 0)
 {
-  source("post/nearest-bed.R")
+  source("scripts/post/nearest-bed.R")
 }
 
 #annotate nearest feature from bed file(s)
 
 if (nearest_gtf_RNA[1] != "" & nrow(ints) != 0)
 {
-  source("post/RNA-seq-gtf-tsv.R")
+  source("scripts/post/RNA-seq-gtf-tsv.R")
 }
 
 #### save output postprocessed file ####
@@ -338,4 +338,4 @@ readr::write_tsv(ints, path = paste0(base_name, ".post.", ext))
 
 #### session info ####
 cat("\n")
-#sessionInfo()
+sessionInfo()
