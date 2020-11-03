@@ -1,5 +1,12 @@
 #### preprocessing rules ####
 
+
+rule write_analysis_summary:
+	output:
+		tsv = "{outpath}/summary/{dset}.analysis_conditions.tsv"
+	run:
+		toDo[toDo['dataset'] == wildcards.dset].to_csv(output.tsv, sep = "\t") 
+
 def get_value_from_df(wildcards, column_name):
 	
 	# get a value from the row of the df corresponding to this sample and dataset
@@ -89,9 +96,28 @@ rule seqPrep:
 		"""
 		SeqPrep -A {params.A} -B {params.B} -f {input.r1} -r {input.r2} -1 {output.proc_r1} -2 {output.proc_r2} -s {output.merged}
 		"""
+		
+rule seqPrep_unmerged:
+	input:
+		r1 = lambda wildcards: get_for_seqprep(wildcards, '1'),
+		r2 = lambda wildcards: get_for_seqprep(wildcards, '2')
+	output:
+		proc_r1 = "{outpath}/{dset}/merged_reads/{samp}.1.fastq.gz",
+		proc_r2 = "{outpath}/{dset}/merged_reads/{samp}.2.fastq.gz"
+	conda:	
+		"../envs/seqprep.yml"
+	container:
+		"docker://szsctt/seqprep:1"
+	params:
+		A = lambda wildcards: get_value_from_df(wildcards, "adapter_1"),
+		B = lambda wildcards: get_value_from_df(wildcards, "adapter_2")
+	shell:
+		"""
+		SeqPrep -A {params.A} -B {params.B} -f {input.r1} -r {input.r2} -1 {output.proc_r1} -2 {output.proc_r2}
+		"""
 
 rule touch_merged:
-# if we don't want to do seqPrep, we still need to have an empty file of unmerged reads
+# if we don't want to do merging, we still need to have an empty file of unmerged reads
 	input:
 		r1 = lambda wildcards: get_for_seqprep(wildcards, '1'),
 		r2 = lambda wildcards: get_for_seqprep(wildcards, '2')

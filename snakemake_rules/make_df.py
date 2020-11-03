@@ -6,25 +6,9 @@ import collections
 import itertools
 import pdb
 
-#### custom errors ####
-
-class Error(Exception):
-    """Base class for exceptions in this module."""
-    pass
-
-class InputError(Error):
-    """Exception raised for errors in the input.
-
-    Attributes:
-        message -- explanation of the error
-    """
-
-    def __init__(self, message):
-        self.message = message
-
 
 #### defaults ####
-bwa_mem_params = "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+bwa_mem_default = "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
 merge_dist_default = 100
 tol_default = 3
 cutoff_default = 20
@@ -40,48 +24,6 @@ fastq_extensions = [".fq", ".fastq"]
 sam_extensions = [".sam", ".bam"]
 compression_extensions = [".gz", ".bz2"]
 
-def check_input_files(config):
-
-	for dataset in config:
-
-		# if input is fastq
-		if "R1_suffix" in config[dataset]:
-	
-			# check that R2_suffix is also specified
-			if "R2_suffix" not in config[dataset]:
-				raise InputError("If R1_suffix is specified (for fastq input), R2_suffix must also be specified")
-	
-			# check R1_suffix for compression and fastq file extension
-			R1_first_extension = path.splitext(config[dataset]["R1_suffix"])[1]
-			R2_first_extension = path.splitext(config[dataset]["R2_suffix"])[1]
-		
-			#bz2 or gz compression
-			if R1_first_extension in compression_extensions:
-		
-				# get second extensions
-				R1_second_extension = path.splitext(path.splitext(config[dataset]["R1_suffix"])[0])[1]
-				R2_second_extension = path.splitext(path.splitext(config[dataset]["R2_suffix"])[0])[1]
-		
-				# check that input looks like a fastq files
-				if R1_second_extension not in fastq_extensions or R2_second_extension not in fastq_extensions:
-					raise InputError("input files do not look like fastq files (extension is not '.fq' or '.fastq'")
-
-			
-			# if uncompressed, check file looks like fastq file
-			elif R1_first_extension not in fastq_extensions or R2_first_extension not in fastq_extensions:
-				raise InputError("for fastq files, input file extensions must be '.fastq' or '.fq'")
-
-		# if input is bam
-		elif "bam_suffix" in config[dataset]:
-			extension = config[dataset]["bam_suffix"]
-			if extension != ".bam" and extension != ".sam":
-				extension = path.splitext(config[dataset]["bam_suffix"])[1]
-				if extension != ".bam" and extension != ".sam":
-					raise InputError("For aligned input, only '.bam' and '.sam' files are currently supported")
-	
-		# if nether R1/R2 suffix or bam suffix specified
-		else:
-			raise InputError("Please specify either 'R1_suffix' and 'R2_suffix' or 'bam_suffix' in the config file")
 		
 
 #### get information for wildcards ####
@@ -91,122 +33,86 @@ def check_input_files(config):
 
 def make_df(config):
 
-	check_input_files(config)
-
 	rows = []
 
 	for dataset in config:
+	
+		check_read_suffixes(config, dataset)
+		
 		# get output directory
-		if "out_dir" not in config[dataset]:
-			print(f"output directory not specified for dataset {dataset}, using current directory")
-			config[dataset]["out_dir"] = getcwd()
-		else:
-			config[dataset]["out_dir"] = path.normpath(config[dataset]["out_dir"])
+		outdir = get_value_or_default(config, dataset, 'out_dir', getcwd())
+		outdir = path.normpath(outdir)
 		
-		# get fastq files for input
-		if "R1_suffix" in config[dataset]:
-			is_bam = False
-			suffix = config[dataset]["R1_suffix"]
-			config[dataset]['read_folder'] = path.normpath(config[dataset]['read_folder'])
-			folder = config[dataset]['read_folder']	
-			samples = [path.basename(f)[:-len(suffix)] for f in glob(f"{folder}/*{suffix}")]
-			if len(samples) == 0:
-				print(f"warning: no files found for dataset {dataset}")
-		
-		# get bam/sam files for input
-		elif "bam_suffix" in config[dataset]:
-			is_bam = True
-			suffix = config[dataset]["bam_suffix"]
-			folder = config[dataset]['read_folder']	
-			config[dataset]["R1_suffix"] = "_1.fq.gz"
-			config[dataset]["R2_suffix"] = "_2.fq.gz"
-			samples = [path.basename(f)[:-len(suffix)] for f in glob(f"{folder}/*{suffix}")]
-			if len(samples) == 0:
-				print(f"warning: no files found for dataset {dataset}")
-		else:
-			raise InputError(f"please specify either bam_suffix or R1_suffix and R2_suffix for dataset {dataset}")
+		# get read directory
+		readdir = check_required(config, dataset, 'read_folder')
+		readdir = path.normpath(readdir)
 			
-		# figure out if 'dedup' and 'merge' are true or false for this dataset
-		if isinstance(config[dataset]["dedup"], bool):
-			dedup = int(config[dataset]["dedup"])
-		elif isinstance(config[dataset]["dedup"], str):
-			if config[dataset]["dedup"].lower() == "true":
-				dedup = 1
-			else:
-				dedup = 0
-		else:
-			raise InputError(f"Please specify True or False for 'dedup' in dataset {dataset}")
-		if isinstance(config[dataset]["merge"], bool):
-			merge = int(config[dataset]["merge"])
-		elif isinstance(config[dataset]["merge"], str):
-			if config[dataset]["merge"].lower() == "true":
-				merge = 1
-			else:
-				merge = 0
-		else:
-			raise InputError(f"Please specify True or False for 'merge' in dataset {dataset}")
+		# figure out if 'dedup', 'merge' and 'trim' are true or false for this dataset
+		dedup = check_bools(config, dataset, 'dedup')
+		merge = check_bools(config, dataset, 'merge')
+		trim = check_bools(config, dataset, 'trim')
 		
 		# get host and virus 
 		# host and virus can either be spcified as 'host_name' and 'host_fasta' ('virus_name' and 'virus_fasta'), 
 		# or in 'host'/'virus', where the key is the name of the host/virus and the value is the path the the fasta
 		if 'host' in config[dataset]:
-			
 			# check at least one host was specified
 			if len(config[dataset]['host']) == 0:
 				raise ValueError(f"At least one host must be specified for dataset {dataset}")
-			
 		else:
-			config[dataset]['host'] = {config[dataset]["host_name"] : config[dataset]["host_fasta"]}
+			host_name = check_required(config, dataset, 'host_name')
+			host_fasta = check_required(config, dataset, 'host_fasta')
+			config[dataset]['host'] = {host_name : host_fasta}
 			
 		if 'virus' in config[dataset]:
-			
 			# check at least one virus was specified
 			if len(config[dataset]['virus']) == 0:
 				raise ValueError(f"At least one virus must be specified for dataset {dataset}")
-			
 		else:
-			config[dataset]['virus'] = {config[dataset]["virus_name"] : config[dataset]["virus_fasta"]}
+			virus_name = check_required(config, dataset, 'virus_name')
+			virus_fasta = check_required(config, dataset, 'virus_fasta')
+			config[dataset]['virus'] = {virus_name: virus_fasta}
 		
-		if "read1-adapt" not in config[dataset] or "read2-adapt" not in config[dataset]:
-			raise ValueError("one or more adapters not specified for dataset {dataset}: please specify with 'read1-adapt' and 'read2-adapt'")
-		adapter_1 = config[dataset]["read1-adapt"]
-		adapter_2 = config[dataset]["read2-adapt"]
+		# only need adapters if we're trimming or merging
+		if merge or trim:
+			adapter_1 =check_required(config, dataset, 'read1-adapt')
+			adapter_2 =check_required(config, dataset, 'read2-adapt')
+		else:
+			adapter_1 = ""
+			adapter_2 = ""
 		
-		if "merge-dist" not in config[dataset]:
-			print(f'merge-dist not specified for dataset {dataset}: using default {merge_dist_default}')
-			config[dataset]["merge-dist"] = merge_dist_default
+		# check for other optional parameters
+		merge_dist = get_value_or_default(config, dataset, 'merge-dist', merge_dist_default)
+		clip_cutoff = get_value_or_default(config, dataset, 'clip-cutoff', cutoff_default)
+		cigar_tol = get_value_or_default(config, dataset, 'cigar-tol', tol_default)
+		min_mapq = get_value_or_default(config, dataset, 'min-mapq', min_mapq_default)
+		bwa_mem_params = get_value_or_default(config, dataset, 'bwa-mem', bwa_mem_default)
 		
-		if "clip-cutoff" not in config[dataset]:
-			print(f'clip-cutoff not specified for dataset {dataset}: using default {cutoff_default}')
-			config[dataset]["clip-cutoff"] = cutoff_default
-			
-		if "cigar-tol" not in config[dataset]:
-			print(f'cigar-tol not specified for dataset {dataset}: using default {tol_default}')
-			config[dataset]["cigar-tol"] = tol_default
-			
-		if "min-mapq" not in config[dataset]:
-			print(f'min-mapq not specified for dataset {dataset}: using default {min_mapq_default}')
-			config[dataset]["min-mapq"] = tol_default
-			
-		merge_dist = config[dataset]["merge-dist"]
-		clip_cutoff = config[dataset]["clip-cutoff"]
-		cigar_tol = config[dataset]["cigar-tol"]
-		min_mapq = config[dataset]["min-mapq"]
+		# check values are integers greater than a minimum value
+		check_int_gt(merge_dist, -1, 'merge-dist', dataset)
+		check_int_gt(clip_cutoff, 1, 'clip-cutoff', dataset)
+		check_int_gt(cigar_tol, 0, 'cigar-tol', dataset)
+		check_int_gt(min_mapq, -1, 'min-mapq', dataset)
 		
 		# get arguments for running postprocessing scripts
 		postargs = make_post_args({dataset : config[dataset]})[0][dataset]
 		
+		# get samples for this dataset
+		samples, is_bam = get_samples(config, dataset)
+		
 		# make one row for each sample
-		for sample, host, virus in itertools.product(samples,config[dataset]['host'].keys(), config[dataset]['virus']):
+		for sample, host, virus in itertools.product(samples,
+																									config[dataset]['host'].keys(), 
+																									config[dataset]['virus']):
 			
 			if is_bam:
-				bam_file = f"{path.normpath(config[dataset]['read_folder'])}/{sample}{config[dataset]['bam_suffix']}"
-				R1_file = f"{path.normpath(config[dataset]['out_dir'])}/{dataset}/reads/{sample}{config[dataset]['R1_suffix']}"
-				R2_file = f"{path.normpath(config[dataset]['out_dir'])}/{dataset}/reads/{sample}{config[dataset]['R2_suffix']}"
+				bam_file = f"{readdir}/{sample}{config[dataset]['bam_suffix']}"
+				R1_file = f"{outdir}/{dataset}/reads/{sample}{config[dataset]['R1_suffix']}"
+				R2_file = f"{outdir}/{dataset}/reads/{sample}{config[dataset]['R2_suffix']}"
 			else:
 				bam_file = ""	
-				R1_file = f"{path.normpath(config[dataset]['read_folder'])}/{sample}{config[dataset]['R1_suffix']}"
-				R2_file = f"{path.normpath(config[dataset]['read_folder'])}/{sample}{config[dataset]['R2_suffix']}"
+				R1_file = f"{readdir}/{sample}{config[dataset]['R1_suffix']}"
+				R2_file = f"{readdir}/{sample}{config[dataset]['R2_suffix']}"
 			
 			# if there is more than one virus or host, append these to the dataset name
 			if len(config[dataset]['host'].keys()) > 1 or len(config[dataset]['virus'].keys()) > 1:
@@ -218,16 +124,15 @@ def make_df(config):
 			unique = f"{dataset_name}+++{sample}"
 			
 			# append combinations of each sample, host and virus		
-			rows.append((dataset_name, dataset, sample, host, config[dataset]["host"][host], virus, config[dataset]["virus"][virus], merge, dedup, unique,  config[dataset]["out_dir"], bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, clip_cutoff, cigar_tol, min_mapq))
+			rows.append((dataset_name, dataset, sample, host, config[dataset]["host"][host], virus, config[dataset]["virus"][virus], merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, clip_cutoff, cigar_tol, min_mapq))
 
 			
 	# check there aren't any duplicate rows
 	if len(set(rows)) != len(rows):
 		raise ValueError("Error - configfile results in duplicate analyses, check samples and dataset names are unique")
-			
 	
 	# make dataframe
-	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'clip_cutoff', 'cigar_tol', 'min_mapq'])
+	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'clip_cutoff', 'cigar_tol', 'min_mapq'])
 	
 	# do checks on dataframe
 	check_dataset_sample_unique(toDo)
@@ -241,16 +146,16 @@ def make_df(config):
 def check_dataset_sample_unique(toDo):
 	# check that every combination of 'dataset' and 'sample' is unique
 	if len(set(toDo.loc[:,'unique'])) != len(toDo.loc[:,'unique']):
-		raise InputError("Every combination of 'dataset' and 'sample' must be unique! Check inputs and try again")
+		raise ValueError("Every combination of 'dataset' and 'sample' must be unique! Check inputs and try again")
 
 def check_fastas_unique(toDo, ref_names):
 	# check that each host/virus name refers to only one fasta
 	for i, virus_name in enumerate(toDo.loc[:,'virus']):
 		if toDo.loc[i,'virus_fasta'] != ref_names[virus_name]:
-			raise InputError(f"Virus {virus_name} is used as a name in multiple datasets for different fasta files.  Please modify your configfile so that each unique virus/host name only refers to one fasta file")
+			raise ValueError(f"Virus {virus_name} is used as a name in multiple datasets for different fasta files.  Please modify your configfile so that each unique virus/host name only refers to one fasta file")
 	for i, host_name in enumerate(toDo.loc[:,'host']):
 		if toDo.loc[i,'host_fasta'] != ref_names[host_name]:
-			raise InputError(f"Host {host_name} is used as a name in multiple datasets for different fasta files.  Please modify your configfile so that each unique virus/host name only refers to one fasta file")
+			raise ValueError(f"Host {host_name} is used as a name in multiple datasets for different fasta files.  Please modify your configfile so that each unique virus/host name only refers to one fasta file")
 	
 	
 def make_reference_dict(toDo):
@@ -320,4 +225,136 @@ def make_post_args(config):
 			POSTARGS[dataset] = " ".join(POSTARGS[dataset])
 		
 	return POSTARGS, TOSORT, SORTED
+	
+def check_bools(config, dataset, key):
+	"""
+	Check that the key in the speicfied dataset is defined, and return 1 if true, 0 if false
+	"""
+	# if not specified
+	if 'dedup' not in config[dataset]:
+		raise ValueError(f"Please specify True or False for 'dedup' in dataset {dataset}")
+	
+	# try to figure out if the user wanted true or false
+	if isinstance(config[dataset]["dedup"], bool):
+		return int(config[dataset]["dedup"])
+	elif isinstance(config[dataset]["dedup"], str):
+		if config[dataset]["dedup"].lower() == "true":
+			return 1
+		else:
+			return 0
+	else:
+		raise ValueError(f"Please specify True or False for '{key}' in dataset {dataset}")
+	
+def check_required(config, dataset, key):
+	"""
+	Check that a required key has been specified, and raise an error if it hasn't
+	"""
+	if key not in config[dataset]:
+		raise ValueError(f"Please specify required parameter '{key}' in dataset {dataset}")
 		
+	return config[dataset][key]
+		
+def get_value_or_default(config, dataset, key, default):
+	"""
+	Check that a optional paramter has been specified, and use the default if it hasn't
+	"""
+	
+	if key not in config[dataset]:
+		print(f"Paramter '{key}' not specified for dataset {dataset}: using default {default}")
+		return default
+	
+	return config[dataset][key]	
+	
+def check_int_gt(var, minimum, name, dataset):
+	"""
+	check if a variable is an integer greater than 'minimum'
+	"""	
+	if not isinstance(var, int):
+		raise ValueError(f"Parameter {name} in dataset {dataset} must be an integer")
+	
+	if var < minimum:
+		raise ValueError(f"Parameter {name} in dataset {dataset} must be greater than {minimum}")
+
+def check_read_suffixes(config, dataset):
+
+	# if input is fastq
+	if "R1_suffix" in config[dataset]:
+	
+		# check that R2_suffix is also specified
+		if "R2_suffix" not in config[dataset]:
+			raise ValueError("If R1_suffix is specified (for fastq input), R2_suffix must also be specified")
+				
+		if config[dataset]['R1_suffix'] == config[dataset]['R2_suffix']:
+			raise ValueError(f"R1_suffix must be different to R2_suffix for dataset {dataset}")
+	
+		# check R1_suffix for compression and fastq file extension
+		R1_first_extension = path.splitext(config[dataset]["R1_suffix"])[1]
+		R2_first_extension = path.splitext(config[dataset]["R2_suffix"])[1]
+		
+		#bz2 or gz compression
+		if R1_first_extension in compression_extensions:
+		
+			# get second extensions
+			R1_second_extension = path.splitext(path.splitext(config[dataset]["R1_suffix"])[0])[1]
+			R2_second_extension = path.splitext(path.splitext(config[dataset]["R2_suffix"])[0])[1]
+		
+			# check that input looks like a fastq files
+			if R1_second_extension not in fastq_extensions or R2_second_extension not in fastq_extensions:
+				raise InputError("input files do not look like fastq files (extension is not '.fq' or '.fastq'")
+
+			
+		# if uncompressed, check file looks like fastq file
+		elif R1_first_extension not in fastq_extensions or R2_first_extension not in fastq_extensions:
+			raise InputError("for fastq files, input file extensions must be '.fastq' or '.fq'")
+
+	# if input is bam
+	elif "bam_suffix" in config[dataset]:
+		extension = config[dataset]["bam_suffix"]
+		if extension != ".bam" and extension != ".sam":
+			extension = path.splitext(config[dataset]["bam_suffix"])[1]
+			if extension != ".bam" and extension != ".sam":
+				raise InputError("For aligned input, only '.bam' and '.sam' files are currently supported")
+	
+	# if nether R1/R2 suffix or bam suffix specified
+	else:
+		raise InputError("Please specify either 'R1_suffix' and 'R2_suffix' or 'bam_suffix' in the config file")
+
+def get_samples(config, dataset):
+		
+		# get fastq files for input
+		if "R1_suffix" in config[dataset]:
+			is_bam = False
+			
+			# get samples with names ending in R1_suffix
+			suffix = config[dataset]["R1_suffix"]
+			config[dataset]['read_folder'] = path.normpath(config[dataset]['read_folder'])
+			folder = config[dataset]['read_folder']	
+			samples = [path.basename(f)[:-len(suffix)] for f in glob(f"{folder}/*{suffix}")]
+			
+			# check for corresponding R2 files
+			dropped_samples = []
+			R2_suffix = config[dataset]["R2_suffix"]
+			for R2_file in [f"{folder}/{sample}{R2_suffix}" for sample in samples]:
+				if not path.exists(R2_file):
+					print(f"Found R1 file for sample {sample} in dataset {dataset}, bud didn't find matching R2 file.  Ignoring R1 file")
+					dropped_samples.append(sample)
+			# drop samples that we couldn't find matching R1 and R2 files for
+			samples = [samp for samp in samples if samp not in dropped_samples]
+			
+			if len(samples) == 0:
+				print(f"warning: no files found for dataset {dataset}")
+		
+		# get bam/sam files for input
+		elif "bam_suffix" in config[dataset]:
+			is_bam = True
+			suffix = config[dataset]["bam_suffix"]
+			folder = config[dataset]['read_folder']	
+			config[dataset]["R1_suffix"] = "_1.fq.gz"
+			config[dataset]["R2_suffix"] = "_2.fq.gz"
+			samples = [path.basename(f)[:-len(suffix)] for f in glob(f"{folder}/*{suffix}")]
+			if len(samples) == 0:
+				print(f"warning: no files found for dataset {dataset}")
+		else:
+			raise InputError(f"please specify either 'bam_suffix' or 'R1_suffix' and 'R2_suffix' for dataset {dataset}")
+			
+		return samples, is_bam

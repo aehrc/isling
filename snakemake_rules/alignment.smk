@@ -1,12 +1,11 @@
 
-
-	
 #functions for if we did seqPrep or not
 def get_for_align(wildcards, read_type):
 
 	assert read_type in ['unmerged_r1', 'unmerged_r2', 'merged']	
 
 	merge = bool(get_value_from_df(wildcards, 'merge'))
+	trim = bool(get_value_from_df(wildcards, 'trim'))
 	
 	# did we merge R1 and R2?
 	if merge is True:
@@ -16,7 +15,15 @@ def get_for_align(wildcards, read_type):
 			return rules.seqPrep.output.proc_r2
 		else:
 			return rules.seqPrep.output.merged
-			
+	# if we trimmed but didn't merge
+	elif trim is True:
+		if read_type == 'unmerged_r1':
+			return rules.seqPrep_unmerged.output.proc_r1
+		if read_type == 'unmerged_r2':
+			return rules.seqPrep_unmerged.output.proc_r2
+		else:
+			return rules.touch_merged.output.merged
+	# if we didn't do either
 	else:
 		if read_type == 'unmerged_r1':
 			return get_for_seqprep(wildcards, "1")

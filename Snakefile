@@ -48,9 +48,6 @@ from snakemake_rules import make_post_args
 
 toDo = make_df(config)
 
-for outdir in set(toDo.loc[:,'outdir']):
-	toDo.to_csv(os.path.join(outdir, "analysis_parameters.tsv"), sep = "\t")
-
 # construct dictionary with reference names as keys and reference fastas as values
 
 ref_names = make_reference_dict(toDo)
@@ -74,18 +71,23 @@ wildcard_constraints:
 localrules: all, touch_merged, check_bam_input_is_paired
 
 #### target files ####
+conditions = set()
 summary_files = set()
 ucsc_files = set()
 merged_bed = set()
 for i, row in toDo.iterrows():
 	summary_files.add(f"{row['outdir']}/summary/{row['dataset']}.xlsx")
 	ucsc_files.add(f"{row['outdir']}/summary/ucsc_bed/{row['dataset']}.post.bed")
+	conditions.add(f"{row['outdir']}/summary/{row['dataset']}.analysis_conditions.tsv")
+	merged_bed.add(f"{row['outdir']}/{row['dataset']}/ints/{row['sample']}.{row['host']}.{row['virus']}.integrations.post.merged.bed")
 
 
 rule all:
 	input: 
+		conditions,
 		summary_files,
 		ucsc_files,
+		merged_bed,
 		expand("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bam",
 			zip,
 			outpath = toDo.loc[:,'outdir'],
@@ -94,14 +96,6 @@ rule all:
 			virus = toDo.loc[:,'virus']
 			),
 		expand("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bam",
-			zip,
-			outpath = toDo.loc[:,'outdir'],
-			dset = toDo.loc[:,'dataset'],
-			samp = toDo.loc[:,'sample'],
-			virus = toDo.loc[:,'virus'],
-			host = toDo.loc[:,'host']
-			),
-		expand("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.merged.bed",
 			zip,
 			outpath = toDo.loc[:,'outdir'],
 			dset = toDo.loc[:,'dataset'],
