@@ -69,7 +69,7 @@ rule summarise:
 	params:
 		outdir = lambda wildcards, output: path.dirname(output[0])
 	shell:
-		"Rscript summarise_ints.R {input} {params.outdir}"
+		"Rscript scripts/summarise_ints.R {input} {params.outdir}"
 
 rule write_bed:
 	input:
