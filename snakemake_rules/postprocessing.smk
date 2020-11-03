@@ -50,7 +50,7 @@ rule post:
 		lambda wildcards: get_value_from_df(wildcards, 'postargs')
 	shell:
 		"""
-		Rscript post/postprocess.R {input.ints} {params}
+		Rscript scripts/post/postprocess.R {input.ints} {params}
 		"""
 	
 rule summarise:
@@ -91,8 +91,8 @@ rule ucsc_bed:
 		"docker://szsctt/rscripts:4"
 	shell:
 		"""
-		Rscript writeBed.R {input} {params.outdir}
-		bash -e format_ucsc.sh {params.outdir}
+		Rscript scripts/writeBed.R {input} {params.outdir}
+		bash -e scripts/format_ucsc.sh {params.outdir}
 		mv {params.outdir}/*bed {params.outdir}/..
 		rmdir {params.outdir}
 		"""
