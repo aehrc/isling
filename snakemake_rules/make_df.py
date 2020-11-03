@@ -28,6 +28,7 @@ bwa_mem_params = "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
 merge_dist_default = 100
 tol_default = 3
 cutoff_default = 20
+min_mapq_default = 0
 
 
 #### check file extensions ####
@@ -183,9 +184,14 @@ def make_df(config):
 			print(f'cigar-tol not specified for dataset {dataset}: using default {tol_default}')
 			config[dataset]["cigar-tol"] = tol_default
 			
+		if "min-mapq" not in config[dataset]:
+			print(f'min-mapq not specified for dataset {dataset}: using default {min_mapq_default}')
+			config[dataset]["min-mapq"] = tol_default
+			
 		merge_dist = config[dataset]["merge-dist"]
 		clip_cutoff = config[dataset]["clip-cutoff"]
 		cigar_tol = config[dataset]["cigar-tol"]
+		min_mapq = config[dataset]["min-mapq"]
 		
 		# get arguments for running postprocessing scripts
 		postargs = make_post_args({dataset : config[dataset]})[0][dataset]
@@ -212,7 +218,7 @@ def make_df(config):
 			unique = f"{dataset_name}+++{sample}"
 			
 			# append combinations of each sample, host and virus		
-			rows.append((dataset_name, dataset, sample, host, config[dataset]["host"][host], virus, config[dataset]["virus"][virus], merge, dedup, unique,  config[dataset]["out_dir"], bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, clip_cutoff, cigar_tol))
+			rows.append((dataset_name, dataset, sample, host, config[dataset]["host"][host], virus, config[dataset]["virus"][virus], merge, dedup, unique,  config[dataset]["out_dir"], bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, clip_cutoff, cigar_tol, min_mapq))
 
 			
 	# check there aren't any duplicate rows
@@ -221,7 +227,7 @@ def make_df(config):
 			
 	
 	# make dataframe
-	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'clip_cutoff', 'cigar_tol'])
+	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'clip_cutoff', 'cigar_tol', 'min_mapq'])
 	
 	# do checks on dataframe
 	check_dataset_sample_unique(toDo)

@@ -21,7 +21,7 @@ my $output = "integrationSites.txt";
 my $bed;
 my $merged;
 my $verbose;
-
+my $min_mapq = 0;
 my $help;
 
 our $warn_flag = 0;
@@ -36,6 +36,7 @@ GetOptions('cutoff=i' => \$cutoff,
 		   'tol=i'    => \$tol,
 		   'n-estimate-tlen' => \$n_estimate_tlen,
 		   'verbose'  => \$verbose,
+		   'min-mapq=i'    => \$min_mapq,
 		   'help',    => \$help);
 
 if ($help) { printHelp(); }
@@ -125,6 +126,9 @@ while (my $vl = <VIRAL>) {
 	
 	#if (($parts[1] & 0x8) and ($parts[1] & 0x4)) { next; }
 
+	# get mapq
+	my $mapq = $parts[4];
+
 	#get cigar
 	my ($cig, $editDist2) = processCIGAR2($parts[5], $tol); # Note that could be a cigar or * if unmapped
 	
@@ -144,8 +148,8 @@ while (my $vl = <VIRAL>) {
 	unless ($editDist) { $editDist = 0; $editDist2 = 0; } 
 	
 	#get if first or second in pair
-	if ($parts[1] & 0x40) 		{ $viralR1{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $vSec, $vSup, ($editDist+$editDist2)); }
-	elsif ($parts[1] & 0x80) 	{ $viralR2{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $vSec, $vSup, ($editDist+$editDist2)); }
+	if ($parts[1] & 0x40) 		{ $viralR1{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $vSec, $vSup, ($editDist+$editDist2), $mapq); }
+	elsif ($parts[1] & 0x80) 	{ $viralR2{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $vSec, $vSup, ($editDist+$editDist2), $mapq); }
 
 }
 close VIRAL;
@@ -214,9 +218,12 @@ while (my $hl = <HOST>) {
 	#if the read is not matched, cant get edit distance  - just set it to 0
 	unless ($editDist) { $editDist = 0; $editDist2 = 0; } 
 	
+	# get mapq
+	my $mapq = $parts[4];
+	
 	#get if first or second in pair and add to appropriate array
-	if ($parts[1] & 0x40) 		{ $hostR1{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $hSec, $hSup, ($editDist+$editDist2));}
-	elsif ($parts[1] & 0x80)  	{ $hostR2{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $hSec, $hSup, ($editDist+$editDist2)); }
+	if ($parts[1] & 0x40) 		{ $hostR1{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $hSec, $hSup, ($editDist+$editDist2), $mapq);}
+	elsif ($parts[1] & 0x80)  	{ $hostR2{$ID} = join("xxx", $seq, $seqOri, $ref, $start, $cig, $hSec, $hSup, ($editDist+$editDist2), $mapq); }
 
 }
 close HOST;
@@ -294,10 +301,10 @@ sub findDiscordant {
 ### sam format specifies 1-based numbering
 	my ($key, $vR1, $vR2, $hR1, $hR2, $tlen, $hostRlen, $virusRlen) = @_;
 	
-	my ($seq1, $vR1ori, $vR1ref, $vR1start, $vR1cig, $vR1sec, $vR1sup, $vNM1) = (split('xxx', $vR1))[0, 1, 2, 3, 4, 5, 6, -1];
-	my ($seq2, $vR2ori, $vR2ref, $vR2start, $vR2cig, $vR2sec, $vR2sup, $vNM2) = (split('xxx', $vR2))[0, 1, 2, 3, 4, 5, 6, -1];
-	my ($hR1ori, $hR1ref, $hR1start, $hR1cig, $hR1sec, $hR1sup, $hNM1) = (split('xxx', $hR1))[1, 2, 3, 4, 5, 6, -1];
-	my ($hR2ori, $hR2ref, $hR2start, $hR2cig, $hR2sec, $hR2sup, $hNM2) = (split('xxx', $hR2))[1, 2, 3, 4, 5, 6, -1];
+	my ($seq1, $vR1ori, $vR1ref, $vR1start, $vR1cig, $vR1sec, $vR1sup, $vNM1, $vMQ1) = (split('xxx', $vR1))[0, 1, 2, 3, 4, 5, 6, -2, -1];
+	my ($seq2, $vR2ori, $vR2ref, $vR2start, $vR2cig, $vR2sec, $vR2sup, $vNM2, $vMQ2) = (split('xxx', $vR2))[0, 1, 2, 3, 4, 5, 6, -2, -1];
+	my ($hR1ori, $hR1ref, $hR1start, $hR1cig, $hR1sec, $hR1sup, $hNM1, $hMQ1) = (split('xxx', $hR1))[1, 2, 3, 4, 5, 6, -2, -1];
+	my ($hR2ori, $hR2ref, $hR2start, $hR2cig, $hR2sec, $hR2sup, $hNM2, $hMQ2) = (split('xxx', $hR2))[1, 2, 3, 4, 5, 6, -2, -1];
 
 	# discordant read-pair can be either one mate mapped and one unmapped
 	# or one mate mostly mapped and the other with only a small mapped region
@@ -333,6 +340,10 @@ sub findDiscordant {
 		unless (($readlen1 - $hR1mapBP) < $cutoff) { return; } 
 		unless (($readlen2 - $vR2mapBP) < $cutoff) { return; } 
 		
+		# check mapping quality
+		if ($hMQ1 < $min_mapq) { return; }
+		if ($vMQ2 < $min_mapq) { return; }
+		
 		$hRef = $hR1ref; 
 		$hSeq = $seq1; 
 		$hNM = $hNM1;
@@ -360,6 +371,10 @@ sub findDiscordant {
 		#check unmapped bases is less than cutoff
 		unless (($readlen2 - $hR2mapBP) < $cutoff) { return; } 
 		unless (($readlen1 - $vR1mapBP) < $cutoff) { return; } 
+		
+		# check mapping quality
+		if ($hMQ2 < $min_mapq) { return; }
+		if ($vMQ1 < $min_mapq) { return; }
 		
 		$hRef = $hR2ref; 
 		$hSeq = $seq2; 
@@ -455,6 +470,7 @@ sub printHelp {
 	print "\t--host:   Alignment of reads to host genome (sam)\n";
 	print "\t--cutoff:  Minimum number of clipped reads to be considered (default = 20)\n";
 	print "\t--tol:     Tolerance when combining short elements with neigbouring matched regions (default = 5)\n";
+	print "\t--min-mapq:	Minimum mapping quality to consider a read (mapped read only)";	
 	print "\t--n-estimate-tlen: Number of pairs to use for estimating template length (default = 10000)\n";
 	print "\t--output:  Output file for results (default = integrationSite.txt\n";
 	print "\t--bed:     Print integrations sites to indicated bed file (default = NA)\n";

@@ -20,10 +20,8 @@ my $output = "integrationSites.txt";
 my $bed;
 my $merged;
 my $verbose;
-
+my $min_mapq = 0;
 my $help;
-
-
 
 GetOptions('cutoff=i' => \$cutoff,
 		   'thresh=f' => \$thresh,
@@ -33,12 +31,19 @@ GetOptions('cutoff=i' => \$cutoff,
 		   'bed=s'    => \$bed,
 		   'merged=s' => \$merged,
 		   'tol=i'    => \$tol,
+		   'min-mapq=i'    => \$min_mapq,
 		   'verbose'  => \$verbose,
 		   'help',    => \$help);
 
 if ($help) { printHelp(); }
 
 unless ($viral and $host) { printHelp(); }
+
+# check inputs
+if ($cutoff < 0) { die "Cutoff must be greater than zero\n"; }
+if ($tol < 0) { die "Tolerance must be greater than zero\n"; }
+if ($min_mapq < 0) { die "Minimum mapping quality must be greater than zero\n"; }
+if ($min_mapq > 60) { die "Minimum mapping quality must be less than 60\n"; }
 
 my %viralIntegrations;
 my %hostIntegrations;
@@ -69,6 +74,9 @@ while (my $vl = <VIRAL>) {
 	if ($parts[1] & 0x800) { next(); } # skip supplementary alignments
 
 	if ($parts[2] eq "*") { next; } # skip unaligned reads
+	
+	# check mapping quality
+	if ($parts[4] < $min_mapq) { next; }
 	
 	#get cigar
 	my ($cig1, $editDist2) = processCIGAR2($parts[5], $tol); # Note that could be a cigar or * if unmapped
@@ -123,6 +131,9 @@ while (my $hl = <HOST>) {
 	unless ($parts[5]) { next; }
 	
 	unless ($parts[5] =~ /^\d+[SH]|\d+[SH]$/) { next; }
+	
+	# check mapping quality
+	if ($parts[4] < $min_mapq) { next; }
 
 	my $seq;
 	my $dir;
@@ -200,12 +211,14 @@ exit;
 sub printHelp {
 	print "Pipeline for detection of viral integration sites within a genome\n\n";
 	print "Usage:\n";
-	print "\tperl softClip.pl --viral <sam> --host <sam> --cutoff <n> --thresh <n> --output <out> --bed <bed> --help\n\n";
+	print "\tperl softClip.pl --viral <sam> --host <sam> --cutoff <n> --thresh <n> --tol <n> --min-mapq <n> --output <out> --bed <bed> --help\n\n";
 	print "Arguments:\n";
 	print "\t--viral:   Alignment of reads to viral genomes (sam)\n";
 	print "\t--host:   Alignment of reads to host genome (sam)\n";
 	print "\t--cutoff:  Minimum number of clipped reads to be considered (default = 20)\n";
 	print "\t--thresh:	Amount of read that must be covered by one alignment to be considered rearrangement";
+	print "\t--tol:	Soft-clipped regions at either end of the read shorter than this will be absorbed into the nearest mapped region";
+	print "\t--min-mapq:	Minimum mapping quality to consider a read";	
 	print "\t--output:  Output file for results (default = integrationSite.txt\n";
 	print "\t--bed:     Print integrations sites to indicated bed file (default = NA)\n";
 	print "\t--merged:  Merge bedfile into overlapping integration sites (default = NA)\n";
