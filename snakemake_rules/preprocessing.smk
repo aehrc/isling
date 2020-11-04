@@ -102,8 +102,8 @@ rule seqPrep_unmerged:
 		r1 = lambda wildcards: get_for_seqprep(wildcards, '1'),
 		r2 = lambda wildcards: get_for_seqprep(wildcards, '2')
 	output:
-		proc_r1 = "{outpath}/{dset}/merged_reads/{samp}.1.fastq.gz",
-		proc_r2 = "{outpath}/{dset}/merged_reads/{samp}.2.fastq.gz"
+		proc_r1 = "{outpath}/{dset}/trimmed_reads/{samp}.1.fastq.gz",
+		proc_r2 = "{outpath}/{dset}/trimmed_reads/{samp}.2.fastq.gz"
 	conda:	
 		"../envs/seqprep.yml"
 	container:
