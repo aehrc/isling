@@ -104,7 +104,7 @@ rule merged_bed:
 		bed = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.bed",
 		merged_bed = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.merged.bed"
 	params:
-		d = lambda wildcards: f"-d int({get_value_from_df(wildcards, 'merge_dist')})",
+		d = lambda wildcards: f"-d {int(get_value_from_df(wildcards, 'merge_dist'))}",
 		n = lambda wildcards: int(get_value_from_df(wildcards, 'merge_n_min')),
 	container:
 		"docker://szsctt/bedtools:1"
