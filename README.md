@@ -8,15 +8,32 @@ Currently have conda environment called `snakemake`, which I'm activating in wra
 
 # Pipeline overview
 
-The pipeline performs several steps in order to identify integration sites.  It takes as input datasets consisting of either fastq files or bam files. It does some pre-processing of the reads (merging overlapping reads, optional) and then aligns them to both a host and a viral sequence.  Reads are first aligned to the viral sequence(s), and then aligned reads are extracted and aligned to the host.  These alignments are used to identify possible viral integrations.  Some 
+The pipeline performs several steps in order to identify integration sites.  It takes as input datasets consisting of either fastq files or bam files. It does some pre-processing of the reads (merging overlapping reads, optional) and then aligns them to both a host and a viral sequence.  Reads are first aligned to the viral sequence(s), and then aligned reads are extracted and aligned to the host.  These alignments are used to identify possible viral integrations.  
+
+# Running
+
+To run with the test data, run:
+
+```
+snakemake --configfile test/config/test.yml -- cores <cores>
+```
 
 ## Inputs
+
+The following inputs are required.
 
 ### Config file
 
 A yaml config file is used to specify the data to be processed and parameters for processing.  The config file is organised into datasets, and specifies the parameters to be used for that dataset.  If multiple datasets are present in the config file, they will be processed simultaneously.  Each dataset contains a number of key-value pairs which indicate how the dataset is to be processed.
 
-An example dataset from a config file:
+The first entry in the config file should be the key 'snakefile', with the value being the path to the directory containing the snakefile, for example:
+```
+snakedir: "/scratch1/sco305/intvi_pipeline"
+```
+
+If snakemake is run from the intvi_pipeline directory (which contains the `Snakefile`), this key may be omitted, otherwise it is required.
+
+This should be followed by one block for each dataset to be processed.  All paths should be either absolute or relative to the directory containing the `Snakefile`. An example dataset block from a config file:
 ```
 dataset_name:
   read_folder: "/path/to/read/folder"
@@ -44,6 +61,10 @@ dataset_name:
       - "/path/to/genes.gtf"
  	merge-dist: 100
 ```
+
+#### Dataset name
+
+The block should start with a name for the dataset. This can be anything, but each dataset name in the config file must be unique.  This will be used to name output files.
 
 #### Read folder, R1\_suffix, R2\_suffix, bam\_suffix
 Specify the path to the folder containing reads for this datset with the `read_folder` key. Reads must be paired-end. Reads can be in either fastq or sam/bam format.  
@@ -102,7 +123,7 @@ Users may be interested only in integrations with a minimum number of supporting
 
 ### Reads
 
-The reads for each dataset should be placed in the folder specified for each dataset.  Reads must be paired-end.
+The reads for each dataset should be placed in the folder specified for each dataset.  Reads must be paired-end.  Note that the pipeline uses SeqPrep to merge and trim reads, and SeqPrep will refuse to process files which contain read-pairs with different read lengths (ie R1 is a different length to R2).  If your reads contain pairs that are different lengths, trim adapters first and then run the pipeline specifing `merge: False` and `trim: False`.
 
 ## Outputs
 

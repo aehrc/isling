@@ -31,6 +31,14 @@
 # contain the details of the detected integrations.
 
 
+# set working directory - directory in which snakefile is located
+if 'snakedir' not in config:
+	config['snakedir'] = getcwd()
+	print(f"warning: 'snakedir' not specified in config file: using current working directory ({config['snakedir']})")
+workdir: config['snakedir']
+snakedir = config['snakedir']
+config.pop('snakedir')
+
 #### python modules ####
 
 from glob import glob
@@ -39,10 +47,13 @@ import pandas as pd
 import pdb
 
 import sys
-sys.path.append(os.path.join(os.getcwd(), "snakemake_rules/"))
+sys.path.append(os.path.join(snakedir, "snakemake_rules/"))
 from snakemake_rules import make_df
 from snakemake_rules import make_reference_dict
 from snakemake_rules import make_post_args
+
+# get directory in which snakefile is located
+
 
 # construct dataframe with wildcards and other information about how to run analysis
 

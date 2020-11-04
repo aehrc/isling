@@ -1,3 +1,5 @@
+snakedir: "/scratch1/sco305/intvi_simulation-experiments/intvi_pipeline"
+
 test-merge:
   read_folder: "test/reads/"
   out_dir: "../out/pipeline-test"
