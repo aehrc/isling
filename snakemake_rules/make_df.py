@@ -13,6 +13,7 @@ merge_dist_default = 100
 tol_default = 3
 cutoff_default = 20
 min_mapq_default = 0
+merge_n_min_default = 1
 
 
 #### check file extensions ####
@@ -23,8 +24,6 @@ min_mapq_default = 0
 fastq_extensions = [".fq", ".fastq"]
 sam_extensions = [".sam", ".bam"]
 compression_extensions = [".gz", ".bz2"]
-
-		
 
 #### get information for wildcards ####
 
@@ -87,12 +86,14 @@ def make_df(config):
 		cigar_tol = get_value_or_default(config, dataset, 'cigar-tol', tol_default)
 		min_mapq = get_value_or_default(config, dataset, 'min-mapq', min_mapq_default)
 		bwa_mem_params = get_value_or_default(config, dataset, 'bwa-mem', bwa_mem_default)
+		merge_n_min = get_value_or_default(config, dataset, 'merge-n-min', merge_n_min_default)
 		
 		# check values are integers greater than a minimum value
 		check_int_gt(merge_dist, -1, 'merge-dist', dataset)
 		check_int_gt(clip_cutoff, 1, 'clip-cutoff', dataset)
 		check_int_gt(cigar_tol, 0, 'cigar-tol', dataset)
 		check_int_gt(min_mapq, -1, 'min-mapq', dataset)
+		check_int_gt(min_mapq, -1, 'merge-n-min', dataset)
 		
 		# get arguments for running postprocessing scripts
 		postargs = make_post_args({dataset : config[dataset]})[0][dataset]
@@ -124,7 +125,7 @@ def make_df(config):
 			unique = f"{dataset_name}+++{sample}"
 			
 			# append combinations of each sample, host and virus		
-			rows.append((dataset_name, dataset, sample, host, config[dataset]["host"][host], virus, config[dataset]["virus"][virus], merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, clip_cutoff, cigar_tol, min_mapq))
+			rows.append((dataset_name, dataset, sample, host, config[dataset]["host"][host], virus, config[dataset]["virus"][virus], merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, merge_n_min, clip_cutoff, cigar_tol, min_mapq))
 
 			
 	# check there aren't any duplicate rows
@@ -132,7 +133,7 @@ def make_df(config):
 		raise ValueError("Error - configfile results in duplicate analyses, check samples and dataset names are unique")
 	
 	# make dataframe
-	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'clip_cutoff', 'cigar_tol', 'min_mapq'])
+	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq'])
 	
 	# do checks on dataframe
 	check_dataset_sample_unique(toDo)

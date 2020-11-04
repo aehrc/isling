@@ -104,17 +104,13 @@ rule merged_bed:
 		bed = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.bed",
 		merged_bed = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.merged.bed"
 	params:
-		d = lambda wildcards: f"-d {get_value_from_df(wildcards, 'merge_dist')}"
+		d = lambda wildcards: f"-d int({get_value_from_df(wildcards, 'merge_dist')})",
+		n = lambda wildcards: int(get_value_from_df(wildcards, 'merge_n_min')),
 	container:
 		"docker://szsctt/bedtools:1"
 	shell:
 		"""
-		awk -F"\t" -v OFS="\t" '(NR != 1) {{print $1,$2,$3,$21}}' {input.txt} | sort -k1,1 -k2,2n > {output.bed}
-		bedtools merge -i {output.bed} {params} -c 4,4 -o count,collapse > {output.merged_bed}
+		awk -F"\t" -v OFS="\t" 'BEGIN {{getline}}{{ ($9 ~ 'hv') ? dir = "+" : dir = "-"; print $1,$2,$3,dir,$21 }}' {input.txt} | sort -k1,1 -k2,2n > {output.bed}
+		bedtools merge -i {output.bed} {params.d} -c 5,5 -o count,collapse | awk -F"\t" -v OFS="\t" '$4 >= {params.n}'  > {output.merged_bed}
 		"""
-		
-		
-		
-		
-		
-		
+
