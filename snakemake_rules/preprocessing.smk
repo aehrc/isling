@@ -82,9 +82,9 @@ rule seqPrep:
 		r1 = lambda wildcards: get_for_seqprep(wildcards, '1'),
 		r2 = lambda wildcards: get_for_seqprep(wildcards, '2')
 	output:
-		merged = "{outpath}/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz",
-		proc_r1 = "{outpath}/{dset}/merged_reads/{samp}.1.fastq.gz",
-		proc_r2 = "{outpath}/{dset}/merged_reads/{samp}.2.fastq.gz"
+		merged = temp("{outpath}/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz"),
+		proc_r1 = temp("{outpath}/{dset}/merged_reads/{samp}.1.fastq.gz"),
+		proc_r2 = temp("{outpath}/{dset}/merged_reads/{samp}.2.fastq.gz")
 	conda:	
 		"../envs/seqprep.yml"
 	container:
@@ -102,8 +102,8 @@ rule seqPrep_unmerged:
 		r1 = lambda wildcards: get_for_seqprep(wildcards, '1'),
 		r2 = lambda wildcards: get_for_seqprep(wildcards, '2')
 	output:
-		proc_r1 = "{outpath}/{dset}/trimmed_reads/{samp}.1.fastq.gz",
-		proc_r2 = "{outpath}/{dset}/trimmed_reads/{samp}.2.fastq.gz"
+		proc_r1 = temp("{outpath}/{dset}/trimmed_reads/{samp}.1.fastq.gz"),
+		proc_r2 = temp("{outpath}/{dset}/trimmed_reads/{samp}.2.fastq.gz")
 	conda:	
 		"../envs/seqprep.yml"
 	container:

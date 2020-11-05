@@ -38,7 +38,7 @@ rule index:
 	input:
 		lambda wildcards: ref_names[wildcards.genome]
 	output:
-		expand("{outpath}/references/{genome}/{genome}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True)
+		temp(expand("{outpath}/references/{genome}/{genome}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True))
 	conda: 
 		"../envs/bwa.yml"
 	container:
@@ -59,7 +59,7 @@ rule align_bwa_virus:
 	output:
 		single = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaSingle.sam"),
 		paired = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam"),
-		combined = "{outpath}/{dset}/virus_aligned/{samp}.{virus}.sam",
+		combined = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.sam"),
 	
 	params:
 		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
@@ -138,7 +138,7 @@ rule extract_to_fastq_single:
 	input:
 		aligned = lambda wildcards: get_sam(wildcards, "single", "virus"),
 	output:
-		fastq = "{outpath}/{dset}/virus_aligned/{samp}.bwaSingle.mappedTo{virus}.fastq.gz",
+		fastq = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaSingle.mappedTo{virus}.fastq.gz"),
 	conda:
 		"../envs/bwa.yml"
 	container:
@@ -236,7 +236,7 @@ rule combine_host:
 		paired = rules.align_bwa_host_paired.output.sam,
 		single = rules.align_bwa_host_single.output.sam
 	output:
-		combined = "{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.sam"
+		combined = temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.sam")
 	conda: 
 		"../envs/bwa.yml"
 	container:
@@ -279,7 +279,7 @@ rule markdup:
 		sam = "{outpath}/{dset}/{folder}/{alignment}.sam"
 	output:
 		fixmate = temp("{outpath}/{dset}/{folder}/{alignment}.fixmate.bam"),
-		markdup = "{outpath}/{dset}/{folder}/{alignment}.dups.sam",
+		markdup = temp("{outpath}/{dset}/{folder}/{alignment}.dups.sam"),
 		metrics = temp("{outpath}/{dset}/{folder}/{alignment}.dups.txt")
 	wildcard_constraints:
 		folder = "host_aligned|virus_aligned"

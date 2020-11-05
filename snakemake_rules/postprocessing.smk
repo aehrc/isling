@@ -3,7 +3,7 @@ rule sortbed:
 	input:
 		TOSORT
 	output:
-		SORTED
+		temp(SORTED)
 	run:
 		for i in range(len(TOSORT)):
 			print(f"sorting file {TOSORT[i]} into file {SORTED[i]}, file extension {path.splitext(TOSORT[i])[1]}")
@@ -101,7 +101,7 @@ rule merged_bed:
 	input:
 		txt = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.txt"
 	output:
-		bed = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.bed",
+		bed = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.bed"),
 		merged_bed = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.merged.bed"
 	params:
 		d = lambda wildcards: f"-d {int(get_value_from_df(wildcards, 'merge_dist'))}",
