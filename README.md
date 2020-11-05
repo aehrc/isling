@@ -15,7 +15,7 @@ The pipeline performs several steps in order to identify integration sites.  It 
 To run with the test data, run:
 
 ```
-snakemake --configfile test/config/test.yml -- cores <cores>
+snakemake --configfile test/config/test.yml --cores <cores>
 ```
 
 ## Inputs
