@@ -60,7 +60,6 @@ rule align_bwa_virus:
 		single = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaSingle.sam"),
 		paired = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam"),
 		combined = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.sam"),
-	
 	params:
 		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
@@ -139,6 +138,7 @@ rule extract_to_fastq_single:
 		aligned = lambda wildcards: get_sam(wildcards, "single", "virus"),
 	output:
 		fastq = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaSingle.mappedTo{virus}.fastq.gz"),
+	group: "host_align"
 	conda:
 		"../envs/bwa.yml"
 	container:
@@ -159,6 +159,7 @@ rule extract_vAligned_paired:
 		pvBam_readUnmap_mateMap = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.R.bam"),
 		pvBam_bothMapped = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.B.bam"),
 		bam = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.bam"),
+	group: "host_align"
 	conda:
 		"../envs/bwa.yml"
 	container:
@@ -177,6 +178,7 @@ rule extract_to_fastq_paired:
 	output:
 		fastq1 = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaPaired.mappedTo{virus}.1.fastq.gz"),
 		fastq2 = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaPaired.mappedTo{virus}.2.fastq.gz")
+	group: "host_align"
 	conda:
 		"../envs/bwa.yml"
 	container:
@@ -192,6 +194,7 @@ rule align_bwa_host_single:
 		all = rules.extract_to_fastq_single.output.fastq,
 	output:
 		sam = temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam"),
+	group: "host_align"
 	conda: 
 		"../envs/bwa.yml"
 	container:
@@ -215,6 +218,7 @@ rule align_bwa_host_paired:
 		r2 = rules.extract_to_fastq_paired.output[1]
 	output:
 		sam = temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaPaired.sam"),
+	group: "host_align"
 	conda: 
 		"../envs/bwa.yml"
 	container:
@@ -237,6 +241,7 @@ rule combine_host:
 		single = rules.align_bwa_host_single.output.sam
 	output:
 		combined = temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.sam")
+	group: "host_align"
 	conda: 
 		"../envs/bwa.yml"
 	container:
@@ -283,6 +288,7 @@ rule markdup:
 		metrics = temp("{outpath}/{dset}/{folder}/{alignment}.dups.txt")
 	wildcard_constraints:
 		folder = "host_aligned|virus_aligned"
+	group: "rmdup"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: attempt * 3 * int(os.stat(input.sam).st_size/1e6)
 	conda: 
@@ -300,6 +306,7 @@ rule rmdup:
 		sam = "{outpath}/{dset}/{folder}/{alignment}.dups.sam"	
 	output:
 		sam = temp("{outpath}/{dset}/{folder}/{alignment}.rmdup.sam")	
+	group: "rmdup"
 	wildcard_constraints:
 		folder = "host_aligned|virus_aligned"
 	conda: 

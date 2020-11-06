@@ -42,6 +42,7 @@ rule post:
 		sorted_beds = rules.sortbed.output
 	output:
 		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt"
+	group: "post"
 	conda:
 		"../envs/rscripts.yml"
 	container:
@@ -62,6 +63,7 @@ rule summarise:
 	output:
 		"{outpath}/summary/{dset}.xlsx",
 		"{outpath}/summary/{dset}_annotated.xlsx"
+	group: "post"
 	conda:
 		"../envs/rscripts.yml"
 	container:
@@ -71,9 +73,6 @@ rule summarise:
 	shell:
 		"Rscript scripts/summarise_ints.R {input} {params.outdir}"
 
-rule write_bed:
-	input:
-		
 
 rule ucsc_bed:
 	input:
@@ -83,6 +82,7 @@ rule ucsc_bed:
 					toDo.loc[toDo['dataset'] == wildcards.dset,'virus'])]
 	output:
 		"{outpath}/summary/ucsc_bed/{dset}.post.bed"
+	group: "post"
 	params:
 		outdir = lambda wildcards, output: f"{path.dirname(output[0])}/{wildcards.dset}"
 	conda:
@@ -103,6 +103,7 @@ rule merged_bed:
 	output:
 		bed = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.bed"),
 		merged_bed = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.merged.bed"
+	group: "post"
 	params:
 		d = lambda wildcards: f"-d {int(get_value_from_df(wildcards, 'merge_dist'))}",
 		n = lambda wildcards: int(get_value_from_df(wildcards, 'merge_n_min')),

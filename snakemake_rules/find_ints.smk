@@ -5,6 +5,7 @@ rule run_soft:
 		virus = lambda wildcards: get_sam(wildcards, "combined", "virus")
 	output:
 		soft = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.soft.txt"),
+	group: "ints"
 	params:
 		cutoff = lambda wildcards: f"--cutoff {int(get_value_from_df(wildcards, 'clip_cutoff'))}",
 		tol = lambda wildcards: f"--tol {int(get_value_from_df(wildcards, 'cigar_tol'))}",
@@ -22,6 +23,7 @@ rule run_short:
 		virus = lambda wildcards: get_sam(wildcards, "combined", "virus"),
 	output:
 		short = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.short.txt"),
+	group: "ints"
 	params:
 		cutoff = lambda wildcards: f"--cutoff {int(get_value_from_df(wildcards, 'clip_cutoff'))}",
 		tol = lambda wildcards: f"--tol {int(get_value_from_df(wildcards, 'cigar_tol'))}",
@@ -39,6 +41,7 @@ rule run_discordant:
 		virus = lambda wildcards: get_sam(wildcards, "paired", "virus"),
 	output:
 		discord = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.discordant.txt"),
+	group: "ints"
 	params:
 		cutoff = lambda wildcards: f"--cutoff {int(get_value_from_df(wildcards, 'clip_cutoff'))}",
 		tol = lambda wildcards: f"--tol {int(get_value_from_df(wildcards, 'cigar_tol'))}",
@@ -55,6 +58,7 @@ rule combine_ints:
 		soft = rules.run_soft.output,
 		short = rules.run_short.output,
 		discordant = rules.run_discordant.output
+	group: "ints"
 	output:
 		temp =  temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp"),
 		all = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"

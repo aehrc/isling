@@ -20,6 +20,7 @@ rule check_bam_input_is_paired:
 		bam = lambda wildcards: get_value_from_df(wildcards, 'bam_file')
 	output:
 		ok = temp("{outpath}/{dset}/reads/{samp}.tmp"),
+	group: "extract_bam"
 	conda:
 		"../envs/bwa.yml"
 	container:
@@ -46,6 +47,7 @@ rule bam_to_fastq:
 	output:
 		r1 = temp("{outpath}/{dset}/reads/{samp}_1.fq.gz"),
 		r2 = temp("{outpath}/{dset}/reads/{samp}_2.fq.gz"),
+	group: "extract_bam"
 	conda:
 		"../envs/bwa.yml"
 	container:
@@ -85,6 +87,7 @@ rule seqPrep:
 		merged = temp("{outpath}/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz"),
 		proc_r1 = temp("{outpath}/{dset}/merged_reads/{samp}.1.fastq.gz"),
 		proc_r2 = temp("{outpath}/{dset}/merged_reads/{samp}.2.fastq.gz")
+	group: "seqprep"
 	conda:	
 		"../envs/seqprep.yml"
 	container:
@@ -104,6 +107,7 @@ rule seqPrep_unmerged:
 	output:
 		proc_r1 = temp("{outpath}/{dset}/trimmed_reads/{samp}.1.fastq.gz"),
 		proc_r2 = temp("{outpath}/{dset}/trimmed_reads/{samp}.2.fastq.gz")
+	group: "seqprep"
 	conda:	
 		"../envs/seqprep.yml"
 	container:
