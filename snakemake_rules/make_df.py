@@ -25,6 +25,21 @@ fastq_extensions = [".fq", ".fastq"]
 sam_extensions = [".sam", ".bam"]
 compression_extensions = [".gz", ".bz2"]
 
+#### global options ####
+
+# global options are specified with as a 'dataset' with the name 'global'
+# values in this dataset are applied to keys which are unset in the remaining datasets
+
+if 'global' in config:		
+	# get default (global) options
+	default = config.pop('global')
+	for dataset in config:
+		for key in default:
+			if key not in config[dataset]:
+				config[dataset][key] = default[key]
+
+
+
 #### get information for wildcards ####
 
 # get the name of each sample in each dataset, and save information about 
@@ -322,8 +337,27 @@ def check_read_suffixes(config, dataset):
 
 def get_samples(config, dataset):
 		
+		# if samples are specified
+		if 'samples' in config[dataset]:
+			if not hasattr(config[dataset]['samples'], '__iter__'):
+				raise ValueError(f"the value for key 'samples' in dataset {dataset} should be a list")
+			
+			
+			if 'R1_suffix' in config[dataset]:
+				is_bam = False
+			elif 'bam_suffix' in config[dataset]:
+				is_bam = True
+				config[dataset]["R1_suffix"] = "_1.fq.gz"
+				config[dataset]["R2_suffix"] = "_2.fq.gz"
+			else:
+				raise ValueError(f"please specfiy either 'R1_suffix' and 'R2_suffix' or 'bam_suffix' for dataset {dataset}")
+				
+			return config[dataset][samples], is_bam
+			
+		
 		# get fastq files for input
 		if "R1_suffix" in config[dataset]:
+			
 			is_bam = False
 			
 			# get samples with names ending in R1_suffix

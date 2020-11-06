@@ -2,7 +2,7 @@
 
 Pipeline to detect viral integration in paired-end reads.
 
-Pipeline requires snakemake and either `conda` or `singularity` to supply dependencies, if they are not already installed.
+Pipeline requires `snakemake` and either `singularity` (recommended) or `conda` to supply dependencies.  Additionaly, `python` version 3.5 or above and `pandas` are required (these should be automatically installed if installing `snakemake` with `conda`.
 
 Currently have conda environment called `snakemake`, which I'm activating in wrapper script `run_ints.sh`.  This runs the pipeline on the cluster (cluster config `cluster.json`), using conda to fufill dependencies (`envs/*.yml` contains specifications of conda environments).
 
@@ -20,7 +20,7 @@ snakemake --configfile test/config/test.yml --cores <cores>
 
 ## Inputs
 
-The following inputs are required.
+A config file, as well as the host and viral references, and reads are required inputs.  Specify all inputs in a config file.
 
 ### Config file
 
@@ -38,6 +38,9 @@ This should be followed by one block for each dataset to be processed.  All path
 dataset_name:
   read_folder: "/path/to/read/folder"
   out_dir: "/path/to/output/"
+  samples:
+  	- "sample1"
+  	- "sample2"
   R1_suffix: "_L001_R1.fastq.gz"
   R2_suffix: "_L001_R2.fastq.gz"
   read1-adapt: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
@@ -66,7 +69,7 @@ dataset_name:
 
 The block should start with a name for the dataset. This can be anything, but each dataset name in the config file must be unique.  This will be used to name output files.
 
-#### Read folder, R1\_suffix, R2\_suffix, bam\_suffix
+#### Read folder, samples, R1\_suffix, R2\_suffix, bam\_suffix
 Specify the path to the folder containing reads for this datset with the `read_folder` key. Reads must be paired-end. Reads can be in either fastq or sam/bam format.  
 
 For fastq reads, each R1 and R2 file must have a common suffix. Specify these common suffixes with `R1_suffix` and `R2_suffix`.  
@@ -75,7 +78,9 @@ For bam files, all reads must be paired and files must have a common suffix, whi
 
 Specify either the `R1_suffix` and `R2_suffix`, or `bam_suffix`, but not both.
 
-Sample names will be inferred from all the files in this folder, using the R1 and R2 suffixes (by identifying files with filenames `<sample><R1_suffix>` and `<sample><R2_suffix>`), or the bam suffix.
+The key `samples` is optional. If it is included, it should be a list of sample names, which together with the suffixes above should describe the filenames of the input reads.  Eg, if the input files are in fastq format, the input `read_folder`, `R1_suffix` and `R2_suffix`, and `samples` list should specify a list of files that can be found at `<read_folder>/<sample><R1_suffix>` and `<read_folder>/<sample><R2_suffix>`.
+
+If the key `samples` is not included, sample names will be inferred from the files present in the `read_folder` having the specified suffixes.  Note that this option requires files to be present on the local filesystem, and is therefore not compatible with cloud execution.
 
 #### Adapters
 Specify the adapters for read 1 and read 2, for trimming and merging, using the `read1-adapt` and `read2-adapt` keys.
@@ -121,9 +126,56 @@ After detection, junction reads/read pairs may be filtered using post-processing
 
 Users may be interested only in integrations with a minimum number of supporting reads.  Include the `merge-dist` key to output a list of integrations where any integrations within the specified distance of each other (in the host) have been merged.  This file contains the number of reads merged, and the read IDs, so the user can refer back to the summary excel file for more information about each read.
 
+#### Speical dataset options
+
+For convenience, a `global` dataset may additionally be included in the config file.  Options from this dataset will be applied to all other datasets in which the `global` dataset contains an option that is not set in the other dataset.  For keys that are specified in both, the option from the other dataset will be used (ie `global` options don't overwrite values from other datasets).  For example, if the following config file is used:
+
+```
+global:
+  out_dir: "/path/to/output/"
+  R1_suffix: "_L001_R1.fastq.gz"
+  R2_suffix: "_L001_R2.fastq.gz"
+  read1-adapt: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
+  read2-adapt: "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
+  merge: True
+  trim: True
+  host_name: "macFas5"
+  host_fasta: "/path/to/refs/macFas5.fa"
+  virus_name: "pAAV2-OTC_flop"
+  virus_fasta: "/path/to/refs/pAAV2-OTC.fa"
+  dedup: False
+  clip-cutoff: 20
+  min-mapq: 10
+  cigar-tol: 3
+  post:
+    - filter
+    - dedup
+    - mask-exclude:
+      - "/path/to/exclude.bed"
+    - nearest-gtf:
+      - "/path/to/genes.gtf"
+ 	merge-dist: 100
+ 	
+dataset-1:
+  read_folder: "/path/to/read/folder/1"
+  samples:
+  	- "sample1"
+  	- "sample2"
+  	
+dataset-2:
+  read_folder: "/path/to/read/folder/2"
+  bam_suffix: ".bam"
+```
+
+two datasets (`dataset-1` and `dataset-2`) will be analysed.  `dataset-1` will consist of samples `sample1` and `sample2`, and `dataset-2` will consist of all the `bam` files in the directory `/path/to/read/folder/2`.
+
 ### Reads
 
 The reads for each dataset should be placed in the folder specified for each dataset.  Reads must be paired-end.  Note that the pipeline uses SeqPrep to merge and trim reads, and SeqPrep will refuse to process files which contain read-pairs with different read lengths (ie R1 is a different length to R2).  If your reads contain pairs that are different lengths, trim adapters first and then run the pipeline specifing `merge: False` and `trim: False`.
+
+### References
+
+The host and viral references (fasta format) should be specified in the config file for each dataset.  These will be indexed during execution.
 
 ## Outputs
 
