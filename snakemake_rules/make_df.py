@@ -25,27 +25,24 @@ fastq_extensions = [".fq", ".fastq"]
 sam_extensions = [".sam", ".bam"]
 compression_extensions = [".gz", ".bz2"]
 
-#### global options ####
-
-# global options are specified with as a 'dataset' with the name 'global'
-# values in this dataset are applied to keys which are unset in the remaining datasets
-
-if 'global' in config:		
-	# get default (global) options
-	default = config.pop('global')
-	for dataset in config:
-		for key in default:
-			if key not in config[dataset]:
-				config[dataset][key] = default[key]
-
-
-
 #### get information for wildcards ####
 
 # get the name of each sample in each dataset, and save information about 
 # how to process it in a dataframe
 
 def make_df(config):
+
+	# global options are specified with as a 'dataset' with the name 'global'
+	# values in this dataset are applied to keys which are unset in the remaining datasets
+
+	if 'global' in config:		
+		# get default (global) options
+		default = config.pop('global')
+		for dataset in config:
+			for key in default:
+				if key not in config[dataset]:
+					config[dataset][key] = default[key]
+
 
 	rows = []
 
