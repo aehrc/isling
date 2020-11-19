@@ -6,15 +6,15 @@ rule sortbed:
 		temp(SORTED)
 	run:
 		for i in range(len(TOSORT)):
-			print(f"sorting file {TOSORT[i]} into file {SORTED[i]}, file extension {path.splitext(TOSORT[i])[1]}")
+			print(f"sorting file {TOSORT[i]} into file {SORTED[i]}, file extension {os.path.splitext(TOSORT[i])[1]}")
 			
 			# if file is a bed file
-			if (path.splitext(TOSORT[i])[1] == ".bed"):
+			if (os.path.splitext(TOSORT[i])[1] == ".bed"):
 				body = f"sort -k1,1 -k2,2n {TOSORT[i]} > {SORTED[i]}"
 				shell(body)
 				print(body)
 			# if file is a gtf file
-			elif (path.splitext(TOSORT[i])[1] == ".gtf"):
+			elif (os.path.splitext(TOSORT[i])[1] == ".gtf"):
 				
 				body = f"awk '{{{{ if ($0 !~ /^#/) {{{{ print $0 }}}} }}}}' {TOSORT[i]} | sort -k1,1 -k4,4n > {SORTED[i]}"
 				shell(body)
@@ -88,7 +88,7 @@ rule ucsc_bed:
 		"{outpath}/summary/ucsc_bed/{dset}.post.bed"
 	group: "post"
 	params:
-		outdir = lambda wildcards, output: f"{path.dirname(output[0])}/{wildcards.dset}"
+		outdir = lambda wildcards, output: f"{os.path.dirname(output[0])}/{wildcards.dset}"
 	conda:
 		"../envs/rscripts.yml"
 	container:

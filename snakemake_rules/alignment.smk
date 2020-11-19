@@ -63,7 +63,7 @@ rule align_bwa_virus:
 		paired = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam"),
 		combined = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.sam"),
 	params:
-		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
+		index = lambda wildcards, input: os.path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
 		single_RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.virus}_merged\\tSM:{wildcards.samp}\\tPM:merged'",
 		paired_RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.virus}_unmerged\\tSM:{wildcards.samp}\\tPM:unmerged'"
@@ -100,13 +100,13 @@ def get_sam(wildcards, readType, genome):
 		if dedup is True:
 			# if we want single reads
 			if readType == "single":
-				return path.splitext(rules.align_bwa_virus.output.single)[0] + ".rmdup.sam"
+				return os.path.splitext(rules.align_bwa_virus.output.single)[0] + ".rmdup.sam"
 			# if we want paired reads
 			elif readType == 'paired':
-				return path.splitext(rules.align_bwa_virus.output.paired)[0] + ".rmdup.sam"
+				return os.path.splitext(rules.align_bwa_virus.output.paired)[0] + ".rmdup.sam"
 			# if we want combined reads
 			else:
-				return path.splitext(rules.align_bwa_virus.output.combined)[0] + ".rmdup.sam"
+				return os.path.splitext(rules.align_bwa_virus.output.combined)[0] + ".rmdup.sam"
 		# if we're not doing deduplication
 		else:
 			if readType == "single":
@@ -121,11 +121,11 @@ def get_sam(wildcards, readType, genome):
 		if dedup is True:
 			# if we want single reads
 			if readType == "single":
-				return path.splitext(rules.align_bwa_host_single.output.sam)[0] + ".rmdup.sam"
+				return os.path.splitext(rules.align_bwa_host_single.output.sam)[0] + ".rmdup.sam"
 			elif readType == "paired":
-				return path.splitext(rules.align_bwa_host_paired.output.sam)[0] + ".rmdup.sam"
+				return os.path.splitext(rules.align_bwa_host_paired.output.sam)[0] + ".rmdup.sam"
 			else:
-				return path.splitext(rules.combine_host.output.combined)[0] + ".rmdup.sam"
+				return os.path.splitext(rules.combine_host.output.combined)[0] + ".rmdup.sam"
 		# if we're not doing deduplication
 		else:
 			if readType == "single":
@@ -204,7 +204,7 @@ rule align_bwa_host_single:
 	resources:
 		mem_mb=lambda wildcards, attempt, input: attempt * 3 * sum([int(os.stat(file).st_size/1e6) for file in input.idx])
 	params:
-		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
+		index = lambda wildcards, input: os.path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
 		RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.host}_merged\\tSM:{wildcards.samp}\\tPM:merged'"
 	threads: 4
@@ -228,7 +228,7 @@ rule align_bwa_host_paired:
 	resources:
 		mem_mb=lambda wildcards, attempt, input: attempt * 3 * sum([int(os.stat(file).st_size/1e6) for file in input.idx])
 	params:
-		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
+		index = lambda wildcards, input: os.path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
 		RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.host}_unmerged\\tSM:{wildcards.samp}\\tPM:unmerged'"
 	threads: 4
@@ -265,7 +265,7 @@ rule convert_to_bam:
 		bam = "{outpath}/{dset}/{folder}/{alignment}.bam",
 		bai = "{outpath}/{dset}/{folder}/{alignment}.bam.bai"
 	params:
-		tmp_prefix = lambda wildcards, input: path.splitext(input[0])[0]
+		tmp_prefix = lambda wildcards, input: os.path.splitext(input[0])[0]
 	wildcard_constraints:
 		folder = "host_aligned|virus_aligned"
 	conda: 
