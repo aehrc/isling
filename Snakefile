@@ -13,15 +13,14 @@
 # the steps in the pipeline are as follows:
 # 1. preprocessing
 #   - convert bam files to fastq, if necessary
-#   - either merge R1 and R2 using seqprep, or don't do merging 
-#     and just concatenate R1 and R2, as specified in the dsets.yaml config file
+#   - either merge R1 and R2 using seqprep, or don't do merging, as specified in the  config file
 # 2. alignments
 #   - align all the reads to the virus
 #   - remove duplicates
 #   - extract only the alinged reads to a fastq
 #   - align these reads to the host
 # 3. perl scripts
-#   - run perl scripts with alignment sam  files as inputs to detect integrations
+#   - run perl scripts with alignment sam files as inputs to detect integrations
 # 4. postprocessing
 #   - apply various types of postprocessing: dedup, filter, mask, annotate
 #   - generate ouput xlsx files for each dataset
@@ -30,6 +29,13 @@
 # the primary output of the pipeline is the xlsx files for each datasets which
 # contain the details of the detected integrations.
 
+#### python modules ####
+
+from glob import glob
+from os import path, getcwd
+import pandas as pd
+import pdb
+import sys
 
 # set working directory - directory in which snakefile is located
 if 'snakedir' not in config:
@@ -39,20 +45,13 @@ workdir: config['snakedir']
 snakedir = config['snakedir']
 config.pop('snakedir')
 
-#### python modules ####
 
-from glob import glob
-from os import path, getcwd
-import pandas as pd
-import pdb
 
-import sys
+
 sys.path.append(os.path.join(snakedir, "snakemake_rules/"))
 from snakemake_rules import make_df
 from snakemake_rules import make_reference_dict
 from snakemake_rules import make_post_args
-
-# get directory in which snakefile is located
 
 
 # construct dataframe with wildcards and other information about how to run analysis
