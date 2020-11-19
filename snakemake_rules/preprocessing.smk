@@ -52,6 +52,8 @@ rule bam_to_fastq:
 		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
+	resources:
+		mem_mb=lambda wildcards, attempt, input: attempt * 3 * sum([int(os.stat(file).st_size/1e6) for file in input])
 	shell:
 		"""
 		samtools view -b -F '0x900' {input.bam} |\

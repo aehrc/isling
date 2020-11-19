@@ -2,7 +2,7 @@
 #functions for if we did seqPrep or not
 def get_for_align(wildcards, read_type):
 
-	assert read_type in ['unmerged_r1', 'unmerged_r2', 'merged']	
+	assert read_type in {'unmerged_r1', 'unmerged_r2', 'merged'}
 
 	merge = bool(get_value_from_df(wildcards, 'merge'))
 	trim = bool(get_value_from_df(wildcards, 'trim'))
@@ -36,7 +36,7 @@ def get_for_align(wildcards, read_type):
 
 rule index:
 	input:
-		lambda wildcards: ref_names[wildcards.genome]
+		fa = lambda wildcards: ref_names[wildcards.genome]
 	output:
 		temp(expand("{outpath}/references/{genome}/{genome}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True))
 	conda: 
@@ -45,8 +45,10 @@ rule index:
 		"docker://szsctt/bwa:1"
 	params:
 		prefix = lambda wildcards, output: path.splitext(output[0])[0]
+	resources:
+		mem_mb=lambda wildcards, attempt, input: attempt * 3 * int(os.stat(input.fa).st_size/1e6)
 	shell:
-		"bwa index -p {params.prefix} {input}"
+		"bwa index -p {params.prefix} {input.fa}"
 
 
 rule align_bwa_virus:
@@ -66,7 +68,7 @@ rule align_bwa_virus:
 		single_RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.virus}_merged\\tSM:{wildcards.samp}\\tPM:merged'",
 		paired_RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.virus}_unmerged\\tSM:{wildcards.samp}\\tPM:unmerged'"
 	resources:
-		mem_mb=lambda wildcards, attempt: attempt * 4000
+		mem_mb=lambda wildcards, attempt, input: attempt * 3 * sum([int(os.stat(file).st_size/1e6) for file in input.idx])
 	conda:
 		"../envs/bwa.yml"
 	container:
@@ -200,7 +202,7 @@ rule align_bwa_host_single:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt: attempt * 4000
+		mem_mb=lambda wildcards, attempt, input: attempt * 3 * sum([int(os.stat(file).st_size/1e6) for file in input.idx])
 	params:
 		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
@@ -224,7 +226,7 @@ rule align_bwa_host_paired:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt: attempt * 4000	
+		mem_mb=lambda wildcards, attempt, input: attempt * 3 * sum([int(os.stat(file).st_size/1e6) for file in input.idx])
 	params:
 		index = lambda wildcards, input: path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
@@ -247,7 +249,7 @@ rule combine_host:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt: attempt * 4000	
+		mem_mb=lambda wildcards, attempt, input: attempt * 3 * sum([int(os.stat(file).st_size/1e6) for file in input])
 	shell:		
 		"""
 		samtools merge {output.combined} {input.single} {input.paired}
@@ -271,11 +273,11 @@ rule convert_to_bam:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: attempt * 3 * int(os.stat(input.sam).st_size/1e6)
+		mem_mb=lambda wildcards, attempt, input: attempt * 3 * int(os.stat(input.sam).st_size/1e6),
 	shell:
 		"""
 		rm -f {params.tmp_prefix}*tmp*
-		samtools sort -o {output.bam} {input}
+		samtools sort -o {output.bam} {input.sam}
 		samtools index {output.bam}
 		"""
 		

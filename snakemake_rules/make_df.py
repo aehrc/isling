@@ -61,7 +61,10 @@ def make_df(config):
 		# figure out if 'dedup', 'merge' and 'trim' are true or false for this dataset
 		dedup = check_bools(config, dataset, 'dedup')
 		merge = check_bools(config, dataset, 'merge')
-		trim = check_bools(config, dataset, 'trim')
+		if merge == 1:
+			trim = 1
+		else:
+			trim = check_bools(config, dataset, 'trim')
 		
 		# get host and virus 
 		# host and virus can either be spcified as 'host_name' and 'host_fasta' ('virus_name' and 'virus_fasta'), 
@@ -244,14 +247,14 @@ def check_bools(config, dataset, key):
 	Check that the key in the speicfied dataset is defined, and return 1 if true, 0 if false
 	"""
 	# if not specified
-	if 'dedup' not in config[dataset]:
-		raise ValueError(f"Please specify True or False for 'dedup' in dataset {dataset}")
+	if key not in config[dataset]:
+		raise ValueError(f"Please specify True or False for {key} in dataset {dataset}")
 	
 	# try to figure out if the user wanted true or false
-	if isinstance(config[dataset]["dedup"], bool):
-		return int(config[dataset]["dedup"])
-	elif isinstance(config[dataset]["dedup"], str):
-		if config[dataset]["dedup"].lower() == "true":
+	if isinstance(config[dataset][key], bool):
+		return int(config[dataset][key])
+	elif isinstance(config[dataset][key], str):
+		if config[dataset][key].lower() == "true":
 			return 1
 		else:
 			return 0
