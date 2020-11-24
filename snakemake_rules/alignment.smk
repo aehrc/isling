@@ -68,7 +68,7 @@ rule align_bwa_virus:
 		single_RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.virus}_merged\\tSM:{wildcards.samp}\\tPM:merged'",
 		paired_RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.virus}_unmerged\\tSM:{wildcards.samp}\\tPM:unmerged'"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: attempt * 3 * sum([int(os.stat(file).st_size/1e6) for file in input.idx])
+		mem_mb=lambda wildcards, attempt, input: min(50000, max(1000, attempt * 3 * sum([int(os.stat(file).st_size/1e6) for file in input.idx])))
 	conda:
 		"../envs/bwa.yml"
 	container:
