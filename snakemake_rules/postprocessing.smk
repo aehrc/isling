@@ -48,7 +48,7 @@ rule post:
 	container:
 		"docker://szsctt/rscripts:4"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: attempt * 3 * sum([int(os.stat(file).st_size/1e6) for file in input])
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
 	params:
 		lambda wildcards: get_value_from_df(wildcards, 'postargs')
 	shell:
@@ -73,7 +73,7 @@ rule summarise:
 	params:
 		outdir = lambda wildcards, output: path.dirname(output[0])
 	resources:
-		mem_mb=lambda wildcards, attempt, input: attempt * 3 * sum([int(os.stat(file).st_size/1e6) for file in input])
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
 	shell:
 		"Rscript scripts/summarise_ints.R {input} {params.outdir}"
 
@@ -94,7 +94,7 @@ rule ucsc_bed:
 	container:
 		"docker://szsctt/rscripts:4"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: attempt * 3 * sum([int(os.stat(file).st_size/1e6) for file in input])
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
 	shell:
 		"""
 		Rscript scripts/writeBed.R {input} {params.outdir}
@@ -116,7 +116,7 @@ rule merged_bed:
 	container:
 		"docker://szsctt/bedtools:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: attempt * 3 * sum([int(os.stat(file).st_size/1e6) for file in input])
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
 	shell:
 		"""
 		awk -F"\t" -v OFS="\t" 'BEGIN {{getline}}{{ ($9 ~ 'hv') ? dir = "+" : dir = "-"; print $1,$2,$3,dir,$21 }}' {input.txt} | sort -k1,1 -k2,2n > {output.bed}

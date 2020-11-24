@@ -1,5 +1,14 @@
 #### preprocessing rules ####
 
+def resources_list_with_min_and_max(file_name_list, attempt, mult_factor=2, minimum = 100, maximum = 50000):
+	
+	resource = int(sum([os.stat(file).st_size/1e6 for file in file_name_list]))
+	
+	resource = min(maximum, resource)
+	
+	return max(minimum, resource)
+
+
 rule write_analysis_summary:
 	output:
 		tsv = "{outpath}/summary/{dset}.analysis_conditions.tsv"
@@ -52,7 +61,7 @@ rule bam_to_fastq:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: attempt * 3 * sum([int(os.stat(file).st_size/1e6) for file in input])
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
 	shell:
 		"""
 		samtools view -b -F '0x900' {input.bam} |\

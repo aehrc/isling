@@ -32,6 +32,7 @@ def get_for_align(wildcards, read_type):
 		else:
 			return rules.touch_merged.output.merged
 
+
 #### alignments ####
 
 rule index:
@@ -46,7 +47,7 @@ rule index:
 	params:
 		prefix = lambda wildcards, output: path.splitext(output[0])[0]
 	resources:
-		mem_mb=lambda wildcards, attempt, input: attempt * 3 * int(os.stat(input.fa).st_size/1e6)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.fa,), attempt)
 	shell:
 		"bwa index -p {params.prefix} {input.fa}"
 
@@ -68,7 +69,7 @@ rule align_bwa_virus:
 		single_RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.virus}_merged\\tSM:{wildcards.samp}\\tPM:merged'",
 		paired_RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.virus}_unmerged\\tSM:{wildcards.samp}\\tPM:unmerged'"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: min(50000, max(1000, attempt * 3 * sum([int(os.stat(file).st_size/1e6) for file in input.idx])))
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt)
 	conda:
 		"../envs/bwa.yml"
 	container:
@@ -202,7 +203,7 @@ rule align_bwa_host_single:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: attempt * 3 * sum([int(os.stat(file).st_size/1e6) for file in input.idx])
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt)
 	params:
 		index = lambda wildcards, input: os.path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
@@ -226,7 +227,7 @@ rule align_bwa_host_paired:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: attempt * 3 * sum([int(os.stat(file).st_size/1e6) for file in input.idx])
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt)
 	params:
 		index = lambda wildcards, input: os.path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
@@ -249,7 +250,7 @@ rule combine_host:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: attempt * 3 * sum([int(os.stat(file).st_size/1e6) for file in input])
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.paired, input.single), attempt)
 	shell:		
 		"""
 		samtools merge {output.combined} {input.single} {input.paired}
@@ -273,7 +274,7 @@ rule convert_to_bam:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: attempt * 3 * int(os.stat(input.sam).st_size/1e6),
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.sam,), attempt , 0.5, 100, 10000)
 	shell:
 		"""
 		rm -f {params.tmp_prefix}*tmp*
@@ -292,7 +293,7 @@ rule markdup:
 		folder = "host_aligned|virus_aligned"
 	group: "rmdup"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: attempt * 3 * int(os.stat(input.sam).st_size/1e6)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.sam,), attempt , 0.5, 100, 10000)
 	conda: 
 		"../envs/picard.yml"	
 	container:
@@ -316,10 +317,11 @@ rule rmdup:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: attempt * 3 * int(os.stat(input.sam).st_size/1e6)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.sam,), attempt , 0.5, 100, 10000)
 	shell:
 		"""
 		samtools view -h -F 1024 {input.sam} > {output.sam}
 		"""
 	
+
 
