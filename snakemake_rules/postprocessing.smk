@@ -107,11 +107,11 @@ rule merged_bed:
 	input:
 		txt = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.txt"
 	output:
-		bed = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.bed"),
-		merged_bed = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.merged.bed"
+		sorted = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.sorted.txt"),
+		merged = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.merged.txt"
 	group: "post"
 	params:
-		d = lambda wildcards: f"-d {int(get_value_from_df(wildcards, 'merge_dist'))}",
+		d = lambda wildcards: int(get_value_from_df(wildcards, 'merge_dist')),
 		n = lambda wildcards: int(get_value_from_df(wildcards, 'merge_n_min')),
 	container:
 		"docker://szsctt/bedtools:1"
@@ -119,7 +119,9 @@ rule merged_bed:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
 	shell:
 		"""
-		awk -F"\t" -v OFS="\t" 'BEGIN {{getline}}{{ ($9 ~ 'hv') ? dir = "+" : dir = "-"; print $1,$2,$3,dir,$21 }}' {input.txt} | sort -k1,1 -k2,2n > {output.bed}
-		bedtools merge -i {output.bed} {params.d} -c 5,5 -o count,collapse | awk -F"\t" -v OFS="\t" '$4 >= {params.n}'  > {output.merged_bed}
+		pwd
+		head -n1 {input.txt} > {output.sorted}
+		tail -n+2  {input.txt} | sort -k1,1 -k2,2n -k4,4 -k5,5n >> {output.sorted}
+		python3 scripts/merge.py -i {output.sorted} -o {output.merged} -t distance -d {params.d} -n {params.n}
 		"""
 

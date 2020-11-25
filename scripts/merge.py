@@ -7,12 +7,13 @@
 # --type distance: merge any sitest within specified of another site in both host and virus
 # if type is 'distance', must also specify -d <merge_distance>
 
-# if type is 'overlap' or 'distance' and a read to be merged is a discordant pair, its coordinates are not considered for the output range of coordinates 
+# if type is 'overlap' or 'distance', output coordinates is the range encompassing coordinates of all chimeric reads in the pair.  if there are no chimeric reads, then the range encompassing all coordinates will be output
 
 # file must be coordinate-sorted in both host and virus coordinates
 # ie sort -k1,1 -k2,2n -k4,4 -k5,5n
 
 # for now, don't consider orientation of integration site (host/virus or virus/host), but just merge based on coordinates
+
 
 import argparse
 import sys
@@ -23,24 +24,30 @@ def main(args):
 
 	parser = argparse.ArgumentParser(description = "merge integration sites based on host and virus coordinates")
 	parser.add_argument('--input', '-i', help = 'input file (from postprocessing)', required=True)
-	parser.add_argument('--output', '-o', help = 'output file', default='merged.bed')
+	parser.add_argument('--output', '-o', help = 'output file', default='merged.txt')
 	parser.add_argument('--type', '-t', help = 'type of merging to do', choices = ("exact", "overlap", "distance"), required=True)
 	parser.add_argument('--distance', '-d', help = 'distance for merging', type=int)
+	parser.add_argument('--min-n', '-n', help = 'minimum number of reads to retain a cluster', default=1, type=int)
 	args = parser.parse_args()
 	
 	# if type == 'distance', check -d was specified
 	if args.type == 'distance':
-		if args.d is None:
+		if args.distance is None:
 			raise ValueError("Please specify positive integer -d when type is 'distance'")
-		if args.d < 0:
+		if args.distance < 0:
 			raise ValueError("Please specify positive integer -d when type is 'distance'")
+	
+	# type 'overlap' is equivalent to type 'distance' with -d 0
+	if args.type == 'overlap':
+		args.distance = 0
+		args.type = 'distance'
 	
 	#open input, output files
 	with open(args.input, 'r', newline = '') as infile, open(args.output, 'w', newline = '') as outfile:
 		reader = csv.DictReader(infile, delimiter = '\t')
 		writer = csv.writer(outfile, delimiter = '\t')
 		
-		header = ('Chr', 'IntStart', 'IntStop', 'Virus', 'VirusStart', 'VirusStop', 'SiteID', 'nReads', 'ReadIDs')
+		header = ('Chr', 'IntStart', 'IntStop', 'Virus', 'VirusStart', 'VirusStop', 'nChimeric', 'nDiscordant', 'SiteID', 'ReadIDs')
 		writer.writerow(header)	
 		
 		# get first row to initialize 
@@ -51,7 +58,6 @@ def main(args):
 		curr = reset_curr(row)
 		seen_host_chrs = {row['Chr']}
 		seen_viruses = {row['VirusRef']}
-
 		
 		# variables for merging clusters
 		n_clust = 0
@@ -86,26 +92,73 @@ def main(args):
 					seen_viruses = set()
 					
 			# set current values
-			curr = reset_curr(row)			
-
-			# check if we should merge this row with current cluster
+			curr = reset_curr(row)
+			
 			if args.type == 'exact':
+				# check if we should merge this row with current cluster
 				merge = check_merge_exact(row, clust)
 						
 				# if we're merging this read
 				if merge:
 					clust['reads'].append(row['ReadID'])
-				# otherwise, write previous cluster to outfile
+					if row['OverlapType'] == 'discordant':
+						clust['n_discord'] += 1
+					else:
+						clust['n_chimeric'] += 1						
+				
 				else:
-					write_cluster(writer, clust, n_clust)
-										
+					# otherwise, write previous cluster to outfile
+					write_cluster_simple(writer, clust, n_clust, args.min_n)
+							
+					# start new cluster			
 					n_clust += 1					
 					clust = reset_clust(row)
-			elif args.type == 'overlap':
-				merge = check_merge_overlap(row, clust)
 			
+			elif args.type == 'distance':
+				# check if we should merge this row with current cluster
+				merge = check_merge_overlap(row, clust, args.distance)
 
+				if merge:
+					clust['reads'].append(row['ReadID'])
+					if row['OverlapType'] == 'discordant':
+						clust['n_discord'] += 1
+					else:
+						clust['n_chimeric'] += 1
+					
+					# if this read is chimeric, but cluster previously contained only discordant pairs
+					# use the coorindates of this chimeric read instead of the di
+					
+					# extend cluster stop, if necessary
+					# don't need to extend start because input is sorted
+					clust['host_stop'] = max(int(row['IntStop']), clust['host_stop'])
+					clust['virus_stop'] = max(int(row['VirusStop']), clust['virus_stop'])
+					
+					# if this read is chimeric, also adjust chimeric start and stop if necessary
+					if row['OverlapType'] != 'discordant' and not clust['contains_chimeric']:
+						clust['chimeric_host_start'] = int(row['IntStart'])
+						clust['chimeric_host_stop'] = int(row['IntStop'])
+						clust['chimeric_virus_start'] = int(row['VirusStart'])
+						clust['chimeric_virus_stop'] = int(row['VirusStop'])
+						clust['contains_chimeric'] = True
+					elif row['OverlapType'] != 'discordant' and clust['contains_chimeric']:
+						clust['chimeric_host_stop'] = max(int(row['IntStop']), clust['chimeric_host_stop'])
+						clust['chimeric_virus_stop'] = max(int(row['VirusStop']), clust['chimeric_virus_stop'])				
+						
+				else:
+					# otherwise, write previous cluster to outfile
+					write_cluster(writer, clust, n_clust, args.min_n)
+							
+					# start new cluster			
+					n_clust += 1					
+					clust = reset_clust(row)		
+			
 			n_line +=1 
+		
+		# write last cluster to file
+		if args.type == 'exact':
+			write_cluster_simple(writer, clust, n_clust, args.min_n)
+		else:
+			write_cluster(writer, clust, n_clust, args.min_n)
 			
 	
 def reset_curr(row):
@@ -122,7 +175,7 @@ def reset_clust(row):
 	"""
 	reset clust dict with data from input row
 	"""			
-	return {
+	clust = {
 		'host_chr'		: row['Chr'],
 		'host_start'	: int(row['IntStart']),
 		'host_stop'		: int(row['IntStop']),
@@ -130,17 +183,43 @@ def reset_clust(row):
 		'virus_start'	: int(row['VirusStart']),
 		'virus_stop'	: int(row['VirusStop']),
 		'reads'				: [row['ReadID']],
+		'contains_chimeric': (row['OverlapType'] != 'discordant'),
+		'n_chimeric'  : 1 if row['OverlapType'] != 'discordant' else 0,
+		'n_discord'		: 1 if row['OverlapType'] == 'discordant' else 0
 	}
+	if row['OverlapType'] != 'discordant':
+		clust['chimeric_host_start'] = clust['host_start']
+		clust['chimeric_host_stop'] = clust['host_stop']
+		clust['chimeric_virus_start'] = clust['virus_start']
+		clust['chimeric_virus_stop'] = clust['virus_stop']
+		
+	return clust
 
 
-def write_cluster(outcsv, clust, clust_id):
+def write_cluster_simple(outcsv, clust, clust_id, min_n):
 	"""
 	write cluster row to outfile
 	"""
-	row = (clust['host_chr'], clust['host_start'], clust['host_stop'], 
-					clust['virus'], clust['virus_start'], clust['virus_stop'], clust_id, len(clust['reads']), ",".join(clust['reads']))
-	outcsv.writerow(row)
+	if len(clust['reads']) >= min_n:
+		row = (clust['host_chr'], clust['host_start'], clust['host_stop'], 
+					clust['virus'], clust['virus_start'], clust['virus_stop'], 
+					clust['n_chimeric'], clust['n_discord'],
+					clust_id, ",".join(clust['reads']))
+		outcsv.writerow(row)
 
+def write_cluster(outcsv, clust, clust_id, min_n):
+	"""
+	write cluster row to outfile
+	"""
+	if len(clust['reads']) >= min_n:	
+		if clust['contains_chimeric']:
+			row = (clust['host_chr'], clust['chimeric_host_start'], clust['chimeric_host_stop'], 
+							clust['virus'], clust['chimeric_virus_start'], clust['chimeric_virus_stop'], 
+							clust['n_chimeric'], clust['n_discord'],
+							clust_id, ",".join(clust['reads']))
+			outcsv.writerow(row)
+		else:
+			write_cluster_simple(outcsv, clust, clust_id, min_n)
 
 	
 def check_merge_exact(row, clust):
@@ -163,16 +242,16 @@ def check_merge_exact(row, clust):
 	
 	return True
 
-def check_merge_overlap(row, clust):
+def check_merge_overlap(row, clust, dist):
 	"""
 	check if there's overlap in both host and virus between intervals defined in row and intervals defined in clust
 	"""
 	# overlap in host
-	if not overlap(row['Chr'], int(row['IntStart']), int(row['IntStop']), 
+	if not overlap(row['Chr'], int(row['IntStart']) - dist, int(row['IntStop']) + dist, 
 									clust['host_chr'], clust['host_start'], clust['host_stop']):	
 		return False
 	# overlap in virus
-	if not overlap(row['VirusRef'], int(row['VirusStart']), int(row['VirusStop']), 
+	if not overlap(row['VirusRef'], int(row['VirusStart']) - dist, int(row['VirusStop']) + dist, 
 									clust['virus'], clust['virus_start'], clust['virus_stop']):
 		return False
 		
@@ -203,7 +282,19 @@ def overlap(ref1, start1, stop1, ref2, start2, stop2):
 	"""
 	check if intervals ref1:start1-stop1 and ref2:start2-stop2 overlap
 	"""
-	return False
+	assert stop1 >= start1
+	assert stop2 >= start2
+	
+	# different chromosome
+	if ref1 != ref2:
+		return False
+	# interval 1 completely to the left of interval 2
+	if start1 > stop2:
+		return False
+	# interval 2 completely to the left of interval 1
+	if start2 > stop1:
+		return False
+	return True
 
 if __name__ == "__main__":
 	main(sys.argv)
