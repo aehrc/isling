@@ -1,4 +1,4 @@
-snakedir: "/scratch1/sco305/intvi_simulation-experiments/intvi_pipeline"
+snakedir: "."
 
 global:
   read_folder: "test/reads/"
