@@ -47,7 +47,7 @@ rule index:
 	params:
 		prefix = lambda wildcards, output: path.splitext(output[0])[0]
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.fa,), attempt)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.fa,), attempt, 5)
 	shell:
 		"bwa index -p {params.prefix} {input.fa}"
 
@@ -69,7 +69,7 @@ rule align_bwa_virus:
 		single_RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.virus}_merged\\tSM:{wildcards.samp}\\tPM:merged'",
 		paired_RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.virus}_unmerged\\tSM:{wildcards.samp}\\tPM:unmerged'"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt, 5)
 	conda:
 		"../envs/bwa.yml"
 	container:
@@ -203,7 +203,7 @@ rule align_bwa_host_single:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt, 5)
 	params:
 		index = lambda wildcards, input: os.path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
@@ -227,7 +227,7 @@ rule align_bwa_host_paired:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt, 5)
 	params:
 		index = lambda wildcards, input: os.path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
@@ -274,7 +274,7 @@ rule convert_to_bam:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.sam,), attempt , 0.5, 100, 10000)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.sam,), attempt, 2, 100, 10000)
 	shell:
 		"""
 		rm -f {params.tmp_prefix}*tmp*
