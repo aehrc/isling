@@ -291,9 +291,8 @@ rule markdup:
 		metrics = temp("{outpath}/{dset}/{folder}/{alignment}.dups.txt")
 	wildcard_constraints:
 		folder = "host_aligned|virus_aligned"
-	group: "rmdup"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.sam,), attempt , 0.5, 100, 10000)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.sam,), attempt, 0.5, 100, 10000)
 	conda: 
 		"../envs/picard.yml"	
 	container:
@@ -309,7 +308,6 @@ rule rmdup:
 		sam = "{outpath}/{dset}/{folder}/{alignment}.dups.sam"	
 	output:
 		sam = temp("{outpath}/{dset}/{folder}/{alignment}.rmdup.sam")	
-	group: "rmdup"
 	wildcard_constraints:
 		folder = "host_aligned|virus_aligned"
 	conda: 
@@ -317,7 +315,7 @@ rule rmdup:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.sam,), attempt , 0.5, 100, 10000)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.sam,), attempt, 0.5, 100, 10000)
 	shell:
 		"""
 		samtools view -h -F 1024 {input.sam} > {output.sam}
