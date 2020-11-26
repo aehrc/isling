@@ -2,7 +2,7 @@
 
 def resources_list_with_min_and_max(file_name_list, attempt, mult_factor=2, minimum = 100, maximum = 50000):
 	
-	resource = int(sum([os.stat(file).st_size/1e6 for file in file_name_list]))
+	resource = int(sum([os.stat(file).st_size/1e6 for file in file_name_list])) * attempt * mult_factor
 	
 	resource = min(maximum, resource)
 	
