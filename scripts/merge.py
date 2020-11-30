@@ -46,10 +46,18 @@ def main(args):
 	with open(args.input, 'r', newline = '') as infile, open(args.output, 'w', newline = '') as outfile:
 		reader = csv.DictReader(infile, delimiter = '\t')
 		writer = csv.writer(outfile, delimiter = '\t')
-		
+
+		# Write header to file
 		header = ('Chr', 'IntStart', 'IntStop', 'Virus', 'VirusStart', 'VirusStop', 'nChimeric', 'nDiscordant', 'SiteID', 'ReadIDs')
 		writer.writerow(header)	
-		
+
+		# Check if input file is empty. If empty write file only with header
+		is_empty = False
+		for row in reader:
+			is_empty = True
+		if not is_empty:
+			return None
+
 		# get first row to initialize 
 		row = next(reader)
 		n_line = 1
