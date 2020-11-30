@@ -586,6 +586,8 @@ sub getIntPos {
 	
 	# make sure that start isn't less than zero, and stop isn't more than the reference length
 	if ($start < 0) { $start = 0; }
+	if ($stop < 0) { $stop = 0; }
+	if ($start > $reflen) { $start = $reflen; }
 	if ($stop > $reflen) { $stop = $reflen; }
 
 	return ($start, $stop, $ambig);
