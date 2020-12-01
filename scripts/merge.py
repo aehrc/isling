@@ -52,15 +52,13 @@ def main(args):
 		writer.writerow(header)	
 
 		# Check if input file is empty. If empty write file only with header
-		is_empty = False
-		for row in reader:
-			is_empty = True
-		if not is_empty:
-			return None
 
 		# get first row to initialize 
-		row = next(reader)
-		n_line = 1
+		try:
+			row = next(reader)
+			n_line = 1
+		except StopIteration:
+			return
 		
 		# variables for checking sorting
 		curr = reset_curr(row)
