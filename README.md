@@ -45,6 +45,7 @@ dataset_name:
   R2_suffix: "_L001_R2.fastq.gz"
   read1-adapt: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
   read2-adapt: "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
+  mean-frag-len: "estimate"
   merge: True
   trim: True
   host_name: "macFas5"
@@ -82,8 +83,8 @@ The key `samples` is optional. If it is included, it should be a list of sample 
 
 If the key `samples` is not included, sample names will be inferred from the files present in the `read_folder` having the specified suffixes.  Note that this option requires files to be present on the local filesystem, and is therefore not compatible with cloud execution.
 
-#### Adapters
-Specify the adapters for read 1 and read 2, for trimming and merging, using the `read1-adapt` and `read2-adapt` keys.
+#### Adapters and mean fragment length.
+Specify the adapters for read 1 and read 2, for trimming and merging, using the `read1-adapt` and `read2-adapt` keys.  Specify either the mean fragment length, or use the string 'estimate' to indicate that the mean fragment length should be estimated from proper pairs in the alignments.
 
 #### Merging, adapter trimming
 
