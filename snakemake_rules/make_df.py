@@ -14,7 +14,7 @@ tol_default = 3
 cutoff_default = 20
 min_mapq_default = 0
 merge_n_min_default = 1
-
+split_default = 1
 
 #### check file extensions ####
 
@@ -102,14 +102,16 @@ def make_df(config):
 		min_mapq = get_value_or_default(config, dataset, 'min-mapq', min_mapq_default)
 		bwa_mem_params = get_value_or_default(config, dataset, 'bwa-mem', bwa_mem_default)
 		merge_n_min = get_value_or_default(config, dataset, 'merge-n-min', merge_n_min_default)
-		
+		split = get_value_or_default(config, dataset, 'split', split_default)
+
 		# check values are integers greater than a minimum value
 		check_int_gt(merge_dist, -1, 'merge-dist', dataset)
 		check_int_gt(clip_cutoff, 1, 'clip-cutoff', dataset)
 		check_int_gt(cigar_tol, 0, 'cigar-tol', dataset)
 		check_int_gt(min_mapq, -1, 'min-mapq', dataset)
-		check_int_gt(min_mapq, -1, 'merge-n-min', dataset)
-		
+		check_int_gt(merge_n_min, -1, 'merge-n-min', dataset)
+		check_int_gt(split, 0, 'split', dataset)
+
 		# get arguments for running postprocessing scripts
 		postargs = make_post_args({dataset : config[dataset]})[0][dataset]
 		
@@ -137,10 +139,10 @@ def make_df(config):
 				dataset_name = dataset
 				
 			# make sample-specific information
-			unique = f"{dataset_name}+++{sample}"
+			unique = f"{dataset_name}+++{sample}+++{split}"
 			
 			# append combinations of each sample, host and virus		
-			rows.append((dataset_name, dataset, sample, host, config[dataset]["host"][host], virus, config[dataset]["virus"][virus], merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, merge_n_min, clip_cutoff, cigar_tol, min_mapq))
+			rows.append((dataset_name, dataset, sample, host, config[dataset]["host"][host], virus, config[dataset]["virus"][virus], merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, merge_n_min, clip_cutoff, cigar_tol, min_mapq, split))
 
 			
 	# check there aren't any duplicate rows
@@ -148,7 +150,7 @@ def make_df(config):
 		raise ValueError("Error - configfile results in duplicate analyses, check samples and dataset names are unique")
 	
 	# make dataframe
-	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq'])
+	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq', 'split'])
 	
 	# do checks on dataframe
 	check_dataset_sample_unique(toDo)
@@ -156,6 +158,16 @@ def make_df(config):
 	ref_names = make_reference_dict(toDo)
 	check_fastas_unique(toDo, ref_names)
 	
+	# Split reads into n parts and add rows to toDo
+	for index, row in toDo.iterrows():
+		split = int(row['split'])
+		toDo.loc[index, 'part'] = str(int(split))
+		for tmpsplit in  range(1,int(split)):
+			tmprow = row
+			tmprow['part'] = tmpsplit
+			tmprow['unique'] = tmprow['unique'].split("+++")[0]+"+++"+tmprow['unique'].split("+++")[1]+"+++"+str(tmpsplit)
+			toDo = toDo.append(tmprow, ignore_index=True)
+
 	return toDo
 
 
