@@ -1,0 +1,9 @@
+name: seqkit
+channels:
+  - bioconda
+  - r
+  - defaults
+dependencies:
+  - seqkit=0.14.0
+
+
