@@ -26,9 +26,9 @@ def get_for_align(wildcards, read_type):
 	# if we didn't do either
 	else:
 		if read_type == 'unmerged_r1':
-			return get_for_seqprep(wildcards, "1")
+			return get_for_split(wildcards, "1")
 		if read_type == 'unmerged_r2':
-			return get_for_seqprep(wildcards, "2")
+			return get_for_split(wildcards, "2")
 		else:
 			return rules.touch_merged.output.merged
 
@@ -60,9 +60,9 @@ rule align_bwa_virus:
 		r2 = lambda wildcards: get_for_align(wildcards, "unmerged_r2"),
 	
 	output:
-		single = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaSingle.sam"),
-		paired = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam"),
-		combined = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.sam"),
+		single = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaSingle.sam"),
+		paired = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.sam"),
+		combined = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.sam"),
 	params:
 		index = lambda wildcards, input: os.path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
@@ -140,7 +140,7 @@ rule extract_to_fastq_single:
 	input:
 		aligned = lambda wildcards: get_sam(wildcards, "single", "virus"),
 	output:
-		fastq = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaSingle.mappedTo{virus}.fastq.gz"),
+		fastq = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.bwaSingle.mappedTo{virus}.fastq.gz"),
 	group: "host_align"
 	conda:
 		"../envs/bwa.yml"
@@ -158,10 +158,10 @@ rule extract_vAligned_paired:
 	input:
 		aligned = lambda wildcards: get_sam(wildcards, "paired", "virus")
 	output:
-		pvBam_readMap_mateUnmap = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.L.bam"),
-		pvBam_readUnmap_mateMap = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.R.bam"),
-		pvBam_bothMapped = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.B.bam"),
-		bam = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.bam"),
+		pvBam_readMap_mateUnmap = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.L.bam"),
+		pvBam_readUnmap_mateMap = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.R.bam"),
+		pvBam_bothMapped = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.B.bam"),
+		bam = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.mapped.bam"),
 	group: "host_align"
 	conda:
 		"../envs/bwa.yml"
@@ -179,8 +179,8 @@ rule extract_to_fastq_paired:
 	input:
 		bam = rules.extract_vAligned_paired.output.bam
 	output:
-		fastq1 = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaPaired.mappedTo{virus}.1.fastq.gz"),
-		fastq2 = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaPaired.mappedTo{virus}.2.fastq.gz")
+		fastq1 = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.bwaPaired.mappedTo{virus}.1.fastq.gz"),
+		fastq2 = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.bwaPaired.mappedTo{virus}.2.fastq.gz")
 	group: "host_align"
 	conda:
 		"../envs/bwa.yml"
@@ -196,7 +196,7 @@ rule align_bwa_host_single:
 		idx = expand("{outpath}/references/{host}/{host}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
 		all = rules.extract_to_fastq_single.output.fastq,
 	output:
-		sam = temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam"),
+		sam = temp("{outpath}/{dset}/host_aligned/{samp}.{part}.{host}.readsFrom{virus}.bwaSingle.sam"),
 	group: "host_align"
 	conda: 
 		"../envs/bwa.yml"
@@ -220,7 +220,7 @@ rule align_bwa_host_paired:
 		r1 = rules.extract_to_fastq_paired.output[0],
 		r2 = rules.extract_to_fastq_paired.output[1]
 	output:
-		sam = temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaPaired.sam"),
+		sam = temp("{outpath}/{dset}/host_aligned/{samp}.{part}.{host}.readsFrom{virus}.bwaPaired.sam"),
 	group: "host_align"
 	conda: 
 		"../envs/bwa.yml"
@@ -243,7 +243,7 @@ rule combine_host:
 		paired = rules.align_bwa_host_paired.output.sam,
 		single = rules.align_bwa_host_single.output.sam
 	output:
-		combined = temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.sam")
+		combined = temp("{outpath}/{dset}/host_aligned/{samp}.{part}.{host}.readsFrom{virus}.sam")
 	group: "host_align"
 	conda: 
 		"../envs/bwa.yml"

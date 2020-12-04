@@ -4,7 +4,7 @@ rule run_soft:
 		host = lambda wildcards: get_sam(wildcards, "combined", "host"),
 		virus = lambda wildcards: get_sam(wildcards, "combined", "virus")
 	output:
-		soft = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.soft.txt"),
+		soft = temp("{outpath}/{dset}/ints/{samp}.{part}.{host}.{virus}.soft.txt"),
 	group: "ints"
 	params:
 		cutoff = lambda wildcards: f"--cutoff {int(get_value_from_df(wildcards, 'clip_cutoff'))}",
@@ -24,7 +24,7 @@ rule run_short:
 		host = lambda wildcards: get_sam(wildcards, "combined", "host"),
 		virus = lambda wildcards: get_sam(wildcards, "combined", "virus"),
 	output:
-		short = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.short.txt"),
+		short = temp("{outpath}/{dset}/ints/{samp}.{part}.{host}.{virus}.short.txt"),
 	group: "ints"
 	params:
 		cutoff = lambda wildcards: f"--cutoff {int(get_value_from_df(wildcards, 'clip_cutoff'))}",
@@ -44,7 +44,7 @@ rule run_discordant:
 		host = lambda wildcards: get_sam(wildcards, "paired", "host"),
 		virus = lambda wildcards: get_sam(wildcards, "paired", "virus"),
 	output:
-		discord = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.discordant.txt"),
+		discord = temp("{outpath}/{dset}/ints/{samp}.{part}.{host}.{virus}.discordant.txt"),
 	group: "ints"
 	params:
 		cutoff = lambda wildcards: f"--cutoff {int(get_value_from_df(wildcards, 'clip_cutoff'))}",
@@ -66,8 +66,8 @@ rule combine_ints:
 		discordant = rules.run_discordant.output
 	group: "ints"
 	output:
-		temp =  temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp"),
-		all = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
+		temp =  temp("{outpath}/{dset}/ints/{samp}.{part}.{host}.{virus}.integrations.txt.tmp"),
+		all = temp("{outpath}/{dset}/ints/{samp}.{part}.{host}.{virus}.integrations.txt")
 	container:
 		"docker://ubuntu:18.04"
 	shell:
@@ -77,3 +77,20 @@ rule combine_ints:
 		cp {output.temp} {output.all}
 		"""
 
+# Get split value from config dataframe
+def get_split():
+	return(int(toDo.loc[:,'split'][0]))
+
+rule merge_parts_ints:
+	input:
+		files = expand("{{outpath}}/{{dset}}/ints/{{samp}}.{parts}.{{host}}.{{virus}}.integrations.txt", parts=range(1,get_split()+1))
+	group: "ints"
+	output:
+		all = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
+	container:
+		"docker://ubuntu:18.04"
+	shell:
+		"""
+		cat {input.files} | head -n 1 > {output.all}
+		grep -v '^Chr' -h  {input.files} >> {output.all}
+		"""

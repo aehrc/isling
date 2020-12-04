@@ -13,7 +13,7 @@
 # the steps in the pipeline are as follows:
 # 1. preprocessing
 #   - convert bam files to fastq, if necessary
-#   - either merge R1 and R2 using seqprep, or don't do merging, as specified in the  config file
+#   - either merge R1 and R2 using seqprep, or don't do merging, as specified in the config file
 # 2. alignments
 #   - align all the reads to the virus
 #   - remove duplicates
@@ -75,7 +75,8 @@ wildcard_constraints:
 	dset = "|".join(set(toDo.loc[:,'dataset'])),
 	host = "|".join(set(toDo.loc[:,'host'])),
 	align_type = "bwaPaired|bwaSingle",
-	outpath = "|".join(set(toDo.loc[:,'outdir']))
+	outpath = "|".join(set(toDo.loc[:,'outdir'])),
+	part = "|".join(set(str(toDo.loc[:,'part'])))
 
 #### local rules ####
 localrules: all, touch_merged, check_bam_input_is_paired
@@ -85,33 +86,37 @@ conditions = set()
 summary_files = set()
 ucsc_files = set()
 merged_bed = set()
+part_fastq = set()
 for i, row in toDo.iterrows():
 	summary_files.add(f"{row['outdir']}/summary/{row['dataset']}.xlsx")
 	ucsc_files.add(f"{row['outdir']}/summary/ucsc_bed/{row['dataset']}.post.bed")
 	conditions.add(f"{row['outdir']}/summary/{row['dataset']}.analysis_conditions.tsv")
 	merged_bed.add(f"{row['outdir']}/{row['dataset']}/ints/{row['sample']}.{row['host']}.{row['virus']}.integrations.post.merged.txt")
+	part_fastq.add(f"{row['outdir']}/{row['dataset']}/split_reads/{row['sample']}1.part_00{row['part']}.fq")
 
 
 rule all:
-	input: 
+	input:
 		conditions,
 		summary_files,
 		ucsc_files,
 		merged_bed,
-		expand("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bam",
-			zip,
-			outpath = toDo.loc[:,'outdir'],
-			dset = toDo.loc[:,'dataset'],
-			samp = toDo.loc[:,'sample'],
-			virus = toDo.loc[:,'virus']
-			),
-		expand("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bam",
+		expand("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bam",
 			zip,
 			outpath = toDo.loc[:,'outdir'],
 			dset = toDo.loc[:,'dataset'],
 			samp = toDo.loc[:,'sample'],
 			virus = toDo.loc[:,'virus'],
-			host = toDo.loc[:,'host']
+			part = toDo.loc[:,'part']
+			),
+		expand("{outpath}/{dset}/host_aligned/{samp}.{part}.{host}.readsFrom{virus}.bam",
+			zip,
+			outpath = toDo.loc[:,'outdir'],
+			dset = toDo.loc[:,'dataset'],
+			samp = toDo.loc[:,'sample'],
+			virus = toDo.loc[:,'virus'],
+			host = toDo.loc[:,'host'],
+			part = toDo.loc[:,'part']
 			)
 			
 
