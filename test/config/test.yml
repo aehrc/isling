@@ -17,6 +17,7 @@ global:
   clip-cutoff: 20
   min-mapq: 10
   cigar-tol: 3
+  split: 2
   post:
     - filter
     - dedup
