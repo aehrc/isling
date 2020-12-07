@@ -14,6 +14,7 @@ tol_default = 3
 cutoff_default = 20
 min_mapq_default = 0
 merge_n_min_default = 1
+mean_frag_len_default = 'estimate'
 
 
 #### check file extensions ####
@@ -96,6 +97,7 @@ def make_df(config):
 			adapter_2 = ""
 		
 		# check for other optional parameters
+		mean_frag_len = get_value_or_default(config, dataset, 'mean-frag-len', mean_frag_len_default)
 		merge_dist = get_value_or_default(config, dataset, 'merge-dist', merge_dist_default)
 		clip_cutoff = get_value_or_default(config, dataset, 'clip-cutoff', cutoff_default)
 		cigar_tol = get_value_or_default(config, dataset, 'cigar-tol', tol_default)
@@ -109,6 +111,12 @@ def make_df(config):
 		check_int_gt(cigar_tol, 0, 'cigar-tol', dataset)
 		check_int_gt(min_mapq, -1, 'min-mapq', dataset)
 		check_int_gt(min_mapq, -1, 'merge-n-min', dataset)
+		if mean_frag_len != 'estimate':
+			if mean_frag_len < 0:
+				raise ValueError('key "mean-frag-len" in dataset {dataset} should be either the string "estimate", or a number greater than 0')
+		elif isinstance(mean_frag_len, str):
+			if mean_frag_len != 'estimate':
+				raise ValueError('key "mean-frag-len" in dataset {dataset} should be either the string "estimate", or a number greater than 0')
 		
 		# get arguments for running postprocessing scripts
 		postargs = make_post_args({dataset : config[dataset]})[0][dataset]
@@ -140,7 +148,7 @@ def make_df(config):
 			unique = f"{dataset_name}+++{sample}"
 			
 			# append combinations of each sample, host and virus		
-			rows.append((dataset_name, dataset, sample, host, config[dataset]["host"][host], virus, config[dataset]["virus"][virus], merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, merge_n_min, clip_cutoff, cigar_tol, min_mapq))
+			rows.append((dataset_name, dataset, sample, host, config[dataset]["host"][host], virus, config[dataset]["virus"][virus], merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, merge_n_min, clip_cutoff, cigar_tol, min_mapq, mean_frag_len))
 
 			
 	# check there aren't any duplicate rows
@@ -148,7 +156,7 @@ def make_df(config):
 		raise ValueError("Error - configfile results in duplicate analyses, check samples and dataset names are unique")
 	
 	# make dataframe
-	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq'])
+	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq', 'mean_frag_len'])
 	
 	# do checks on dataframe
 	check_dataset_sample_unique(toDo)

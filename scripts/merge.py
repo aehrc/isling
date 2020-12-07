@@ -58,6 +58,7 @@ def main(args):
 		except StopIteration:
 			return
 		n_line = 1
+
 		
 		# variables for checking sorting
 		curr = reset_curr(row)

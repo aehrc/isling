@@ -7,6 +7,7 @@ global:
   R2_suffix: "2.fq"
   read1-adapt: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
   read2-adapt: "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
+  mean-frag-len: "estimate"
   merge: True
   trim: True
   host_name: "host"
