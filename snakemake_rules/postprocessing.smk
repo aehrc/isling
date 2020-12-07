@@ -51,6 +51,7 @@ rule post:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
 	params:
 		lambda wildcards: get_value_from_df(wildcards, 'postargs')
+	threads: 1
 	shell:
 		"""
 		Rscript scripts/post/postprocess.R {input.ints} {params}
@@ -65,7 +66,7 @@ rule summarise:
 	output:
 		"{outpath}/summary/{dset}.xlsx",
 		"{outpath}/summary/{dset}_annotated.xlsx"
-	group: "post"
+#	group: "post"
 	conda:
 		"../envs/rscripts.yml"
 	container:
@@ -74,6 +75,7 @@ rule summarise:
 		outdir = lambda wildcards, output: path.dirname(output[0])
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
+	threads: 1
 	shell:
 		"Rscript scripts/summarise_ints.R {input} {params.outdir}"
 
@@ -86,7 +88,7 @@ rule ucsc_bed:
 					toDo.loc[toDo['dataset'] == wildcards.dset,'virus'])]
 	output:
 		"{outpath}/summary/ucsc_bed/{dset}.post.bed"
-	group: "post"
+#	group: "post"
 	params:
 		outdir = lambda wildcards, output: f"{os.path.dirname(output[0])}/{wildcards.dset}"
 	conda:
@@ -95,6 +97,7 @@ rule ucsc_bed:
 		"docker://szsctt/rscripts:4"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
+	threads: 1
 	shell:
 		"""
 		Rscript scripts/writeBed.R {input} {params.outdir}
@@ -109,7 +112,7 @@ rule merged_bed:
 	output:
 		sorted = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.sorted.txt"),
 		merged = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.merged.txt"
-	group: "post"
+#	group: "post"
 	params:
 		d = lambda wildcards: int(get_value_from_df(wildcards, 'merge_dist')),
 		n = lambda wildcards: int(get_value_from_df(wildcards, 'merge_n_min')),
@@ -117,6 +120,7 @@ rule merged_bed:
 		"docker://szsctt/bedtools:1"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
+	threads: 1
 	shell:
 		"""
 		pwd
