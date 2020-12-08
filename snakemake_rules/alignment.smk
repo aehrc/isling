@@ -274,7 +274,7 @@ rule convert_to_bam:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.sam,), attempt, 2, 100, 10000)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.sam,), attempt, 2, 1000, 10000)
 	shell:
 		"""
 		rm -f {params.tmp_prefix}*tmp*
@@ -292,7 +292,7 @@ rule markdup:
 	wildcard_constraints:
 		folder = "host_aligned|virus_aligned"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.sam,), attempt, 0.5, 100, 10000)
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max((input.sam,), attempt, 0.5, 2000, 10000))
 	conda: 
 		"../envs/picard.yml"	
 	container:
@@ -315,7 +315,7 @@ rule rmdup:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.sam,), attempt, 0.5, 100, 10000)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.sam,), attempt, 0.5, 2000, 10000)
 	shell:
 		"""
 		samtools view -h -F 1024 {input.sam} > {output.sam}

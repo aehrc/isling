@@ -41,16 +41,20 @@ def main(args):
 		# Write header to file
 		header = ('Chr', 'IntStart', 'IntStop', 'Virus', 'VirusStart', 'VirusStop', 'nChimeric', 'nDiscordant', 'SiteID', 'ReadIDs')
 		writer.writerow(header)	
-
-		# Check if input file is empty. If empty write file only with header
-
-		# get first row to initialize 
+		
+		# get first row to initalize
 		try:
 			row = next(reader)
+<<<<<<< HEAD
 			row = prune_row(row)
 			n_line = 1
+=======
+		# if file is empty, just quit
+>>>>>>> a08a6b99298ea0fad1db277ef7b422dcde3d05de
 		except StopIteration:
 			return
+		n_line = 1
+
 		
 		# variables for checking sorting
 		curr = reset_curr(row)
