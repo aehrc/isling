@@ -77,13 +77,6 @@ rule combine_ints:
 		cp {output.temp} {output.all}
 		"""
 
-# Get split value from config dataframe
-def get_split():
-	parts = []
-	for part in set(toDo.loc[:,'part']):
-		parts.append(part)
-	return parts
-
 rule merge_parts_ints:
 	input:
 		files = expand("{{outpath}}/{{dset}}/ints/{{samp}}.{parts}.{{host}}.{{virus}}.integrations.txt", parts = get_split())

@@ -57,8 +57,7 @@ rule align_bwa_virus:
 		idx = expand("{outpath}/references/{virus}/{virus}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
 		merged = lambda wildcards: get_for_align(wildcards, "merged"),
 		r1 = lambda wildcards: get_for_align(wildcards, "unmerged_r1"),
-		r2 = lambda wildcards: get_for_align(wildcards, "unmerged_r2"),
-	
+		r2 = lambda wildcards: get_for_align(wildcards, "unmerged_r2"),	
 	output:
 		single = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaSingle.sam"),
 		paired = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.sam"),
@@ -83,7 +82,41 @@ rule align_bwa_virus:
 		
 		samtools merge {output.combined} {output.single} {output.paired}
 		"""
-		
+
+# Get split value from config dataframe
+def get_split():
+	parts = []
+	for part in set(toDo.loc[:,'part']):
+		parts.append(part)
+	return parts
+
+rule merge_virus_sams:
+	input:
+		expand("{{outpath}}/{{dset}}/virus_aligned/{{samp}}.{parts}.{{virus}}.sam", parts = get_split())
+	output:
+		temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.sam")
+	conda:
+		"../envs/bwa.yml"
+	container:
+		"docker://szsctt/bwa:1"
+	shell:
+		"""
+		samtools merge {output} {input}
+		"""
+
+rule merge_host_sams:
+	input:
+		expand("{{outpath}}/{{dset}}/host_aligned/{{samp}}.{parts}.{{host}}.readsFrom{{virus}}.bwaSingle.sam", parts = get_split())
+	output:
+		temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam")
+	conda:
+		"../envs/bwa.yml"
+	container:
+		"docker://szsctt/bwa:1"
+	shell:
+		"""
+		samtools merge {output} {input}
+		"""
 
 def get_sam(wildcards, readType, genome):
 
@@ -259,29 +292,38 @@ rule combine_host:
 
 #### sam file manipulations ####
 
-rule convert_to_bam:
+rule convert_virus_sam_to_bam:
 	input:
-		sam = "{outpath}/{dset}/{folder}/{alignment}.sam"
+		sam = rules.merge_virus_sams.output
 	output:
-		bam = "{outpath}/{dset}/{folder}/{alignment}.bam",
-		bai = "{outpath}/{dset}/{folder}/{alignment}.bam.bai"
-	params:
-		tmp_prefix = lambda wildcards, input: os.path.splitext(input[0])[0]
-	wildcard_constraints:
-		folder = "host_aligned|virus_aligned"
+		bam = "{outpath}/{dset}/virus_aligned/{samp}.{virus}.bam",
+		bai = "{outpath}/{dset}/virus_aligned/{samp}.{virus}.bam.bai"
 	conda: 
 		"../envs/bwa.yml"	
 	container:
 		"docker://szsctt/bwa:1"
-	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.sam,), attempt, 2, 100, 10000)
 	shell:
 		"""
-		rm -f {params.tmp_prefix}*tmp*
 		samtools sort -o {output.bam} {input.sam}
 		samtools index {output.bam}
 		"""
-		
+
+rule convert_host_sam_to_bam:
+	input:
+		sam = rules.merge_host_sams.output
+	output:
+		bam = "{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.bam",
+		bai = "{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.bam.bai"
+	conda: 
+		"../envs/bwa.yml"	
+	container:
+		"docker://szsctt/bwa:1"
+	shell:
+		"""
+		samtools sort -o {output.bam} {input.sam}
+		samtools index {output.bam}
+		"""
+
 rule markdup:
 	input:
 		sam = "{outpath}/{dset}/{folder}/{alignment}.sam"
@@ -302,7 +344,7 @@ rule markdup:
 		picard FixMateInformation I={input.sam} O={output.fixmate} ADD_MATE_CIGAR=true SORT_ORDER=queryname
 		picard MarkDuplicates I={output.fixmate} O={output.markdup} METRICS_FILE={output.metrics}
 		"""
-		
+
 rule rmdup:
 	input:
 		sam = "{outpath}/{dset}/{folder}/{alignment}.dups.sam"	

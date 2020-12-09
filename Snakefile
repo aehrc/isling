@@ -101,15 +101,16 @@ rule all:
 		summary_files,
 		ucsc_files,
 		merged_bed,
-		expand("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bam",
+		expand("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.bam",
 			zip,
 			outpath = toDo.loc[:,'outdir'],
 			dset = toDo.loc[:,'dataset'],
 			samp = toDo.loc[:,'sample'],
 			virus = toDo.loc[:,'virus'],
+			host = toDo.loc[:,'host'],
 			part = toDo.loc[:,'part']
 			),
-		expand("{outpath}/{dset}/host_aligned/{samp}.{part}.{host}.readsFrom{virus}.bam",
+		expand("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bam",
 			zip,
 			outpath = toDo.loc[:,'outdir'],
 			dset = toDo.loc[:,'dataset'],
@@ -119,6 +120,7 @@ rule all:
 			part = toDo.loc[:,'part']
 			)
 	
+
 
 #### read preprocessing ####
 include: "snakemake_rules/preprocessing.smk"
