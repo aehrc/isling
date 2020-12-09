@@ -45,17 +45,13 @@ def main(args):
 		# get first row to initalize
 		try:
 			row = next(reader)
-<<<<<<< HEAD
-			row = prune_row(row)
-			n_line = 1
-=======
+
 		# if file is empty, just quit
->>>>>>> a08a6b99298ea0fad1db277ef7b422dcde3d05de
 		except StopIteration:
 			return
-		n_line = 1
-
 		
+		row = prune_row(row)
+		n_line = 1		
 		# variables for checking sorting
 		curr = reset_curr(row)
 		seen_host_chrs = {row['Chr']}

@@ -126,6 +126,6 @@ rule merged_bed:
 		pwd
 		head -n1 {input.txt} > {output.sorted}
 		tail -n+2  {input.txt} | sort -k1,1 -k2,2n -k4,4 -k5,5n >> {output.sorted}
-		python3 scripts/merge.py -i {output.sorted} -o {output.merged} -t distance -d {params.d} -n {params.n}
+		python3 scripts/merge.py -i {output.sorted} -o {output.merged} -d {params.d} -n {params.n}
 		"""
 
