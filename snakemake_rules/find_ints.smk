@@ -79,11 +79,14 @@ rule combine_ints:
 
 # Get split value from config dataframe
 def get_split():
-	return(int(toDo.loc[:,'split'][0]))
+	parts = []
+	for part in set(toDo.loc[:,'part']):
+		parts.append(part)
+	return parts
 
 rule merge_parts_ints:
 	input:
-		files = expand("{{outpath}}/{{dset}}/ints/{{samp}}.{parts}.{{host}}.{{virus}}.integrations.txt", parts=range(1,get_split()+1))
+		files = expand("{{outpath}}/{{dset}}/ints/{{samp}}.{parts}.{{host}}.{{virus}}.integrations.txt", parts = get_split())
 	group: "ints"
 	output:
 		all = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
@@ -91,6 +94,7 @@ rule merge_parts_ints:
 		"docker://ubuntu:18.04"
 	shell:
 		"""
-		cat {input.files} | head -n 1 > {output.all}
-		grep -v '^Chr' -h  {input.files} >> {output.all}
+		echo {input.files}
+		awk 'NR==1' {input.files} > {output.all}
+		grep -v "^Chr" -h  {input.files} >> {output.all}
 		"""

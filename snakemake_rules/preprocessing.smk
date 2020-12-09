@@ -6,8 +6,8 @@ rule split_fastq:
 		r1 = lambda wildcards: get_for_split(wildcards, '1'),
 		r2 = lambda wildcards: get_for_split(wildcards, '2')
 	output:
-		r1 = "{outpath}/{dset}/split_reads/{samp}1.part_00{part}.fq",
-		r2 = "{outpath}/{dset}/split_reads/{samp}2.part_00{part}.fq"
+		r1 = "{outpath}/{dset}/split_reads/{samp}1.{part}.fq",
+		r2 = "{outpath}/{dset}/split_reads/{samp}2.{part}.fq"
 	params:
 		outdir = temp("{outpath}/{dset}/split_reads/"),
 		parts = lambda wildcards: get_value_from_df(wildcards, "split")
@@ -16,6 +16,22 @@ rule split_fastq:
 	shell:
 		"seqkit split2 -1 {input.r1} -2 {input.r2} -p {params.parts} -O {params.outdir} -f"
 
+# input functions for if had a bam or fastq as input
+def get_for_split(wildcards, read_type):
+
+	bam_suffix = get_value_from_df(wildcards, 'bam_file')
+
+	# pass either reads extracted from bam or 
+	if bam_suffix != "":
+		if read_type == "1":
+			return rules.bam_to_fastq.output.r1
+		else:
+			return rules.bam_to_fastq.output.r2
+	else:
+		if read_type == "1":
+			return get_value_from_df(wildcards, 'R1_file')
+		else:
+			return get_value_from_df(wildcards, 'R2_file')
 
 def resources_list_with_min_and_max(file_name_list, attempt, mult_factor=2, minimum = 100, maximum = 50000):
 	
@@ -88,23 +104,6 @@ rule bam_to_fastq:
 		samtools collate -O - |\
 		samtools fastq -1 {output.r1} -2 {output.r2} -0 /dev/null -
 		"""
-
-# input functions for if had a bam or fastq as input
-def get_for_split(wildcards, read_type):
-
-	bam_suffix = get_value_from_df(wildcards, 'bam_file')
-
-	# pass either reads extracted from bam or 
-	if bam_suffix != "":
-		if read_type == "1":
-			return rules.bam_to_fastq.output.r1
-		else:
-			return rules.bam_to_fastq.output.r2
-	else:
-		if read_type == "1":
-			return get_value_from_df(wildcards, 'R1_file')
-		else:
-			return get_value_from_df(wildcards, 'R2_file')
 
 rule seqPrep:
 # if we're doing it

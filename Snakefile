@@ -76,7 +76,7 @@ wildcard_constraints:
 	host = "|".join(set(toDo.loc[:,'host'])),
 	align_type = "bwaPaired|bwaSingle",
 	outpath = "|".join(set(toDo.loc[:,'outdir'])),
-	part = "|".join(set(str(toDo.loc[:,'part'])))
+	part = "|".join(toDo.loc[:,'part'])
 
 #### local rules ####
 localrules: all, touch_merged, check_bam_input_is_paired
@@ -92,7 +92,7 @@ for i, row in toDo.iterrows():
 	ucsc_files.add(f"{row['outdir']}/summary/ucsc_bed/{row['dataset']}.post.bed")
 	conditions.add(f"{row['outdir']}/summary/{row['dataset']}.analysis_conditions.tsv")
 	merged_bed.add(f"{row['outdir']}/{row['dataset']}/ints/{row['sample']}.{row['host']}.{row['virus']}.integrations.post.merged.txt")
-	part_fastq.add(f"{row['outdir']}/{row['dataset']}/split_reads/{row['sample']}1.part_00{row['part']}.fq")
+	part_fastq.add(f"{row['outdir']}/{row['dataset']}/split_reads/{row['sample']}1.{row['part']}.fq")
 
 
 rule all:
@@ -118,7 +118,7 @@ rule all:
 			host = toDo.loc[:,'host'],
 			part = toDo.loc[:,'part']
 			)
-			
+	
 
 #### read preprocessing ####
 include: "snakemake_rules/preprocessing.smk"

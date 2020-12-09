@@ -139,7 +139,8 @@ def make_df(config):
 				dataset_name = dataset
 				
 			# make sample-specific information
-			unique = f"{dataset_name}+++{sample}+++{split}"
+			partUnique = "part_{:03d}".format(split)
+			unique = f"{dataset_name}+++{sample}+++{partUnique}"
 			
 			# append combinations of each sample, host and virus		
 			rows.append((dataset_name, dataset, sample, host, config[dataset]["host"][host], virus, config[dataset]["virus"][virus], merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, merge_n_min, clip_cutoff, cigar_tol, min_mapq, split))
@@ -161,11 +162,11 @@ def make_df(config):
 	# Split reads into n parts and add rows to toDo
 	for index, row in toDo.iterrows():
 		split = int(row['split'])
-		toDo.loc[index, 'part'] = str(int(split))
+		toDo.loc[index, 'part'] = "part_{:03d}".format(int(split))
 		for tmpsplit in  range(1,int(split)):
 			tmprow = row
-			tmprow['part'] = tmpsplit
-			tmprow['unique'] = tmprow['unique'].split("+++")[0]+"+++"+tmprow['unique'].split("+++")[1]+"+++"+str(tmpsplit)
+			tmprow['part'] = "part_{:03d}".format(tmpsplit)
+			tmprow['unique'] = tmprow['unique'].split("+++")[0]+"+++"+tmprow['unique'].split("+++")[1]+"+++"+"part_{:03d}".format(tmpsplit)
 			toDo = toDo.append(tmprow, ignore_index=True)
 
 	return toDo
