@@ -3,8 +3,8 @@ snakedir: "."
 global:
   read_folder: "test/reads/"
   out_dir: "out/pipeline-test"
-  R1_suffix: "1.fq"
-  R2_suffix: "2.fq"
+  R1_suffix: "_1.fq"
+  R2_suffix: "_2.fq"
   read1-adapt: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
   read2-adapt: "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
   merge: True
@@ -17,7 +17,7 @@ global:
   clip-cutoff: 20
   min-mapq: 10
   cigar-tol: 3
-  split: 2
+  split: 3
   post:
     - filter
     - dedup

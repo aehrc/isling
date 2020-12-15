@@ -26,9 +26,9 @@ def get_for_align(wildcards, read_type):
 	# if we didn't do either
 	else:
 		if read_type == 'unmerged_r1':
-			return get_for_split(wildcards, "1")
+			return "{outpath}/{dset}/split_reads/{samp}_1.{part}.fq"
 		if read_type == 'unmerged_r2':
-			return get_for_split(wildcards, "2")
+			return "{outpath}/{dset}/split_reads/{samp}_2.{part}.fq"
 		else:
 			return rules.touch_merged.output.merged
 
@@ -82,13 +82,6 @@ rule align_bwa_virus:
 		
 		samtools merge {output.combined} {output.single} {output.paired}
 		"""
-
-# Get split value from config dataframe
-def get_split():
-	parts = []
-	for part in set(toDo.loc[:,'part']):
-		parts.append(part)
-	return parts
 
 rule merge_virus_sams:
 	input:

@@ -1,20 +1,29 @@
 #### preprocessing rules ####
 
+# Get split value from config dataframe
+def get_split():
+	parts = []
+	for part in set(toDo.loc[:,'part']):
+		parts.append(part)
+	return parts
+
 # Split reads to decrease memory usage and increase parallelization
 rule split_fastq:
 	input:
 		r1 = lambda wildcards: get_for_split(wildcards, '1'),
 		r2 = lambda wildcards: get_for_split(wildcards, '2')
 	output:
-		r1 = "{outpath}/{dset}/split_reads/{samp}1.{part}.fq",
-		r2 = "{outpath}/{dset}/split_reads/{samp}2.{part}.fq"
+		r1 = expand("{{outpath}}/{{dset}}/split_reads/{{samp}}_1.{part}.fq", part = get_split()),
+		r2 = expand("{{outpath}}/{{dset}}/split_reads/{{samp}}_2.{part}.fq", part = get_split())
 	params:
-		outdir = temp("{outpath}/{dset}/split_reads/"),
-		parts = lambda wildcards: get_value_from_df(wildcards, "split")
+		outdir = "{outpath}/{dset}/split_reads/",
+		n = lambda wildcards: get_value_from_df(wildcards, "split")
 	conda: 
 		"../envs/seqkit.yml"
+	threads: workflow.cores
 	shell:
-		"seqkit split2 -1 {input.r1} -2 {input.r2} -p {params.parts} -O {params.outdir} -f"
+		"seqkit split2 -1 {input.r1} -2 {input.r2} -p {params.n} -O {params.outdir} -f"
+
 
 # input functions for if had a bam or fastq as input
 def get_for_split(wildcards, read_type):
@@ -51,10 +60,7 @@ rule write_analysis_summary:
 def get_value_from_df(wildcards, column_name):
 	
 	# get a value from the row of the df corresponding to this sample and dataset
-	try:
-		unique = f"{wildcards.dset}+++{wildcards.samp}+++{wildcards.part}"
-	except:
-		unique = f"{wildcards.dset}+++{wildcards.samp}"
+	unique = f"{wildcards.dset}+++{wildcards.samp}"
 
 	return toDo.loc[(toDo['unique'] == unique).idxmax(), column_name] 
 
@@ -150,8 +156,8 @@ rule seqPrep_unmerged:
 rule touch_merged:
 # if we don't want to do merging, we still need to have an empty file of unmerged reads
 	input:
-		r1 = rules.split_fastq.output.r1,
-		r2 = rules.split_fastq.output.r2
+		r1 = "{outpath}/{dset}/split_reads/{samp}_1.{part}.fq",
+		r2 = "{outpath}/{dset}/split_reads/{samp}_2.{part}.fq"
 	output:
 		merged = temp("{outpath}/{dset}/combined_reads/{samp}.{part}.mockMerged.fastq.gz")
 	container:

@@ -139,8 +139,7 @@ def make_df(config):
 				dataset_name = dataset
 				
 			# make sample-specific information
-			partUnique = "part_{:03d}".format(split)
-			unique = f"{dataset_name}+++{sample}+++{partUnique}"
+			unique = f"{dataset_name}+++{sample}"
 			
 			# append combinations of each sample, host and virus		
 			rows.append((dataset_name, dataset, sample, host, config[dataset]["host"][host], virus, config[dataset]["virus"][virus], merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, merge_n_min, clip_cutoff, cigar_tol, min_mapq, split))
