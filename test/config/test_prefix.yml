@@ -1,0 +1,43 @@
+snakedir: "."
+
+global:
+  read_folder: "test/reads/"
+  out_dir: "out/pipeline-test"
+  R1_suffix: "1.fq"
+  R2_suffix: "2.fq"
+  read1-adapt: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
+  read2-adapt: "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
+  mean-frag-len: "estimate"
+  merge: True
+  trim: True
+#  host_name: "host"
+#  host_fasta: "test/references/test_human.fa"
+#  virus_name: "rep68"
+#  virus_fasta: "test/references/test_AAV.fa"
+  host: 
+    host: test/references/test_human.fa 
+  virus_prefixes:
+    rep68: test/references/test_AAV.fa
+  
+  dedup: False
+  clip-cutoff: 20
+  min-mapq: 10
+  cigar-tol: 3
+  post:
+    - filter
+    - dedup
+  merge-dist: 0
+  min-n-merge: 1
+
+test-merge:
+  merge-dist: 100
+  min-n-merge: 2
+  
+test-trim:
+  merge: False
+  trim: True
+
+test-none:
+  merge: False
+  trim: False
+
