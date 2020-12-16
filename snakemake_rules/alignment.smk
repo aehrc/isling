@@ -54,7 +54,7 @@ rule index:
 
 rule align_bwa_virus:
 	input:
-		idx = expand("{outpath}/references/{virus}/{virus}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
+		idx = lambda wildcards: multiext(get_value_from_df(wildcards, 'virus_prefix'), ".ann", ".amb", ".bwt", ".pac", ".sa"),
 		merged = lambda wildcards: get_for_align(wildcards, "merged"),
 		r1 = lambda wildcards: get_for_align(wildcards, "unmerged_r1"),
 		r2 = lambda wildcards: get_for_align(wildcards, "unmerged_r2"),
@@ -193,7 +193,7 @@ rule extract_to_fastq_paired:
 
 rule align_bwa_host_single:
 	input:	
-		idx = expand("{outpath}/references/{host}/{host}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
+		idx = lambda wildcards: multiext(get_value_from_df(wildcards, 'host_prefix'), ".ann", ".amb", ".bwt", ".pac", ".sa"),
 		all = rules.extract_to_fastq_single.output.fastq,
 	output:
 		sam = temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam"),
@@ -216,7 +216,7 @@ rule align_bwa_host_single:
 		
 rule align_bwa_host_paired:
 	input:	
-		idx = expand("{outpath}/references/{host}/{host}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
+		idx = lambda wildcards: multiext(get_value_from_df(wildcards, 'host_prefix'), ".ann", ".amb", ".bwt", ".pac", ".sa"),
 		r1 = rules.extract_to_fastq_paired.output[0],
 		r2 = rules.extract_to_fastq_paired.output[1]
 	output:

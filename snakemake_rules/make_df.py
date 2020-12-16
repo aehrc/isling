@@ -23,6 +23,7 @@ mean_frag_len_default = 'estimate'
 # supported file extensions for bam/sam files are .bam, .sam
 
 fastq_extensions = [".fq", ".fastq"]
+bwa_prefix_extensions = [".amb", ".ann", ".bwt", ".pac", ".sa"]
 sam_extensions = [".sam", ".bam"]
 compression_extensions = [".gz", ".bz2"]
 
@@ -35,7 +36,6 @@ def make_df(config):
 
 	# global options are specified with as a 'dataset' with the name 'global'
 	# values in this dataset are applied to keys which are unset in the remaining datasets
-
 	if 'global' in config:		
 		# get default (global) options
 		default = config.pop('global')
@@ -54,12 +54,13 @@ def make_df(config):
 		# get output directory
 		outdir = get_value_or_default(config, dataset, 'out_dir', getcwd())
 		outdir = path.normpath(outdir)
+		config[dataset]['out_dir'] = outdir
 		
 		# get read directory
 		readdir = check_required(config, dataset, 'read_folder')
 		readdir = path.normpath(readdir)
 			
-		# figure out if 'dedup', 'merge' and 'trim' are true or false for this dataset
+		# figure out if 'dedup', 'merge' and 'trim' are true or false for this dataset`
 		dedup = check_bools(config, dataset, 'dedup')
 		merge = check_bools(config, dataset, 'merge')
 		if merge == 1:
@@ -68,25 +69,16 @@ def make_df(config):
 			trim = check_bools(config, dataset, 'trim')
 		
 		# get host and virus 
-		# host and virus can either be spcified as 'host_name' and 'host_fasta' ('virus_name' and 'virus_fasta'), 
-		# or in 'host'/'virus', where the key is the name of the host/virus and the value is the path the the fasta
-		if 'host' in config[dataset]:
-			# check at least one host was specified
-			if len(config[dataset]['host']) == 0:
-				raise ValueError(f"At least one host must be specified for dataset {dataset}")
-		else:
-			host_name = check_required(config, dataset, 'host_name')
-			host_fasta = check_required(config, dataset, 'host_fasta')
-			config[dataset]['host'] = {host_name : host_fasta}
-			
-		if 'virus' in config[dataset]:
-			# check at least one virus was specified
-			if len(config[dataset]['virus']) == 0:
-				raise ValueError(f"At least one virus must be specified for dataset {dataset}")
-		else:
-			virus_name = check_required(config, dataset, 'virus_name')
-			virus_fasta = check_required(config, dataset, 'virus_fasta')
-			config[dataset]['virus'] = {virus_name: virus_fasta}
+		# host and virus can either be spcified as 'host_name' (mandatory) and 
+		# either 'host_prefix' or 'host_fasta' 
+		# ('virus_name', 'virus_fasta', 'virus_prefix' in the case of viral reference), 
+		
+		# or in 'host'/'virus', where the key is the name of the host/virus and the 
+		# value is the path the the fasta (for fasta input), or 'host_prefixes'/'virus_preifxes'
+		# in the case of pre-indexed references
+		
+		get_refs(config, dataset, 'host')
+		get_refs(config, dataset, 'virus')		
 		
 		# only need adapters if we're trimming or merging
 		if merge or trim:
@@ -127,7 +119,7 @@ def make_df(config):
 		# make one row for each sample
 		for sample, host, virus in itertools.product(samples,
 																									config[dataset]['host'].keys(), 
-																									config[dataset]['virus']):
+																									config[dataset]['virus'].keys()):
 			
 			if is_bam:
 				bam_file = f"{readdir}/{sample}{config[dataset]['bam_suffix']}"
@@ -147,8 +139,13 @@ def make_df(config):
 			# make sample-specific information
 			unique = f"{dataset_name}+++{sample}"
 			
+			host_fasta = config[dataset]["host"][host]
+			host_prefix = config[dataset]["host_prefixes"][host]
+			virus_fasta = config[dataset]["virus"][virus]
+			virus_prefix = config[dataset]["virus_prefixes"][virus]			
+			
 			# append combinations of each sample, host and virus		
-			rows.append((dataset_name, dataset, sample, host, config[dataset]["host"][host], virus, config[dataset]["virus"][virus], merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, merge_n_min, clip_cutoff, cigar_tol, min_mapq, mean_frag_len))
+			rows.append((dataset_name, dataset, sample, host, host_fasta, host_prefix, virus, virus_fasta, virus_prefix, merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, merge_n_min, clip_cutoff, cigar_tol, min_mapq, mean_frag_len))
 
 			
 	# check there aren't any duplicate rows
@@ -156,7 +153,7 @@ def make_df(config):
 		raise ValueError("Error - configfile results in duplicate analyses, check samples and dataset names are unique")
 	
 	# make dataframe
-	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'virus', 'virus_fasta', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq', 'mean_frag_len'])
+	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq', 'mean_frag_len'])
 	
 	# do checks on dataframe
 	check_dataset_sample_unique(toDo)
@@ -175,11 +172,13 @@ def check_dataset_sample_unique(toDo):
 def check_fastas_unique(toDo, ref_names):
 	# check that each host/virus name refers to only one fasta
 	for i, virus_name in enumerate(toDo.loc[:,'virus']):
-		if toDo.loc[i,'virus_fasta'] != ref_names[virus_name]:
-			raise ValueError(f"Virus {virus_name} is used as a name in multiple datasets for different fasta files.  Please modify your configfile so that each unique virus/host name only refers to one fasta file")
+		if toDo.loc[i,'virus_fasta'] != "":
+			if toDo.loc[i,'virus_fasta'] != ref_names[virus_name]:
+				raise ValueError(f"Virus {virus_name} is used as a name in multiple datasets for different fasta files.  Please modify your configfile so that each unique virus/host name only refers to one fasta file")
 	for i, host_name in enumerate(toDo.loc[:,'host']):
-		if toDo.loc[i,'host_fasta'] != ref_names[host_name]:
-			raise ValueError(f"Host {host_name} is used as a name in multiple datasets for different fasta files.  Please modify your configfile so that each unique virus/host name only refers to one fasta file")
+		if toDo.loc[i,'host_fasta'] != "":
+			if toDo.loc[i,'host_fasta'] != ref_names[host_name]:
+				raise ValueError(f"Host {host_name} is used as a name in multiple datasets for different fasta files.  Please modify your configfile so that each unique virus/host name only refers to one fasta file")
 	
 	
 def make_reference_dict(toDo):
@@ -187,8 +186,10 @@ def make_reference_dict(toDo):
 	
 	ref_names = {}
 	for index, row in toDo.iterrows():
-		ref_names[row['host']] = row['host_fasta']
-		ref_names[row['virus']] = row['virus_fasta']
+		if row['host_fasta'] != "":
+			ref_names[row['host']] = row['host_fasta']
+		if row['virus_fasta'] != "":
+			ref_names[row['virus']] = row['virus_fasta']
 	
 	return ref_names
 	
@@ -250,6 +251,79 @@ def make_post_args(config):
 		
 	return POSTARGS, TOSORT, SORTED
 	
+
+def get_refs(config, dataset, ref_type):
+	"""
+	host and virus can either be spcified as 'host_name' (mandatory) and 
+	either 'host_prefix' or 'host_fasta' 
+	('virus_name', 'virus_fasta', 'virus_prefix' in the case of viral reference), 
+		
+	or in 'host'/'virus', where the key is the name of the host/virus and the 
+	value is the path the the fasta (for fasta input), or 'host_prefixes'/'virus_prefixes'
+	in the case of pre-indexed references
+	
+	if both prefixes and fastas are specified, use only prefixes and ignore fastas
+	
+	make sure the necessary keys are present in config for this dataset
+	"""
+	assert ref_type in {'host', 'virus'}
+	# if one prefix specified
+	if f"{ref_type}_prefix" in config[dataset]:
+		prefix = config[dataset][f"{ref_type}_prefix"]
+		# host name is mandatory
+		name = check_required(config, dataset, f"{ref_type}_name")
+		
+		# add dict to config
+		config[dataset][f"{ref_type}_prefixes"] = {name:prefix}
+		
+		# add fasta info
+		if f"{ref_type}_fasta" in config[dataset]:
+			print(f"dataset {dataset} has both fasta and bwa prefix specified: ignoring fasta")
+			
+		config[dataset][ref_type] = {name:""}
+		
+		return
+
+	# if prefixes specified in a dict
+	elif f"{ref_type}_prefixes" in config[dataset]:
+		# make sure dict contains at least one entry
+		if len(config[dataset][f"{ref_type}_prefixes"]) == 0:
+			raise ValueError(f"At least one {ref_type} prefix must be specified for dataset {dataset}")
+		
+		# check for fasta dict, print warning if exists, and create fasta dict with empty strings
+		if ref_type in config[dataset]:
+			print(f"dataset {dataset} has both fastas and bwa prefixes specified: ignoring fastas")			
+		
+		config[dataset][ref_type] = {name:"" for name in config[dataset][f"{ref_type}_prefixes"]}
+		
+	# if one fasta specified	
+	elif f"{ref_type}_fasta" in config[dataset]:	
+		fasta = config[dataset][f"{ref_type}_fasta"]
+		# host name is mandatory
+		name = check_required(config, dataset, f"{ref_type}_name")
+		
+		# add dict to config
+		config[dataset][ref_type] = {name:fasta}	
+		
+		# add prefix info
+		outdir = config[dataset]['out_dir']
+		prefix = f"{outdir}/references/{name}/{name}"
+		
+		# add dict to config
+		config[dataset][f"{ref_type}_prefixes"] = {name:prefix}	
+		return	
+		
+	# fasta refs specified in a dict
+	elif f"{ref_type}" in config[dataset]:
+		# make sure dict contains at least one entry
+		if len(config[dataset][f"{ref_type}"]) == 0:
+			raise ValueError(f"At least one {ref_type} fasta must be specified for dataset {dataset}")
+		
+		outdir = config[dataset]['out_dir']
+		config[dataset][f"{ref_type}_prefixes"] = {name:f"{outdir}/references/{name}/{name}" for name in config[dataset][f"{ref_type}"]}
+		
+
+
 def check_bools(config, dataset, key):
 	"""
 	Check that the key in the speicfied dataset is defined, and return 1 if true, 0 if false
