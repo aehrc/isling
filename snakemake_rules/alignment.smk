@@ -26,9 +26,9 @@ def get_for_align(wildcards, read_type):
 	# if we didn't do either
 	else:
 		if read_type == 'unmerged_r1':
-			return "{outpath}/{dset}/split_reads/{samp}_1.{part}.fq"
+			return "{outpath}/{dset}/split_reads/{samp}/{samp}_1.{part}.fq"
 		if read_type == 'unmerged_r2':
-			return "{outpath}/{dset}/split_reads/{samp}_2.{part}.fq"
+			return "{outpath}/{dset}/split_reads/{samp}/{samp}_2.{part}.fq"
 		else:
 			return rules.touch_merged.output.merged
 

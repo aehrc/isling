@@ -92,17 +92,14 @@ for i, row in toDo.iterrows():
 	ucsc_files.add(f"{row['outdir']}/summary/ucsc_bed/{row['dataset']}.post.bed")
 	conditions.add(f"{row['outdir']}/summary/{row['dataset']}.analysis_conditions.tsv")
 	merged_bed.add(f"{row['outdir']}/{row['dataset']}/ints/{row['sample']}.{row['host']}.{row['virus']}.integrations.post.merged.txt")
-	part_fastq.add(f"{row['outdir']}/{row['dataset']}/split_reads/{row['sample']}_1.{row['part']}.fq")
 
 
 rule all:
 	input:
-		part_fastq,
 		conditions,
 		summary_files,
 		ucsc_files,
 		merged_bed,
-
 		expand("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.bam",
 			zip,
 			outpath = toDo.loc[:,'outdir'],

@@ -55,10 +55,10 @@ rule post:
 		"""
 		Rscript scripts/post/postprocess.R {input.ints} {params}
 		"""
-	
+
 rule summarise:
 	input:
-		lambda wildcards: [f"{wildcards.outpath}/{wildcards.dset}/ints/{samp}.{host}.{virus}.integrations.post.txt" for samp, host, virus
+		lambda wildcards: [f"{{outpath}}/{{dset}}/ints/{samp}.{host}.{virus}.integrations.post.txt" for samp, host, virus
 			in zip(toDo.loc[toDo['dataset'] == wildcards.dset,'sample'], 
 					toDo.loc[toDo['dataset'] == wildcards.dset,'host'], 
 					toDo.loc[toDo['dataset'] == wildcards.dset,'virus'])]

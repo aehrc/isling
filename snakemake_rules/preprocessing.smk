@@ -13,14 +13,14 @@ rule split_fastq:
 		r1 = lambda wildcards: get_for_split(wildcards, '1'),
 		r2 = lambda wildcards: get_for_split(wildcards, '2')
 	output:
-		r1 = expand("{{outpath}}/{{dset}}/split_reads/{{samp}}_1.{part}.fq", part = get_split()),
-		r2 = expand("{{outpath}}/{{dset}}/split_reads/{{samp}}_2.{part}.fq", part = get_split())
+		r1 = temp(expand("{{outpath}}/{{dset}}/split_reads/{{samp}}/{{samp}}_1.{part}.fq", part = get_split())),
+		r2 = temp(expand("{{outpath}}/{{dset}}/split_reads/{{samp}}/{{samp}}_2.{part}.fq", part = get_split()))
 	params:
-		outdir = "{outpath}/{dset}/split_reads/",
+		outdir = "{outpath}/{dset}/split_reads/{samp}",
 		n = lambda wildcards: get_value_from_df(wildcards, "split")
 	conda: 
 		"../envs/seqkit.yml"
-	threads: workflow.cores
+	threads: 1
 	shell:
 		"seqkit split2 -1 {input.r1} -2 {input.r2} -p {params.n} -O {params.outdir} -f"
 
@@ -156,8 +156,8 @@ rule seqPrep_unmerged:
 rule touch_merged:
 # if we don't want to do merging, we still need to have an empty file of unmerged reads
 	input:
-		r1 = "{outpath}/{dset}/split_reads/{samp}_1.{part}.fq",
-		r2 = "{outpath}/{dset}/split_reads/{samp}_2.{part}.fq"
+		r1 = "{outpath}/{dset}/split_reads/{samp}/{samp}_1.{part}.fq",
+		r2 = "{outpath}/{dset}/split_reads/{samp}/{samp}_2.{part}.fq"
 	output:
 		merged = temp("{outpath}/{dset}/combined_reads/{samp}.{part}.mockMerged.fastq.gz")
 	container:
