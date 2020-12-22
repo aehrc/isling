@@ -423,8 +423,7 @@ def get_samples(config, dataset):
 		if 'samples' in config[dataset]:
 			if not hasattr(config[dataset]['samples'], '__iter__'):
 				raise ValueError(f"the value for key 'samples' in dataset {dataset} should be a list")
-			
-			
+
 			if 'R1_suffix' in config[dataset]:
 				is_bam = False
 			elif 'bam_suffix' in config[dataset]:
@@ -434,7 +433,7 @@ def get_samples(config, dataset):
 			else:
 				raise ValueError(f"please specfiy either 'R1_suffix' and 'R2_suffix' or 'bam_suffix' for dataset {dataset}")
 				
-			return config[dataset][samples], is_bam
+			return config[dataset]['samples'], is_bam
 			
 		
 		# get fastq files for input
