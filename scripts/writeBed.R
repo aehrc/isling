@@ -67,8 +67,7 @@ chroms <- paste0("chr", c(1:22, "X", "Y", "M")) %>% paste(collapse = "|")
 
 if (nrow(df) == 0) {
 	exp <- basename(out_path)
-	samp <- "empty"
-	file.create(paste0(out_path, exp, ".", samp, ".post.bed"))
+	file.create(paste0(out_path, "empty.bed"))
 } else {
 	for (i in unique(df$dataset)) {
 	  toWrite <- list()
