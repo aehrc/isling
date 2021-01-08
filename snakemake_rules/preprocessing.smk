@@ -1,5 +1,6 @@
 #### preprocessing rules ####
 
+
 def resources_list_with_min_and_max(file_name_list, attempt, mult_factor=2, minimum = 100, maximum = 50000):
 	
 	resource = int(sum([os.stat(file).st_size/1e6 for file in file_name_list])) * attempt * mult_factor
@@ -19,7 +20,9 @@ def get_value_from_df(wildcards, column_name):
 	
 	# get a value from the row of the df corresponding to this sample and dataset
 	unique = f"{wildcards.dset}+++{wildcards.samp}"
-
+	if column_name == 'align_cpus':
+		return int(toDo.loc[(toDo['unique'] == unique).idxmax(), column_name])
+		 
 	return toDo.loc[(toDo['unique'] == unique).idxmax(), column_name] 
 
 
