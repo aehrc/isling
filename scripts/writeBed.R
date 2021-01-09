@@ -62,7 +62,6 @@ df <- tibble::tibble(filename = data_files) %>% # create a data frame holding th
 						col_types = int_cols))) %>%
   dplyr::mutate(total_count = purrr::flatten_int(purrr::map(integrations, ~nrow(.)))) 
 
-
 #add extra columns with sample name, dataset, host
 df <- df %>% 
   dplyr::mutate(dataset = dirname(dirname(filename))) %>% 
@@ -92,28 +91,32 @@ df <- df %>%
 
 chroms <- paste0("chr", c(1:22, "X", "Y", "M")) %>% paste(collapse = "|")
 
-
-for (i in unique(df$dataset)) {
-  toWrite <- list()
-  data_filt <- df %>% 
-    dplyr::filter(dataset == i)
-  for (j in unique(data_filt$sample)) {
-  df %>%
-	dplyr::filter(sample == j) %>%
-	dplyr::mutate(Chr = case_when(
-		!str_detect(Chr, "chr") ~ paste0("chr", Chr),
-		Chr == "chrMT" ~ "chrM",
-		TRUE ~ Chr
-		)) %>%
-  dplyr::mutate(Chr = ifelse(Chr == "chrMT", "chrM", Chr)) %>%
-	dplyr::select(Chr, IntStart, IntStop, ReadID) %>%
-	dplyr::filter(str_detect(Chr, chroms)) %>%
-	dplyr::rename(`#chrom` = Chr) %>%
-	dplyr::rename(`ChromStart` = IntStart) %>%
-	dplyr::rename(`ChromEnd` = IntStop) %>%
-	dplyr::rename(name = ReadID) %>%
-	readr::write_tsv(path = paste0(out_path, basename(i), ".", j, ".post.bed"), col_names = TRUE)
-  }
+if (nrow(df) == 0) {
+	exp <- basename(out_path)
+	file.create(paste0(out_path, "empty.bed"))
+} else {
+	for (i in unique(df$dataset)) {
+	  toWrite <- list()
+	  data_filt <- df %>% 
+		dplyr::filter(dataset == i)
+	  for (j in unique(data_filt$sample)) {
+	  df %>%
+		dplyr::filter(sample == j) %>%
+		dplyr::mutate(Chr = case_when(
+			!str_detect(Chr, "chr") ~ paste0("chr", Chr),
+			Chr == "chrMT" ~ "chrM",
+			TRUE ~ Chr
+			)) %>%
+	  dplyr::mutate(Chr = ifelse(Chr == "chrMT", "chrM", Chr)) %>%
+		dplyr::select(Chr, IntStart, IntStop, ReadID) %>%
+		dplyr::filter(str_detect(Chr, chroms)) %>%
+		dplyr::rename(`#chrom` = Chr) %>%
+		dplyr::rename(`ChromStart` = IntStart) %>%
+		dplyr::rename(`ChromEnd` = IntStop) %>%
+		dplyr::rename(name = ReadID) %>%
+		readr::write_tsv(path = paste0(out_path, basename(i), ".", j, ".post.bed"), col_names = TRUE)
+	  }
+   }
 }
 
 

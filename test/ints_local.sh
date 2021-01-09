@@ -4,4 +4,12 @@ source ~/.bashrc
 eval "$(conda shell.bash hook)"
 conda activate snakemake
 
-snakemake -j 1 -s viralIntegrations.sf --rerun-incomplete --use-conda --configfile ../proj-spcfc/test.yml
+module load singularity
+
+cd ..
+
+snakemake \
+	-j 1 \
+	--rerun-incomplete \
+	--use-singularity \
+	--configfile test/config/test.yml

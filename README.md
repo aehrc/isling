@@ -92,7 +92,7 @@ The keys `merge` and `trim` specify if the reads will be merged (if R1 and R2 ar
 
 #### Host and virus references
 
-Specify a name and sequence (`fasta` format) for both the host and virus using the `host_name`, `host_fasta`, `virus_name`, `virus_fasta` keys.  The host `fasta` file may contian multiple chromosomes, and the virus `fasta` file may contain multiple viral sequences.
+Specify a name and one of either sequence (`fasta` format) or `bwa` index prefix for both the host and virus using the `host_name`, `host_fasta`, `host_prefix`, `virus_name`, `virus_fasta`, `virus_prefix` keys.  The host reference may contian multiple chromosomes, and the virus reference may contain multiple viral sequences.  If both a `fasta` file and `bwa` prefix are specified, only the prefix will be used.
 
 #### De-duplication
 

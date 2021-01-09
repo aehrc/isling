@@ -1,3 +1,6 @@
+import functools
+
+cpus = functools.partial(get_value_from_df, column_name='align_cpus')
 
 #functions for if we did seqPrep or not
 def get_for_align(wildcards, read_type):
@@ -54,11 +57,10 @@ rule index:
 
 rule align_bwa_virus:
 	input:
-		idx = expand("{outpath}/references/{virus}/{virus}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
+		idx = lambda wildcards: multiext(get_value_from_df(wildcards, 'virus_prefix'), ".ann", ".amb", ".bwt", ".pac", ".sa"),
 		merged = lambda wildcards: get_for_align(wildcards, "merged"),
 		r1 = lambda wildcards: get_for_align(wildcards, "unmerged_r1"),
 		r2 = lambda wildcards: get_for_align(wildcards, "unmerged_r2"),
-	
 	output:
 		single = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaSingle.sam"),
 		paired = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam"),
@@ -74,7 +76,7 @@ rule align_bwa_virus:
 		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
-	threads: 5
+	threads: cpus
 	shell:
 		"""
 		bwa mem -t {threads} {params.mapping} {params.single_RG} -o {output.single} {params.index} {input.merged}
@@ -83,7 +85,6 @@ rule align_bwa_virus:
 		
 		samtools merge {output.combined} {output.single} {output.paired}
 		"""
-		
 
 def get_sam(wildcards, readType, genome):
 
@@ -193,7 +194,7 @@ rule extract_to_fastq_paired:
 
 rule align_bwa_host_single:
 	input:	
-		idx = expand("{outpath}/references/{host}/{host}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
+		idx = lambda wildcards: multiext(get_value_from_df(wildcards, 'host_prefix'), ".ann", ".amb", ".bwt", ".pac", ".sa"),
 		all = rules.extract_to_fastq_single.output.fastq,
 	output:
 		sam = temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam"),
@@ -208,7 +209,7 @@ rule align_bwa_host_single:
 		index = lambda wildcards, input: os.path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
 		RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.host}_merged\\tSM:{wildcards.samp}\\tPM:merged'"
-	threads: 4
+	threads: cpus
 	shell:		
 		"""
 		bwa mem -t {threads} {params.mapping} {params.RG} -o {output.sam} {params.index} {input.all}
@@ -216,7 +217,7 @@ rule align_bwa_host_single:
 		
 rule align_bwa_host_paired:
 	input:	
-		idx = expand("{outpath}/references/{host}/{host}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
+		idx = lambda wildcards: multiext(get_value_from_df(wildcards, 'host_prefix'), ".ann", ".amb", ".bwt", ".pac", ".sa"),
 		r1 = rules.extract_to_fastq_paired.output[0],
 		r2 = rules.extract_to_fastq_paired.output[1]
 	output:
@@ -232,7 +233,7 @@ rule align_bwa_host_paired:
 		index = lambda wildcards, input: os.path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
 		RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.host}_unmerged\\tSM:{wildcards.samp}\\tPM:unmerged'"
-	threads: 4
+	threads: cpus
 	shell:		
 		"""
 		bwa mem -t {threads} {params.mapping} {params.RG} -o {output.sam} {params.index} {input.r1} {input.r2}
