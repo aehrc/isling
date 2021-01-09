@@ -30,10 +30,36 @@ dir.create(file.path(out_path), showWarnings = FALSE)
 
 
 #import all datasets
+int_cols <- readr::cols(
+  Chr = col_character(),
+  IntStart = col_integer(),
+  IntStop = col_integer(),
+  VirusRef = col_character(),
+  VirusStart = col_integer(),
+  VirusStop = col_integer(),
+  NoAmbiguousBases = col_integer(),
+  OverlapType = col_character(),
+  Orientation = col_character(),
+  HostSeq = col_character(),
+  ViralSeq = col_character(),
+  AmbiguousSeq = col_character(),
+  HostEditDist = col_integer(),
+  ViralEditDist = col_integer(),
+  TotalEditDist = col_integer(),
+  PossibleHostTranslocation = col_character(),
+  PossibleVectorRearrangement = col_character(),
+  HostPossibleAmbiguous = col_character(),
+  ViralPossibleAmbiguous = col_character(),
+  Type = col_character(),
+  ReadID = col_character(),
+  merged = col_character(),
+  .default = col_guess()
+)
+
 df <- tibble::tibble(filename = data_files) %>% # create a data frame holding the file names
   dplyr::mutate(integrations = purrr::map(filename, ~ readr::read_tsv(file.path(.), 
 						na = c("", "NA", "?"),
-						col_types = cols(Chr = col_character(), NoAmbiguousBases = col_integer(), .default =col_guess())))) %>%
+						col_types = int_cols))) %>%
   dplyr::mutate(total_count = purrr::flatten_int(purrr::map(integrations, ~nrow(.)))) 
 
 
