@@ -63,7 +63,7 @@ dataset_name:
       - "/path/to/exclude.bed"
     - nearest-gtf:
       - "/path/to/genes.gtf"
- 	merge-dist: 100
+ merge-dist: 100
 ```
 
 #### Dataset name
@@ -155,7 +155,7 @@ global:
       - "/path/to/exclude.bed"
     - nearest-gtf:
       - "/path/to/genes.gtf"
- 	merge-dist: 100
+ merge-dist: 100
  	
 dataset-1:
   read_folder: "/path/to/read/folder/1"
