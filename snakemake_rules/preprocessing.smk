@@ -115,8 +115,8 @@ rule bam_to_fastq:
 rule seqPrep:
 # if we're doing it
 	input:
-		r1 = rules.split_fastq.output.r1,
-		r2 = rules.split_fastq.output.r2
+		r1 = "{outpath}/{dset}/split_reads/{samp}/{samp}_1.{part}.fq",
+		r2 = "{outpath}/{dset}/split_reads/{samp}/{samp}_2.{part}.fq"
 	output:
 		merged = temp("{outpath}/{dset}/merged_reads/{samp}.{part}.SeqPrep_merged.fastq.gz"),
 		proc_r1 = temp("{outpath}/{dset}/merged_reads/{samp}.{part}.1.fastq.gz"),
@@ -136,8 +136,8 @@ rule seqPrep:
 		
 rule seqPrep_unmerged:
 	input:
-		r1 = rules.split_fastq.output.r1,
-		r2 = rules.split_fastq.output.r2
+		r1 = "{outpath}/{dset}/split_reads/{samp}/{samp}_1.{part}.fq",
+		r2 = "{outpath}/{dset}/split_reads/{samp}/{samp}_2.{part}.fq"
 	output:
 		proc_r1 = temp("{outpath}/{dset}/trimmed_reads/{samp}.{part}.1.fastq.gz"),
 		proc_r2 = temp("{outpath}/{dset}/trimmed_reads/{samp}.{part}.2.fastq.gz")
