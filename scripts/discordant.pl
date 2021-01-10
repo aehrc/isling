@@ -14,6 +14,7 @@ my $cutoff = 20; # default clipping cutoff
 # unmapped reads must have fewer than this number of mapped bases
 my $thresh = 0.95; #default amount of read that must be covered by alignments for rearrangement
 my $tol = 5; #when processing CIGARS, combine any IDPN elements between matched regions with this number of bases or less
+my $tlen = 'estimate';
 my $n_estimate_tlen = 10000; #  maximum number of pairs to use to estimate mean fragment length
 my $viral;
 my $host;
@@ -34,6 +35,7 @@ GetOptions('cutoff=i' => \$cutoff,
 		   'bed=s'    => \$bed,
 		   'merged=s' => \$merged,
 		   'tol=i'    => \$tol,
+		   'tlen=s'   => \$tlen,
 		   'n-estimate-tlen' => \$n_estimate_tlen,
 		   'verbose'  => \$verbose,
 		   'min-mapq=i'    => \$min_mapq,
@@ -42,6 +44,17 @@ GetOptions('cutoff=i' => \$cutoff,
 if ($help) { printHelp(); }
 
 unless ($viral and $host) { printHelp(); }
+
+
+## check if we want to estimate template length or not
+my $estimate_tlen;
+if ($tlen =~ /estimate/) {
+	$estimate_tlen = 1;
+}
+else {
+	$estimate_tlen = 0;
+	$tlen = int($tlen);
+}
 
 ### hash arrays will store putative discordant pairs from both alignments
 ### make one array for R1 and R2, and one for viral and host (four total)
@@ -103,13 +116,15 @@ while (my $vl = <VIRAL>) {
 	if ($parts[1] & 0x100) { next(); } # skip alignments that are not primary
 	
 	# if read is proper pair, get template length
-	if ($parts[1] & 0x2) {
-		# if we haven't already counted enough reads
-		if ($counter < $n_estimate_tlen) {
-			unless (exists $virus_tlen_reads{$parts[0]}) {
-				$virus_tlen += abs($parts[8]);
-				$counter++;
-				$virus_tlen_reads{$parts[0]} = '';
+	if ($estimate_tlen) {
+		if ($parts[1] & 0x2) {
+			# if we haven't already counted enough reads
+			if ($counter < $n_estimate_tlen) {
+				unless (exists $virus_tlen_reads{$parts[0]}) {
+					$virus_tlen += abs($parts[8]);
+					$counter++;
+					$virus_tlen_reads{$parts[0]} = '';
+				}
 			}
 		}
 	}
@@ -185,13 +200,15 @@ while (my $hl = <HOST>) {
 	if ($parts[1] & 0x100) { next(); } # skip alignments that are not primary
 	
 	# if read is proper pair, get template length
-	if ($parts[1] & 0x2) {
-		# if we haven't already counted enough reads
-		if ($counter < $n_estimate_tlen) {
-			unless (exists $host_tlen_reads{$parts[0]}) {
-				$host_tlen += abs($parts[8]);
-				$counter++;
-				$host_tlen_reads{$parts[0]} = '';
+	if ($estimate_tlen) {
+		if ($parts[1] & 0x2) {
+			# if we haven't already counted enough reads
+			if ($counter < $n_estimate_tlen) {
+				unless (exists $host_tlen_reads{$parts[0]}) {
+					$host_tlen += abs($parts[8]);
+					$counter++;
+					$host_tlen_reads{$parts[0]} = '';
+				}
 			}
 		}
 	}
@@ -235,30 +252,35 @@ unless (scalar keys %hostRlen > 0) {
 
 # need to keep track of how many host alignments we used for estimating template length
 #first check that there was at least one proper pair of each
-my $tlen;
+my $tlen_est;
 my $host_pairs = keys %host_tlen_reads;
 my $virus_pairs = keys %virus_tlen_reads;
-# if we didn't find any proper pairs, then we can't estimate template length
-# assume most pairs were merged, so set to 0
-if ($host_pairs == 0 and $virus_pairs == 0) {
-	$tlen = 0;
-	print("no proper pairs found: setting template length to 0\n");
-}
-elsif ($host_pairs == 0 and $virus_pairs > 0) {
-	$tlen = ($virus_tlen / $virus_counter);
-	print("template length estimated to be $tlen from virus alignments\n");
-}
-elsif ($virus_pairs == 0 and $host_pairs > 0) {
-	$tlen = ($host_tlen / $counter);
-	print("template length estimated to be $tlen from host alignments\n");
-}
-else {
-	$tlen = ($host_tlen + $virus_tlen) / ($counter + $virus_counter);
-	print("template length estimated to be $tlen from host and virus alignments\n");
-}
-#https://stackoverflow.com/questions/178539/how-do-you-round-a-floating-point-number-in-perl
-$tlen = int($tlen + 0.5);
 
+if ($estimate_tlen) {
+	# if we didn't find any proper pairs, then we can't estimate template length
+	# assume most pairs were merged, so set to 0
+	if ($host_pairs == 0 and $virus_pairs == 0) {
+		$tlen_est = 0;
+		print("no proper pairs found: setting template length to 0\n");
+	}
+	elsif ($host_pairs == 0 and $virus_pairs > 0) {
+		$tlen_est = ($virus_tlen / $virus_counter);
+		print("template length estimated to be $tlen_est from virus alignments\n");
+	}
+	elsif ($virus_pairs == 0 and $host_pairs > 0) {
+		$tlen_est = ($host_tlen / $counter);
+		print("template length estimated to be $tlen_est from host alignments\n");
+	}
+	else {
+		$tlen_est = ($host_tlen + $virus_tlen) / ($counter + $virus_counter);
+		print("template length estimated to be $tlen_est from host and virus alignments\n");
+	}
+	#https://stackoverflow.com/questions/178539/how-do-you-round-a-floating-point-number-in-perl
+	$tlen_est = int($tlen_est + 0.5);
+	}
+else {
+	$tlen_est = $tlen;
+}
 
 ### Look for evidence of integration sites by identifying discordant read-pairs
 ### Need to compare the junction sites in the viral and host genomes to see if there is any overlap (ambiguous bases)
@@ -273,7 +295,7 @@ foreach my $key (keys %hostR1) {
 	unless ( exists $hostR2{$key} ) { next; }
 
 	# Find discordant read pairs
-	my @intData = findDiscordant($key, $viralR1{$key}, $viralR2{$key}, $hostR1{$key}, $hostR2{$key}, $tlen, \%hostRlen, \%virusRlen);
+	my @intData = findDiscordant($key, $viralR1{$key}, $viralR2{$key}, $hostR1{$key}, $hostR2{$key}, $tlen_est, \%hostRlen, \%virusRlen);
 	unless (@intData) { next; }	
 
 	# Once the positions are collected, put together the output	
@@ -478,7 +500,8 @@ sub printHelp {
 	print "\t--host:   Alignment of reads to host genome (sam)\n";
 	print "\t--cutoff:  Minimum number of clipped reads to be considered (default = 20)\n";
 	print "\t--tol:     Tolerance when combining short elements with neigbouring matched regions (default = 5)\n";
-	print "\t--min-mapq:	Minimum mapping quality to consider a read (mapped read only)";	
+	print "\t--min-mapq:	Minimum mapping quality to consider a read (mapped read only)\n";	
+	print "\t--tlen: Mean template (fragment) length.  Can be either the string 'estimate' to estimate from the data, or a positive float (default = 'estimate')\n";
 	print "\t--n-estimate-tlen: Number of pairs to use for estimating template length (default = 10000)\n";
 	print "\t--output:  Output file for results (default = integrationSite.txt\n";
 	print "\t--bed:     Print integrations sites to indicated bed file (default = NA)\n";

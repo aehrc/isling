@@ -8,6 +8,7 @@ library(tidyr)
 library(readr)
 library(writexl)
 library(tibble)
+library(tools)
 
 #### import data ####
 args <- commandArgs(trailingOnly=TRUE)
@@ -16,6 +17,18 @@ data_files <- args[1:(length(args) - 1)]
 out_path <- args[length(args)]
 out_path <- file.path(out_path)
 out_path <- paste0(out_path, "/")
+
+# function to get samples from data_files
+getSamples <- function(data_files) {
+	data_files <- basename(data_files)
+	data_files <- data_files %>%
+									file_path_sans_ext() %>%
+									file_path_sans_ext() %>%
+									file_path_sans_ext() %>%
+									file_path_sans_ext() %>%
+									file_path_sans_ext() 
+	return(data_files)
+}
 
 #import all datasets
 df <- tibble::tibble(filename = data_files) %>% # create a data frame holding the file names
@@ -48,18 +61,30 @@ for (i in unique(df$dataset)) {
 }
 
 # also write an excel spreadsheet for each dataset that doesn't contain the annotations
-for (i in unique(df$dataset)) {
-  toWrite <- list()
-  data_filt <- df %>% 
-    dplyr::filter(dataset == i) %>%
+if (nrow(df) == 0) {
+	dset <- basename(dirname(dirname(data_files[1])))
+	samples <- getSamples(data_files)
+	toWrite <- list()
+	for (i in samples) {
+		toWrite[[i]] <- tibble()
+	}
+	writexl::write_xlsx(toWrite, path = paste(out_path, dset, ".xlsx", sep = ""))
+	writexl::write_xlsx(toWrite, path = paste(out_path, dset, "_annotated.xlsx", sep = ""))
+} else {
+	for (i in unique(df$dataset)) {
+	  toWrite <- list()
+	  data_filt <- df %>% 
+		    dplyr::filter(dataset == i) %>%
     dplyr::select(dataset, sample, host, Chr, IntStart, IntStop, VirusRef, VirusStart, VirusStop, OverlapType, Orientation,
-    				HostSeq, ViralSeq, AmbiguousSeq, HostEditDist, ViralEditDist, TotalEditDist, 
-    				PossibleHostTranslocation, PossibleVectorRearrangement, HostPossibleAmbiguous, ViralPossibleAmbiguous,
-    				Type, ReadID, merged)
-  for (j in unique(data_filt$sample)) {
-    toWrite[[j]] <- data_filt  %>% 
-      dplyr::filter(sample == j)
-  }
-  writexl::write_xlsx(toWrite, path = paste(out_path, i, ".xlsx", sep = ""))
+	    				HostSeq, ViralSeq, AmbiguousSeq, HostEditDist, ViralEditDist, TotalEditDist, 
+	    				PossibleHostTranslocation, PossibleVectorRearrangement, HostPossibleAmbiguous, ViralPossibleAmbiguous,
+	    				Type, ReadID, merged)
+	  for (j in unique(data_filt$sample)) {
+	    toWrite[[j]] <- data_filt  %>% 
+	      dplyr::filter(sample == j)
+	  }
+	  writexl::write_xlsx(toWrite, path = paste(out_path, i, ".xlsx", sep = ""))
+	}
 }
+
 

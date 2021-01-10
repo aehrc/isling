@@ -1,3 +1,6 @@
+import functools
+
+cpus = functools.partial(get_value_from_df, column_name='align_cpus')
 
 #functions for if we did seqPrep or not
 def get_for_align(wildcards, read_type):
@@ -47,14 +50,14 @@ rule index:
 	params:
 		prefix = lambda wildcards, output: path.splitext(output[0])[0]
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.fa,), attempt, 5)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.fa,), attempt, 5, 1000)
 	shell:
 		"bwa index -p {params.prefix} {input.fa}"
 
 
 rule align_bwa_virus:
 	input:
-		idx = expand("{outpath}/references/{virus}/{virus}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
+		idx = lambda wildcards: multiext(get_value_from_df(wildcards, 'virus_prefix'), ".ann", ".amb", ".bwt", ".pac", ".sa"),
 		merged = lambda wildcards: get_for_align(wildcards, "merged"),
 		r1 = lambda wildcards: get_for_align(wildcards, "unmerged_r1"),
 		r2 = lambda wildcards: get_for_align(wildcards, "unmerged_r2"),	
@@ -68,12 +71,12 @@ rule align_bwa_virus:
 		single_RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.virus}_merged\\tSM:{wildcards.samp}\\tPM:merged'",
 		paired_RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.virus}_unmerged\\tSM:{wildcards.samp}\\tPM:unmerged'"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt, 5)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt, 5, 2000)
 	conda:
 		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
-	threads: 5
+	threads: cpus
 	shell:
 		"""
 		bwa mem -t {threads} {params.mapping} {params.single_RG} -o {output.single} {params.index} {input.merged}
@@ -219,7 +222,7 @@ rule extract_to_fastq_paired:
 
 rule align_bwa_host_single:
 	input:	
-		idx = expand("{outpath}/references/{host}/{host}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
+		idx = lambda wildcards: multiext(get_value_from_df(wildcards, 'host_prefix'), ".ann", ".amb", ".bwt", ".pac", ".sa"),
 		all = rules.extract_to_fastq_single.output.fastq,
 	output:
 		sam = temp("{outpath}/{dset}/host_aligned/{samp}.{part}.{host}.readsFrom{virus}.bwaSingle.sam"),
@@ -229,12 +232,12 @@ rule align_bwa_host_single:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt, 5)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt, 5, 2000)
 	params:
 		index = lambda wildcards, input: os.path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
 		RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.host}_merged\\tSM:{wildcards.samp}\\tPM:merged'"
-	threads: 4
+	threads: cpus
 	shell:		
 		"""
 		bwa mem -t {threads} {params.mapping} {params.RG} -o {output.sam} {params.index} {input.all}
@@ -242,7 +245,7 @@ rule align_bwa_host_single:
 		
 rule align_bwa_host_paired:
 	input:	
-		idx = expand("{outpath}/references/{host}/{host}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True),
+		idx = lambda wildcards: multiext(get_value_from_df(wildcards, 'host_prefix'), ".ann", ".amb", ".bwt", ".pac", ".sa"),
 		r1 = rules.extract_to_fastq_paired.output[0],
 		r2 = rules.extract_to_fastq_paired.output[1]
 	output:
@@ -253,12 +256,12 @@ rule align_bwa_host_paired:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt, 5)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt, 5, 2000)
 	params:
 		index = lambda wildcards, input: os.path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
 		RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.host}_unmerged\\tSM:{wildcards.samp}\\tPM:unmerged'"
-	threads: 4
+	threads: cpus
 	shell:		
 		"""
 		bwa mem -t {threads} {params.mapping} {params.RG} -o {output.sam} {params.index} {input.r1} {input.r2}
@@ -295,6 +298,8 @@ rule convert_virus_sam_to_bam:
 		"../envs/bwa.yml"	
 	container:
 		"docker://szsctt/bwa:1"
+#	resources: # removed due to error in splitFASTQ-feature
+#		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.sam,), attempt, 2, 1000, 10000)
 	shell:
 		"""
 		samtools sort -o {output.bam} {input.sam}
@@ -327,7 +332,7 @@ rule markdup:
 	wildcard_constraints:
 		folder = "host_aligned|virus_aligned"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.sam,), attempt, 0.5, 100, 10000)
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max((input.sam,), attempt, 0.5, 2000, 10000))
 	conda: 
 		"../envs/picard.yml"	
 	container:
@@ -350,7 +355,7 @@ rule rmdup:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.sam,), attempt, 0.5, 100, 10000)
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max((input.sam,), attempt, 0.5, 2000, 10000))
 	shell:
 		"""
 		samtools view -h -F 1024 {input.sam} > {output.sam}

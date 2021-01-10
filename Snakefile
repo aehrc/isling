@@ -46,12 +46,8 @@ snakedir = config['snakedir']
 config.pop('snakedir')
 
 
-
-
 sys.path.append(os.path.join(snakedir, "snakemake_rules/"))
-from snakemake_rules import make_df
-from snakemake_rules import make_reference_dict
-from snakemake_rules import make_post_args
+from snakemake_rules.make_df import make_df, make_reference_dict, make_post_args
 
 
 # construct dataframe with wildcards and other information about how to run analysis

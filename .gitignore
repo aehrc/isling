@@ -22,3 +22,4 @@ analysis.tsv
 .parallel/
 *tsv
 *txt
+*.sif

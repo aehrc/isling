@@ -45,6 +45,7 @@ dataset_name:
   R2_suffix: "_L001_R2.fastq.gz"
   read1-adapt: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
   read2-adapt: "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
+  mean-frag-len: "estimate"
   merge: True
   trim: True
   host_name: "macFas5"
@@ -62,7 +63,7 @@ dataset_name:
       - "/path/to/exclude.bed"
     - nearest-gtf:
       - "/path/to/genes.gtf"
- 	merge-dist: 100
+ merge-dist: 100
 ```
 
 #### Dataset name
@@ -82,8 +83,8 @@ The key `samples` is optional. If it is included, it should be a list of sample 
 
 If the key `samples` is not included, sample names will be inferred from the files present in the `read_folder` having the specified suffixes.  Note that this option requires files to be present on the local filesystem, and is therefore not compatible with cloud execution.
 
-#### Adapters
-Specify the adapters for read 1 and read 2, for trimming and merging, using the `read1-adapt` and `read2-adapt` keys.
+#### Adapters and mean fragment length.
+Specify the adapters for read 1 and read 2, for trimming and merging, using the `read1-adapt` and `read2-adapt` keys.  Specify either the mean fragment length, or use the string 'estimate' to indicate that the mean fragment length should be estimated from proper pairs in the alignments.
 
 #### Merging, adapter trimming
 
@@ -91,7 +92,7 @@ The keys `merge` and `trim` specify if the reads will be merged (if R1 and R2 ar
 
 #### Host and virus references
 
-Specify a name and sequence (`fasta` format) for both the host and virus using the `host_name`, `host_fasta`, `virus_name`, `virus_fasta` keys.  The host `fasta` file may contian multiple chromosomes, and the virus `fasta` file may contain multiple viral sequences.
+Specify a name and one of either sequence (`fasta` format) or `bwa` index prefix for both the host and virus using the `host_name`, `host_fasta`, `host_prefix`, `virus_name`, `virus_fasta`, `virus_prefix` keys.  The host reference may contian multiple chromosomes, and the virus reference may contain multiple viral sequences.  If both a `fasta` file and `bwa` prefix are specified, only the prefix will be used.
 
 #### De-duplication
 
@@ -154,7 +155,7 @@ global:
       - "/path/to/exclude.bed"
     - nearest-gtf:
       - "/path/to/genes.gtf"
- 	merge-dist: 100
+ merge-dist: 100
  	
 dataset-1:
   read_folder: "/path/to/read/folder/1"
