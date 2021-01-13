@@ -55,6 +55,7 @@ rule run_discordant:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.host, input.virus), attempt)
 	container:
 		"docker://ubuntu:18.04"
+	threads: workflow.cores
 	shell:
 		"""
 		perl -Iscripts scripts/discordant.pl --viral {input.virus} --host {input.host} --output {output.discord} {params}

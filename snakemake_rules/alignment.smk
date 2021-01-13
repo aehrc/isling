@@ -180,7 +180,7 @@ rule extract_to_fastq_single:
 		# 0x4 - read unmapped
 		# 0x100 - not primary alignment
 		# 0x800 - secondary alignment
-		samtools view -h -F 0x4 -F 0x800 -F 0x100 -o - {input.aligned} | samtools fastq -0 {output.fastq} - 
+		samtools view -h -F 0x4 -F 0x800 -F 0x100 -o - {input.aligned} | samtools fastq -0 {output.fastq}  
 		"""
 
 rule extract_vAligned_paired:
@@ -217,7 +217,7 @@ rule extract_to_fastq_paired:
 		"docker://szsctt/bwa:1"
 	shell:
 		"""
-		samtools collate -O {input.bam} | samtools fastq -1 {output.fastq1} -2 {output.fastq2} -
+		samtools collate -O {input.bam} | samtools fastq -1 {output.fastq1} -2 {output.fastq2}
 		"""
 
 rule align_bwa_host_single:
