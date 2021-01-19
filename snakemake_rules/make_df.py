@@ -60,7 +60,10 @@ def make_df(config):
 		# get read directory
 		readdir = check_required(config, dataset, 'read_folder')
 		readdir = path.normpath(readdir)
-			
+
+		# Create temporary symlink directory
+		readdir = path.normpath(symlink_reads(readdir, os.path.join(outdir,"symreads"), config[dataset]['R1_suffix'], config[dataset]['R2_suffix']))
+
 		# figure out if 'dedup', 'merge' and 'trim' are true or false for this dataset`
 		dedup = check_bools(config, dataset, 'dedup')
 		merge = check_bools(config, dataset, 'merge')
@@ -490,3 +493,19 @@ def get_samples(config, dataset):
 			raise InputError(f"please specify either 'bam_suffix' or 'R1_suffix' and 'R2_suffix' for dataset {dataset}")
 			
 		return samples, is_bam
+
+def symlink_reads(readdir, symreaddir, r1_suffix, r2_suffix):
+
+    # Create symlink directory for reads
+    if not os.path.exists(symreaddir):
+        os.mkdir(symreaddir)
+
+    # Get all files in read directory
+    _, _, filenames = next(os.walk(readdir))
+
+    # Create symlink to reads that match read suffix
+    for filename in filenames:
+        filename_new = filename.replace(r1_suffix, "_1.fq").replace(r2_suffix, "_2.fq")
+        os.symlink(os.path.join(readdir, filename), os.path.join(symreaddir, filename_new))
+        
+    return symreaddir
