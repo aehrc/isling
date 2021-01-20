@@ -9,6 +9,7 @@ def get_split():
 
 # Split reads to decrease memory usage and increase parallelization
 rule split_fastq:
+	message: "Splitting reads in {params.n} parts."
 	input:
 		r1 = lambda wildcards: get_for_split(wildcards, '1'),
 		r2 = lambda wildcards: get_for_split(wildcards, '2')
@@ -25,7 +26,7 @@ rule split_fastq:
 		"seqkit split2 -1 {input.r1} -2 {input.r2} -p {params.n} -O {params.outdir} -f"
 
 
-# input functions for if had a bam or fastq as input
+# Input functions for if had a bam or fastq as input
 def get_for_split(wildcards, read_type):
 
 	bam_suffix = get_value_from_df(wildcards, 'bam_file')

@@ -8,7 +8,7 @@ Currently have conda environment called `snakemake`, which I'm activating in wra
 
 # Pipeline overview
 
-The pipeline performs several steps in order to identify integration sites.  It takes as input datasets consisting of either fastq files or bam files. It does some pre-processing of the reads (merging overlapping reads, optional) and then aligns them to both a host and a viral sequence.  Reads are first aligned to the viral sequence(s), and then aligned reads are extracted and aligned to the host.  These alignments are used to identify possible viral integrations.  
+The pipeline performs several steps in order to identify integration sites.  It takes as input datasets consisting of either fastq files or bam files. It does some pre-processing of the reads (merging overlapping reads, optional) and then aligns them to both a host and a viral sequence.  Reads are first aligned to the viral sequence(s), and then aligned reads are extracted and aligned to the host.  These alignments are used to identify possible viral integrations.
 
 # Running
 
@@ -27,6 +27,7 @@ A config file, as well as the host and viral references, and reads are required 
 A yaml config file is used to specify the data to be processed and parameters for processing.  The config file is organised into datasets, and specifies the parameters to be used for that dataset.  If multiple datasets are present in the config file, they will be processed simultaneously.  Each dataset contains a number of key-value pairs which indicate how the dataset is to be processed.
 
 The first entry in the config file should be the key 'snakefile', with the value being the path to the directory containing the snakefile, for example:
+
 ```
 snakedir: "/scratch1/sco305/intvi_pipeline"
 ```
@@ -34,6 +35,7 @@ snakedir: "/scratch1/sco305/intvi_pipeline"
 If snakemake is run from the intvi_pipeline directory (which contains the `Snakefile`), this key may be omitted, otherwise it is required.
 
 This should be followed by one block for each dataset to be processed.  All paths should be either absolute or relative to the directory containing the `Snakefile`. An example dataset block from a config file:
+
 ```
 dataset_name:
   read_folder: "/path/to/read/folder"
@@ -43,6 +45,7 @@ dataset_name:
   	- "sample2"
   R1_suffix: "_L001_R1.fastq.gz"
   R2_suffix: "_L001_R2.fastq.gz"
+  split: 1
   read1-adapt: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
   read2-adapt: "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
   mean-frag-len: "estimate"
@@ -71,11 +74,12 @@ dataset_name:
 The block should start with a name for the dataset. This can be anything, but each dataset name in the config file must be unique.  This will be used to name output files.
 
 #### Read folder, samples, R1\_suffix, R2\_suffix, bam\_suffix
-Specify the path to the folder containing reads for this datset with the `read_folder` key. Reads must be paired-end. Reads can be in either fastq or sam/bam format.  
 
-For fastq reads, each R1 and R2 file must have a common suffix. Specify these common suffixes with `R1_suffix` and `R2_suffix`.  
+Specify the path to the folder containing reads for this datset with the `read_folder` key. Reads must be paired-end. Reads can be in either fastq or sam/bam format.
 
-For bam files, all reads must be paired and files must have a common suffix, which should be specified with `bam_suffix`.  
+For fastq reads, each R1 and R2 file must have a common suffix. Specify these common suffixes with `R1_suffix` and `R2_suffix`.
+
+For bam files, all reads must be paired and files must have a common suffix, which should be specified with `bam_suffix`.
 
 Specify either the `R1_suffix` and `R2_suffix`, or `bam_suffix`, but not both.
 
@@ -83,7 +87,12 @@ The key `samples` is optional. If it is included, it should be a list of sample 
 
 If the key `samples` is not included, sample names will be inferred from the files present in the `read_folder` having the specified suffixes.  Note that this option requires files to be present on the local filesystem, and is therefore not compatible with cloud execution.
 
+#### Split FASTQ file
+
+The optional `split` feature alllows to split the provided reads in `n` parts to decrease memory usage and to increase amount of possible threads.
+
 #### Adapters and mean fragment length.
+
 Specify the adapters for read 1 and read 2, for trimming and merging, using the `read1-adapt` and `read2-adapt` keys.  Specify either the mean fragment length, or use the string 'estimate' to indicate that the mean fragment length should be estimated from proper pairs in the alignments.
 
 #### Merging, adapter trimming
@@ -104,19 +113,19 @@ When detecting integrations, only primary alignments with a mapping quality equa
 
 The parameter `clip-cutoff` is used when detecting chimeric integrations: in the case of a simple junction, this parameter is the minimum nubmer of bases that must come from both host and virus.  That is, for a `clip-cutoff` value of 20, the read must contain at least 20 bases from the host and 20 bases from the virus.  For short integrations (host on either end, virus in the middle), both ends of the read must contain this many bases from the host.  For discordant read pairs, a mapped read may contain at most this number of unmapped bases, and an unmapped read may contain at most this number of mapped bases. This paramter is optional, and if not set then a default value of 20 will be used.
 
-The parameter `cigar-tol` is relevant when there are a small number of non-mapped bases between two mapped regions, or between one mapped region and the end of the read.  If the number of these non-mapped bases is equal to or less than `cigar-tol`, then they will be combined with the nearest mapped region.  For example, for `cigar-tol: 3` `147M3S` would become `150M`, `98M2I50M` would become `150M`, but `145M5S` would remain unchanged. 
+The parameter `cigar-tol` is relevant when there are a small number of non-mapped bases between two mapped regions, or between one mapped region and the end of the read.  If the number of these non-mapped bases is equal to or less than `cigar-tol`, then they will be combined with the nearest mapped region.  For example, for `cigar-tol: 3` `147M3S` would become `150M`, `98M2I50M` would become `150M`, but `145M5S` would remain unchanged.
 
 #### Post-processing
 
 After detection, junction reads/read pairs may be filtered using post-processing.  The user may specify the types of post-processing to be performed in a list, consisting of one or more of the following types:
 
 1. `filter`: Remove any integrations with the following properties:
-		- edit distance from host alignment more than 5
-		- edit distance from viral alignment more than 5
-		- if read is chimeric, more than 20 ambiguous bases
-		- not indicated to be a possible vector rearrangement
-		- not indicated to be a possible host translocation
-	These filters may be edited by the user by editing the R script `post/filter.R`
+   - edit distance from host alignment more than 5
+   - edit distance from viral alignment more than 5
+   - if read is chimeric, more than 20 ambiguous bases
+   - not indicated to be a possible vector rearrangement
+   - not indicated to be a possible host translocation
+   These filters may be edited by the user by editing the R script `post/filter.R`
 2. `dedup`: De-duplicate reads on the basis of an exact match in read sequence.  This option differs from the de-duplication performed by Picard (see de-duplication above) because it a) considers only one read (for chimeric reads), rather than the pair and b) uses the read sequence rather than the mapped location as the basis for identifying duplicates
 3. `mask-exclude`: Specify a list of `bed` files in order to exclude any integrations that fall within the regions in those `bed` files
 4. `mask-include`: Specify a list of `bed` files in order to only include integrations that fall within the regions in those `bed` files
@@ -156,13 +165,13 @@ global:
     - nearest-gtf:
       - "/path/to/genes.gtf"
  merge-dist: 100
- 	
+ 
 dataset-1:
   read_folder: "/path/to/read/folder/1"
   samples:
   	- "sample1"
   	- "sample2"
-  	
+  
 dataset-2:
   read_folder: "/path/to/read/folder/2"
   bam_suffix: ".bam"
@@ -182,13 +191,12 @@ The host and viral references (fasta format) should be specified in the config f
 
 A summary of the integrations for each dataset can be found in a folder `summary` in the specified output folder.  For each dataset, the `summary` folder will contain an excel spreadsheet with information about each integration. This file has one tab for each sample in the dataset. Additionally, a `bed` file formatted for use with the [UCSC browswer](https://www.genome.ucsc.edu/) can be found in `summary/ucsc_bed`.
 
-
 # Types of integrations
 
 ## Soft-clipped
 
 Identify soft-clipped reads (`soft.pl`) by identifying reads where one half is mapped and the other soft-clipped in one alignment, and vice versa in the other.  Allow for some gap or overlap between the two alignments.
-	
+
 ## Discordant read-pairs
 
 Identify discordant read-pairs (`discordant.pl`) by identifying unmerged pairs where one read is mapped and one unmapped in one alignment, and vice versa for the other alignment.  Allow some soft-clipping in mapped reads and mapping in unmapped reads here - a read is considered mapped if it has a number of soft-clipped bases that is less than a threshould (say 20), and unmapped if it has a number of mapped bases that is less than the same threshould.
@@ -196,13 +204,13 @@ Identify discordant read-pairs (`discordant.pl`) by identifying unmerged pairs w
 ## Short integrations
 
 Short integrations are identified on the basis of the following criteria:
+
 1. Host alignment must be matched on both ends, and the length of the match must be more than a cutoff (default 20 base pairs)
 2. Host alignment must have an inserted region between the two matched regions
 3. Viral alignment must be soft-clipped on both ends with a matched region in the middle.  The number of matched bases must be more than a cutoff (default 20 base pairs)
 4. The inserted bases in the host alignment must overlap with the matched bases in the viral alignment (on the read).  This is enforced by checking that the end of the inserted region is more than the start of the matched region, and the end of the matched region is more than the start of the inserted region.
 
-Each read with a short integration has two associated integration sites (one for each end of the integration).  
-
+Each read with a short integration has two associated integration sites (one for each end of the integration).
 
 # Identifying ambiguities and possible issues
 
@@ -214,21 +222,21 @@ To identify reads where a location of the integration can't be unambigouosly def
 
 ## Possible rearrangements
 
- For the clincal OTC vector datasets, we see a lot of intergration in regions of the host genome that are contained in the vector.  The clinical vector contains the hAAT (SERPINA1) promoter and the OTC enhancer, and there were a lot of apparent integrations in these regions in the host genome.  However, a lot of these reads which were indicated to be integrations could also be completely accounted for by alignments to the vector genome, indicating that they could also be vector rearrangments.  Translocations are also possible, where the read is accounted for by multiple alingments to the host genome.
+For the clincal OTC vector datasets, we see a lot of intergration in regions of the host genome that are contained in the vector.  The clinical vector contains the hAAT (SERPINA1) promoter and the OTC enhancer, and there were a lot of apparent integrations in these regions in the host genome.  However, a lot of these reads which were indicated to be integrations could also be completely accounted for by alignments to the vector genome, indicating that they could also be vector rearrangments.  Translocations are also possible, where the read is accounted for by multiple alingments to the host genome.
 
 At first, identified possible rearrangements (either vector rearrangements or host translocations) as reads where multiple alignments to one genome span most of the read.  A first attempt at this check was to see if 95% of bases in read were accounted for by any number of alignments from one genome, that read is flagged as a possible rearrangement
 
 However, this led to some rearrangments being missed - an analysis of the variants in these regions, particularly in the FRG and macaque datasets, indicated that there are very few, if any, true integrations in these regions.  I therefore changed this check to consider two explanations for every read that might be an integration:
- - The read is an integration, composed of viral and host portions
- - The read is a vector rearragement (or a host translocation), composed of multiple alignments to only one reference genome
-For each possible explanation, I calculate an 'edit distance', which is defined as the sum of the edit distances for the individual alingments, and the number of bases in any gaps between those alignments.  The edit distance for each of these explanations is then compared, and the explanation with the smaller edit distance is output.  In the case of a tie, vector rearrangement is output to err on the side of caution.
+
+- The read is an integration, composed of viral and host portions
+- The read is a vector rearragement (or a host translocation), composed of multiple alignments to only one reference genome
+  For each possible explanation, I calculate an 'edit distance', which is defined as the sum of the edit distances for the individual alingments, and the number of bases in any gaps between those alignments.  The edit distance for each of these explanations is then compared, and the explanation with the smaller edit distance is output.  In the case of a tie, vector rearrangement is output to err on the side of caution.
 
 ### Variants
 
 It would be good to distinguish between vector rearrangements and integrations in the regions where the vector and the human genome are homologous (hAAT \[SERPINA1\] promoter, OTC enhancer).  Can do this by looking for variants between vector and human genome in this region: there are a few in the hAAT promoter.  Interrograte this by extracting only the junction fragments from the alignment.  Made a seperate snakefile to do this, in folder `SNPs`.
 
 First pull out reads called as integrations by the pipeline.  Specify regions (usually SERPINA1 promoter and OTC enhancer) in which to call variants and do pileup.  Output vcfs with variants and a pileup.
-
 
 ### Alignment paramters
 
@@ -237,5 +245,3 @@ The pipeline uses bwa-mem for alignment.  The settings are more or less default,
 One example of this is read M01996:226:000000000-CFBJG:1:2107:24838:18761 in sample 22 of the london macaque data.  This read is not indicated to be an integration site. CIGAR in chr1 is 97M159H (supplementary alignment, reverse), POS is 120875219, main alignment is Chr7 CIGAR 101S31M8I48M2I66M (reverse).  Viral alignment is forward 156M100S.  Two primary alignments don't give integration because clipped part is on the same side of the read, but secondary host alignment with viral primary could be integration. Host coordinates of matched region would be chr1:12075122-120875219 - this is 297 bp from Sunando's site.
 
 In general, optimising the alingment might be difficult because a) we don't really know what a true positive in this datset is and b) optimising parameters might lead to overfitting.
-
-

@@ -80,6 +80,7 @@ rule combine_ints:
 		"""
 
 rule merge_parts_ints:
+	message: "Merge the intergrations of each part into one file"
 	input:
 		files = expand("{{outpath}}/{{dset}}/ints/{{samp}}.{parts}.{{host}}.{{virus}}.integrations.txt", parts = get_split())
 	group: "ints"
@@ -87,6 +88,7 @@ rule merge_parts_ints:
 		all = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
 	container:
 		"docker://ubuntu:18.04"
+	threads: 1
 	shell:
 		"""
 		echo {input.files}

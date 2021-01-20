@@ -96,7 +96,7 @@ rule all:
 		summary_files,
 		ucsc_files,
 		merged_bed,
-		expand("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.bam",
+		expand("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bam",
 			zip,
 			outpath = toDo.loc[:,'outdir'],
 			dset = toDo.loc[:,'dataset'],
@@ -105,7 +105,7 @@ rule all:
 			host = toDo.loc[:,'host'],
 			part = toDo.loc[:,'part']
 			),
-		expand("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bam",
+		expand("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bam",
 			zip,
 			outpath = toDo.loc[:,'outdir'],
 			dset = toDo.loc[:,'dataset'],
@@ -121,12 +121,8 @@ include: "snakemake_rules/preprocessing.smk"
 #### alignments ####
 include: "snakemake_rules/alignment.smk"
 
-
 #### find integrations ####
 include: "snakemake_rules/find_ints.smk"
 
 #### postprocessing ####
 include: "snakemake_rules/postprocessing.smk"
-
-
-

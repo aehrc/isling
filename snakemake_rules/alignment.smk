@@ -60,7 +60,7 @@ rule align_bwa_virus:
 		idx = lambda wildcards: multiext(get_value_from_df(wildcards, 'virus_prefix'), ".ann", ".amb", ".bwt", ".pac", ".sa"),
 		merged = lambda wildcards: get_for_align(wildcards, "merged"),
 		r1 = lambda wildcards: get_for_align(wildcards, "unmerged_r1"),
-		r2 = lambda wildcards: get_for_align(wildcards, "unmerged_r2"),	
+		r2 = lambda wildcards: get_for_align(wildcards, "unmerged_r2"),
 	output:
 		single = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaSingle.sam"),
 		paired = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.sam"),
@@ -87,6 +87,7 @@ rule align_bwa_virus:
 		"""
 
 rule merge_virus_sams:
+	message: "Merging virus sam files to one single sam file."
 	input:
 		expand("{{outpath}}/{{dset}}/virus_aligned/{{samp}}.{parts}.{{virus}}.sam", parts = get_split())
 	output:
@@ -95,12 +96,14 @@ rule merge_virus_sams:
 		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
+	threads: 1
 	shell:
 		"""
 		samtools merge {output} {input}
 		"""
 
 rule merge_host_sams:
+	message: "Merging host sam files to one single sam file."
 	input:
 		expand("{{outpath}}/{{dset}}/host_aligned/{{samp}}.{parts}.{{host}}.readsFrom{{virus}}.bwaSingle.sam", parts = get_split())
 	output:
@@ -109,6 +112,7 @@ rule merge_host_sams:
 		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
+	threads: 1
 	shell:
 		"""
 		samtools merge {output} {input}
@@ -310,8 +314,8 @@ rule convert_host_sam_to_bam:
 	input:
 		sam = rules.merge_host_sams.output
 	output:
-		bam = "{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.bam",
-		bai = "{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.bam.bai"
+		bam = "{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bam",
+		bai = "{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bam.bai"
 	conda: 
 		"../envs/bwa.yml"	
 	container:
@@ -360,6 +364,5 @@ rule rmdup:
 		"""
 		samtools view -h -F 1024 {input.sam} > {output.sam}
 		"""
-	
 
 

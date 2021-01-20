@@ -5,5 +5,3 @@ channels:
   - defaults
 dependencies:
   - seqkit=0.14.0
-
-
