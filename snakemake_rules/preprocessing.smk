@@ -21,6 +21,8 @@ rule split_fastq:
 		n = lambda wildcards: get_value_from_df(wildcards, "split")
 	conda: 
 		"../envs/seqkit.yml"
+	container:
+		"docker://szsctt/seqkit:1"
 	threads: 1
 	shell:
 		"seqkit split2 -1 {input.r1} -2 {input.r2} -p {params.n} -O {params.outdir} -f"
