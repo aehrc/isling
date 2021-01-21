@@ -68,30 +68,29 @@ rule combine_ints:
 		discordant = rules.run_discordant.output
 	group: "ints"
 	output:
-		temp =  temp("{outpath}/{dset}/ints/{samp}.{part}.{host}.{virus}.integrations.txt.tmp"),
 		all = temp("{outpath}/{dset}/ints/{samp}.{part}.{host}.{virus}.integrations.txt")
 	container:
 		"docker://ubuntu:18.04"
 	shell:
 		"""
 		awk 'FNR>1 || NR==1' {input} > {output.all}
-		sort -n -k1,1 -k2,2n {output.all} > {output.temp}
-		cp {output.temp} {output.all}
 		"""
 
 rule merge_parts_ints:
-	message: "Merge the intergrations of each part into one file"
+	message: "Merge the intergrations from each part into one file"
 	input:
-		files = expand("{{outpath}}/{{dset}}/ints/{{samp}}.{parts}.{{host}}.{{virus}}.integrations.txt", parts = get_split())
+		files = expand("{{outpath}}/{{dset}}/ints/{{samp}}.{parts}.{{host}}.{{virus}}.integrations.txt", parts = get_split()),
 	group: "ints"
 	output:
-		all = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
+		all = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
+		temp =  temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp"),
 	container:
 		"docker://ubuntu:18.04"
 	threads: 1
 	shell:
 		"""
 		echo {input.files}
-		awk 'NR==1' {input.files} > {output.all}
-		grep -v "^Chr" -h  {input.files} >> {output.all}
+		awk 'FNR>1 || NR==1' {input.files} > {output.all}
+		sort -n -k1,1 -k2,2n {output.all} > {output.temp}
+		cp {output.temp} {output.all}
 		"""
