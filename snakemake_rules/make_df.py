@@ -5,6 +5,7 @@ import pandas as pd
 import collections
 import itertools
 import pdb
+import os
 
 
 #### defaults ####
@@ -14,6 +15,7 @@ tol_default = 3
 cutoff_default = 20
 min_mapq_default = 0
 merge_n_min_default = 1
+split_default = 1
 mean_frag_len_default = 'estimate'
 align_cpus_default = 5
 
@@ -59,7 +61,13 @@ def make_df(config):
 		# get read directory
 		readdir = check_required(config, dataset, 'read_folder')
 		readdir = path.normpath(readdir)
-			
+
+		# Create temporary symlink directory
+		readdir = path.normpath(symlink_reads(readdir, os.path.join(outdir,"symreads"), config[dataset]['R1_suffix'], config[dataset]['R2_suffix']))
+		config[dataset]['read_folder'] = readdir
+		config[dataset]["R1_suffix"] = "_1.fq"
+		config[dataset]["R2_suffix"] = "_2.fq"
+
 		# figure out if 'dedup', 'merge' and 'trim' are true or false for this dataset`
 		dedup = check_bools(config, dataset, 'dedup')
 		merge = check_bools(config, dataset, 'merge')
@@ -96,6 +104,7 @@ def make_df(config):
 		min_mapq = get_value_or_default(config, dataset, 'min-mapq', min_mapq_default)
 		bwa_mem_params = get_value_or_default(config, dataset, 'bwa-mem', bwa_mem_default)
 		merge_n_min = get_value_or_default(config, dataset, 'merge-n-min', merge_n_min_default)
+		split = get_value_or_default(config, dataset, 'split', split_default)
 		align_cpus = get_value_or_default(config, dataset, 'align-cpus', align_cpus_default)
 		
 		# check values are integers greater than a minimum value
@@ -103,6 +112,9 @@ def make_df(config):
 		check_int_gt(clip_cutoff, 1, 'clip-cutoff', dataset)
 		check_int_gt(cigar_tol, 0, 'cigar-tol', dataset)
 		check_int_gt(min_mapq, -1, 'min-mapq', dataset)
+		check_int_gt(merge_n_min, -1, 'merge-n-min', dataset)
+		check_int_gt(split, 0, 'split', dataset)
+
 		check_int_gt(min_mapq, -1, 'merge-n-min', dataset)
 		if mean_frag_len != 'estimate':
 			if mean_frag_len < 0:
@@ -146,7 +158,7 @@ def make_df(config):
 			virus_prefix = config[dataset]["virus_prefixes"][virus]			
 			
 			# append combinations of each sample, host and virus		
-			rows.append((dataset_name, dataset, sample, host, host_fasta, host_prefix, virus, virus_fasta, virus_prefix, merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, merge_n_min, clip_cutoff, cigar_tol, min_mapq, mean_frag_len, align_cpus))
+			rows.append((dataset_name, dataset, sample, host, host_fasta, host_prefix, virus, virus_fasta, virus_prefix, merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, merge_n_min, clip_cutoff, cigar_tol, min_mapq, split, mean_frag_len, align_cpus))
 
 			
 	# check there aren't any duplicate rows
@@ -154,7 +166,7 @@ def make_df(config):
 		raise ValueError("Error - configfile results in duplicate analyses, check samples and dataset names are unique")
 	
 	# make dataframe
-	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq', 'mean_frag_len', 'align_cpus'])
+	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq', 'split', 'mean_frag_len', 'align_cpus'])
 	
 	# do checks on dataframe
 	check_dataset_sample_unique(toDo)
@@ -162,6 +174,16 @@ def make_df(config):
 	ref_names = make_reference_dict(toDo)
 	check_fastas_unique(toDo, ref_names)
 	
+	# Split reads into n parts and add rows to toDo
+	for index, row in toDo.iterrows():
+		split = int(row['split'])
+		toDo.loc[index, 'part'] = "part_{:03d}".format(int(split))
+		for tmpsplit in  range(1,int(split)):
+			tmprow = row
+			tmprow['part'] = "part_{:03d}".format(tmpsplit)
+			tmprow['unique'] = tmprow['unique'].split("+++")[0]+"+++"+tmprow['unique'].split("+++")[1]+"+++"+"part_{:03d}".format(tmpsplit)
+			toDo = toDo.append(tmprow, ignore_index=True)
+
 	return toDo
 
 
@@ -475,3 +497,19 @@ def get_samples(config, dataset):
 			raise InputError(f"please specify either 'bam_suffix' or 'R1_suffix' and 'R2_suffix' for dataset {dataset}")
 			
 		return samples, is_bam
+
+def symlink_reads(readdir, symreaddir, r1_suffix, r2_suffix):
+
+	# Create symlink directory for reads
+	os.makedirs(symreaddir, exist_ok=True)
+
+	# Get all files in read directory
+	_, _, filenames = next(os.walk(readdir))
+
+	# Create symlink to reads that match read suffix
+	for filename in filenames:
+		filename_new = filename.replace(r1_suffix, "_1.fq").replace(r2_suffix, "_2.fq")
+		if not os.path.isfile(os.path.abspath(os.path.join(symreaddir, filename_new))):
+			os.symlink(os.path.abspath(os.path.join(readdir, filename)), os.path.abspath(os.path.join(symreaddir, filename_new)))
+
+	return symreaddir

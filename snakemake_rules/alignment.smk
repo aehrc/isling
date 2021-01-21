@@ -29,9 +29,9 @@ def get_for_align(wildcards, read_type):
 	# if we didn't do either
 	else:
 		if read_type == 'unmerged_r1':
-			return get_for_seqprep(wildcards, "1")
+			return "{outpath}/{dset}/split_reads/{samp}/{samp}_1.{part}.fq"
 		if read_type == 'unmerged_r2':
-			return get_for_seqprep(wildcards, "2")
+			return "{outpath}/{dset}/split_reads/{samp}/{samp}_2.{part}.fq"
 		else:
 			return rules.touch_merged.output.merged
 
@@ -62,9 +62,9 @@ rule align_bwa_virus:
 		r1 = lambda wildcards: get_for_align(wildcards, "unmerged_r1"),
 		r2 = lambda wildcards: get_for_align(wildcards, "unmerged_r2"),
 	output:
-		single = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaSingle.sam"),
-		paired = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.sam"),
-		combined = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.sam"),
+		single = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaSingle.sam"),
+		paired = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.sam"),
+		combined = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.sam"),
 	params:
 		index = lambda wildcards, input: os.path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
@@ -84,6 +84,38 @@ rule align_bwa_virus:
 		bwa mem -t {threads} {params.mapping} {params.paired_RG} -o {output.paired} {params.index} {input.r1} {input.r2} 
 		
 		samtools merge {output.combined} {output.single} {output.paired}
+		"""
+
+rule merge_virus_sams:
+	message: "Merging virus sam files to one single sam file."
+	input:
+		expand("{{outpath}}/{{dset}}/virus_aligned/{{samp}}.{parts}.{{virus}}.sam", parts = get_split())
+	output:
+		temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.sam")
+	conda:
+		"../envs/bwa.yml"
+	container:
+		"docker://szsctt/bwa:1"
+	threads: 1
+	shell:
+		"""
+		samtools merge {output} {input}
+		"""
+
+rule merge_host_sams:
+	message: "Merging host sam files to one single sam file."
+	input:
+		expand("{{outpath}}/{{dset}}/host_aligned/{{samp}}.{parts}.{{host}}.readsFrom{{virus}}.bwaSingle.sam", parts = get_split())
+	output:
+		temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam")
+	conda:
+		"../envs/bwa.yml"
+	container:
+		"docker://szsctt/bwa:1"
+	threads: 1
+	shell:
+		"""
+		samtools merge {output} {input}
 		"""
 
 def get_sam(wildcards, readType, genome):
@@ -141,7 +173,7 @@ rule extract_to_fastq_single:
 	input:
 		aligned = lambda wildcards: get_sam(wildcards, "single", "virus"),
 	output:
-		fastq = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaSingle.mappedTo{virus}.fastq.gz"),
+		fastq = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.bwaSingle.mappedTo{virus}.fastq.gz"),
 	group: "host_align"
 	conda:
 		"../envs/bwa.yml"
@@ -152,17 +184,17 @@ rule extract_to_fastq_single:
 		# 0x4 - read unmapped
 		# 0x100 - not primary alignment
 		# 0x800 - secondary alignment
-		samtools view -h -F 0x4 -F 0x800 -F 0x100 -o - {input.aligned} | samtools fastq -0 {output.fastq} - 
+		samtools view -h -F 0x4 -F 0x800 -F 0x100 -o - {input.aligned} | samtools fastq -0 {output.fastq}  
 		"""
 
 rule extract_vAligned_paired:
 	input:
 		aligned = lambda wildcards: get_sam(wildcards, "paired", "virus")
 	output:
-		pvBam_readMap_mateUnmap = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.L.bam"),
-		pvBam_readUnmap_mateMap = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.R.bam"),
-		pvBam_bothMapped = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.B.bam"),
-		bam = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bwaPaired.mapped.bam"),
+		pvBam_readMap_mateUnmap = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.L.bam"),
+		pvBam_readUnmap_mateMap = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.R.bam"),
+		pvBam_bothMapped = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.B.bam"),
+		bam = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.mapped.bam"),
 	group: "host_align"
 	conda:
 		"../envs/bwa.yml"
@@ -180,8 +212,8 @@ rule extract_to_fastq_paired:
 	input:
 		bam = rules.extract_vAligned_paired.output.bam
 	output:
-		fastq1 = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaPaired.mappedTo{virus}.1.fastq.gz"),
-		fastq2 = temp("{outpath}/{dset}/virus_aligned/{samp}.bwaPaired.mappedTo{virus}.2.fastq.gz")
+		fastq1 = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.bwaPaired.mappedTo{virus}.1.fastq.gz"),
+		fastq2 = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.bwaPaired.mappedTo{virus}.2.fastq.gz")
 	group: "host_align"
 	conda:
 		"../envs/bwa.yml"
@@ -189,7 +221,7 @@ rule extract_to_fastq_paired:
 		"docker://szsctt/bwa:1"
 	shell:
 		"""
-		samtools collate -O {input.bam} | samtools fastq -1 {output.fastq1} -2 {output.fastq2} -
+		samtools collate -O {input.bam} | samtools fastq -1 {output.fastq1} -2 {output.fastq2}
 		"""
 
 rule align_bwa_host_single:
@@ -197,7 +229,7 @@ rule align_bwa_host_single:
 		idx = lambda wildcards: multiext(get_value_from_df(wildcards, 'host_prefix'), ".ann", ".amb", ".bwt", ".pac", ".sa"),
 		all = rules.extract_to_fastq_single.output.fastq,
 	output:
-		sam = temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam"),
+		sam = temp("{outpath}/{dset}/host_aligned/{samp}.{part}.{host}.readsFrom{virus}.bwaSingle.sam"),
 	group: "host_align"
 	conda: 
 		"../envs/bwa.yml"
@@ -221,7 +253,7 @@ rule align_bwa_host_paired:
 		r1 = rules.extract_to_fastq_paired.output[0],
 		r2 = rules.extract_to_fastq_paired.output[1]
 	output:
-		sam = temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaPaired.sam"),
+		sam = temp("{outpath}/{dset}/host_aligned/{samp}.{part}.{host}.readsFrom{virus}.bwaPaired.sam"),
 	group: "host_align"
 	conda: 
 		"../envs/bwa.yml"
@@ -244,7 +276,7 @@ rule combine_host:
 		paired = rules.align_bwa_host_paired.output.sam,
 		single = rules.align_bwa_host_single.output.sam
 	output:
-		combined = temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.sam")
+		combined = temp("{outpath}/{dset}/host_aligned/{samp}.{part}.{host}.readsFrom{virus}.sam")
 	group: "host_align"
 	conda: 
 		"../envs/bwa.yml"
@@ -260,29 +292,40 @@ rule combine_host:
 
 #### sam file manipulations ####
 
-rule convert_to_bam:
+rule convert_virus_sam_to_bam:
 	input:
-		sam = "{outpath}/{dset}/{folder}/{alignment}.sam"
+		sam = rules.merge_virus_sams.output
 	output:
-		bam = "{outpath}/{dset}/{folder}/{alignment}.bam",
-		bai = "{outpath}/{dset}/{folder}/{alignment}.bam.bai"
-	params:
-		tmp_prefix = lambda wildcards, input: os.path.splitext(input[0])[0]
-	wildcard_constraints:
-		folder = "host_aligned|virus_aligned"
+		bam = "{outpath}/{dset}/virus_aligned/{samp}.{virus}.bam",
+		bai = "{outpath}/{dset}/virus_aligned/{samp}.{virus}.bam.bai"
 	conda: 
 		"../envs/bwa.yml"	
 	container:
 		"docker://szsctt/bwa:1"
-	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.sam,), attempt, 2, 1000, 10000)
+#	resources: # removed due to error in splitFASTQ-feature
+#		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.sam,), attempt, 2, 1000, 10000)
 	shell:
 		"""
-		rm -f {params.tmp_prefix}*tmp*
 		samtools sort -o {output.bam} {input.sam}
 		samtools index {output.bam}
 		"""
-		
+
+rule convert_host_sam_to_bam:
+	input:
+		sam = rules.merge_host_sams.output
+	output:
+		bam = "{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bam",
+		bai = "{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bam.bai"
+	conda: 
+		"../envs/bwa.yml"	
+	container:
+		"docker://szsctt/bwa:1"
+	shell:
+		"""
+		samtools sort -o {output.bam} {input.sam}
+		samtools index {output.bam}
+		"""
+
 rule markdup:
 	input:
 		sam = "{outpath}/{dset}/{folder}/{alignment}.sam"
@@ -303,7 +346,7 @@ rule markdup:
 		picard FixMateInformation I={input.sam} O={output.fixmate} ADD_MATE_CIGAR=true SORT_ORDER=queryname
 		picard MarkDuplicates I={output.fixmate} O={output.markdup} METRICS_FILE={output.metrics}
 		"""
-		
+
 rule rmdup:
 	input:
 		sam = "{outpath}/{dset}/{folder}/{alignment}.dups.sam"	
@@ -321,6 +364,5 @@ rule rmdup:
 		"""
 		samtools view -h -F 1024 {input.sam} > {output.sam}
 		"""
-	
 
 

@@ -13,7 +13,7 @@
 # the steps in the pipeline are as follows:
 # 1. preprocessing
 #   - convert bam files to fastq, if necessary
-#   - either merge R1 and R2 using seqprep, or don't do merging, as specified in the  config file
+#   - either merge R1 and R2 using seqprep, or don't do merging, as specified in the config file
 # 2. alignments
 #   - align all the reads to the virus
 #   - remove duplicates
@@ -71,7 +71,8 @@ wildcard_constraints:
 	dset = "|".join(set(toDo.loc[:,'dataset'])),
 	host = "|".join(set(toDo.loc[:,'host'])),
 	align_type = "bwaPaired|bwaSingle",
-	outpath = "|".join(set(toDo.loc[:,'outdir']))
+	outpath = "|".join(set(toDo.loc[:,'outdir'])),
+	part = "|".join(toDo.loc[:,'part'])
 
 #### local rules ####
 localrules: all, touch_merged, check_bam_input_is_paired
@@ -81,6 +82,7 @@ conditions = set()
 summary_files = set()
 ucsc_files = set()
 merged_bed = set()
+part_fastq = set()
 for i, row in toDo.iterrows():
 	summary_files.add(f"{row['outdir']}/summary/{row['dataset']}.xlsx")
 	ucsc_files.add(f"{row['outdir']}/summary/ucsc_bed/{row['dataset']}.post.bed")
@@ -89,7 +91,7 @@ for i, row in toDo.iterrows():
 
 
 rule all:
-	input: 
+	input:
 		conditions,
 		summary_files,
 		ucsc_files,
@@ -99,7 +101,9 @@ rule all:
 			outpath = toDo.loc[:,'outdir'],
 			dset = toDo.loc[:,'dataset'],
 			samp = toDo.loc[:,'sample'],
-			virus = toDo.loc[:,'virus']
+			virus = toDo.loc[:,'virus'],
+			host = toDo.loc[:,'host'],
+			part = toDo.loc[:,'part']
 			),
 		expand("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bam",
 			zip,
@@ -107,16 +111,15 @@ rule all:
 			dset = toDo.loc[:,'dataset'],
 			samp = toDo.loc[:,'sample'],
 			virus = toDo.loc[:,'virus'],
-			host = toDo.loc[:,'host']
+			host = toDo.loc[:,'host'],
+			part = toDo.loc[:,'part']
 			)
-			
 
 #### read preprocessing ####
 include: "snakemake_rules/preprocessing.smk"
 
 #### alignments ####
 include: "snakemake_rules/alignment.smk"
-
 
 #### find integrations ####
 include: "snakemake_rules/find_ints.smk"
