@@ -1,8 +1,72 @@
 #### preprocessing rules ####
 
+# Get split value from config dataframe
+def get_split(wildcards):
+	n_parts =  get_value_from_df(wildcards, "split")
+	return range(int(n_parts))
+
+# Split reads to decrease memory usage and increase parallelization
+#rule split_fastq:
+#	message: "Splitting reads in {params.n} parts."
+#	input:
+#		r1 = lambda wildcards: get_for_split(wildcards, '1'),
+#		r2 = lambda wildcards: get_for_split(wildcards, '2')
+#	output:
+#		r1 = temp(expand("{{outpath}}/{{dset}}/split_reads/{{samp}}/{{samp}}_1.{part}.fq", part = get_split())),
+#		r2 = temp(expand("{{outpath}}/{{dset}}/split_reads/{{samp}}/{{samp}}_2.{part}.fq", part = get_split()))
+#	params:
+#		outdir = "{outpath}/{dset}/split_reads/{samp}",
+#		n = lambda wildcards: get_value_from_df(wildcards, "split")
+#	conda: 
+#		"../envs/seqkit.yml"
+#	container:
+#		"docker://szsctt/seqkit:1"
+#	threads: 1
+#	shell:
+#		"seqkit split2 -1 {input.r1} -2 {input.r2} -p {params.n} -O {params.outdir} -f"
+
+
+rule split_fastq:
+	input:
+		reads = lambda wildcards: get_for_split(wildcards, wildcards.read_num)
+	output:
+		reads = "{outpath}/{dset}/split_reads/{samp}_{read_num}.{part}.fq"
+	params:
+		n_total =  lambda wildcards: get_value_from_df(wildcards, "split"),
+		line_spec = lambda wildcards: get_value_from_df(wildcards, "split_lines").split("xxx")[int(wildcards.part)],
+		cat = lambda wildcards: get_value_from_df(wildcards, "cat")	
+	wildcard_constraints:
+		read_num = "1|2",
+		part = "\d+"
+	shell:
+		"""
+		if [[ {params.n_total} -eq 1 ]]
+		then
+			{params.cat} {input.reads} > {output.reads}
+		else
+			{params.cat} {input.reads} | sed -n '{params.line_spec} p' > {output.reads}
+		fi
+		"""
+		
+
+# Input functions for if had a bam or fastq as input
+def get_for_split(wildcards, read_type):
+
+	bam_suffix = get_value_from_df(wildcards, 'bam_file')
+
+	# pass either reads extracted from bam or 
+	if bam_suffix != "":
+		if read_type == "1":
+			return rules.bam_to_fastq.output.r1
+		else:
+			return rules.bam_to_fastq.output.r2
+	else:
+		if read_type == "1":
+			return get_value_from_df(wildcards, 'R1_file')
+		else:
+			return get_value_from_df(wildcards, 'R2_file')
 
 def resources_list_with_min_and_max(file_name_list, attempt, mult_factor=2, minimum = 100, maximum = 50000):
-	
 	resource = int(sum([os.stat(file).st_size/1e6 for file in file_name_list])) * attempt * mult_factor
 	
 	resource = min(maximum, resource)
@@ -72,34 +136,15 @@ rule bam_to_fastq:
 		samtools fastq -1 {output.r1} -2 {output.r2} -0 /dev/null -
 		"""
 
-
-# input functions for if had a bam or fastq as input
-def get_for_seqprep(wildcards, read_type):
-
-	bam_suffix = get_value_from_df(wildcards, 'bam_file')
-	
-	# pass either reads extracted from bam or 
-	if bam_suffix != "":
-		if read_type == "1":
-			return rules.bam_to_fastq.output.r1
-		else:
-			return rules.bam_to_fastq.output.r2
-	else:
-		if read_type == "1":
-			return get_value_from_df(wildcards, 'R1_file')
-		else:
-			return get_value_from_df(wildcards, 'R2_file')
-
-
 rule seqPrep:
 # if we're doing it
 	input:
-		r1 = lambda wildcards: get_for_seqprep(wildcards, '1'),
-		r2 = lambda wildcards: get_for_seqprep(wildcards, '2')
+		r1 = "{outpath}/{dset}/split_reads/{samp}_1.{part}.fq",
+		r2 = "{outpath}/{dset}/split_reads/{samp}_2.{part}.fq"
 	output:
-		merged = temp("{outpath}/{dset}/merged_reads/{samp}.SeqPrep_merged.fastq.gz"),
-		proc_r1 = temp("{outpath}/{dset}/merged_reads/{samp}.1.fastq.gz"),
-		proc_r2 = temp("{outpath}/{dset}/merged_reads/{samp}.2.fastq.gz")
+		merged = temp("{outpath}/{dset}/merged_reads/{samp}.{part}.SeqPrep_merged.fastq.gz"),
+		proc_r1 = temp("{outpath}/{dset}/merged_reads/{samp}.{part}.1.fastq.gz"),
+		proc_r2 = temp("{outpath}/{dset}/merged_reads/{samp}.{part}.2.fastq.gz")
 	group: "seqprep"
 	conda:	
 		"../envs/seqprep.yml"
@@ -115,11 +160,11 @@ rule seqPrep:
 		
 rule seqPrep_unmerged:
 	input:
-		r1 = lambda wildcards: get_for_seqprep(wildcards, '1'),
-		r2 = lambda wildcards: get_for_seqprep(wildcards, '2')
+		r1 = "{outpath}/{dset}/split_reads/{samp}_1.{part}.fq",
+		r2 = "{outpath}/{dset}/split_reads/{samp}_2.{part}.fq"
 	output:
-		proc_r1 = temp("{outpath}/{dset}/trimmed_reads/{samp}.1.fastq.gz"),
-		proc_r2 = temp("{outpath}/{dset}/trimmed_reads/{samp}.2.fastq.gz")
+		proc_r1 = temp("{outpath}/{dset}/trimmed_reads/{samp}.{part}.1.fastq.gz"),
+		proc_r2 = temp("{outpath}/{dset}/trimmed_reads/{samp}.{part}.2.fastq.gz")
 	group: "seqprep"
 	conda:	
 		"../envs/seqprep.yml"
@@ -136,10 +181,10 @@ rule seqPrep_unmerged:
 rule touch_merged:
 # if we don't want to do merging, we still need to have an empty file of unmerged reads
 	input:
-		r1 = lambda wildcards: get_for_seqprep(wildcards, '1'),
-		r2 = lambda wildcards: get_for_seqprep(wildcards, '2')
+		r1 = "{outpath}/{dset}/split_reads/{samp}_1.{part}.fq",
+		r2 = "{outpath}/{dset}/split_reads/{samp}_2.{part}.fq"
 	output:
-		merged = temp("{outpath}/{dset}/combined_reads/{samp}.mockMerged.fastq.gz")
+		merged = temp("{outpath}/{dset}/combined_reads/{samp}.{part}.mockMerged.fastq.gz")
 	container:
 		"docker://ubuntu:18.04"	
 	shell:

@@ -4,7 +4,7 @@ rule run_soft:
 		host = lambda wildcards: get_sam(wildcards, "combined", "host"),
 		virus = lambda wildcards: get_sam(wildcards, "combined", "virus")
 	output:
-		soft = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.soft.txt"),
+		soft = temp("{outpath}/{dset}/ints/{samp}.{part}.{host}.{virus}.soft.txt"),
 	group: "ints"
 	params:
 		cutoff = lambda wildcards: f"--cutoff {int(get_value_from_df(wildcards, 'clip_cutoff'))}",
@@ -24,7 +24,7 @@ rule run_short:
 		host = lambda wildcards: get_sam(wildcards, "combined", "host"),
 		virus = lambda wildcards: get_sam(wildcards, "combined", "virus"),
 	output:
-		short = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.short.txt"),
+		short = temp("{outpath}/{dset}/ints/{samp}.{part}.{host}.{virus}.short.txt"),
 	group: "ints"
 	params:
 		cutoff = lambda wildcards: f"--cutoff {int(get_value_from_df(wildcards, 'clip_cutoff'))}",
@@ -44,7 +44,7 @@ rule run_discordant:
 		host = lambda wildcards: get_sam(wildcards, "paired", "host"),
 		virus = lambda wildcards: get_sam(wildcards, "paired", "virus"),
 	output:
-		discord = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.discordant.txt"),
+		discord = temp("{outpath}/{dset}/ints/{samp}.{part}.{host}.{virus}.discordant.txt"),
 	group: "ints"
 	params:
 		cutoff = lambda wildcards: f"--cutoff {int(get_value_from_df(wildcards, 'clip_cutoff'))}",
@@ -55,6 +55,7 @@ rule run_discordant:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.host, input.virus), attempt)
 	container:
 		"docker://ubuntu:18.04"
+	threads: workflow.cores
 	shell:
 		"""
 		perl -Iscripts scripts/discordant.pl --viral {input.virus} --host {input.host} --output {output.discord} {params}
@@ -67,14 +68,29 @@ rule combine_ints:
 		discordant = rules.run_discordant.output
 	group: "ints"
 	output:
-		temp =  temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp"),
-		all = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
+		all = temp("{outpath}/{dset}/ints/{samp}.{part}.{host}.{virus}.integrations.txt")
 	container:
 		"docker://ubuntu:18.04"
 	shell:
 		"""
 		awk 'FNR>1 || NR==1' {input} > {output.all}
+		"""
+
+rule merge_parts_ints:
+	message: "Merge the intergrations from each part into one file"
+	input:
+		files = lambda wildcards: expand("{{outpath}}/{{dset}}/ints/{{samp}}.{parts}.{{host}}.{{virus}}.integrations.txt", parts = get_split(wildcards)),
+	group: "ints"
+	output:
+		all = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
+		temp =  temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp"),
+	container:
+		"docker://ubuntu:18.04"
+	threads: 1
+	shell:
+		"""
+		echo {input.files}
+		awk 'FNR>1 || NR==1' {input.files} > {output.all}
 		sort -n -k1,1 -k2,2n {output.all} > {output.temp}
 		cp {output.temp} {output.all}
 		"""
-

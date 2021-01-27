@@ -5,6 +5,9 @@ import pandas as pd
 import collections
 import itertools
 import pdb
+import os
+import gzip
+import bz2
 
 
 #### defaults ####
@@ -14,6 +17,7 @@ tol_default = 3
 cutoff_default = 20
 min_mapq_default = 0
 merge_n_min_default = 1
+split_default = 1
 mean_frag_len_default = 'estimate'
 align_cpus_default = 5
 
@@ -49,7 +53,7 @@ def make_df(config):
 
 	for dataset in config:
 	
-		check_read_suffixes(config, dataset)
+		cat = check_read_suffixes(config, dataset)
 		
 		# get output directory
 		outdir = get_value_or_default(config, dataset, 'out_dir', getcwd())
@@ -59,7 +63,13 @@ def make_df(config):
 		# get read directory
 		readdir = check_required(config, dataset, 'read_folder')
 		readdir = path.normpath(readdir)
-			
+
+		# Create temporary symlink directory
+#		readdir = path.normpath(symlink_reads(readdir, os.path.join(outdir,"symreads"), config[dataset]['R1_suffix'], config[dataset]['R2_suffix']))
+#		config[dataset]['read_folder'] = readdir
+#		config[dataset]["R1_suffix"] = "_1.fq"
+#		config[dataset]["R2_suffix"] = "_2.fq"
+
 		# figure out if 'dedup', 'merge' and 'trim' are true or false for this dataset`
 		dedup = check_bools(config, dataset, 'dedup')
 		merge = check_bools(config, dataset, 'merge')
@@ -96,6 +106,7 @@ def make_df(config):
 		min_mapq = get_value_or_default(config, dataset, 'min-mapq', min_mapq_default)
 		bwa_mem_params = get_value_or_default(config, dataset, 'bwa-mem', bwa_mem_default)
 		merge_n_min = get_value_or_default(config, dataset, 'merge-n-min', merge_n_min_default)
+		split = get_value_or_default(config, dataset, 'split', split_default)
 		align_cpus = get_value_or_default(config, dataset, 'align-cpus', align_cpus_default)
 		
 		# check values are integers greater than a minimum value
@@ -103,6 +114,9 @@ def make_df(config):
 		check_int_gt(clip_cutoff, 1, 'clip-cutoff', dataset)
 		check_int_gt(cigar_tol, 0, 'cigar-tol', dataset)
 		check_int_gt(min_mapq, -1, 'min-mapq', dataset)
+		check_int_gt(merge_n_min, -1, 'merge-n-min', dataset)
+		check_int_gt(split, 0, 'split', dataset)
+
 		check_int_gt(min_mapq, -1, 'merge-n-min', dataset)
 		if mean_frag_len != 'estimate':
 			if mean_frag_len < 0:
@@ -126,10 +140,12 @@ def make_df(config):
 				bam_file = f"{readdir}/{sample}{config[dataset]['bam_suffix']}"
 				R1_file = f"{outdir}/{dataset}/reads/{sample}{config[dataset]['R1_suffix']}"
 				R2_file = f"{outdir}/{dataset}/reads/{sample}{config[dataset]['R2_suffix']}"
+				split_lines = '' #TODO
 			else:
 				bam_file = ""	
 				R1_file = f"{readdir}/{sample}{config[dataset]['R1_suffix']}"
 				R2_file = f"{readdir}/{sample}{config[dataset]['R2_suffix']}"
+				split_lines = split_lines_fastq(R1_file, split, cat)
 			
 			# if there is more than one virus or host, append these to the dataset name
 			if len(config[dataset]['host'].keys()) > 1 or len(config[dataset]['virus'].keys()) > 1:
@@ -143,10 +159,10 @@ def make_df(config):
 			host_fasta = config[dataset]["host"][host]
 			host_prefix = config[dataset]["host_prefixes"][host]
 			virus_fasta = config[dataset]["virus"][virus]
-			virus_prefix = config[dataset]["virus_prefixes"][virus]			
+			virus_prefix = config[dataset]["virus_prefixes"][virus]	
 			
 			# append combinations of each sample, host and virus		
-			rows.append((dataset_name, dataset, sample, host, host_fasta, host_prefix, virus, virus_fasta, virus_prefix, merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, merge_n_min, clip_cutoff, cigar_tol, min_mapq, mean_frag_len, align_cpus))
+			rows.append((dataset_name, dataset, sample, host, host_fasta, host_prefix, virus, virus_fasta, virus_prefix, merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, merge_n_min, clip_cutoff, cigar_tol, min_mapq, split, mean_frag_len, align_cpus, cat, split_lines))
 
 			
 	# check there aren't any duplicate rows
@@ -154,14 +170,15 @@ def make_df(config):
 		raise ValueError("Error - configfile results in duplicate analyses, check samples and dataset names are unique")
 	
 	# make dataframe
-	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq', 'mean_frag_len', 'align_cpus'])
+	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq', 'split', 'mean_frag_len', 'align_cpus', 'cat', 'split_lines'])
 	
 	# do checks on dataframe
 	check_dataset_sample_unique(toDo)
 	
 	ref_names = make_reference_dict(toDo)
 	check_fastas_unique(toDo, ref_names)
-	
+
+
 	return toDo
 
 
@@ -376,6 +393,8 @@ def check_int_gt(var, minimum, name, dataset):
 
 def check_read_suffixes(config, dataset):
 
+	cat = 'cat'
+
 	# if input is fastq
 	if "R1_suffix" in config[dataset]:
 	
@@ -392,6 +411,9 @@ def check_read_suffixes(config, dataset):
 		
 		#bz2 or gz compression
 		if R1_first_extension in compression_extensions:
+		
+			# check for which cat we should use
+			cat =  'zcat' if R1_first_extension == '.gz' else 'bzcat'
 		
 			# get second extensions
 			R1_second_extension = path.splitext(path.splitext(config[dataset]["R1_suffix"])[0])[1]
@@ -417,6 +439,9 @@ def check_read_suffixes(config, dataset):
 	# if nether R1/R2 suffix or bam suffix specified
 	else:
 		raise InputError("Please specify either 'R1_suffix' and 'R2_suffix' or 'bam_suffix' in the config file")
+
+
+	return cat
 
 def get_samples(config, dataset):
 		
@@ -475,3 +500,37 @@ def get_samples(config, dataset):
 			raise InputError(f"please specify either 'bam_suffix' or 'R1_suffix' and 'R2_suffix' for dataset {dataset}")
 			
 		return samples, is_bam
+
+
+def split_lines_fastq(read_file_path, split_n, cat):
+	# in the trivial case, only one part
+	if split_n == 1:
+		return ''
+
+	# get number of lines in file
+	count = 0
+	if cat == 'bzcat':
+		open_func = bz2.open
+	elif cat == 'zcat':
+		open_func = gzip.open
+	else:
+		open_func = open
+		
+	with open_func(read_file_path, 'r') as handle:
+		for line in handle:
+			count += 1
+			
+	# we want to split the line into split_n chunks
+	# where each chunk starts on a line (1+4i)
+	# and each chunck ends on a line (4j)
+	# where i, j are integers
+	chunk_lines = count / split_n
+	chunks = []
+	curr_start = 1
+	while curr_start < count:
+		end = 4 * round((curr_start + chunk_lines) / 4)
+		chunks.append(f"{curr_start},{end}")
+		curr_start = end + 1
+		
+	return "xxx".join(chunks)
+
