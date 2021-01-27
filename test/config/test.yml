@@ -36,4 +36,5 @@ test-trim:
 test-none:
   merge: False
   trim: False
+  split: 1
 

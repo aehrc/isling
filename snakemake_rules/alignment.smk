@@ -29,9 +29,9 @@ def get_for_align(wildcards, read_type):
 	# if we didn't do either
 	else:
 		if read_type == 'unmerged_r1':
-			return "{outpath}/{dset}/split_reads/{samp}/{samp}_1.{part}.fq"
+			return "{outpath}/{dset}/split_reads/{samp}_1.{part}.fq"
 		if read_type == 'unmerged_r2':
-			return "{outpath}/{dset}/split_reads/{samp}/{samp}_2.{part}.fq"
+			return "{outpath}/{dset}/split_reads/{samp}_2.{part}.fq"
 		else:
 			return rules.touch_merged.output.merged
 
@@ -89,7 +89,7 @@ rule align_bwa_virus:
 rule merge_virus_sams:
 	message: "Merging virus sam files to one single sam file."
 	input:
-		expand("{{outpath}}/{{dset}}/virus_aligned/{{samp}}.{parts}.{{virus}}.sam", parts = get_split())
+		lambda wildcards: expand("{{outpath}}/{{dset}}/virus_aligned/{{samp}}.{parts}.{{virus}}.sam", parts = get_split(wildcards))
 	output:
 		temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.sam")
 	conda:
@@ -105,7 +105,7 @@ rule merge_virus_sams:
 rule merge_host_sams:
 	message: "Merging host sam files to one single sam file."
 	input:
-		expand("{{outpath}}/{{dset}}/host_aligned/{{samp}}.{parts}.{{host}}.readsFrom{{virus}}.bwaSingle.sam", parts = get_split())
+		lambda wildcards: expand("{{outpath}}/{{dset}}/host_aligned/{{samp}}.{parts}.{{host}}.readsFrom{{virus}}.bwaSingle.sam", parts = get_split(wildcards))
 	output:
 		temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam")
 	conda:

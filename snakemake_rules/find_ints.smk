@@ -79,7 +79,7 @@ rule combine_ints:
 rule merge_parts_ints:
 	message: "Merge the intergrations from each part into one file"
 	input:
-		files = expand("{{outpath}}/{{dset}}/ints/{{samp}}.{parts}.{{host}}.{{virus}}.integrations.txt", parts = get_split()),
+		files = lambda wildcards: expand("{{outpath}}/{{dset}}/ints/{{samp}}.{parts}.{{host}}.{{virus}}.integrations.txt", parts = get_split(wildcards)),
 	group: "ints"
 	output:
 		all = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
