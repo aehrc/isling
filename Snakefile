@@ -72,7 +72,7 @@ wildcard_constraints:
 	host = "|".join(set(toDo.loc[:,'host'])),
 	align_type = "bwaPaired|bwaSingle",
 	outpath = "|".join(set(toDo.loc[:,'outdir'])),
-	part = "|".join(toDo.loc[:,'part'])
+	part = "\d+"
 
 #### local rules ####
 localrules: all, touch_merged, check_bam_input_is_paired
@@ -82,7 +82,6 @@ conditions = set()
 summary_files = set()
 ucsc_files = set()
 merged_bed = set()
-part_fastq = set()
 for i, row in toDo.iterrows():
 	summary_files.add(f"{row['outdir']}/summary/{row['dataset']}.xlsx")
 	ucsc_files.add(f"{row['outdir']}/summary/ucsc_bed/{row['dataset']}.post.bed")
@@ -103,7 +102,6 @@ rule all:
 			samp = toDo.loc[:,'sample'],
 			virus = toDo.loc[:,'virus'],
 			host = toDo.loc[:,'host'],
-			part = toDo.loc[:,'part']
 			),
 		expand("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bam",
 			zip,
@@ -112,7 +110,6 @@ rule all:
 			samp = toDo.loc[:,'sample'],
 			virus = toDo.loc[:,'virus'],
 			host = toDo.loc[:,'host'],
-			part = toDo.loc[:,'part']
 			)
 
 #### read preprocessing ####
