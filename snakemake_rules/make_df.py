@@ -6,8 +6,7 @@ import collections
 import itertools
 import pdb
 import os
-import gzip
-import bz2
+import subprocess
 
 
 #### defaults ####
@@ -508,18 +507,14 @@ def split_lines_fastq(read_file_path, split_n, cat):
 		return ''
 
 	# get number of lines in file
-	count = 0
 	if cat == 'bzcat':
-		open_func = bz2.open
+		count = int(subprocess.check_output(['bzgrep', '-Ec', '$', read_file_path]).split()[0])
 	elif cat == 'zcat':
-		open_func = gzip.open
+		count = int(subprocess.check_output('zgrep', '-Ec', '$', read_file_path]).split()[0])
 	else:
-		open_func = open
-		
-	with open_func(read_file_path, 'r') as handle:
-		for line in handle:
-			count += 1
-			
+		count = int(subprocess.check_output(['wc', '-l', read_file_path]).split()[0])	
+	print(f"Counted {count} lines in {read_file_path}")
+
 	# we want to split the line into split_n chunks
 	# where each chunk starts on a line (1+4i)
 	# and each chunck ends on a line (4j)
