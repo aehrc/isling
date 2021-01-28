@@ -9,6 +9,7 @@ import os
 import gzip
 import bz2
 import subprocess
+import scripts.pybam3 as pybam
 
 
 #### defaults ####
@@ -136,12 +137,13 @@ def make_df(config):
 		for sample, host, virus in itertools.product(samples,
 																									config[dataset]['host'].keys(), 
 																									config[dataset]['virus'].keys()):
-			
+			print(is_bam)
 			if is_bam:
 				bam_file = f"{readdir}/{sample}{config[dataset]['bam_suffix']}"
 				R1_file = f"{outdir}/{dataset}/reads/{sample}{config[dataset]['R1_suffix']}"
 				R2_file = f"{outdir}/{dataset}/reads/{sample}{config[dataset]['R2_suffix']}"
-				split_lines = '' #TODO
+				print(R2_file)
+				split_lines = split_lines_bam(bam_file, split, cat)
 			else:
 				bam_file = ""	
 				R1_file = f"{readdir}/{sample}{config[dataset]['R1_suffix']}"
@@ -179,7 +181,7 @@ def make_df(config):
 	ref_names = make_reference_dict(toDo)
 	check_fastas_unique(toDo, ref_names)
 
-
+	print(toDo)
 	return toDo
 
 
@@ -533,5 +535,34 @@ def split_lines_fastq(read_file_path, split_n, cat):
 		chunks.append(f"{curr_start},{end}")
 		curr_start = end + 1
 		
+	return "xxx".join(chunks)
+
+
+def split_lines_bam(bam_file_path, split_n, cat):
+	# in the trivial case, only one part
+	if split_n == 1:
+		return ''
+
+	# get number of lines in file
+	alignments = pybam.read(bam_file_path)
+	count = 0
+	for alignment in alignments:
+		count += 1
+
+	header_count = alignments.file_header.split('\n')
+	header_count = list(filter(None, header_count))
+
+	# we want to split the line into split_n chunks
+	# where each chunk starts on a line (1+4i)
+	# and each chunck ends on a line (4j)
+	# where i, j are integers
+	chunk_lines = count / split_n
+	chunks = []
+	curr_start = 1
+	while curr_start < count:
+		end = 4 * round((curr_start + chunk_lines) / 4)
+		chunks.append(f"{curr_start},{end}")
+		curr_start = end + 1
+	
 	return "xxx".join(chunks)
 
