@@ -510,7 +510,7 @@ def split_lines_fastq(read_file_path, split_n, cat):
 	if cat == 'bzcat':
 		count = int(subprocess.check_output(['bzgrep', '-Ec', '$', read_file_path]).split()[0])
 	elif cat == 'zcat':
-		count = int(subprocess.check_output('zgrep', '-Ec', '$', read_file_path]).split()[0])
+		count = int(subprocess.check_output(['zgrep', '-Ec', '$', read_file_path]).split()[0])
 	else:
 		count = int(subprocess.check_output(['wc', '-l', read_file_path]).split()[0])	
 	print(f"Counted {count} lines in {read_file_path}")
