@@ -94,8 +94,8 @@ rule bam_to_fastq:
 		bam = lambda wildcards: get_value_from_df(wildcards, 'bam_file'),
 		ok = rules.check_bam_input_is_paired.output.ok
 	output:
-		r1 = temp("{outpath}/{dset}/reads/{samp}_1.fq.gz"),
-		r2 = temp("{outpath}/{dset}/reads/{samp}_2.fq.gz"),
+		r1 = temp("{outpath}/{dset}/reads/{samp}_1.fq"),
+		r2 = temp("{outpath}/{dset}/reads/{samp}_2.fq"),
 	group: "extract_bam"
 	conda:
 		"../envs/bwa.yml"
