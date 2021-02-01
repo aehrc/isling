@@ -277,6 +277,11 @@ def check_sorted(row, curr, n_line, seen_host_chrs):
 	"""
 	check that position in host is the same as previous, or increasing
 	"""
+	
+	# check coordinates are valid
+	assert int(row['IntStart']) <= int(row['IntStop'])
+	assert int(row['VirusStart']) <= int(row['VirusStop'])
+	
 	# check sorting
 	# same chromosome as current
 	if row['Chr'] == curr['host_chr']:
@@ -343,10 +348,6 @@ def merge_row(clust, row):
 	return clust
 
 def prune_row(row):
-
-	# check coordinates are valid
-	assert row['IntStart'] <= row['IntStop']
-	assert row['VirusStart'] <= row['VirusStop']
 	
 	# remove extraneous information
 	tmp = {}
