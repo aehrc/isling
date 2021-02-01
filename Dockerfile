@@ -30,17 +30,21 @@ RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86
     /opt/conda/bin/conda update conda python>3 -y &&\
     /opt/conda/bin/conda clean --all -y 
 
-# include isling scripts, etc
-ADD scripts /opt/isling/scripts/
-ADD snakemake_rules /opt/isling/snakemake_rules
-ADD Snakefile /opt/isling/Snakefile
-
 # install conda stuff
+ADD scripts/consolidate_envs.py /opt/isling/scripts/
 ADD envs /opt/isling/envs/
 RUN /opt/conda/bin/conda install -n base -c anaconda pyyaml=5.3 -y &&\
 	python3 /opt/isling/scripts/consolidate_envs.py /opt/isling/envs/*yml /opt/isling/envs/isling.yml &&\
 	/opt/conda/bin/conda env update -n base -f /opt/isling/envs/isling.yml &&\
 	/opt/conda/bin/conda clean --all -y 	
 
+# include isling scripts, etc
+ADD scripts /opt/isling/scripts/
+ADD snakemake_rules /opt/isling/snakemake_rules
+ADD Snakefile /opt/isling/Snakefile
+
+# add test files
+ADD test /opt/isling/test
+ADD run_test.sh /opt/isling/
 
 WORKDIR /opt/isling
