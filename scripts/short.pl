@@ -325,9 +325,12 @@ sub analyseShort{
 	#number of ambiguous bases
 	#always calculate as right - left (relative to read)
 	## ie for $ambig1, orientation is host-virus, so right is virus and left is host
-	my $ambig1 = abs($vMatchStart - $hMatch1Stop) - 1; # 1-based
-	my $ambig2 = abs($hMatch2Start - $vMatchStop) - 1;
-	
+
+	my $ambig1 = abs($vMatchStart - $hMatch1Stop - 1); # 1-based
+	my $ambig2 = abs($hMatch2Start - $vMatchStop - 1);
+	print "viral match start: $vMatchStart, host match 1 stop: $hMatch1Stop, ambiguous bases: $ambig1\n";
+	print "host match 2 start: $hMatch2Start, viral match stop: $vMatchStop,  ambiguous bases: $ambig2\n";
+			
 	#number of inserted bases:
 	my $inserted = $hInsertStop - $hInsertStart + 1;
 

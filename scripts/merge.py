@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
 
-# merge integration sites in various ways:
+# merge integration sites:
 
-# --type exact: merge only sites with exactly the same coordinates in both host and virus
-# --type overlap: merge any sites with overlapping coordinates in both host and virus,  output the range of coordinates
-# --type distance: merge any sitest within specified of another site in both host and virus
-# if type is 'distance', must also specify -d <merge_distance>
 
-# if type is 'overlap' or 'distance', output coordinates is the range encompassing coordinates common to all ranges included in the cluster.  eg if a cluster consists of the host coordinates 0-1, 0-150 and 0-10, the output coordinates will be 0-1.
-# if there are no coordinates common to all included ranges, (STILL NEED TO SORT THIS OUT!!!)
+# output coordinates is the range encompassing coordinates common to all ranges included in the cluster.  
+# eg if a cluster consists of the host coordinates 0-1, 0-150 and 0-10, the output coordinates will be 0-1.
 
 # file must be coordinate-sorted in host coordinates
 # ie sort -k1,1 -k2,2n 
@@ -28,7 +24,7 @@ def main(args):
 	parser = argparse.ArgumentParser(description = "merge integration sites based on host and virus coordinates")
 	parser.add_argument('--input', '-i', help = 'input file (from postprocessing)', required=True)
 	parser.add_argument('--output', '-o', help = 'output file', default='merged.txt')
-	parser.add_argument('--distance', '-d', help = 'distance for merging', type=int, default = 0)
+	parser.add_argument('--distance', '-d', help = 'distance for merging', type=int, default = 100)
 	parser.add_argument('--min-n', '-n', help = 'minimum number of reads to retain a cluster', default=1, type=int)
 	args = parser.parse_args()
 	
@@ -61,7 +57,7 @@ def main(args):
 		clust = reset_clust(row)
 	
 		for row in reader:
-			
+
 			row = prune_row(row)
 
 			# check sorting
@@ -172,7 +168,6 @@ def split_clust(clust, i):
 			
 	return [clust1, clust2]
 
-
 def get_overlap(start1, stop1, start2, stop2):
 	"""
 	return the coordinates of the overlaped bases between two intervals.
@@ -222,8 +217,6 @@ def cluster_virus(clust, d):
 			clusts.append(reset_clust(row))
 			curr_clust += 1
 		
-			
-	
 	return clusts
 	
 def reset_curr(row):
@@ -265,8 +258,6 @@ def write_clusters(outcsv, clusts, clust_id, min_n):
 						clust_id, ",".join(clust['reads']))
 			outcsv.writerow(row)
 			clust_id += 1
-
-
 
 def check_overlap(row, clust, dist, ref):
 	"""
@@ -352,6 +343,11 @@ def merge_row(clust, row):
 	return clust
 
 def prune_row(row):
+
+	# check coordinates are valid
+	assert row['IntStart'] <= row['IntStop']
+	assert row['VirusStart'] <= row['VirusStop']
+	
 	# remove extraneous information
 	tmp = {}
 	for key in row:
