@@ -45,6 +45,6 @@ ADD Snakefile /opt/isling/Snakefile
 
 # add test files
 ADD test /opt/isling/test
-ADD run_test.sh /opt/isling/
+ADD run_tests.sh /opt/isling/
 
 WORKDIR /opt/isling
