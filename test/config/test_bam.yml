@@ -1,14 +1,14 @@
 snakedir: "."
 
 test_bam:
-  read_folder: "/home/hartkopff/scratch/lau_hbv/output/lau_hg38/virus_aligned"
+  read_folder: "test/bam"
   out_dir: "out/pipeline-test"
   bam_suffix: ".bam"
   read1-adapt: ""
   read2-adapt: ""
   mean-frag-len: "estimate"
-  merge: True
-  trim: True
+  merge: False
+  trim: False
   host_name: "host"
   host_fasta: "test/references/test_human.fa"
   virus_name: "rep68"
@@ -17,7 +17,7 @@ test_bam:
   clip-cutoff: 20
   min-mapq: 10
   cigar-tol: 3
-  split: 3
+  split: 10
   post:
     - filter
     - dedup
