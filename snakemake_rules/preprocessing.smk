@@ -28,7 +28,8 @@ def get_split(wildcards):
 
 rule split_fastq:
 	input:
-		reads = lambda wildcards: get_for_split(wildcards, wildcards.read_num)
+		reads = lambda wildcards: get_for_split(wildcards, wildcards.read_num),
+		splits = "{outpath}/{dset}/reads/{samp}_count.tmp"
 	output:
 		reads = "{outpath}/{dset}/split_reads/{samp}_{read_num}.{part}.fq"
 	params:
@@ -43,11 +44,18 @@ rule split_fastq:
 		if [[ {params.n_total} -eq 1 ]]
 		then
 			{params.cat} {input.reads} > {output.reads}
+		elif [ {params.line_spec} = "bam,bam" ]
+		then
+  			echo "Count is greater than 100"
+			part=$(({wildcards.part}+1))
+			lines=$(sed -n $part" p" {input.splits})
+			cmd="{params.cat} {input.reads} | sed -n  '"$lines" p' > {output.reads}"
+			eval $cmd
 		else
-			{params.cat} {input.reads} | sed -n '{params.line_spec} p' > {output.reads}
+			{params.cat} {input.reads} | sed -n '$lines p' > {output.reads}
 		fi
 		"""
-		
+
 
 # Input functions for if had a bam or fastq as input
 def get_for_split(wildcards, read_type):
@@ -90,6 +98,34 @@ def get_value_from_df(wildcards, column_name):
 	return toDo.loc[(toDo['unique'] == unique).idxmax(), column_name] 
 
 
+rule count_reads:
+	input: 
+		fastq = "{outpath}/{dset}/reads/{samp}_1.fq.gz"
+	output:
+		count_reads = "{outpath}/{dset}/reads/{samp}_count.tmp"
+	params: 
+		n_total =  lambda wildcards: get_value_from_df(wildcards, "split"),
+	group: "extract_bam"
+	conda:
+		"../envs/bwa.yml"
+	container:
+		"docker://szsctt/bwa:1"
+	shell:
+		"""
+		count=$(zcat -f {input} | wc -l)
+		split_n={params.n_total}
+		chunk_lines=$((count / split_n))
+		curr_start=1
+		while [ $curr_start -le $count ]
+		do
+			end=$(( 4 * ((curr_start-1)+chunk_lines) / 4))
+			mod=$((end % 4))
+			end=$((end + 4 - mod))
+			echo $curr_start','$end >> {output.count_reads}
+			curr_start=$((end + 1))
+		done
+		"""	
+
 rule check_bam_input_is_paired:
 	input: 
 		bam = lambda wildcards: get_value_from_df(wildcards, 'bam_file')
@@ -109,7 +145,7 @@ rule check_bam_input_is_paired:
 		fi
 		REV=$(samtools view -c -f 0x80 {input})
 		if [[ "$FWD" != "$REV" ]]; then
-			echo "Number of forward reads must match number of paired reads"
+			echo "Number of forward reads ($FWD) must match number of reverse reads ($REV)"
 			exit 1
 		fi
 		touch {output.ok}
