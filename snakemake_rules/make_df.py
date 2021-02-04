@@ -135,13 +135,14 @@ def make_df(config):
 		for sample, host, virus in itertools.product(samples,
 																									config[dataset]['host'].keys(), 
 																									config[dataset]['virus'].keys()):
-			print(is_bam)
 			if is_bam:
 				bam_file = f"{readdir}/{sample}{config[dataset]['bam_suffix']}"
 				R1_file = f"{outdir}/{dataset}/reads/{sample}{config[dataset]['R1_suffix']}"
 				R2_file = f"{outdir}/{dataset}/reads/{sample}{config[dataset]['R2_suffix']}"
-				print(R2_file)
-				split_lines = split_lines_bam(bam_file, split, cat)
+				if split == 1:
+					split_lines = ''
+				else:
+					split_lines = f'bam,bam'+f'xxxbam,bam'*(split-1)#split_lines_bam(bam_file, split, cat)
 			else:
 				bam_file = ""	
 				R1_file = f"{readdir}/{sample}{config[dataset]['R1_suffix']}"
@@ -431,6 +432,8 @@ def check_read_suffixes(config, dataset):
 
 	# if input is bam
 	elif "bam_suffix" in config[dataset]:
+		# check for which cat we should use
+		cat =  'zcat'
 		extension = config[dataset]["bam_suffix"]
 		if extension != ".bam" and extension != ".sam":
 			extension = path.splitext(config[dataset]["bam_suffix"])[1]
@@ -512,7 +515,7 @@ def split_lines_fastq(read_file_path, split_n, cat):
 	if cat == 'bzcat':
 		count = int(subprocess.check_output(['bzgrep', '-Ec', '$', read_file_path]).split()[0])
 	elif cat == 'zcat':
-		count = int(subprocess.check_output('zgrep', '-Ec', '$', read_file_path]).split()[0])
+		count = int(subprocess.check_output(['zgrep', '-Ec', '$', read_file_path]).split()[0])
 	else:
 		count = int(subprocess.check_output(['wc', '-l', read_file_path]).split()[0])	
 	print(f"Counted {count} lines in {read_file_path}")
@@ -531,32 +534,4 @@ def split_lines_fastq(read_file_path, split_n, cat):
 		
 	return "xxx".join(chunks)
 
-
-def split_lines_bam(bam_file_path, split_n, cat):
-	# in the trivial case, only one part
-	if split_n == 1:
-		return ''
-
-	# get number of lines in file
-	alignments = pybam.read(bam_file_path)
-	count = 0
-	for alignment in alignments:
-		count += 1
-
-	header_count = alignments.file_header.split('\n')
-	header_count = list(filter(None, header_count))
-
-	# we want to split the line into split_n chunks
-	# where each chunk starts on a line (1+4i)
-	# and each chunck ends on a line (4j)
-	# where i, j are integers
-	chunk_lines = count / split_n
-	chunks = []
-	curr_start = 1
-	while curr_start < count:
-		end = 4 * round((curr_start + chunk_lines) / 4)
-		chunks.append(f"{curr_start},{end}")
-		curr_start = end + 1
-	
-	return "xxx".join(chunks)
 
