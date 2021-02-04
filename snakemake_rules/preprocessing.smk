@@ -7,14 +7,14 @@ def get_split(wildcards):
 
 rule split_fastq:
 	input:
-		reads = lambda wildcards: get_for_split(wildcards, wildcards.read_num),
-		splits = "{outpath}/{dset}/reads/{samp}_count.tmp"
+		reads = lambda wildcards: get_for_split(wildcards, wildcards.read_num)
 	output:
 		reads = "{outpath}/{dset}/split_reads/{samp}_{read_num}.{part}.fq"
 	params:
 		n_total =  lambda wildcards: get_value_from_df(wildcards, "split"),
 		line_spec = lambda wildcards: get_value_from_df(wildcards, "split_lines").split("xxx")[int(wildcards.part)],
-		cat = lambda wildcards: get_value_from_df(wildcards, "cat")	
+		cat = lambda wildcards: get_value_from_df(wildcards, "cat"),
+		count_bam = "{outpath}/{dset}/reads/{samp}_count.tmp"	
 	wildcard_constraints:
 		read_num = "1|2",
 		part = "\d+"
@@ -27,11 +27,11 @@ rule split_fastq:
 		then
   			echo "Count is greater than 100"
 			part=$(({wildcards.part}+1))
-			lines=$(sed -n $part" p" {input.splits})
+			lines=$(sed -n $part" p" {params.count_bam})
 			cmd="{params.cat} {input.reads} | sed -n  '"$lines" p' > {output.reads}"
 			eval $cmd
 		else
-			{params.cat} {input.reads} | sed -n '$lines p' > {output.reads}
+			{params.cat} {input.reads} | sed -n '{params.line_spec} p' > {output.reads}
 		fi
 		"""
 
@@ -77,34 +77,6 @@ def get_value_from_df(wildcards, column_name):
 	return toDo.loc[(toDo['unique'] == unique).idxmax(), column_name] 
 
 
-rule count_reads:
-	input: 
-		fastq = "{outpath}/{dset}/reads/{samp}_1.fq.gz"
-	output:
-		count_reads = "{outpath}/{dset}/reads/{samp}_count.tmp"
-	params: 
-		n_total =  lambda wildcards: get_value_from_df(wildcards, "split"),
-	group: "extract_bam"
-	conda:
-		"../envs/bwa.yml"
-	container:
-		"docker://szsctt/bwa:1"
-	shell:
-		"""
-		count=$(zcat -f {input} | wc -l)
-		split_n={params.n_total}
-		chunk_lines=$((count / split_n))
-		curr_start=1
-		while [ $curr_start -le $count ]
-		do
-			end=$(( 4 * ((curr_start-1)+chunk_lines) / 4))
-			mod=$((end % 4))
-			end=$((end + 4 - mod))
-			echo $curr_start','$end >> {output.count_reads}
-			curr_start=$((end + 1))
-		done
-		"""	
-
 rule check_bam_input_is_paired:
 	input: 
 		bam = lambda wildcards: get_value_from_df(wildcards, 'bam_file')
@@ -137,11 +109,14 @@ rule bam_to_fastq:
 	output:
 		r1 = temp("{outpath}/{dset}/reads/{samp}_1.fq.gz"),
 		r2 = temp("{outpath}/{dset}/reads/{samp}_2.fq.gz"),
+		count_reads = "{outpath}/{dset}/reads/{samp}_count.tmp"
 	group: "extract_bam"
 	conda:
 		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
+	params: 
+		n_total =  lambda wildcards: get_value_from_df(wildcards, "split"),
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
 	shell:
@@ -149,6 +124,19 @@ rule bam_to_fastq:
 		samtools view -b -F '0x900' {input.bam} |\
 		samtools collate -O - |\
 		samtools fastq -1 {output.r1} -2 {output.r2} -0 /dev/null -
+
+		count=$(zcat -f {output.r1} | wc -l)
+		split_n={params.n_total}
+		chunk_lines=$((count / split_n))
+		curr_start=1
+		while [ $curr_start -le $count ]
+		do
+			end=$(( 4 * ((curr_start-1)+chunk_lines) / 4))
+			mod=$((end % 4))
+			end=$((end + 4 - mod))
+			echo $curr_start','$end >> {output.count_reads}
+			curr_start=$((end + 1))
+		done
 		"""
 
 rule seqPrep:
