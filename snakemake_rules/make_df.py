@@ -7,7 +7,6 @@ import itertools
 import pdb
 import os
 import subprocess
-import scripts.pybam3 as pybam
 
 
 #### defaults ####
@@ -180,7 +179,6 @@ def make_df(config):
 	ref_names = make_reference_dict(toDo)
 	check_fastas_unique(toDo, ref_names)
 
-	print(toDo)
 	return toDo
 
 
