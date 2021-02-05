@@ -138,15 +138,11 @@ def make_df(config):
 				bam_file = f"{readdir}/{sample}{config[dataset]['bam_suffix']}"
 				R1_file = f"{outdir}/{dataset}/reads/{sample}{config[dataset]['R1_suffix']}"
 				R2_file = f"{outdir}/{dataset}/reads/{sample}{config[dataset]['R2_suffix']}"
-				if split == 1:
-					split_lines = ''
-				else:
-					split_lines = f'bam,bam'+f'xxxbam,bam'*(split-1)#split_lines_bam(bam_file, split, cat)
+
 			else:
 				bam_file = ""	
 				R1_file = f"{readdir}/{sample}{config[dataset]['R1_suffix']}"
 				R2_file = f"{readdir}/{sample}{config[dataset]['R2_suffix']}"
-				split_lines = split_lines_fastq(R1_file, split, cat)
 			
 			# if there is more than one virus or host, append these to the dataset name
 			if len(config[dataset]['host'].keys()) > 1 or len(config[dataset]['virus'].keys()) > 1:
@@ -504,32 +500,6 @@ def get_samples(config, dataset):
 		return samples, is_bam
 
 
-def split_lines_fastq(read_file_path, split_n, cat):
-	# in the trivial case, only one part
-	if split_n == 1:
-		return ''
 
-	# get number of lines in file
-	if cat == 'bzcat':
-		count = int(subprocess.check_output(['bzgrep', '-Ec', '$', read_file_path]).split()[0])
-	elif cat == 'zcat':
-		count = int(subprocess.check_output(['zgrep', '-Ec', '$', read_file_path]).split()[0])
-	else:
-		count = int(subprocess.check_output(['wc', '-l', read_file_path]).split()[0])	
-	print(f"Counted {count} lines in {read_file_path}")
-
-	# we want to split the line into split_n chunks
-	# where each chunk starts on a line (1+4i)
-	# and each chunck ends on a line (4j)
-	# where i, j are integers
-	chunk_lines = count / split_n
-	chunks = []
-	curr_start = 1
-	while curr_start < count:
-		end = 4 * round((curr_start + chunk_lines) / 4)
-		chunks.append(f"{curr_start},{end}")
-		curr_start = end + 1
-		
-	return "xxx".join(chunks)
 
 
