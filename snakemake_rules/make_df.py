@@ -63,12 +63,6 @@ def make_df(config):
 		readdir = check_required(config, dataset, 'read_folder')
 		readdir = path.normpath(readdir)
 
-		# Create temporary symlink directory
-#		readdir = path.normpath(symlink_reads(readdir, os.path.join(outdir,"symreads"), config[dataset]['R1_suffix'], config[dataset]['R2_suffix']))
-#		config[dataset]['read_folder'] = readdir
-#		config[dataset]["R1_suffix"] = "_1.fq"
-#		config[dataset]["R2_suffix"] = "_2.fq"
-
 		# figure out if 'dedup', 'merge' and 'trim' are true or false for this dataset`
 		dedup = check_bools(config, dataset, 'dedup')
 		merge = check_bools(config, dataset, 'merge')
@@ -134,17 +128,15 @@ def make_df(config):
 		for sample, host, virus in itertools.product(samples,
 																									config[dataset]['host'].keys(), 
 																									config[dataset]['virus'].keys()):
-			
 			if is_bam:
 				bam_file = f"{readdir}/{sample}{config[dataset]['bam_suffix']}"
 				R1_file = f"{outdir}/{dataset}/reads/{sample}{config[dataset]['R1_suffix']}"
 				R2_file = f"{outdir}/{dataset}/reads/{sample}{config[dataset]['R2_suffix']}"
-				split_lines = '' #TODO
+
 			else:
 				bam_file = ""	
 				R1_file = f"{readdir}/{sample}{config[dataset]['R1_suffix']}"
 				R2_file = f"{readdir}/{sample}{config[dataset]['R2_suffix']}"
-				split_lines = split_lines_fastq(R1_file, split, cat)
 			
 			# if there is more than one virus or host, append these to the dataset name
 			if len(config[dataset]['host'].keys()) > 1 or len(config[dataset]['virus'].keys()) > 1:
@@ -161,7 +153,7 @@ def make_df(config):
 			virus_prefix = config[dataset]["virus_prefixes"][virus]	
 			
 			# append combinations of each sample, host and virus		
-			rows.append((dataset_name, dataset, sample, host, host_fasta, host_prefix, virus, virus_fasta, virus_prefix, merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, merge_n_min, clip_cutoff, cigar_tol, min_mapq, split, mean_frag_len, align_cpus, cat, split_lines))
+			rows.append((dataset_name, dataset, sample, host, host_fasta, host_prefix, virus, virus_fasta, virus_prefix, merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, merge_n_min, clip_cutoff, cigar_tol, min_mapq, split, mean_frag_len, align_cpus, cat))
 
 			
 	# check there aren't any duplicate rows
@@ -169,14 +161,13 @@ def make_df(config):
 		raise ValueError("Error - configfile results in duplicate analyses, check samples and dataset names are unique")
 	
 	# make dataframe
-	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq', 'split', 'mean_frag_len', 'align_cpus', 'cat', 'split_lines'])
+	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq', 'split', 'mean_frag_len', 'align_cpus', 'cat'])
 	
 	# do checks on dataframe
 	check_dataset_sample_unique(toDo)
 	
 	ref_names = make_reference_dict(toDo)
 	check_fastas_unique(toDo, ref_names)
-
 
 	return toDo
 
@@ -500,32 +491,4 @@ def get_samples(config, dataset):
 			
 		return samples, is_bam
 
-
-def split_lines_fastq(read_file_path, split_n, cat):
-	# in the trivial case, only one part
-	if split_n == 1:
-		return ''
-
-	# get number of lines in file
-	if cat == 'bzcat':
-		count = int(subprocess.check_output(['bzgrep', '-Ec', '$', read_file_path]).split()[0])
-	elif cat == 'zcat':
-		count = int(subprocess.check_output(['zgrep', '-Ec', '$', read_file_path]).split()[0])
-	else:
-		count = int(subprocess.check_output(['wc', '-l', read_file_path]).split()[0])	
-	print(f"Counted {count} lines in {read_file_path}")
-
-	# we want to split the line into split_n chunks
-	# where each chunk starts on a line (1+4i)
-	# and each chunck ends on a line (4j)
-	# where i, j are integers
-	chunk_lines = count / split_n
-	chunks = []
-	curr_start = 1
-	while curr_start < count:
-		end = 4 * round((curr_start + chunk_lines) / 4)
-		chunks.append(f"{curr_start},{end}")
-		curr_start = end + 1
-		
-	return "xxx".join(chunks)
 
