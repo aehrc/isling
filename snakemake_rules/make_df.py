@@ -63,12 +63,6 @@ def make_df(config):
 		readdir = check_required(config, dataset, 'read_folder')
 		readdir = path.normpath(readdir)
 
-		# Create temporary symlink directory
-#		readdir = path.normpath(symlink_reads(readdir, os.path.join(outdir,"symreads"), config[dataset]['R1_suffix'], config[dataset]['R2_suffix']))
-#		config[dataset]['read_folder'] = readdir
-#		config[dataset]["R1_suffix"] = "_1.fq"
-#		config[dataset]["R2_suffix"] = "_2.fq"
-
 		# figure out if 'dedup', 'merge' and 'trim' are true or false for this dataset`
 		dedup = check_bools(config, dataset, 'dedup')
 		merge = check_bools(config, dataset, 'merge')
@@ -498,8 +492,5 @@ def get_samples(config, dataset):
 			raise InputError(f"please specify either 'bam_suffix' or 'R1_suffix' and 'R2_suffix' for dataset {dataset}")
 			
 		return samples, is_bam
-
-
-
 
 

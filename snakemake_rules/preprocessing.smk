@@ -54,7 +54,6 @@ rule count_fastq:
 		done
 		"""
 
-
 # Input functions for if had a bam or fastq as input
 def get_for_split(wildcards, read_type):
 
@@ -72,19 +71,32 @@ def get_for_split(wildcards, read_type):
 		else:
 			return get_value_from_df(wildcards, 'R2_file')
 
+
+def get_input_reads(wildcards, read_type):
+
+	assert read_type in ("1", "2")
+	bam_suffix = get_value_from_df(wildcards, 'bam_file')
+
+	# pass either reads extracted from bam or 
+	if bam_suffix != "":
+		if read_type == "1":
+			return rules.bam_to_fastq.output.r1
+		else:
+			return rules.bam_to_fastq.output.r2
+	else:
+		if read_type == "1":
+			return get_value_from_df(wildcards, 'R1_file')
+		else:
+			return get_value_from_df(wildcards, 'R2_file')
+
+
 def resources_list_with_min_and_max(file_name_list, attempt, mult_factor=2, minimum = 100, maximum = 50000):
 	resource = int(sum([os.stat(file).st_size/1e6 for file in file_name_list])) * attempt * mult_factor
 	
 	resource = min(maximum, resource)
 	
 	return max(minimum, resource)
-
-
-rule write_analysis_summary:
-	output:
-		tsv = "{outpath}/summary/{dset}.analysis_conditions.tsv"
-	run:
-		toDo[toDo['dataset'] == wildcards.dset].to_csv(output.tsv, sep = "\t") 
+	
 
 def get_value_from_df(wildcards, column_name):
 	
@@ -95,6 +107,11 @@ def get_value_from_df(wildcards, column_name):
 		 
 	return toDo.loc[(toDo['unique'] == unique).idxmax(), column_name] 
 
+rule write_analysis_summary:
+	output:
+		tsv = "{outpath}/summary/{dset}.analysis_conditions.tsv"
+	run:
+		toDo[toDo['dataset'] == wildcards.dset].to_csv(output.tsv, sep = "\t") 
 
 rule check_bam_input_is_paired:
 	input: 
@@ -126,8 +143,8 @@ rule bam_to_fastq:
 		bam = lambda wildcards: get_value_from_df(wildcards, 'bam_file'),
 		ok = rules.check_bam_input_is_paired.output.ok
 	output:
-		r1 = temp("{outpath}/{dset}/reads/{samp}_1.fq.gz"),
-		r2 = temp("{outpath}/{dset}/reads/{samp}_2.fq.gz"),
+		r1 = temp("{outpath}/{dset}/reads/{samp}_1.fq"),
+		r2 = temp("{outpath}/{dset}/reads/{samp}_2.fq"),
 	group: "extract_bam"
 	conda:
 		"../envs/bwa.yml"
@@ -141,6 +158,49 @@ rule bam_to_fastq:
 		samtools collate -O - |\
 		samtools fastq -1 {output.r1} -2 {output.r2} -0 /dev/null -
 		"""
+
+
+#rule dedupe:
+#	input:
+#		r1 = get_input_reads(wildcards, "1"),
+#		r2 = get_input_reads(wildcards, "2")
+#	output:
+#		r1_dedup = "{outpath}/{dset}/dedup_reads/{samp}_1.fq",
+#		r2_dedup = "{outpath}/{dset}/dedup_reads/{samp}_2.fq"
+#	params:
+#		n_subs = get_value_from_df(wildcards, "dedup_subs")
+#	threads: cpus
+#	conda:	
+#		"../envs/bbmap.yml"
+#	container:
+#		"docker://szsctt/bbmap:1"	
+#	shell:
+#		"""
+#		dedupe.sh in1={input.r1} in2={input.r2} out1={output.r1_dedup} out2={output.r2_dedup} ac=f s={n_subs}{threads}
+#		"""
+
+rule split_fastq:
+	input:
+		reads = lambda wildcards: get_for_split(wildcards, wildcards.read_num)
+	output:
+		reads = "{outpath}/{dset}/split_reads/{samp}_{read_num}.{part}.fq"
+	params:
+		n_total =  lambda wildcards: get_value_from_df(wildcards, "split"),
+		line_spec = lambda wildcards: get_value_from_df(wildcards, "split_lines").split("xxx")[int(wildcards.part)],
+		cat = lambda wildcards: get_value_from_df(wildcards, "cat")	
+	wildcard_constraints:
+		read_num = "1|2",
+		part = "\d+"
+	shell:
+		"""
+		if [[ {params.n_total} -eq 1 ]]
+		then
+			{params.cat} {input.reads} > {output.reads}
+		else
+			{params.cat} {input.reads} | sed -n '{params.line_spec} p' > {output.reads}
+		fi
+		"""
+
 
 rule seqPrep:
 # if we're doing it
