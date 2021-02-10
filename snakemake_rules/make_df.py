@@ -420,8 +420,6 @@ def check_read_suffixes(config, dataset):
 
 	# if input is bam
 	elif "bam_suffix" in config[dataset]:
-		# check for which cat we should use
-		cat =  'zcat'
 		extension = config[dataset]["bam_suffix"]
 		if extension != ".bam" and extension != ".sam":
 			extension = path.splitext(config[dataset]["bam_suffix"])[1]

@@ -179,28 +179,6 @@ rule bam_to_fastq:
 #		dedupe.sh in1={input.r1} in2={input.r2} out1={output.r1_dedup} out2={output.r2_dedup} ac=f s={n_subs}{threads}
 #		"""
 
-rule split_fastq:
-	input:
-		reads = lambda wildcards: get_for_split(wildcards, wildcards.read_num)
-	output:
-		reads = "{outpath}/{dset}/split_reads/{samp}_{read_num}.{part}.fq"
-	params:
-		n_total =  lambda wildcards: get_value_from_df(wildcards, "split"),
-		line_spec = lambda wildcards: get_value_from_df(wildcards, "split_lines").split("xxx")[int(wildcards.part)],
-		cat = lambda wildcards: get_value_from_df(wildcards, "cat")	
-	wildcard_constraints:
-		read_num = "1|2",
-		part = "\d+"
-	shell:
-		"""
-		if [[ {params.n_total} -eq 1 ]]
-		then
-			{params.cat} {input.reads} > {output.reads}
-		else
-			{params.cat} {input.reads} | sed -n '{params.line_spec} p' > {output.reads}
-		fi
-		"""
-
 
 rule seqPrep:
 # if we're doing it
