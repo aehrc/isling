@@ -76,6 +76,21 @@ def get_for_split(wildcards, read_type):
 def get_split(wildcards):
 	n_parts =  get_value_from_df(wildcards, "split")
 	return range(int(n_parts))
+	
+# which cat to use in split rule
+def get_cat(wildcards):
+	dedup = bool(get_value_from_df(wildcards, 'dedup'))
+	bam_suffix = get_value_from_df(wildcards, 'bam_file')
+	
+	# if we did de-duplication, reads will always be uncompressed
+	if dedup:
+		return 'cat'
+	# same if we extracted reads from bam file
+	elif bam_suffix != "":
+		return 'cat'
+	# otherwise, use original compression for input reads
+	else:
+		return get_value_from_df(wildcards, "cat")
 
 rule write_analysis_summary:
 	output:
@@ -158,7 +173,7 @@ rule count_fastq:
 		count_reads = "{outpath}/{dset}/reads/{samp}_count.tmp"	
 	params:
 		n_total =  lambda wildcards: get_value_from_df(wildcards, "split"),
-		cat = lambda wildcards: get_value_from_df(wildcards, "cat"),
+		cat = lambda wildcards: get_cat(wildcards),
 	shell:
 		"""
 		count=$({params.cat} {input.reads} | wc -l)
