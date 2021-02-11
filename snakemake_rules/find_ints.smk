@@ -11,7 +11,7 @@ rule run_soft:
 		tol = lambda wildcards: f"--tol {int(get_value_from_df(wildcards, 'cigar_tol'))}",
 		min_mapq = lambda wildcards: f"--min-mapq {int(get_value_from_df(wildcards, 'min_mapq'))}",
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.host, input.virus), attempt)
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max((input.host, input.virus), attempt, 1.5))
 	container:
 		"docker://ubuntu:18.04"	
 	shell:
@@ -31,7 +31,7 @@ rule run_short:
 		tol = lambda wildcards: f"--tol {int(get_value_from_df(wildcards, 'cigar_tol'))}",
 		min_mapq = lambda wildcards: f"--min-mapq {int(get_value_from_df(wildcards, 'min_mapq'))}",
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.host, input.virus), attempt)
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max((input.host, input.virus), attempt, 1.5))
 	container:
 		"docker://ubuntu:18.04"
 	shell:
@@ -52,7 +52,7 @@ rule run_discordant:
 		min_mapq = lambda wildcards: f"--min-mapq {int(get_value_from_df(wildcards, 'min_mapq'))}",
 		tlen = lambda wildcards: f"--tlen {get_value_from_df(wildcards, 'mean_frag_len')}"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.host, input.virus), attempt)
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max((input.host, input.virus), attempt, 1.5))
 	container:
 		"docker://ubuntu:18.04"
 	shell:
