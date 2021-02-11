@@ -325,10 +325,12 @@ sub analyseShort{
 	#number of ambiguous bases
 	#always calculate as right - left (relative to read)
 	## ie for $ambig1, orientation is host-virus, so right is virus and left is host
-	
-	my $ambig1 = abs($hMatch1Stop - $vMatchStart) + 1; # 1-based
-	my $ambig2 = abs($hMatch2Start - $vMatchStop) + 1;
-	
+
+	my $ambig1 = abs($vMatchStart - $hMatch1Stop - 1); # 1-based
+	my $ambig2 = abs($hMatch2Start - $vMatchStop - 1);
+	print "viral match start: $vMatchStart, host match 1 stop: $hMatch1Stop, ambiguous bases: $ambig1\n";
+	print "host match 2 start: $hMatch2Start, viral match stop: $vMatchStop,  ambiguous bases: $ambig2\n";
+			
 	#number of inserted bases:
 	my $inserted = $hInsertStop - $hInsertStart + 1;
 
@@ -367,20 +369,16 @@ sub analyseShort{
 	#don't give the coordinates of the gapped bases because they don't align to the host, and therefore their genomic coordinates are not defined
 	
 	##host coordinates
-	if ($overlap1 eq 'overlap') { ($hg1Start, $hg1Stop) = ($hgMatch1Stop - 1, $hgMatch1Stop + $ambig1); }
-	else 						{ ($hg1Start, $hg1Stop) = ($hgMatch1Stop - 1, $hgMatch1Stop); }
-	#for second matched region, one or more deletions/matched regions in the middle of the read will mean that the coordinates 
-	#aren't right next to first site
-	#but still use second matched region
-	if ($overlap2 eq 'overlap') { ($hg2Start, $hg2Stop) = ($hgMatch2Start - $ambig2, $hgMatch2Start + 1); }
-	else 						{ ($hg2Start, $hg2Stop) = ($hgMatch2Start, $hgMatch2Start + 1); }		
+	($hg1Start, $hg1Stop) = getAmbigCoords($hgMatch1Stop, $ambig1, $overlap1);
+	($hg2Start, $hg2Stop) = getAmbigCoords($hgMatch2Start, $ambig2, $overlap2);
+
 
 	## viral coordinates
-	my ($vgMatchStart, $vgMatchStop) = getGenomicCoords($vMatchStart, $vMatchStop, $vPos, $vDir, $vCig); #this assumes a single matched region, so could be problematic if there are more than one
-	if ($overlap1 eq 'overlap') { ($vg1Start, $vg1Stop) = ($vgMatchStart - $ambig1, $vgMatchStart  + 1); }
-	else 						{ ($vg1Start, $vg1Stop) = ($vgMatchStart, $vgMatchStart + 1); }
-	if ($overlap2 eq 'overlap') { ($vg2Start, $vg2Stop) = ($vgMatchStop - 1, $vgMatchStop + $ambig2); }
-	else 						{ ($vg2Start, $vg2Stop) = ($vgMatchStop - 1, $vgMatchStop); }
+	my ($vgMatchStart, $vgMatchStop) = getGenomicCoords($vMatchStart, $vMatchStop, $vPos, $vDir, $vCig); 	
+	
+	#this assumes a single matched region, so could be problematic if there are more than one
+	($vg1Start, $vg1Stop) = getAmbigCoords($vgMatchStart, $ambig1, $overlap1);
+	($vg2Start, $vg2Stop) = getAmbigCoords($vgMatchStop, $ambig2, $overlap2);
 	
 	#calculate total edit distance
 	my $totalNM1 = $vNM + $hNM;
@@ -459,6 +457,33 @@ sub analyseShort{
 	my $int2Data = join("\t", $hRef, $hg2Start, $hg2Stop, $vRef, $vg2Start, $vg2Stop, $ambig2, $overlap2, 'vh', $hostSeq2, $viralSeq, $ambigSeq2, $hNM, $vNM, $totalNM2, $hRe, $vRe, $hAmbig, $vAmbig, 'short', $ID, $seq);
 	
 	return ($int1Data, $int2Data);
+}
+
+sub getAmbigCoords {
+	# get the genomic coordinates of the ambiguous bases for output
+	
+	my ($gCoord, $ambigLen, $overlap) = @_;
+	
+	my ($start, $stop);
+	
+	if ($overlap eq 'overlap') {
+		$start = $gCoord - $ambigLen;
+		$stop = $gCoord;
+	}
+	elsif ($overlap eq 'gap') {
+		$start = $gCoord;
+		$stop = $gCoord + $ambigLen;
+	}
+	elsif ($overlap eq 'none') {
+		$start = $gCoord;
+		$stop = $gCoord;
+	}
+	else {
+		die "invalid value for $overlap: must be 'gap', 'overlap' or 'none'"
+	}
+
+	return ($start, $stop);
+	
 }
 
 sub getInserted {

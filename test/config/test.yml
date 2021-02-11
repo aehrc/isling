@@ -3,26 +3,30 @@ snakedir: "."
 global:
   read_folder: "test/reads/"
   out_dir: "out/pipeline-test"
-  R1_suffix: "1.fq"
-  R2_suffix: "2.fq"
+  R1_suffix: "_001.fastq"
+  R2_suffix: "_002.fastq"
   read1-adapt: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
   read2-adapt: "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
   mean-frag-len: "estimate"
   merge: True
   trim: True
+  dedup: True
   host_name: "host"
   host_fasta: "test/references/test_human.fa"
   virus_name: "rep68"
   virus_fasta: "test/references/test_AAV.fa"
-  dedup: False
   clip-cutoff: 20
   min-mapq: 10
   cigar-tol: 3
+  split: 3
   post:
     - filter
     - dedup
   merge-dist: 0
-  min-n-merge: 1
+  merge-n-min: 1
+  bwa-mem: "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+  align-cpus: 1
+  dedup-subs: 2
 
 test-merge:
   merge-dist: 100
@@ -31,8 +35,12 @@ test-merge:
 test-trim:
   merge: False
   trim: True
+  dedup: True
 
+  
 test-none:
   merge: False
   trim: False
+  dedup: False
+  split: 1
 
