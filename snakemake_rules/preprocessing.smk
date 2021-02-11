@@ -160,7 +160,7 @@ rule dedupe:
 	container:
 		"docker://szsctt/bbmap:1"	
 	resources:
-		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
+		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 8)
 	shell:
 		"""
 		clumpify.sh -Xmx{params.mem_mb}m in1={input.r1} in2={input.r2} out1={output.r1_dedup} out2={output.r2_dedup} dedupe=t ac=f subs={params.n_subs}{threads}
@@ -198,7 +198,7 @@ rule split_fastq:
 		reads = "{outpath}/{dset}/split_reads/{samp}_{read_num}.{part}.fq",
 	params:
 		n_total =  lambda wildcards: get_value_from_df(wildcards, "split"),
-		cat = lambda wildcards: get_value_from_df(wildcards, "cat"),
+		cat = lambda wildcards: get_cat(wildcards),
 	wildcard_constraints:
 		read_num = "1|2",
 		part = "\d+"
