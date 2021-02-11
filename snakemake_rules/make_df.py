@@ -19,6 +19,7 @@ merge_n_min_default = 1
 split_default = 1
 mean_frag_len_default = 'estimate'
 align_cpus_default = 5
+dedup_subs_default = 2
 
 #### check file extensions ####
 
@@ -101,6 +102,7 @@ def make_df(config):
 		merge_n_min = get_value_or_default(config, dataset, 'merge-n-min', merge_n_min_default)
 		split = get_value_or_default(config, dataset, 'split', split_default)
 		align_cpus = get_value_or_default(config, dataset, 'align-cpus', align_cpus_default)
+		dedup_subs = get_value_or_default(config, dataset, 'dedup-subs', dedup_subs_default)
 		
 		# check values are integers greater than a minimum value
 		check_int_gt(merge_dist, -1, 'merge-dist', dataset)
@@ -153,7 +155,7 @@ def make_df(config):
 			virus_prefix = config[dataset]["virus_prefixes"][virus]	
 			
 			# append combinations of each sample, host and virus		
-			rows.append((dataset_name, dataset, sample, host, host_fasta, host_prefix, virus, virus_fasta, virus_prefix, merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, merge_n_min, clip_cutoff, cigar_tol, min_mapq, split, mean_frag_len, align_cpus, cat))
+			rows.append((dataset_name, dataset, sample, host, host_fasta, host_prefix, virus, virus_fasta, virus_prefix, merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, merge_n_min, clip_cutoff, cigar_tol, min_mapq, split, mean_frag_len, align_cpus, cat, dedup_subs))
 
 			
 	# check there aren't any duplicate rows
@@ -161,7 +163,7 @@ def make_df(config):
 		raise ValueError("Error - configfile results in duplicate analyses, check samples and dataset names are unique")
 	
 	# make dataframe
-	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq', 'split', 'mean_frag_len', 'align_cpus', 'cat'])
+	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq', 'split', 'mean_frag_len', 'align_cpus', 'cat', 'dedup_subs'])
 	
 	# do checks on dataframe
 	check_dataset_sample_unique(toDo)

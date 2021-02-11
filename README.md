@@ -45,17 +45,18 @@ dataset_name:
   	- "sample2"
   R1_suffix: "_L001_R1.fastq.gz"
   R2_suffix: "_L001_R2.fastq.gz"
-  split: 1
+  split: 2
   read1-adapt: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
   read2-adapt: "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
   mean-frag-len: "estimate"
+  dedup: True
+  dedup-subs: 2
   merge: True
   trim: True
   host_name: "macFas5"
   host_fasta: "/path/to/refs/macFas5.fa"
   virus_name: "pAAV2-OTC_flop"
   virus_fasta: "/path/to/refs/pAAV2-OTC.fa"
-  dedup: False
   clip-cutoff: 20
   min-mapq: 10
   cigar-tol: 3
@@ -67,6 +68,7 @@ dataset_name:
     - nearest-gtf:
       - "/path/to/genes.gtf"
  merge-dist: 100
+ min-n-merge: 1
 ```
 
 #### Dataset name
@@ -105,7 +107,7 @@ Specify a name and one of either sequence (`fasta` format) or `bwa` index prefix
 
 #### De-duplication
 
-The key `dedup` indicates whether duplicate reads should be removed from the alignments before identifying integrations using [picard MarkDuplicates](https://gatk.broadinstitute.org/hc/en-us/articles/360036366192-MarkDuplicates-Picard-).  Note that only reads where both members of the pair are duplicates will be removed.
+The key `dedup` indicates whether duplicate reads should be removed from the reads before merging, trimming and alignment using  [bbmap Clumpify](https://jgi.doe.gov/data-and-tools/bbtools/bb-tools-user-guide/clumpify-guide/).  Sequence-based duplicate removal is necessary since separate alignments are performed to the host and virus, and removing duplicates from these alignments can result in missing reads, since a read pair may appear to be a duplicate in one alignment (and hence would be removed), but may not be a duplicate in the other alignment.  Note that only reads where both members of the pair are duplicates will be removed.  Use the parameter `dedup-subs` to set the number of substitutions allowed for reads to be considered duplicates.  Since this step is memory-intensive, it is not recommended for large datasets.
 
 #### Options for integration detection (`clip-cutoff`, `min-mapq`, `cigar-tol`)
 

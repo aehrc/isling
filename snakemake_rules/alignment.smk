@@ -1,6 +1,4 @@
-import functools
 
-cpus = functools.partial(get_value_from_df, column_name='align_cpus')
 
 #functions for if we did seqPrep or not
 def get_for_align(wildcards, read_type):
@@ -9,6 +7,7 @@ def get_for_align(wildcards, read_type):
 
 	merge = bool(get_value_from_df(wildcards, 'merge'))
 	trim = bool(get_value_from_df(wildcards, 'trim'))
+	dedup = bool(get_value_from_df(wildcards, 'dedup'))
 	
 	# did we merge R1 and R2?
 	if merge is True:
@@ -26,7 +25,15 @@ def get_for_align(wildcards, read_type):
 			return rules.seqPrep_unmerged.output.proc_r2
 		else:
 			return rules.touch_merged.output.merged
-	# if we didn't do either
+	# if we did de-duplication, but didn't trim or merge
+	elif dedup is True:
+		if read_type == 'unmerged_r1':
+			return rules.dedupe.output.r1_dedup
+		if read_type == 'unmerged_r2':
+			return rules.dedupe.output.r2_dedup
+		else:
+			return rules.touch_merged.output.merged
+	# if we didn't do any of these
 	else:
 		if read_type == 'unmerged_r1':
 			return "{outpath}/{dset}/split_reads/{samp}_1.{part}.fq"
@@ -37,7 +44,6 @@ def get_for_align(wildcards, read_type):
 
 
 #### alignments ####
-
 rule index:
 	input:
 		fa = lambda wildcards: ref_names[wildcards.genome]
@@ -86,88 +92,29 @@ rule align_bwa_virus:
 		samtools merge {output.combined} {output.single} {output.paired}
 		"""
 
-rule merge_virus_sams:
-	message: "Merging virus sam files to one single sam file."
-	input:
-		lambda wildcards: expand("{{outpath}}/{{dset}}/virus_aligned/{{samp}}.{parts}.{{virus}}.sam", parts = get_split(wildcards))
-	output:
-		temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.sam")
-	conda:
-		"../envs/bwa.yml"
-	container:
-		"docker://szsctt/bwa:1"
-	threads: 1
-	shell:
-		"""
-		samtools merge {output} {input}
-		"""
-
-rule merge_host_sams:
-	message: "Merging host sam files to one single sam file."
-	input:
-		lambda wildcards: expand("{{outpath}}/{{dset}}/host_aligned/{{samp}}.{parts}.{{host}}.readsFrom{{virus}}.bwaSingle.sam", parts = get_split(wildcards))
-	output:
-		temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam")
-	conda:
-		"../envs/bwa.yml"
-	container:
-		"docker://szsctt/bwa:1"
-	threads: 1
-	shell:
-		"""
-		samtools merge {output} {input}
-		"""
-
 def get_sam(wildcards, readType, genome):
-
-	#pdb.set_trace()
 	
 	assert readType in ['single', 'paired', 'combined']
 	assert genome in ['host', 'virus']
 
 	merge = bool(get_value_from_df(wildcards, 'merge'))
-	dedup = bool(get_value_from_df(wildcards, 'dedup'))
 	
 	# if we want host alignment
 	if genome == "virus":
-		# if we're doing deduplication
-		if dedup is True:
-			# if we want single reads
-			if readType == "single":
-				return os.path.splitext(rules.align_bwa_virus.output.single)[0] + ".rmdup.sam"
-			# if we want paired reads
-			elif readType == 'paired':
-				return os.path.splitext(rules.align_bwa_virus.output.paired)[0] + ".rmdup.sam"
-			# if we want combined reads
-			else:
-				return os.path.splitext(rules.align_bwa_virus.output.combined)[0] + ".rmdup.sam"
-		# if we're not doing deduplication
+		if readType == "single":
+			return rules.align_bwa_virus.output.single
+		elif readType == "paired":
+			return rules.align_bwa_virus.output.paired
 		else:
-			if readType == "single":
-				return rules.align_bwa_virus.output.single
-			elif readType == "paired":
-				return rules.align_bwa_virus.output.paired
-			else:
-				return rules.align_bwa_virus.output.combined
+			return rules.align_bwa_virus.output.combined
 	# if we want the host alignment
 	else:
-		# if we're doing deduplication
-		if dedup is True:
-			# if we want single reads
-			if readType == "single":
-				return os.path.splitext(rules.align_bwa_host_single.output.sam)[0] + ".rmdup.sam"
-			elif readType == "paired":
-				return os.path.splitext(rules.align_bwa_host_paired.output.sam)[0] + ".rmdup.sam"
-			else:
-				return os.path.splitext(rules.combine_host.output.combined)[0] + ".rmdup.sam"
-		# if we're not doing deduplication
+		if readType == "single":
+			return rules.align_bwa_host_single.output.sam
+		elif readType == "paired":
+			return rules.align_bwa_host_paired.output.sam
 		else:
-			if readType == "single":
-				return rules.align_bwa_host_single.output.sam
-			elif readType == "paired":
-				return rules.align_bwa_host_paired.output.sam
-			else:
-				return rules.combine_host.output.combined
+			return rules.combine_host.output.combined
 		
 rule extract_to_fastq_single:
 	input:
@@ -291,6 +238,37 @@ rule combine_host:
 	
 
 #### sam file manipulations ####
+rule merge_virus_sams:
+	message: "Merging virus sam files to one single sam file."
+	input:
+		lambda wildcards: expand("{{outpath}}/{{dset}}/virus_aligned/{{samp}}.{parts}.{{virus}}.sam", parts = get_split(wildcards))
+	output:
+		temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.sam")
+	conda:
+		"../envs/bwa.yml"
+	container:
+		"docker://szsctt/bwa:1"
+	threads: 1
+	shell:
+		"""
+		samtools merge {output} {input}
+		"""
+
+rule merge_host_sams:
+	message: "Merging host sam files to one single sam file."
+	input:
+		lambda wildcards: expand("{{outpath}}/{{dset}}/host_aligned/{{samp}}.{parts}.{{host}}.readsFrom{{virus}}.bwaSingle.sam", parts = get_split(wildcards))
+	output:
+		temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam")
+	conda:
+		"../envs/bwa.yml"
+	container:
+		"docker://szsctt/bwa:1"
+	threads: 1
+	shell:
+		"""
+		samtools merge {output} {input}
+		"""
 
 rule convert_virus_sam_to_bam:
 	input:
@@ -325,44 +303,4 @@ rule convert_host_sam_to_bam:
 		samtools sort -o {output.bam} {input.sam}
 		samtools index {output.bam}
 		"""
-
-rule markdup:
-	input:
-		sam = "{outpath}/{dset}/{folder}/{alignment}.sam"
-	output:
-		fixmate = temp("{outpath}/{dset}/{folder}/{alignment}.fixmate.bam"),
-		markdup = temp("{outpath}/{dset}/{folder}/{alignment}.dups.sam"),
-		metrics = temp("{outpath}/{dset}/{folder}/{alignment}.dups.txt")
-	wildcard_constraints:
-		folder = "host_aligned|virus_aligned"
-	resources:
-		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max((input.sam,), attempt, 0.5, 2000, 10000))
-	conda: 
-		"../envs/picard.yml"	
-	container:
-		"docker://szsctt/picard:1"
-	shell:
-		"""
-		picard FixMateInformation I={input.sam} O={output.fixmate} ADD_MATE_CIGAR=true SORT_ORDER=queryname
-		picard MarkDuplicates I={output.fixmate} O={output.markdup} METRICS_FILE={output.metrics}
-		"""
-
-rule rmdup:
-	input:
-		sam = "{outpath}/{dset}/{folder}/{alignment}.dups.sam"	
-	output:
-		sam = temp("{outpath}/{dset}/{folder}/{alignment}.rmdup.sam")	
-	wildcard_constraints:
-		folder = "host_aligned|virus_aligned"
-	conda: 
-		"../envs/bwa.yml"	
-	container:
-		"docker://szsctt/bwa:1"
-	resources:
-		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max((input.sam,), attempt, 0.5, 2000, 10000))
-	shell:
-		"""
-		samtools view -h -F 1024 {input.sam} > {output.sam}
-		"""
-
 
