@@ -155,7 +155,7 @@ def make_df(config):
 			virus_prefix = config[dataset]["virus_prefixes"][virus]	
 			
 			# append combinations of each sample, host and virus		
-			rows.append((dataset_name, dataset, sample, host, host_fasta, host_prefix, virus, virus_fasta, virus_prefix, merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, merge_n_min, clip_cutoff, cigar_tol, min_mapq, split, mean_frag_len, align_cpus, cat))
+			rows.append((dataset_name, dataset, sample, host, host_fasta, host_prefix, virus, virus_fasta, virus_prefix, merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, merge_n_min, clip_cutoff, cigar_tol, min_mapq, split, mean_frag_len, align_cpus, cat, dedup_subs))
 
 			
 	# check there aren't any duplicate rows

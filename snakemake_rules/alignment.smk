@@ -1,6 +1,4 @@
-import functools
 
-cpus = functools.partial(get_value_from_df, column_name='align_cpus')
 
 #functions for if we did seqPrep or not
 def get_for_align(wildcards, read_type):

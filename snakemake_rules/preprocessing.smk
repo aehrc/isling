@@ -10,6 +10,10 @@
 #		if trim and merge, or just merge specified then rule SeqPrep
 #		if neither specified, then neither rule is performed
 
+import functools
+
+
+
 # fuction to get mem_mb based on size of input files
 def resources_list_with_min_and_max(file_name_list, attempt, mult_factor=2, minimum = 100, maximum = 50000):
 	resource = int(sum([os.stat(file).st_size/1e6 for file in file_name_list])) * attempt * mult_factor
@@ -27,6 +31,9 @@ def get_value_from_df(wildcards, column_name):
 		return int(toDo.loc[(toDo['unique'] == unique).idxmax(), column_name])
 		 
 	return toDo.loc[(toDo['unique'] == unique).idxmax(), column_name] 
+	
+# number of cpus to use
+cpus = functools.partial(get_value_from_df, column_name='align_cpus')
 		
 #get input fastq files depending on bam or fastq input
 def get_input_reads(wildcards, read_type):
@@ -124,23 +131,24 @@ rule bam_to_fastq:
 		
 rule dedupe:
 	input:
-		r1 = get_input_reads(wildcards, "1"),
-		r2 = get_input_reads(wildcards, "2")
+		r1 = lambda wildcards: get_input_reads(wildcards, "1"),
+		r2 = lambda wildcards: get_input_reads(wildcards, "2")
 	output:
 		r1_dedup = "{outpath}/{dset}/dedup_reads/{samp}_1.fq",
 		r2_dedup = "{outpath}/{dset}/dedup_reads/{samp}_2.fq"
 	params:
-		n_subs = get_value_from_df(wildcards, "dedup_subs")
+		n_subs = lambda wildcards: get_value_from_df(wildcards, "dedup_subs"),
+		mem_mb = lambda wildcards, resources: int(resources.mem_mb * 0.8)
 	threads: cpus
 	conda:	
 		"../envs/bbmap.yml"
 	container:
 		"docker://szsctt/bbmap:1"	
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
+		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
 	shell:
 		"""
-		dedupe.sh in1={input.r1} in2={input.r2} out1={output.r1_dedup} out2={output.r2_dedup} ac=f s={n_subs}{threads}
+		clumpify.sh -Xmx{params.mem_mb}m in1={input.r1} in2={input.r2} out1={output.r1_dedup} out2={output.r2_dedup} dedupe=t ac=f subs={params.n_subs}{threads}
 		"""
 
 rule count_fastq:
