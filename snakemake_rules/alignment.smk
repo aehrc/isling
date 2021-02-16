@@ -246,6 +246,8 @@ rule merge_virus_sams:
 		temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.sam")
 	conda:
 		"../envs/bwa.yml"
+	resources:
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
 	container:
 		"docker://szsctt/bwa:1"
 	threads: 1
@@ -262,6 +264,8 @@ rule merge_host_sams:
 		temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam")
 	conda:
 		"../envs/bwa.yml"
+	resources:
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
 	container:
 		"docker://szsctt/bwa:1"
 	threads: 1
@@ -280,8 +284,8 @@ rule convert_virus_sam_to_bam:
 		"../envs/bwa.yml"	
 	container:
 		"docker://szsctt/bwa:1"
-#	resources: # removed due to error in splitFASTQ-feature
-#		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.sam,), attempt, 2, 1000, 10000)
+	resources:
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
 	shell:
 		"""
 		samtools sort -o {output.bam} {input.sam}
@@ -298,6 +302,8 @@ rule convert_host_sam_to_bam:
 		"../envs/bwa.yml"	
 	container:
 		"docker://szsctt/bwa:1"
+	resources:
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
 	shell:
 		"""
 		samtools sort -o {output.bam} {input.sam}

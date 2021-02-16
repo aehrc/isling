@@ -48,7 +48,7 @@ rule post:
 	container:
 		"docker://szsctt/rscripts:4"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 2000)
 	params:
 		lambda wildcards: get_value_from_df(wildcards, 'postargs')
 	threads: 1
@@ -74,7 +74,7 @@ rule summarise:
 	params:
 		outdir = lambda wildcards, output: path.dirname(output[0])
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000)
 	threads: 1
 	shell:
 		"Rscript scripts/summarise_ints.R {input} {params.outdir}"
@@ -96,7 +96,7 @@ rule ucsc_bed:
 	container:
 		"docker://szsctt/rscripts:4"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000)
 	threads: 1
 	shell:
 		"""
@@ -119,7 +119,7 @@ rule merged_bed:
 	container:
 		"docker://szsctt/bedtools:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000)
 	threads: 1
 	shell:
 		"""
