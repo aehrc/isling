@@ -176,6 +176,7 @@ rule count_fastq:
 		cat = lambda wildcards: get_cat(wildcards),
 	shell:
 		"""
+		rm -f {output.count_reads}
 		count=$({params.cat} {input.reads} | wc -l)
 		split_n={params.n_total}
 		chunk_lines=$((count / split_n))
