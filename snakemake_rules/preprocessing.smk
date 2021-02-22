@@ -36,7 +36,7 @@ def get_value_from_df(wildcards, column_name):
 cpus = functools.partial(get_value_from_df, column_name='align_cpus')
 		
 #get input fastq files depending on bam or fastq input
-def get_input_reads(wildcards, read_type):
+def get_reads_input(wildcards, read_type):
 
 	assert read_type in ("1", "2")
 	bam_suffix = get_value_from_df(wildcards, 'bam_file')
@@ -70,7 +70,7 @@ def get_for_split(wildcards, read_type):
 	
 	# if no de-duplication, get input fastq files or reads extracted from bam
 	else:
-		return get_input_reads(wildcards, read_type)
+		return get_reads_input(wildcards, read_type)
 
 # Get list of split values for sample
 def get_split(wildcards):
@@ -146,8 +146,8 @@ rule bam_to_fastq:
 		
 rule dedupe:
 	input:
-		r1 = lambda wildcards: get_input_reads(wildcards, "1"),
-		r2 = lambda wildcards: get_input_reads(wildcards, "2")
+		r1 = lambda wildcards: get_reads_input(wildcards, "1"),
+		r2 = lambda wildcards: get_reads_input(wildcards, "2")
 	output:
 		r1_dedup = "{outpath}/{dset}/dedup_reads/{samp}_1.fq",
 		r2_dedup = "{outpath}/{dset}/dedup_reads/{samp}_2.fq"
