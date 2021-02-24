@@ -22,7 +22,6 @@ my $output = "integrationSites.txt";
 my $bed;
 my $merged;
 my $verbose;
-my $min_mapq = 0;
 my $help;
 
 our $warn_flag = 0;
@@ -38,7 +37,6 @@ GetOptions('cutoff=i' => \$cutoff,
 		   'tlen=s'   => \$tlen,
 		   'n-estimate-tlen' => \$n_estimate_tlen,
 		   'verbose'  => \$verbose,
-		   'min-mapq=i'    => \$min_mapq,
 		   'help',    => \$help);
 
 if ($help) { printHelp(); }
@@ -308,7 +306,7 @@ foreach my $key (keys %hostR1) {
 
 if ($verbose) { print "Writing output...\n"; }
 
-my $header = "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNoAmbiguousBases\tOverlapType\tOrientation\tHostSeq\tViralSeq\tAmbiguousSeq\tHostEditDist\tViralEditDist\tTotalEditDist\tPossibleHostTranslocation\tPossibleVectorRearrangement\tHostPossibleAmbiguous\tViralPossibleAmbiguous\tType\tReadID\tmerged\n";		
+my $header = "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNoAmbiguousBases\tOverlapType\tOrientation\tViralOrientation\tHostSeq\tViralSeq\tAmbiguousSeq\tHostEditDist\tViralEditDist\tTotalEditDist\tPossibleHostTranslocation\tPossibleVectorRearrangement\tHostPossibleAmbiguous\tViralPossibleAmbiguous\tType\tHostMapQ\tViralMapQ\tReadID\tmerged\n";		
 		
 printOutput($output, $header, @outLines); #write to outfile: if no sites detected will be header only
 
@@ -361,7 +359,7 @@ sub findDiscordant {
 	# get reference for virus and host based on which is mapped
 	my ($vRef, $vSeq, $vCig, $vOri, $vPos, $vSec, $vSup, $vNM);
 	my ($hRef, $hSeq, $hCig, $hOri, $hPos, $hSec, $hSup, $hNM);
-	my ($intNM, $junct);
+	my ($intNM, $junct, $hMQ, $vMQ);
 	
 	#if host mapped R1, virus mapped R2
 	if ($hR1map eq "map") { 
@@ -369,10 +367,6 @@ sub findDiscordant {
 		#check unmapped bases in mapped reads is less than cutoff
 		unless (($readlen1 - $hR1mapBP) < $cutoff) { return; } 
 		unless (($readlen2 - $vR2mapBP) < $cutoff) { return; } 
-		
-		# check mapping quality
-		if ($hMQ1 < $min_mapq) { return; }
-		if ($vMQ2 < $min_mapq) { return; }
 		
 		$hRef = $hR1ref; 
 		$hSeq = $seq1; 
@@ -393,6 +387,9 @@ sub findDiscordant {
 		$vSup = $vR2sup;
 		
 		$intNM = $vNM + $hNM;
+				
+		$hMQ = $hMQ1;
+		$vMQ = $vMQ2;
 		
 	}
 	#if host mapped R2, virus mapped R1
@@ -401,10 +398,6 @@ sub findDiscordant {
 		#check unmapped bases is less than cutoff
 		unless (($readlen2 - $hR2mapBP) < $cutoff) { return; } 
 		unless (($readlen1 - $vR1mapBP) < $cutoff) { return; } 
-		
-		# check mapping quality
-		if ($hMQ2 < $min_mapq) { return; }
-		if ($vMQ1 < $min_mapq) { return; }
 		
 		$hRef = $hR2ref; 
 		$hSeq = $seq2; 
@@ -425,6 +418,9 @@ sub findDiscordant {
 		$vSup = $vR1sup;
 		
 		$intNM = $vNM + $hNM;
+		
+		$hMQ = $hMQ2;
+		$vMQ = $vMQ1;
 		
 	}	
 
@@ -455,6 +451,17 @@ sub findDiscordant {
 			$vJunctSide = 'right';
 		}
 	}
+	
+	# was the virus integrated in + or - orientation?
+	my $vInsOri;
+	if ($hOri eq 'f') {
+		if ($vOri eq 'f') { $vInsOri = '+'; }
+		else { $vInsOri = '-'; }
+	}
+	if ($hOri eq 'r') {
+		if ($vOri eq 'f') { $vInsOri = '-'; }
+		else { $vInsOri = '+'; }
+	}	
 
 	# find if junction is host/virus or virus/host
 	# find approximate location of junction on both host and virus side (assign to end of read closest to junction)
@@ -486,21 +493,20 @@ sub findDiscordant {
 
 
 	return($hRef, $hIntStart, $hIntStop, $vRef, $vIntStart, $vIntStop, 
-				"", 'discordant', $junct, $hSeq, $vSeq, '-', $hNM, $vNM, $intNM, 
-				$isHumRearrange, $isVecRearrange, $isVirAmbig, $isHumAmbig, 'discordant');
+				"", 'discordant', $junct, $vInsOri, $hSeq, $vSeq, '-', $hNM, $vNM, $intNM, 
+				$isHumRearrange, $isVecRearrange, $isVirAmbig, $isHumAmbig, 'discordant', $hMQ, $vMQ);
 
 }
 
 sub printHelp {
 	print "Pipeline for detection of viral integration sites within a genome\n\n";
 	print "Usage:\n";
-	print "\tperl discordant.pl --viral <sam> --host <sam> --cutoff <n> --output <out> --bed <bed> --tol <tol> --help\n\n";
+	print "\tperl discordant.pl --viral <sam> --host <sam> --cutoff <n>  --tol <tol> --tlen <n> --n-estimate-tlen <n> --output <out> --bed <bed> --help\n\n";
 	print "Arguments:\n";
 	print "\t--viral:   Alignment of reads to viral genomes (sam)\n";
 	print "\t--host:   Alignment of reads to host genome (sam)\n";
 	print "\t--cutoff:  Minimum number of clipped reads to be considered (default = 20)\n";
-	print "\t--tol:     Tolerance when combining short elements with neigbouring matched regions (default = 5)\n";
-	print "\t--min-mapq:	Minimum mapping quality to consider a read (mapped read only)\n";	
+	print "\t--tol:     Tolerance when combining short elements with neigbouring matched regions (default = 5)\n";	
 	print "\t--tlen: Mean template (fragment) length.  Can be either the string 'estimate' to estimate from the data, or a positive float (default = 'estimate')\n";
 	print "\t--n-estimate-tlen: Number of pairs to use for estimating template length (default = 10000)\n";
 	print "\t--output:  Output file for results (default = integrationSite.txt\n";
