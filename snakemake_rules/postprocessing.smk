@@ -4,6 +4,9 @@ rule sortbed:
 		TOSORT
 	output:
 		temp(SORTED)
+	resources:
+		mem_mb=lambda wildcards, attempt: attempt * 2000,
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 	run:
 		for i in range(len(TOSORT)):
 			print(f"sorting file {TOSORT[i]} into file {SORTED[i]}, file extension {os.path.splitext(TOSORT[i])[1]}")
@@ -42,13 +45,14 @@ rule post:
 		sorted_beds = rules.sortbed.output
 	output:
 		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt"
-	group: "post"
+#	group: "post"
 	conda:
 		"../envs/rscripts.yml"
 	container:
 		"docker://szsctt/rscripts:4"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 2000)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 2000),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 	params:
 		lambda wildcards: get_value_from_df(wildcards, 'postargs')
 	threads: 1
@@ -74,7 +78,8 @@ rule summarise:
 	params:
 		outdir = lambda wildcards, output: path.dirname(output[0])
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 	threads: 1
 	shell:
 		"Rscript scripts/summarise_ints.R {input} {params.outdir}"
@@ -96,7 +101,8 @@ rule ucsc_bed:
 	container:
 		"docker://szsctt/rscripts:4"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 	threads: 1
 	shell:
 		"""
@@ -119,7 +125,8 @@ rule merged_bed:
 	container:
 		"docker://szsctt/bedtools:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 	threads: 1
 	shell:
 		"""

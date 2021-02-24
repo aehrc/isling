@@ -11,7 +11,8 @@ rule run_soft:
 		tol = lambda wildcards: f"--tol {int(get_value_from_df(wildcards, 'cigar_tol'))}",
 		min_mapq = lambda wildcards: f"--min-mapq {int(get_value_from_df(wildcards, 'min_mapq'))}",
 	resources:
-		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max((input.host, input.virus), attempt, 1.5))
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max((input.host, input.virus), attempt, 1.5)),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 	container:
 		"docker://ubuntu:18.04"	
 	shell:
@@ -31,7 +32,8 @@ rule run_short:
 		tol = lambda wildcards: f"--tol {int(get_value_from_df(wildcards, 'cigar_tol'))}",
 		min_mapq = lambda wildcards: f"--min-mapq {int(get_value_from_df(wildcards, 'min_mapq'))}",
 	resources:
-		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max((input.host, input.virus), attempt, 1.5))
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max((input.host, input.virus), attempt, 1.5)),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 	container:
 		"docker://ubuntu:18.04"
 	shell:
@@ -52,7 +54,8 @@ rule run_discordant:
 		min_mapq = lambda wildcards: f"--min-mapq {int(get_value_from_df(wildcards, 'min_mapq'))}",
 		tlen = lambda wildcards: f"--tlen {get_value_from_df(wildcards, 'mean_frag_len')}"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max((input.host, input.virus), attempt, 1.5))
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max((input.host, input.virus), attempt, 1.5)),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 	container:
 		"docker://ubuntu:18.04"
 	threads: workflow.cores
@@ -66,7 +69,10 @@ rule combine_ints:
 		soft = rules.run_soft.output,
 		short = rules.run_short.output,
 		discordant = rules.run_discordant.output
-	group: "ints"
+	resources:
+		mem_mb=lambda wildcards, attempt: attempt * 2000,
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+	threads: 1
 	output:
 		all = temp("{outpath}/{dset}/ints/{samp}.{part}.{host}.{virus}.integrations.txt")
 	container:
@@ -80,13 +86,15 @@ rule merge_parts_ints:
 	message: "Merge the intergrations from each part into one file"
 	input:
 		files = lambda wildcards: expand("{{outpath}}/{{dset}}/ints/{{samp}}.{parts}.{{host}}.{{virus}}.integrations.txt", parts = get_split(wildcards)),
-	group: "ints"
 	output:
 		all = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
 		temp =  temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp"),
 	container:
 		"docker://ubuntu:18.04"
 	threads: 1
+	resources:
+		mem_mb=lambda wildcards, attempt: attempt * 2000,
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 	shell:
 		"""
 		echo {input.files}
