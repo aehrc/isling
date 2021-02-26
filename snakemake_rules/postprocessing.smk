@@ -1,60 +1,95 @@
-
-rule sortbed:
-	input:
-		TOSORT
-	output:
-		temp(SORTED)
-	run:
-		for i in range(len(TOSORT)):
-			print(f"sorting file {TOSORT[i]} into file {SORTED[i]}, file extension {os.path.splitext(TOSORT[i])[1]}")
-			
-			# if file is a bed file
-			if (os.path.splitext(TOSORT[i])[1] == ".bed"):
-				body = f"sort -k1,1 -k2,2n {TOSORT[i]} > {SORTED[i]}"
-				shell(body)
-				print(body)
-			# if file is a gtf file
-			elif (os.path.splitext(TOSORT[i])[1] == ".gtf"):
-				
-				body = f"awk '{{{{ if ($0 !~ /^#/) {{{{ print $0 }}}} }}}}' {TOSORT[i]} | sort -k1,1 -k4,4n > {SORTED[i]}"
-				shell(body)
-				print(body)
-			else:
-				raise ValueError("only gtf files and bed files are supported")
-
-
-#this rule (post) sometimes causes issues with conda. The error is usually something to do with ldpaths:
-
-#Activating conda environment: /scratch1/sco305/intvi_cmri/intvi_pipeline/.snakemake/conda/586e76e5
-#/scratch1/sco305/intvi_cmri/intvi_pipeline/.snakemake/conda/586e76e5/lib/R/bin/R: line 238: /scratch1/sco305/intvi_cmri/#intvi_pipeline/.snakemake/conda/586e76e5/lib/R/etc/ldoutpaths: No such file or directory
-
-# however, sometimes this rule runs just fine.
-
-# this issue is descrived here: https://github.com/conda-forge/r-base-feedstock/issues/67
-# however, it doesn't appear to have been resolved.  temporarily get around this by re-attempting jobs
-# that failed using command line option --restart-times, but will need to come up with a better solution for this
-
-# I would recommend always running with singularity (--use-singularity)
-
-rule post:
+rule filter:
 	input:
 		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
-		sorted_beds = rules.sortbed.output
 	output:
-		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt"
-	group: "post"
-	conda:
-		"../envs/rscripts.yml"
-	container:
-		"docker://szsctt/rscripts:4"
-	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 2000)
+		kept = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.p.txt"),
+		excluded = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.re.txt"),
 	params:
-		lambda wildcards: get_value_from_df(wildcards, 'postargs')
-	threads: 1
+		filterstring = lambda wildcards: get_value_from_df(wildcards, 'filter')
+	container:
+		"docker://szsctt/simvi:1"
 	shell:
 		"""
-		Rscript scripts/post/postprocess.R {input.ints} {params}
+		python3 scripts/filter.py -i {input.ints} -k {output.kept} -e {output.excluded} -c '{params.filterstring}'
+		"""
+
+rule sort_bed:
+	input:
+		unsorted = "{name}.bed"
+	output:
+		sorted = "{name}.sorted.bed"
+	container:
+		"docker://ubuntu:18.04"
+	shell:
+		"sort -k1,1 -k2,2n {input.unsorted} > {output.sorted}"
+		
+
+rule exclude_bed:
+	input:
+		beds = lambda wildcards: [os.path.splitext(i)[0] + '.sorted.bed' for i in get_value_from_df(wildcards, 'bed_exclude')],
+		filt = rules.filter.output.kept,
+		excluded = rules.filter.output.excluded
+	output:
+		tmp = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.po.txt.tmp"),
+		kept = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.po.txt",
+		excluded = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.remo.txt",
+	container:
+		"docker://szsctt/bedtools:1"
+	conda:
+		"envs/bedtools.yml"
+	shell:
+		"""
+		cp {input.filt} {output.tmp}
+		cp {input.excluded} {output.excluded}
+		
+		if [ -z "{input.beds}" ]; then
+			cp {input.filt} {output.kept}
+			cp {input.excluded} {output.excluded}
+			touch {output.tmp}
+		else
+			ARRAY=( {input.beds} )
+			for bed in "${{ARRAY[@]}}"; do
+				echo "excluding integrations that intersect with $bed"
+				head -n1 {input.filt} > {output.kept}
+				bedtools intersect -v -a {output.tmp} -b $bed >> {output.kept}
+				bedtools intersect -u -a {output.tmp} -b $bed >> {output.excluded}
+				cp {output.kept} {output.tmp}
+			done
+		fi
+		"""
+
+rule include_bed:
+	input:
+		beds = lambda wildcards: [os.path.splitext(i)[0] + '.sorted.bed' for i in get_value_from_df(wildcards, 'bed_include')],	
+		filt = rules.exclude_bed.output.kept,
+		excluded = rules.exclude_bed.output.excluded
+	output:
+		tmp = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt.tmp"),
+		kept = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt",
+		excluded = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.removed.txt",
+	container:
+		"docker://szsctt/bedtools:1"
+	conda:
+		"envs/bedtools.yml"
+	shell:
+		"""
+		cp {input.filt} {output.tmp}
+		cp {input.excluded} {output.excluded}
+		
+		if [ -z "{input.beds}" ]; then
+			cp {input.filt} {output.kept}
+			cp {input.excluded} {output.excluded}
+			touch {output.tmp}
+		else
+			ARRAY=( {input.beds} )
+			for bed in "${{ARRAY[@]}}"; do
+				echo "only keepint integrations that intersect with $bed"
+				head -n1 {input.filt} > {output.kept}
+				bedtools intersect -u -a {output.tmp} -b $bed >> {output.kept}
+				bedtools intersect -v -a {output.tmp} -b $bed >> {output.excluded}
+				cp {output.kept} {output.tmp}
+			done
+		fi
 		"""
 
 rule summarise:

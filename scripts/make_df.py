@@ -8,18 +8,28 @@ import pdb
 import os
 import subprocess
 
+from filter import Criteria
+
 
 #### defaults ####
 bwa_mem_default = "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
 merge_dist_default = 100
 tol_default = 3
 cutoff_default = 20
-min_mapq_default = 0
 merge_n_min_default = 1
 split_default = 1
 mean_frag_len_default = 'estimate'
 align_cpus_default = 5
 dedup_subs_default = 2
+filter_default = ["HostEditDist <= 5 and ViralEditDist <= 5",
+									"NoAmbiguousBases < 20 or Type == discordant",
+									"HostMapQ > 20",
+									"HostPossibleAmbiguous == no",
+									"PossibleVectorRearrangement == no",
+									"PossibleHostTranslocation == no"]
+bed_exclude_default = []
+bed_include_default = []
+
 
 #### check file extensions ####
 
@@ -47,7 +57,6 @@ def make_df(config):
 			for key in default:
 				if key not in config[dataset]:
 					config[dataset][key] = default[key]
-
 
 	rows = []
 
@@ -97,31 +106,29 @@ def make_df(config):
 		merge_dist = get_value_or_default(config, dataset, 'merge-dist', merge_dist_default)
 		clip_cutoff = get_value_or_default(config, dataset, 'clip-cutoff', cutoff_default)
 		cigar_tol = get_value_or_default(config, dataset, 'cigar-tol', tol_default)
-		min_mapq = get_value_or_default(config, dataset, 'min-mapq', min_mapq_default)
 		bwa_mem_params = get_value_or_default(config, dataset, 'bwa-mem', bwa_mem_default)
 		merge_n_min = get_value_or_default(config, dataset, 'merge-n-min', merge_n_min_default)
 		split = get_value_or_default(config, dataset, 'split', split_default)
 		align_cpus = get_value_or_default(config, dataset, 'align-cpus', align_cpus_default)
 		dedup_subs = get_value_or_default(config, dataset, 'dedup-subs', dedup_subs_default)
+		filter_str = get_filter(config, dataset, filter_default)
+		bed_exclude = tuple(get_value_or_default(config, dataset, 'bed-exclude', bed_exclude_default))
+		bed_include = tuple(get_value_or_default(config, dataset, 'bed-include', bed_include_default))
 		
 		# check values are integers greater than a minimum value
 		check_int_gt(merge_dist, -1, 'merge-dist', dataset)
 		check_int_gt(clip_cutoff, 1, 'clip-cutoff', dataset)
 		check_int_gt(cigar_tol, 0, 'cigar-tol', dataset)
-		check_int_gt(min_mapq, -1, 'min-mapq', dataset)
 		check_int_gt(merge_n_min, -1, 'merge-n-min', dataset)
 		check_int_gt(split, 0, 'split', dataset)
 
-		check_int_gt(min_mapq, -1, 'merge-n-min', dataset)
 		if mean_frag_len != 'estimate':
 			if mean_frag_len < 0:
 				raise ValueError('key "mean-frag-len" in dataset {dataset} should be either the string "estimate", or a number greater than 0')
 		elif isinstance(mean_frag_len, str):
 			if mean_frag_len != 'estimate':
 				raise ValueError('key "mean-frag-len" in dataset {dataset} should be either the string "estimate", or a number greater than 0')
-		
-		# get arguments for running postprocessing scripts
-		postargs = make_post_args({dataset : config[dataset]})[0][dataset]
+
 		
 		# get samples for this dataset
 		samples, is_bam = get_samples(config, dataset)
@@ -155,15 +162,12 @@ def make_df(config):
 			virus_prefix = config[dataset]["virus_prefixes"][virus]	
 			
 			# append combinations of each sample, host and virus		
-			rows.append((dataset_name, dataset, sample, host, host_fasta, host_prefix, virus, virus_fasta, virus_prefix, merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, postargs, merge_dist, merge_n_min, clip_cutoff, cigar_tol, min_mapq, split, mean_frag_len, align_cpus, cat, dedup_subs))
+			rows.append((dataset_name, dataset, sample, host, host_fasta, host_prefix, virus, virus_fasta, virus_prefix, merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, merge_dist, merge_n_min, clip_cutoff, cigar_tol, split, mean_frag_len, align_cpus, cat, dedup_subs, filter_str, bed_exclude, bed_include))
 
-			
-	# check there aren't any duplicate rows
-	if len(set(rows)) != len(rows):
-		raise ValueError("Error - configfile results in duplicate analyses, check samples and dataset names are unique")
-	
+				
 	# make dataframe
-	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'postargs', 'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'min_mapq', 'split', 'mean_frag_len', 'align_cpus', 'cat', 'dedup_subs'])
+	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2',  'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'split', 'mean_frag_len', 'align_cpus', 'cat', 'dedup_subs', 'filter', 'bed_exclude', 'bed_include'])
+	
 	
 	# do checks on dataframe
 	check_dataset_sample_unique(toDo)
@@ -173,8 +177,13 @@ def make_df(config):
 
 	return toDo
 
-
 def check_dataset_sample_unique(toDo):
+	
+	# check there aren't any duplicate rows
+	if toDo.duplicated().any():
+		raise ValueError("Error - configfile results in duplicate analyses, check samples and dataset names are unique")
+
+
 	# check that every combination of 'dataset' and 'sample' is unique
 	if len(set(toDo.loc[:,'unique'])) != len(toDo.loc[:,'unique']):
 		raise ValueError("Every combination of 'dataset' and 'sample' must be unique! Check inputs and try again")
@@ -202,65 +211,6 @@ def make_reference_dict(toDo):
 			ref_names[row['virus']] = row['virus_fasta']
 	
 	return ref_names
-	
-# construct arguments for postprocess.R script for each dataset
-def make_post_args(config):
-
-	POSTARGS = {}
-	TOSORT = []
-	SORTED = []
-	for dataset in config:
-		POSTARGS[dataset] = []
-		if "post" in config[dataset]:
-			for element in config[dataset]["post"]:
-				# need to check if this element is a string or a dict
-				if isinstance(element, str):
-					# look for keys to be 'filter' or 'dedup'
-					if element == "filter":
-						POSTARGS[dataset].append("filter")
-					elif element == "dedup":
-						POSTARGS[dataset].append("dedup")
-				# postprocessing types with files specified will be in ordered dictionaries
-				elif isinstance(element, collections.OrderedDict):
-					if "mask-exclude" in element.keys():
-						for bed in element["mask-exclude"]:
-							POSTARGS[dataset].append("mask-exclude")
-							POSTARGS[dataset].append(bed)	
-					elif "mask-include" in element.keys():
-						for bed in element["mask-include"]:
-							POSTARGS[dataset].append("mask-include")
-							POSTARGS[dataset].append(bed)
-					elif "nearest-gtf" in element.keys():
-						for gtf in element["nearest-gtf"]:
-							sortedgtf = path.splitext(gtf)[0] + ".sorted.gtf"
-							POSTARGS[dataset].append("nearest-gtf")
-							POSTARGS[dataset].append(sortedgtf)
-							if gtf not in TOSORT:
-								TOSORT.append(gtf)
-								SORTED.append(sortedgtf)
-					elif "nearest-bed" in element.keys():
-						for bed in element["nearest-bed"]:
-							sortedbed = path.splitext(bed)[0] + ".sorted.bed"
-							POSTARGS[dataset].append("nearest-bed")
-							POSTARGS[dataset].append(sortedbed)
-							if bed not in TOSORT:
-								TOSORT.append(bed)
-								SORTED.append(sortedbed)
-					elif "RNA-seq" in element.keys():
-						ref = element["genes"]
-						sortedref = path.splitext(ref)[0] + ".sorted" + path.splitext(ref)[1]
-						if ref not in TOSORT:
-							TOSORT.append(ref)
-							SORTED.append(sortedref)
-						for tsv in element["counts"]:
-							POSTARGS[dataset].append("RNA-seq-gtf")
-							POSTARGS[dataset].append(sortedref)
-							POSTARGS[dataset].append(element["col"])
-							POSTARGS[dataset].append(tsv)
-			POSTARGS[dataset] = " ".join(POSTARGS[dataset])
-		
-	return POSTARGS, TOSORT, SORTED
-	
 
 def get_refs(config, dataset, ref_type):
 	"""
@@ -332,7 +282,37 @@ def get_refs(config, dataset, ref_type):
 		outdir = config[dataset]['out_dir']
 		config[dataset][f"{ref_type}_prefixes"] = {name:f"{outdir}/references/{name}/{name}" for name in config[dataset][f"{ref_type}"]}
 		
+def get_filter(config, dataset, filter_default):
+	"""
+	Check the 'filter' key
+	This may be a list, a string, or a bool
+	If True, use the default filter string
+	If False, set to 'True' (to keep all integrations)
+	If a string, check if string is valid criteria
+	If a list, combine all elements in list with 'and', and check if string is valid criteria
+	"""
+	filter_str = get_value_or_default(config, dataset, 'filter', filter_default)
 
+	if not(isinstance(filter_str, bool) or isinstance(filter_str, str) or isinstance(filter_str, list)):
+		raise ValueError(f'key "filter" in dataset {dataset} should be True, False or a string containing a custom filter')
+	
+	# if it's true or false
+	if filter_str is True:
+		filter_str = filter_default
+	
+	if filter_str is False:
+		filter_str = "True"
+	elif isinstance(filter_str, list):
+		if not all([isinstance(i, str) for i in filter_str]):
+			raise ValueError(f"key 'filter' in dataset {dataset} is a list, and should contain only strings (found somethig that isn't a string)")
+		filter_str = [f"({i})" for i in filter_str]
+		filter_str = " and ".join(filter_str)
+			
+	# check filtering string is valid
+	Criteria(filter_str.split(' '))	
+	
+	return filter_str
+	
 
 def check_bools(config, dataset, key):
 	"""

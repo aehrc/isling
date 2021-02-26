@@ -9,7 +9,6 @@ rule run_soft:
 	params:
 		cutoff = lambda wildcards: f"--cutoff {int(get_value_from_df(wildcards, 'clip_cutoff'))}",
 		tol = lambda wildcards: f"--tol {int(get_value_from_df(wildcards, 'cigar_tol'))}",
-		min_mapq = lambda wildcards: f"--min-mapq {int(get_value_from_df(wildcards, 'min_mapq'))}",
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max((input.host, input.virus), attempt, 1.5))
 	container:
@@ -29,7 +28,6 @@ rule run_short:
 	params:
 		cutoff = lambda wildcards: f"--cutoff {int(get_value_from_df(wildcards, 'clip_cutoff'))}",
 		tol = lambda wildcards: f"--tol {int(get_value_from_df(wildcards, 'cigar_tol'))}",
-		min_mapq = lambda wildcards: f"--min-mapq {int(get_value_from_df(wildcards, 'min_mapq'))}",
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max((input.host, input.virus), attempt, 1.5))
 	container:
@@ -49,7 +47,6 @@ rule run_discordant:
 	params:
 		cutoff = lambda wildcards: f"--cutoff {int(get_value_from_df(wildcards, 'clip_cutoff'))}",
 		tol = lambda wildcards: f"--tol {int(get_value_from_df(wildcards, 'cigar_tol'))}",
-		min_mapq = lambda wildcards: f"--min-mapq {int(get_value_from_df(wildcards, 'min_mapq'))}",
 		tlen = lambda wildcards: f"--tlen {get_value_from_df(wildcards, 'mean_frag_len')}"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max((input.host, input.virus), attempt, 1.5))

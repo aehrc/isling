@@ -46,8 +46,8 @@ snakedir = config['snakedir']
 config.pop('snakedir')
 
 
-sys.path.append(os.path.join(snakedir, "snakemake_rules/"))
-from snakemake_rules.make_df import make_df, make_reference_dict, make_post_args
+sys.path.append(os.path.join(snakedir, "scripts/"))
+from scripts.make_df import make_df, make_reference_dict
 
 
 # construct dataframe with wildcards and other information about how to run analysis
@@ -57,11 +57,6 @@ toDo = make_df(config)
 # construct dictionary with reference names as keys and reference fastas as values
 
 ref_names = make_reference_dict(toDo)
-
-# construct arguments for postprocess.R script for each dataset
-
-POSTARGS, TOSORT, SORTED = make_post_args(config)
-
 
 #### global wildcard constraints ####
 
