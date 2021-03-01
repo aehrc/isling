@@ -10,7 +10,10 @@
 # ie sort -k1,1 -k2,2n 
 # merge first based on host coordinates, to make an intermediate cluster , then divide this cluster up into clusters based on the same process but with viral coordinates
 
-# for now, don't consider orientation of integration site (host/virus or virus/host), but just merge based on coordinates
+# Two methods for clustering are available - in 'common', output clusters have some common bases in both host and virus genome
+# and in 'exact', integration sites are only clustered if they have exactly the same coordinates.
+# In both cases, clustered integration sites must have the same orientation (host-virus or virus-host), and 
+# viral orientation (integrated in '+' or '-' orientation)
 
 
 import argparse
@@ -24,8 +27,8 @@ def main(args):
 	parser = argparse.ArgumentParser(description = "merge integration sites based on host and virus coordinates")
 	parser.add_argument('--input', '-i', help = 'input file (from postprocessing)', required=True)
 	parser.add_argument('--output', '-o', help = 'output file', default='merged.txt')
-	parser.add_argument('--distance', '-d', help = 'distance for merging', type=int, default = 100)
 	parser.add_argument('--min-n', '-n', help = 'minimum number of reads to retain a cluster', default=1, type=int)
+	parser.add_argument('--cluster-method', '-c', help = 'method for clustering', choices = {'common', 'exact'}, default='common')
 	args = parser.parse_args()
 	
 	
@@ -35,7 +38,7 @@ def main(args):
 		writer = csv.writer(outfile, delimiter = '\t')
 
 		# Write header to file
-		header = ('Chr', 'IntStart', 'IntStop', 'Virus', 'VirusStart', 'VirusStop', 'nChimeric', 'nDiscordant', 'SiteID', 'ReadIDs')
+		header = ('Chr', 'IntStart', 'IntStop', 'JunctionType', 'Virus', 'VirusStart', 'VirusStop', 'VirusOri', 'nChimeric', 'nDiscordant', 'SiteID', 'ReadIDs')
 		writer.writerow(header)	
 		
 		# get first row to initalize
@@ -67,18 +70,14 @@ def main(args):
 			curr = reset_curr(row)
 
 			# initial merging only based on host
-			merge = check_overlap(row, clust, args.distance, 'host')
+			merge = check_overlap(row, clust, 'host')
 
 			if merge:
 				clust = merge_row(clust, row)
 						
 			else:
-				# process this cluster - cluster using viral coordinates
-				clusts = cluster_virus(clust, args.distance)
 				
-				# get common coordinates for output - this might result in further splitting clusters if there are no common coordinates
-				# for a particular cluster (ie if d was too large and resulted in merging of independent integrations)		
-				clusts = add_common_coords(clusts)
+				clusts = process_initial_cluster(clust, method = args.cluster_method)
 				
 				# otherwise, write previous cluster to outfile
 				write_clusters(writer, clusts, n_clust, args.min_n)
@@ -90,83 +89,81 @@ def main(args):
 			n_line += 1 
 		
 		# write last cluster to file
-		clusts = cluster_virus(clust, args.distance)
-		clusts = add_common_coords(clusts)
+		clusts = process_initial_cluster(clust, method = args.cluster_method)
 		write_clusters(writer, clusts, n_clust, args.min_n)
+		
+		print(f"read {n_line} reads from file {args.input}")
+		print(f"grouped into {n_clust} clusters using method '{args.cluster_method}'")
+		print(f"saved clusters to file {args.output}")
 
-def add_common_coords(clusts):
+def process_initial_cluster(clust, method = 'common'):
 	"""
-	add common coordinates to each cluster - the coordinates (host and virus) that are common to all integrations within the cluster
-	eg if one integration has coordinates (50, 60) and another has coordinates (40, 100), the comon coordinates would be (50, 60)
+	Process initial cluster (based on host coordinates) to produce further clusters.
+	 
+	In method 'common', reads belong in the same cluster if they have the same host and virus orientation
+	and they also have common coordinates in both host and virus
 	
-	if there are no common coordinates, try to group into multiple clusters that each have some common coordinates
+	In 'exact', reads belong in the same cluster if they ahve the same host and virus orientation
+	and they have the same coordiantes in both host and virus
+	"""
+	assert method in {'common', 'exact'}
+	
+	# if there's only one row in this cluster, we're already done
+	if len(clust['ints']) == 1:
+		return [clust]
+	
+	# create new cluster from first integration
+	clusts = [reset_clust(clust['ints'].pop())]
+	
+	# for each integration in this cluster, check if it belongs in any of the current clusters
+	for row in clust['ints']:
+		merge = False
+		for c in clusts:
+			
+			# if we already merged this row with a cluster, skip
+			if merge:
+				continue
+		
+			# check if we should merge row in to cluster c
+			if method == 'common' and merge_common_coords(c, row):
+				merge = True
+				c = merge_row(c, row, method = 'common')
+				continue
+			elif method == 'exact' and merge_same_coords(c, row):
+				merge = True
+				c = merge_row(c, row, method = 'common') # method doesn't matter because we already know the coordinates are the same
+		
+		# if we didn't merge this row with a cluster, we need a new cluster
+		if not merge:
+			clusts.append(reset_clust(row))
+			
+	return clusts
+			
+				
+	
+def merge_common_coords(clust, row):
+	"""
+	Check if both host and virus have an overlap
+	"""
+	if not check_overlap(row, clust, 'host', True):
+		return False
+	if not check_overlap(row, clust, 'virus', True):
+		return False
+		
+	return True
+	
+def merge_same_coords(clust, row):
+	"""
+	Check if both host and virus have same coordinates
 	"""	
-	done = []
+	if not check_same_coordinates(row, clust, 'host', True):
+		return False
+	if not check_same_coordinates(row, clust, 'virus', True):
+		return False
 	
-	# try each cluster in turn
-	for clust in clusts:	
-	
-		# if there's only one integration in this cluster
-		if len(clust['ints']) == 1:
-			done.append(clust)
-			continue
+	return True
 
-		# sort integrations by host coords
-		clust['ints'].sort(key = lambda row: int(row['IntStart']))
-		
-		# keep getting common coordinates in host until we find a non-overlap
-		breakpoint = -1
-		for i, row in enumerate(clust['ints']):
-			try:
-				clust['host_coords'] = get_overlap(clust['host_coords'][0], clust['host_coords'][1], 
-																						int(row['IntStart']), int(row['IntStop']))
-			
-			# if non-overlap, we need to split the cluster in two
-			except AssertionError:
-				breakpoint = i
-				break
-				
-		if breakpoint != -1	:
-			# retry these two new clusters
-			done += add_common_coords(split_clust(clust, breakpoint))
-			continue
-				
-		# sort by virus coords
-		clust['ints'].sort(key = lambda row: int(row['VirusStart']))		
-		
-		# keep getting common coordinates in virus until we find a non-overlap
-		for i, row in enumerate(clust['ints']):
-			try:
-				clust['virus_coords'] = get_overlap(clust['virus_coords'][0], clust['virus_coords'][1], 
-																						int(row['VirusStart']), int(row['VirusStop']))
-			# if non-overlap, we need to split the cluster in two
-			except AssertionError:
-				breakpoint = i
-				break
-			
-		if breakpoint != -1	:
-			# retry these two new clusters
-			done +=  add_common_coords(split_clust(clust, breakpoint))
-			continue		
 
-		# if we got all the way through, add this cluster
-		done.append(clust)
-		
-	return done
-
-def split_clust(clust, i):
-	"""
-	split a cluster into two at row number i
-	"""
-	clust1 = reset_clust(clust['ints'][0])
-	for j in range(i):
-			clust1 = merge_row(clust1, clust['ints'][j])
-	
-	clust2 = reset_clust(clust['ints'][i])
-	for j in range(i, len(clust['ints'])):
-		clust2 = merge_row(clust2, clust['ints'][j])
-			
-	return [clust1, clust2]
 
 def get_overlap(start1, stop1, start2, stop2):
 	"""
@@ -189,35 +186,6 @@ def get_overlap(start1, stop1, start2, stop2):
 		
 	return (start, stop)
 
-def cluster_virus(clust, d):
-	"""
-	process initial cluster (based on host coordinates) - divide into smaller clusters based on distance in virus
-	ideally we should sort integrations, but assume there won't be too many in each cluster so it's probably not necessary
-	"""
-	# if there's only one row in this cluster, we're already done
-	if len(clust['ints']) == 1:
-		return [clust]	
-	
-	# otherwise, sort the integrations	
-	clust['ints'].sort(key = lambda row: int(row['VirusStart']))
-	
-	# start with first integration in cluster
-	clusts = [reset_clust(clust['ints'][0])]
-	
-	# check remaining rows
-	curr_clust = 0
-	for row in clust['ints'][1:]:
-		
-		# check for overlap with current cluster
-		if check_overlap(row, clusts[curr_clust], d, 'virus') and check_overlap(row, clusts[curr_clust], d, 'host'):
-			clusts[curr_clust] = merge_row(clusts[curr_clust], row)
-		
-		# if no overlap, start new cluster	
-		else:
-			clusts.append(reset_clust(row))
-			curr_clust += 1
-		
-	return clusts
 	
 def reset_curr(row):
 		"""
@@ -236,9 +204,11 @@ def reset_clust(row):
 	clust = {
 		'host_chr'		: row['Chr'],
 		'host_coords'	: [int(row['IntStart']), int(row['IntStop'])], # stores range encompassing all host coordinates in cluster
+		'oris'				: {row['Orientation']},
 		'virus'				: row['VirusRef'],
-		'virus_coords'	: [int(row['VirusStart']), int(row['VirusStop'])],# stores range encompassing all virus coordinates in cluster
-		'reads'				: [row['ReadID']],
+		'virus_coords': [int(row['VirusStart']), int(row['VirusStop'])],# stores range encompassing all virus coordinates in cluster
+		'virus_ori'		: {row['VirusOrientation']},
+		'reads'				: {row['ReadID']},
 		'n_chimeric'  : 1 if row['OverlapType'] != 'discordant' else 0,
 		'n_discord'		: 1 if row['OverlapType'] == 'discordant' else 0,
 		'ints': [row] # store all integrations currently in cluster
@@ -252,26 +222,68 @@ def write_clusters(outcsv, clusts, clust_id, min_n):
 	"""
 	for clust in clusts:
 		if len(clust['reads']) >= min_n:
-			row = (clust['host_chr'], clust['host_coords'][0], clust['host_coords'][1], 
-						clust['virus'], clust['virus_coords'][0], clust['virus_coords'][1], 
+			row = (clust['host_chr'], clust['host_coords'][0], clust['host_coords'][1], clust['oris'].pop(),
+						clust['virus'], clust['virus_coords'][0], clust['virus_coords'][1],  clust['virus_ori'].pop(),
 						clust['n_chimeric'], clust['n_discord'],
 						clust_id, ",".join(clust['reads']))
 			outcsv.writerow(row)
 			clust_id += 1
 
-def check_overlap(row, clust, dist, ref):
+def check_overlap(row, clust, ref, check_ori = False):
 	"""
 	check if there's overlap in both host intervals defined in row, and intervals defined in clust
 	'ref' is either 'host' or 'virus', and indicates whether to check for overlap in host or virus
 	"""
 	assert ref in {'host', 'virus'}
+	assert check_ori is True or check_ori is False
+	if check_ori and ref == 'host':
+		assert len(clust['oris']) == 1
+	elif check_ori and ref == 'virus':
+		assert len(clust['virus_ori']) == 1
 	
 	if ref == 'host':
-		return overlap(row['Chr'], int(row['IntStart']) - dist, int(row['IntStop']) + dist, 
+		if check_ori and (row['Orientation'] not in clust['oris']):
+			return False
+		return overlap(row['Chr'], int(row['IntStart']), int(row['IntStop']), 
 									clust['host_chr'], clust['host_coords'][0], clust['host_coords'][1])
 	else:
-		return overlap(row['VirusRef'], int(row['VirusStart']) - dist, int(row['VirusStop']) + dist, 
+		if check_ori and (row['VirusOrientation'] not in clust['virus_ori']):
+			return False		
+		return overlap(row['VirusRef'], int(row['VirusStart']), int(row['VirusStop']), 
 									clust['virus'], clust['virus_coords'][0], clust['virus_coords'][1])
+
+def check_same_coordinates(row, clust, ref, check_ori = True):
+	"""
+	check if both host intervals defined in row, and intervals defined in clust have same start and stop coordinates
+	'ref' is either 'host' or 'virus', and indicates whether to check for overlap in host or virus
+	"""
+	assert ref in {'host', 'virus'}
+	assert check_ori is True or check_ori is False
+	if check_ori and ref == 'host':
+		assert len(clust['oris']) == 1
+	elif check_ori and ref == 'virus':
+		assert len(clust['virus_ori']) == 1
+		
+	if ref == 'host':
+		if check_ori and (row['Orientation'] not in clust['oris']):
+			return False
+		if row['Chr'] != clust['host_chr']:
+			return False
+		if int(row['IntStart']) != clust['host_coords'][0]:
+			return False
+		if int(row['IntStop']) != clust['host_coords'][1]:
+			return False
+	else:
+		if check_ori and (row['VirusOrientation'] not in clust['virus_ori']):
+			return False
+		if row['VirusRef'] != clust['virus']:
+			return False
+		if int(row['VirusStart']) != clust['virus_coords'][0]:
+			return False
+		if int(row['VirusStop']) != clust['virus_coords'][1]:
+			return False
+			
+	return True
 	
 def check_sorted(row, curr, n_line, seen_host_chrs):
 	"""
@@ -318,32 +330,40 @@ def overlap(ref1, start1, stop1, ref2, start2, stop2):
 		return False
 	return True
 	
-def merge_row(clust, row):
+def merge_row(clust, row, method = 'all_bases'):
 	"""
-	merge integration defined in row with current
-		'host_chr'		: row['Chr'],
-		'host_coords'	: [int(row['IntStart']), int(row['IntStop'])], # stores range encompassing all host coordinates in cluster
-		'virus'				: row['VirusRef'],
-		'virus_coords'	: [int(row['VirusStart']), int(row['VirusStop'])],# stores range encompassing all virus coordinates in cluster
-		'reads'				: [row['ReadID']],
-		'n_chimeric'  : 1 if row['OverlapType'] != 'discordant' else 0,
-		'n_discord'		: 1 if row['OverlapType'] == 'discordant' else 0,
-		'ints': [row] # store all integrations currently in cluster
+	merge integration defined in row with current cluster
+	
+	two methods for merging coordinates:
+		'all_bases': coordinates of cluster encompass full range of coordinates occupied by both cluster and row
+		'common': coordinates of cluster are only those bases common to the cluster and the row
 	"""
 	
-	clust['reads'].append(row['ReadID'])
+	assert method in {'all_bases', 'common'}
+	assert clust['host_chr'] == row['Chr']
+	
+	clust['reads'].add(row['ReadID'])
 	clust['ints'].append(row)
+	clust['oris'].add(row['Orientation'])
+	clust['virus_ori'].add(row['VirusOrientation'])
 	
 	if row['OverlapType'] == 'discordant':
 		clust['n_discord'] += 1
 	else:
 		clust['n_chimeric'] += 1
 					
-	# extend cluster start and stop, if necessary
-	clust['host_coords'][0] = min(int(row['IntStart']), clust['host_coords'][0])
-	clust['host_coords'][1] = max(int(row['IntStop']), clust['host_coords'][1])
-	clust['virus_coords'][0] = min(int(row['VirusStart']), clust['virus_coords'][0])
-	clust['virus_coords'][1] = max(int(row['VirusStop']), clust['virus_coords'][1])
+	# re-calculate cluster coordinates
+	if method == 'all_bases':
+		clust['host_coords'][0] = min(int(row['IntStart']), clust['host_coords'][0])
+		clust['host_coords'][1] = max(int(row['IntStop']), clust['host_coords'][1])
+		clust['virus_coords'][0] = min(int(row['VirusStart']), clust['virus_coords'][0])
+		clust['virus_coords'][1] = max(int(row['VirusStop']), clust['virus_coords'][1])
+	else:
+		clust['host_coords'] = get_overlap(int(row['IntStart']), int(row['IntStop']), 
+																				clust['host_coords'][0],  clust['host_coords'][1])
+		clust['virus_coords'] = get_overlap(int(row['VirusStart']), int(row['VirusStop']), 
+																				clust['virus_coords'][0],  clust['virus_coords'][1])
+		
 		
 	return clust
 
@@ -352,9 +372,9 @@ def prune_row(row):
 	# remove extraneous information
 	tmp = {}
 	for key in row:
-		if key in {'Chr', 'IntStart', 'IntStop', 'VirusRef', 'VirusStart', 'VirusStop', 'OverlapType', 'ReadID'}:
-			tmp[key] = row[key]
-					
+
+		if key in {'Chr', 'IntStart', 'IntStop', 'Orientation', 'VirusRef', 'VirusStart', 'VirusStop', 'VirusOrientation', 'OverlapType', 'ReadID'}:
+			tmp[key] = row[key]			
 	return tmp
 	
 	

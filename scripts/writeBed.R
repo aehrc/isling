@@ -1,14 +1,14 @@
 #### this script takes the output from the viral integration pipeline, and outputs a bed file for display in the UCSC browser
 
-# usage: Rscript writeBed.R [<bed1> <bed2> ... <bedn>] <out_path>
+# usage: Rscript writeBed.R host virus [<bed1> <bed2> ... <bedn>] <out_path>
 
 #### load libraries ####
 library(stringr)
 library(dplyr)
-library(ggplot2)
 library(purrr)
 library(tidyr)
 library(readr)
+library(glue)
 
 #### path to the data ###
 # pass in files to process as command line arguments
@@ -16,10 +16,10 @@ library(readr)
 # within the dataset folders, the integrations for each sample are contained in a folder called ints, 
 # 
 
-
 args <- commandArgs(trailingOnly=TRUE)
-
-data_files <- args[1:(length(args) - 1)]
+host <- args[1]
+virus <- args[2]
+data_files <- args[3:(length(args) - 1)]
 
 out_path <- args[length(args)]
 out_path <- file.path(out_path)
@@ -34,45 +34,28 @@ int_cols <- readr::cols(
   Chr = col_character(),
   IntStart = col_integer(),
   IntStop = col_integer(),
-  VirusRef = col_character(),
+  JunctionType = col_character(),
+  Virus = col_character(),
   VirusStart = col_integer(),
   VirusStop = col_integer(),
-  NoAmbiguousBases = col_integer(),
-  OverlapType = col_character(),
-  Orientation = col_character(),
-  HostSeq = col_character(),
-  ViralSeq = col_character(),
-  AmbiguousSeq = col_character(),
-  HostEditDist = col_integer(),
-  ViralEditDist = col_integer(),
-  TotalEditDist = col_integer(),
-  PossibleHostTranslocation = col_character(),
-  PossibleVectorRearrangement = col_character(),
-  HostPossibleAmbiguous = col_character(),
-  ViralPossibleAmbiguous = col_character(),
-  Type = col_character(),
-  ReadID = col_character(),
-  merged = col_character(),
+  VirusOri = col_character(),
+  nChimeric = col_integer(),
+  nDiscordant = col_integer(),
+  SiteID = col_integer(),
+  ReadIDs = col_character(),
   .default = col_guess()
 )
 
 df <- tibble::tibble(filename = data_files) %>% # create a data frame holding the file names
   dplyr::mutate(integrations = purrr::map(filename, ~ readr::read_tsv(file.path(.), 
 						na = c("", "NA", "?"),
-						col_types = int_cols))) %>%
-  dplyr::mutate(total_count = purrr::flatten_int(purrr::map(integrations, ~nrow(.)))) 
+						col_types = int_cols)))  
 
 #add extra columns with sample name, dataset, host
 df <- df %>% 
   dplyr::mutate(dataset = dirname(dirname(filename))) %>% 
-  dplyr::mutate(sample = stringr::str_extract(basename(filename), "^[\\w-_]+(?=\\.)")) %>% 
-  dplyr::mutate( host = dplyr::case_when(
-				stringr::str_detect(basename(filename), "mouse|mm10|GRCm38") ~ "mm10",
-				stringr::str_detect(basename(filename), "macaque|macaca|macFas5") ~ "macFas5",
-				stringr::str_detect(basename(filename), "hg19") ~ "hg19",
-				stringr::str_detect(basename(filename), "hg38|GRCh38|human") ~ "hg38",
-				TRUE ~ "???"
-))
+  dplyr::mutate(sample = stringr::str_match(basename(df$filename), glue("(.+)\\.{host}\\.{virus}.integrations.post.merged.txt"))[,2])
+
 
 
 #unnest
@@ -89,8 +72,6 @@ df <- df %>%
 #note that need to add "chr" to chromosome numbers
 #chrom chromStart chromEnd
 
-chroms <- paste0("chr", c(1:22, "X", "Y", "M")) %>% paste(collapse = "|")
-
 if (nrow(df) == 0) {
 	exp <- basename(out_path)
 	file.create(paste0(out_path, "empty.bed"))
@@ -102,22 +83,22 @@ if (nrow(df) == 0) {
 	  for (j in unique(data_filt$sample)) {
 	  df %>%
 		dplyr::filter(sample == j) %>%
-		dplyr::mutate(Chr = case_when(
-			!str_detect(Chr, "chr") ~ paste0("chr", Chr),
+		dplyr::mutate(Chr = dplyr::case_when(
+			!stringr::str_detect(Chr, "chr") ~ paste0("chr", Chr),
 			Chr == "chrMT" ~ "chrM",
 			TRUE ~ Chr
 			)) %>%
 	  dplyr::mutate(Chr = ifelse(Chr == "chrMT", "chrM", Chr)) %>%
-		dplyr::select(Chr, IntStart, IntStop, ReadID) %>%
-		dplyr::filter(str_detect(Chr, chroms)) %>%
+		dplyr::select(Chr, IntStart, IntStop, ReadIDs) %>%
+		dplyr::filter(stringr::str_detect(Chr, 'chr\\d+|chrX|chrY|chrM')) %>%
 		dplyr::rename(`#chrom` = Chr) %>%
 		dplyr::rename(`ChromStart` = IntStart) %>%
 		dplyr::rename(`ChromEnd` = IntStop) %>%
-		dplyr::rename(name = ReadID) %>%
+		dplyr::rename(name = ReadIDs) %>%
 		readr::write_tsv(path = paste0(out_path, basename(i), ".", j, ".post.bed"), col_names = TRUE)
 	  }
    }
 }
 
 
-
+sessionInfo()

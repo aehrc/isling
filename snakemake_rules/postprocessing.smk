@@ -2,8 +2,8 @@ rule filter:
 	input:
 		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
 	output:
-		kept = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.p.txt"),
-		excluded = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.re.txt"),
+		kept = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.filter.txt"),
+		excluded = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.removedFilter.txt"),
 	params:
 		filterstring = lambda wildcards: get_value_from_df(wildcards, 'filter')
 	container:
@@ -30,9 +30,9 @@ rule exclude_bed:
 		filt = rules.filter.output.kept,
 		excluded = rules.filter.output.excluded
 	output:
-		tmp = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.po.txt.tmp"),
-		kept = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.po.txt",
-		excluded = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.remo.txt",
+		tmp = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.filter2.txt.tmp"),
+		kept = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.filter2.txt",
+		excluded = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.remove2.txt",
 	container:
 		"docker://szsctt/bedtools:1"
 	conda:
@@ -94,7 +94,7 @@ rule include_bed:
 
 rule summarise:
 	input:
-		lambda wildcards: [f"{{outpath}}/{{dset}}/ints/{samp}.{host}.{virus}.integrations.post.txt" for samp, host, virus
+		lambda wildcards: [f"{{outpath}}/{{dset}}/ints/{samp}.{host}.{virus}.integrations.post.merged.txt" for samp, host, virus
 			in zip(toDo.loc[toDo['dataset'] == wildcards.dset,'sample'], 
 					toDo.loc[toDo['dataset'] == wildcards.dset,'host'], 
 					toDo.loc[toDo['dataset'] == wildcards.dset,'virus'])]
@@ -107,17 +107,18 @@ rule summarise:
 	container:
 		"docker://szsctt/rscripts:4"
 	params:
-		outdir = lambda wildcards, output: path.dirname(output[0])
+		outdir = lambda wildcards, output: path.dirname(output[0]),
+		host = lambda wildcards: set(toDo.loc[toDo['dataset'] == wildcards.dset,'host']).pop(),
+		virus = lambda wildcards: set(toDo.loc[toDo['dataset'] == wildcards.dset,'virus']).pop()
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000)
 	threads: 1
 	shell:
-		"Rscript scripts/summarise_ints.R {input} {params.outdir}"
-
+		"Rscript scripts/summarise_ints.R {params.host} {params.virus} {input} {params.outdir}"
 
 rule ucsc_bed:
 	input:
-		lambda wildcards: [f"{wildcards.outpath}/{wildcards.dset}/ints/{samp}.{host}.{virus}.integrations.post.txt" for samp, host, virus
+		lambda wildcards: [f"{wildcards.outpath}/{wildcards.dset}/ints/{samp}.{host}.{virus}.integrations.post.merged.txt" for samp, host, virus
 			in zip(toDo.loc[toDo['dataset'] == wildcards.dset,'sample'], 
 					toDo.loc[toDo['dataset'] == wildcards.dset,'host'], 
 					toDo.loc[toDo['dataset'] == wildcards.dset,'virus'])]
@@ -125,7 +126,9 @@ rule ucsc_bed:
 		"{outpath}/summary/ucsc_bed/{dset}.post.bed"
 #	group: "post"
 	params:
-		outdir = lambda wildcards, output: f"{os.path.dirname(output[0])}/{wildcards.dset}"
+		outdir = lambda wildcards, output: f"{os.path.dirname(output[0])}/{wildcards.dset}",
+		host = lambda wildcards: set(toDo.loc[toDo['dataset'] == wildcards.dset,'host']).pop(),
+		virus = lambda wildcards: set(toDo.loc[toDo['dataset'] == wildcards.dset,'virus']).pop()
 	conda:
 		"../envs/rscripts.yml"
 	container:
@@ -135,21 +138,18 @@ rule ucsc_bed:
 	threads: 1
 	shell:
 		"""
-		Rscript scripts/writeBed.R {input} {params.outdir}
+		Rscript scripts/writeBed.R {params.host} {params.virus} {input} {params.outdir}
 		bash -e scripts/format_ucsc.sh {params.outdir}
-		mv {params.outdir}/*bed {params.outdir}/..
-		rmdir {params.outdir}
 		"""
 		
 rule merged_bed:
 	input:
 		txt = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.txt"
 	output:
-		sorted = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.sorted.txt"),
 		merged = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.merged.txt"
 #	group: "post"
 	params:
-		d = lambda wildcards: int(get_value_from_df(wildcards, 'merge_dist')),
+		method = lambda wildcards: get_value_from_df(wildcards, 'merge_method'),
 		n = lambda wildcards: int(get_value_from_df(wildcards, 'merge_n_min')),
 	container:
 		"docker://szsctt/bedtools:1"
@@ -158,9 +158,6 @@ rule merged_bed:
 	threads: 1
 	shell:
 		"""
-		pwd
-		head -n1 {input.txt} > {output.sorted}
-		tail -n+2  {input.txt} | sort -k1,1 -k2,2n -k4,4 -k5,5n >> {output.sorted}
-		python3 scripts/merge.py -i {output.sorted} -o {output.merged} -d {params.d} -n {params.n}
+		python3 scripts/merge.py -i {input.txt} -o {output.merged} -c {params.method} -n {params.n}
 		"""
 

@@ -16,6 +16,7 @@ bwa_mem_default = "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
 merge_dist_default = 100
 tol_default = 3
 cutoff_default = 20
+merge_method_default= 'common'
 merge_n_min_default = 1
 split_default = 1
 mean_frag_len_default = 'estimate'
@@ -40,6 +41,7 @@ fastq_extensions = [".fq", ".fastq"]
 bwa_prefix_extensions = [".amb", ".ann", ".bwt", ".pac", ".sa"]
 sam_extensions = [".sam", ".bam"]
 compression_extensions = [".gz", ".bz2"]
+merge_methods = {'exact', 'common'}
 
 #### get information for wildcards ####
 
@@ -107,6 +109,7 @@ def make_df(config):
 		clip_cutoff = get_value_or_default(config, dataset, 'clip-cutoff', cutoff_default)
 		cigar_tol = get_value_or_default(config, dataset, 'cigar-tol', tol_default)
 		bwa_mem_params = get_value_or_default(config, dataset, 'bwa-mem', bwa_mem_default)
+		merge_method = get_value_or_default(config, dataset, 'merge-method', merge_method_default)
 		merge_n_min = get_value_or_default(config, dataset, 'merge-n-min', merge_n_min_default)
 		split = get_value_or_default(config, dataset, 'split', split_default)
 		align_cpus = get_value_or_default(config, dataset, 'align-cpus', align_cpus_default)
@@ -129,6 +132,8 @@ def make_df(config):
 			if mean_frag_len != 'estimate':
 				raise ValueError('key "mean-frag-len" in dataset {dataset} should be either the string "estimate", or a number greater than 0')
 
+		if merge_method not in merge_methods:
+			raise ValueError(f"key 'merge-method' must be one of {merge_methods}")
 		
 		# get samples for this dataset
 		samples, is_bam = get_samples(config, dataset)
@@ -162,11 +167,11 @@ def make_df(config):
 			virus_prefix = config[dataset]["virus_prefixes"][virus]	
 			
 			# append combinations of each sample, host and virus		
-			rows.append((dataset_name, dataset, sample, host, host_fasta, host_prefix, virus, virus_fasta, virus_prefix, merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, merge_dist, merge_n_min, clip_cutoff, cigar_tol, split, mean_frag_len, align_cpus, cat, dedup_subs, filter_str, bed_exclude, bed_include))
+			rows.append((dataset_name, dataset, sample, host, host_fasta, host_prefix, virus, virus_fasta, virus_prefix, merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, merge_method, merge_n_min, clip_cutoff, cigar_tol, split, mean_frag_len, align_cpus, cat, dedup_subs, filter_str, bed_exclude, bed_include))
 
 				
 	# make dataframe
-	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2',  'merge_dist', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'split', 'mean_frag_len', 'align_cpus', 'cat', 'dedup_subs', 'filter', 'bed_exclude', 'bed_include'])
+	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'merge_method', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'split', 'mean_frag_len', 'align_cpus', 'cat', 'dedup_subs', 'filter', 'bed_exclude', 'bed_include'])
 	
 	
 	# do checks on dataframe
