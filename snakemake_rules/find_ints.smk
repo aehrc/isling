@@ -60,34 +60,16 @@ rule run_discordant:
 
 rule combine_ints:
 	input:
-		soft = rules.run_soft.output,
-		short = rules.run_short.output,
-		discordant = rules.run_discordant.output
+		soft = lambda wildcards: expand(rules.run_soft.output, part = get_split(wildcards), allow_missing = True),
+		short = lambda wildcards: expand(rules.run_short.output, part = get_split(wildcards), allow_missing = True),
+		discordant = lambda wildcards: expand(rules.run_discordant.output, part = get_split(wildcards), allow_missing = True)
 	group: "ints"
 	output:
-		all = temp("{outpath}/{dset}/ints/{samp}.{part}.{host}.{virus}.integrations.txt")
+		all = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
 	container:
 		"docker://ubuntu:18.04"
 	shell:
 		"""
-		awk 'FNR>1 || NR==1' {input} > {output.all}
+		(head -n1 {input.soft[0]} && awk '(FNR==1){{next}}{{print $0| "sort -k1,1 -k2,2n"}}' {input}) > {output.all}
 		"""
 
-rule merge_parts_ints:
-	message: "Merge the intergrations from each part into one file"
-	input:
-		files = lambda wildcards: expand("{{outpath}}/{{dset}}/ints/{{samp}}.{parts}.{{host}}.{{virus}}.integrations.txt", parts = get_split(wildcards)),
-	group: "ints"
-	output:
-		all = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
-		temp =  temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp"),
-	container:
-		"docker://ubuntu:18.04"
-	threads: 1
-	shell:
-		"""
-		echo {input.files}
-		awk 'FNR>1 || NR==1' {input.files} > {output.all}
-		sort -n -k1,1 -k2,2n {output.all} > {output.temp}
-		cp {output.temp} {output.all}
-		"""
