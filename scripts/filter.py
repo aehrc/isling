@@ -132,7 +132,7 @@ class Criteria():
 		
 		# criteria list can be just 'True' to include all integrations
 		if len(self.criteria_list) == 1:
-			assert self.criteria_list[0] == "True"
+			assert self.criteria_list[0] == "True" or self.criteria_list[0] == "(True)"
 			self.criteria = "True"
 			return
 		
