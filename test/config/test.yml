@@ -41,7 +41,7 @@ global:
     - "PossibleHostTranslocation == no"
   bed-exclude:
     - test/references/test.bed
-  merge-dist: 0
+  merge-method: 'common'
   merge-n-min: 1
 
 test-merge:
@@ -61,4 +61,5 @@ test-none:
   trim: False
   dedup: False
   split: 1
+  merge-method: 'exact'
 

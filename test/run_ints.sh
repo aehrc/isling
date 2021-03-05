@@ -9,7 +9,7 @@ cd ..
 
 #snakemake --configfile test/config/test.yml --cores 1 --forceall --use-singularity --dag | dot -Tsvg > dag.svg
 
-snakemake --configfile test/config/test.yml --cores 1 --rerun-incomplete --use-singularity
+snakemake --configfile test/config/test.yml --cores 1 --use-singularity --notemp
 
 
 #snakemake --configfile ../config/test_pipeline.yml -j 100 --rerun-incomplete --cluster-config cluster.json --use-conda --profile slurm -np
