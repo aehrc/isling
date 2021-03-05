@@ -10,7 +10,9 @@ rule run_soft:
 		cutoff = lambda wildcards: f"--cutoff {int(get_value_from_df(wildcards, 'clip_cutoff'))}",
 		tol = lambda wildcards: f"--tol {int(get_value_from_df(wildcards, 'cigar_tol'))}",
 	resources:
-		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max((input.host, input.virus), attempt, 1.5))
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		nodes = 1
 	container:
 		"docker://ubuntu:18.04"	
 	shell:
@@ -29,7 +31,8 @@ rule run_short:
 		cutoff = lambda wildcards: f"--cutoff {int(get_value_from_df(wildcards, 'clip_cutoff'))}",
 		tol = lambda wildcards: f"--tol {int(get_value_from_df(wildcards, 'cigar_tol'))}",
 	resources:
-		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max((input.host, input.virus), attempt, 1.5))
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 	container:
 		"docker://ubuntu:18.04"
 	shell:
@@ -49,7 +52,8 @@ rule run_discordant:
 		tol = lambda wildcards: f"--tol {int(get_value_from_df(wildcards, 'cigar_tol'))}",
 		tlen = lambda wildcards: f"--tlen {get_value_from_df(wildcards, 'mean_frag_len')}"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max((input.host, input.virus), attempt, 1.5))
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 	container:
 		"docker://ubuntu:18.04"
 	threads: workflow.cores
@@ -63,7 +67,9 @@ rule combine_ints:
 		soft = lambda wildcards: expand(rules.run_soft.output, part = get_split(wildcards), allow_missing = True),
 		short = lambda wildcards: expand(rules.run_short.output, part = get_split(wildcards), allow_missing = True),
 		discordant = lambda wildcards: expand(rules.run_discordant.output, part = get_split(wildcards), allow_missing = True)
-	group: "ints"
+	resources:
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 	output:
 		all = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
 	container:

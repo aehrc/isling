@@ -1,11 +1,14 @@
-rule filter:
+rule post_filter:
 	input:
 		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
 	output:
 		kept = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.filter.txt"),
-		excluded = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.removedFilter.txt"),
+		excluded = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.removed.txt"),
 	params:
 		filterstring = lambda wildcards: get_value_from_df(wildcards, 'filter')
+	resources:
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 	container:
 		"docker://szsctt/simvi:1"
 	shell:
@@ -27,12 +30,15 @@ rule sort_bed:
 rule exclude_bed:
 	input:
 		beds = lambda wildcards: [os.path.splitext(i)[0] + '.sorted.bed' for i in get_value_from_df(wildcards, 'bed_exclude')],
-		filt = rules.filter.output.kept,
-		excluded = rules.filter.output.excluded
+		filt = rules.post_filter.output.kept,
+		excluded = rules.post_filter.output.excluded
 	output:
 		tmp = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.filter2.txt.tmp"),
 		kept = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.filter2.txt",
-		excluded = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.remove2.txt",
+		excluded = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.removed2.txt",
+	resources:
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 	container:
 		"docker://szsctt/bedtools:1"
 	conda:
@@ -40,33 +46,44 @@ rule exclude_bed:
 	shell:
 		"""
 		cp {input.filt} {output.tmp}
-		cp {input.excluded} {output.excluded}
-		
-		if [ -z "{input.beds}" ]; then
-			cp {input.filt} {output.kept}
-			cp {input.excluded} {output.excluded}
-			touch {output.tmp}
-		else
-			ARRAY=( {input.beds} )
-			for bed in "${{ARRAY[@]}}"; do
-				echo "excluding integrations that intersect with $bed"
-				head -n1 {input.filt} > {output.kept}
-				bedtools intersect -v -a {output.tmp} -b $bed >> {output.kept}
-				bedtools intersect -u -a {output.tmp} -b $bed >> {output.excluded}
-				cp {output.kept} {output.tmp}
-			done
-		fi
+		ARRAY=( {input.beds} )
+		for bed in "${{ARRAY[@]}}"; do
+			echo "excluding integrations that intersect with $bed"
+			head -n1 {input.filt} > {output.kept}
+			bedtools intersect -v -a {output.tmp} -b $bed >> {output.kept}
+			bedtools intersect -u -a {output.tmp} -b $bed >> {output.excluded}
+			cp {output.kept} {output.tmp}
+		done
 		"""
+
+def get_for_include_bed(wildcards, file_type):
+	assert file_type in {'kept', 'excluded'}
+	# if there aren't any bed files to use for excluding
+	if len(get_value_from_df(wildcards, 'bed_exclude')) == 0:
+		if file_type == 'kept':
+			return rules.post_filter.output.kept
+		else:
+			return rules.post_filter.output.excluded
+	# if there are, then use files after excluding
+	else:
+		if file_type == 'kept':
+			return rules.exclude_bed.output.kept
+		else:
+			return rules.exclude_bed.output.excluded
+		
 
 rule include_bed:
 	input:
 		beds = lambda wildcards: [os.path.splitext(i)[0] + '.sorted.bed' for i in get_value_from_df(wildcards, 'bed_include')],	
-		filt = rules.exclude_bed.output.kept,
-		excluded = rules.exclude_bed.output.excluded
+		filt = lambda wildcards:  get_for_include_bed(wildcards, 'kept'),
+		excluded = lambda wildcards:  get_for_include_bed(wildcards, 'excluded')
 	output:
-		tmp = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt.tmp"),
-		kept = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt",
-		excluded = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.removed.txt",
+		tmp = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.filter3.txt.tmp"),
+		kept = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.filter3.txt",
+		excluded = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.removed3.txt",
+	resources:
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 	container:
 		"docker://szsctt/bedtools:1"
 	conda:
@@ -74,34 +91,90 @@ rule include_bed:
 	shell:
 		"""
 		cp {input.filt} {output.tmp}
-		cp {input.excluded} {output.excluded}
-		
-		if [ -z "{input.beds}" ]; then
-			cp {input.filt} {output.kept}
-			cp {input.excluded} {output.excluded}
-			touch {output.tmp}
-		else
-			ARRAY=( {input.beds} )
-			for bed in "${{ARRAY[@]}}"; do
-				echo "only keepint integrations that intersect with $bed"
-				head -n1 {input.filt} > {output.kept}
-				bedtools intersect -u -a {output.tmp} -b $bed >> {output.kept}
-				bedtools intersect -v -a {output.tmp} -b $bed >> {output.excluded}
-				cp {output.kept} {output.tmp}
-			done
-		fi
+ 
+		ARRAY=( {input.beds} )
+		for bed in "${{ARRAY[@]}}"; do
+			echo "only keepint integrations that intersect with $bed"
+			head -n1 {input.filt} > {output.kept}
+			bedtools intersect -u -a {output.tmp} -b $bed >> {output.kept}
+			bedtools intersect -v -a {output.tmp} -b $bed >> {output.excluded}
+			cp {output.kept} {output.tmp}
+		done
 		"""
 
-rule summarise:
+def get_post_final(wildcards, file_type):
+	assert file_type in {'kept', 'excluded'}
+	exclude_beds = len(get_value_from_df(wildcards, 'bed_exclude'))
+	include_beds = len(get_value_from_df(wildcards, 'bed_exclude'))
+	
+	# if there aren't any bed files to use for excluding
+	if exclude_beds == 0 and include_beds == 0:
+		if file_type == 'kept':
+			return rules.post_filter.output.kept
+		else:
+			return rules.post_filter.output.excluded
+	# if there are, then use files after excluding
+	elif exclude_beds != 0:
+		if file_type == 'kept':
+			return rules.exclude_bed.output.kept
+		else:
+			return rules.exclude_bed.output.excluded
+	else:
+		if file_type == 'kept':
+			return rules.include_bed.output.kept
+		else:
+			return rules.include_bed.output.excluded		
+
+
+rule post_final:
 	input:
-		lambda wildcards: [f"{{outpath}}/{{dset}}/ints/{samp}.{host}.{virus}.integrations.post.merged.txt" for samp, host, virus
-			in zip(toDo.loc[toDo['dataset'] == wildcards.dset,'sample'], 
-					toDo.loc[toDo['dataset'] == wildcards.dset,'host'], 
-					toDo.loc[toDo['dataset'] == wildcards.dset,'virus'])]
+		kept = lambda wildcards: get_post_final(wildcards, 'kept'),
+		excluded = lambda wildcards: get_post_final(wildcards, 'excluded'),
+	output:
+		kept = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt",
+		excluded = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.excluded.txt"
+	resources:
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+	shell:
+		"""
+		mv {input.kept} {output.kept}
+		mv {input.excluded} {output.excluded}
+		"""
+
+		
+rule merged_bed:
+	input:
+		txt = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.txt"
+	output:
+		merged = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.merged.txt"
+	params:
+		method = lambda wildcards: get_value_from_df(wildcards, 'merge_method'),
+		n = lambda wildcards: int(get_value_from_df(wildcards, 'merge_n_min')),
+		
+	container:
+		"docker://szsctt/bedtools:1"
+	resources:
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5, 1000)),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+	threads: 1
+	shell:
+		"""
+		python3 scripts/merge.py -i {input.txt} -o {output.merged} -c {params.method} -n {params.n}
+		"""
+
+
+rule summarise:
+	input: 
+		merged_beds = lambda wildcards: expand(rules.merged_bed.output.merged, zip,
+							samp = toDo.loc[toDo['dataset'] == wildcards.dset,'sample'],
+							host = toDo.loc[toDo['dataset'] == wildcards.dset,'host'],
+							virus = toDo.loc[toDo['dataset'] == wildcards.dset,'virus'],
+							allow_missing = True
+					)
 	output:
 		"{outpath}/summary/{dset}.xlsx",
 		"{outpath}/summary/{dset}_annotated.xlsx"
-#	group: "post"
 	conda:
 		"../envs/rscripts.yml"
 	container:
@@ -111,20 +184,22 @@ rule summarise:
 		host = lambda wildcards: set(toDo.loc[toDo['dataset'] == wildcards.dset,'host']).pop(),
 		virus = lambda wildcards: set(toDo.loc[toDo['dataset'] == wildcards.dset,'virus']).pop()
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 	threads: 1
 	shell:
 		"Rscript scripts/summarise_ints.R {params.host} {params.virus} {input} {params.outdir}"
 
 rule ucsc_bed:
-	input:
-		lambda wildcards: [f"{wildcards.outpath}/{wildcards.dset}/ints/{samp}.{host}.{virus}.integrations.post.merged.txt" for samp, host, virus
-			in zip(toDo.loc[toDo['dataset'] == wildcards.dset,'sample'], 
-					toDo.loc[toDo['dataset'] == wildcards.dset,'host'], 
-					toDo.loc[toDo['dataset'] == wildcards.dset,'virus'])]
+	input: 		
+		merged_beds = lambda wildcards: expand(rules.merged_bed.output.merged, zip,
+							samp = toDo.loc[toDo['dataset'] == wildcards.dset,'sample'],
+							host = toDo.loc[toDo['dataset'] == wildcards.dset,'host'],
+							virus = toDo.loc[toDo['dataset'] == wildcards.dset,'virus'],
+							allow_missing = True
+					)
 	output:
 		"{outpath}/summary/ucsc_bed/{dset}.post.bed"
-#	group: "post"
 	params:
 		outdir = lambda wildcards, output: f"{os.path.dirname(output[0])}/{wildcards.dset}",
 		host = lambda wildcards: set(toDo.loc[toDo['dataset'] == wildcards.dset,'host']).pop(),
@@ -134,30 +209,12 @@ rule ucsc_bed:
 	container:
 		"docker://szsctt/rscripts:4"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000)
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 	threads: 1
 	shell:
 		"""
 		Rscript scripts/writeBed.R {params.host} {params.virus} {input} {params.outdir}
 		bash -e scripts/format_ucsc.sh {params.outdir}
-		"""
-		
-rule merged_bed:
-	input:
-		txt = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.txt"
-	output:
-		merged = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.merged.txt"
-#	group: "post"
-	params:
-		method = lambda wildcards: get_value_from_df(wildcards, 'merge_method'),
-		n = lambda wildcards: int(get_value_from_df(wildcards, 'merge_n_min')),
-	container:
-		"docker://szsctt/bedtools:1"
-	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000)
-	threads: 1
-	shell:
-		"""
-		python3 scripts/merge.py -i {input.txt} -o {output.merged} -c {params.method} -n {params.n}
 		"""
 

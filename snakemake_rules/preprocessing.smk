@@ -15,7 +15,7 @@ import functools
 
 
 # fuction to get mem_mb based on size of input files
-def resources_list_with_min_and_max(file_name_list, attempt, mult_factor=2, minimum = 100, maximum = 50000):
+def resources_list_with_min_and_max(file_name_list, attempt, mult_factor=2, minimum = 1000, maximum = 50000):
 	resource = int(sum([os.stat(file).st_size/1e6 for file in file_name_list])) * attempt * mult_factor
 	
 	resource = min(maximum, resource)
@@ -103,7 +103,9 @@ rule check_bam_input_is_paired:
 		bam = lambda wildcards: get_value_from_df(wildcards, 'bam_file')
 	output:
 		ok = temp("{outpath}/{dset}/reads/{samp}.tmp"),
-	group: "extract_bam"
+	resources:
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 	conda:
 		"../envs/bwa.yml"
 	container:
@@ -130,7 +132,9 @@ rule bam_to_fastq:
 	output:
 		r1 = temp("{outpath}/{dset}/reads/{samp}_1.fq"),
 		r2 = temp("{outpath}/{dset}/reads/{samp}_2.fq"),
-	group: "extract_bam"
+	resources:
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 	conda:
 		"../envs/bwa.yml"
 	container:
@@ -160,7 +164,8 @@ rule dedupe:
 	container:
 		"docker://szsctt/bbmap:1"	
 	resources:
-		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 8)
+		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 8),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 	shell:
 		"""
 		clumpify.sh -Xmx{params.mem_mb}m in1={input.r1} in2={input.r2} out1={output.r1_dedup} out2={output.r2_dedup} dedupe=t ac=f subs={params.n_subs}{threads}
@@ -174,6 +179,9 @@ rule count_fastq:
 	params:
 		n_total =  lambda wildcards: get_value_from_df(wildcards, "split"),
 		cat = lambda wildcards: get_cat(wildcards),
+	resources:
+		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 8),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 	shell:
 		"""
 		rm -f {output.count_reads}
@@ -200,6 +208,9 @@ rule split_fastq:
 	params:
 		n_total =  lambda wildcards: get_value_from_df(wildcards, "split"),
 		cat = lambda wildcards: get_cat(wildcards),
+	resources:
+		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 8),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 	wildcard_constraints:
 		read_num = "1|2",
 		part = "\d+"
@@ -229,6 +240,9 @@ rule seqPrep:
 		"../envs/seqprep.yml"
 	container:
 		"docker://szsctt/seqprep:1"
+	resources:
+		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 8),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 	params:
 		A = lambda wildcards: get_value_from_df(wildcards, "adapter_1"),
 		B = lambda wildcards: get_value_from_df(wildcards, "adapter_2")
@@ -248,6 +262,9 @@ rule seqPrep_unmerged:
 		"../envs/seqprep.yml"
 	container:
 		"docker://szsctt/seqprep:1"
+	resources:
+		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 8),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 	params:
 		A = lambda wildcards: get_value_from_df(wildcards, "adapter_1"),
 		B = lambda wildcards: get_value_from_df(wildcards, "adapter_2")
