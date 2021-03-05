@@ -125,6 +125,10 @@ rule extract_to_fastq_single:
 		aligned = lambda wildcards: get_sam(wildcards, "single", "virus"),
 	output:
 		fastq = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.bwaSingle.mappedTo{virus}.fastq.gz"),
+	resources:
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 5, 2000),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		nodes = 1
 	conda:
 		"../envs/bwa.yml"
 	container:
@@ -145,6 +149,10 @@ rule extract_vAligned_paired:
 		pvBam_readUnmap_mateMap = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.R.bam"),
 		pvBam_bothMapped = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.B.bam"),
 		bam = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.mapped.bam"),
+	resources:
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 5, 2000),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		nodes = 1	
 	conda:
 		"../envs/bwa.yml"
 	container:
@@ -163,6 +171,10 @@ rule extract_to_fastq_paired:
 	output:
 		fastq1 = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.bwaPaired.mappedTo{virus}.1.fastq.gz"),
 		fastq2 = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.bwaPaired.mappedTo{virus}.2.fastq.gz")
+	resources:
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 5, 2000),
+		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		nodes = 1
 	conda:
 		"../envs/bwa.yml"
 	container:
@@ -183,7 +195,7 @@ rule align_bwa_host_single:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt, 5, 2000),
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 5, 2000),
 		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 		nodes = 1
 	params:
