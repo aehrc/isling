@@ -60,15 +60,17 @@ dataset_name:
   clip-cutoff: 20
   min-mapq: 10
   cigar-tol: 3
-  post:
-    - filter
-    - dedup
-    - mask-exclude:
-      - "/path/to/exclude.bed"
-    - nearest-gtf:
-      - "/path/to/genes.gtf"
- merge-dist: 100
- min-n-merge: 1
+  filter: 
+    - "HostEditDist <= 5"
+    - "ViralEditDist <= 5"
+    - "HostMapQ > 20"
+    - "NoAmbiguousBases < 20 or Type == discordant"
+  bed-include:
+    - "path/to/bed"
+  bed-exclude:
+    - "path/to/bed"
+  min-n-merge: 1
+  merge-method: 'common'
 ```
 
 #### Dataset name
@@ -119,24 +121,23 @@ The parameter `cigar-tol` is relevant when there are a small number of non-mappe
 
 #### Post-processing
 
-After detection, junction reads/read pairs may be filtered using post-processing.  The user may specify the types of post-processing to be performed in a list, consisting of one or more of the following types:
+After detection, junction reads/read pairs may be filtered using post-processing.  The following types of post-processing are availble:
 
-1. `filter`: Remove any integrations with the following properties:
-   - edit distance from host alignment more than 5
-   - edit distance from viral alignment more than 5
-   - if read is chimeric, more than 20 ambiguous bases
-   - not indicated to be a possible vector rearrangement
-   - not indicated to be a possible host translocation
-   These filters may be edited by the user by editing the R script `post/filter.R`
-2. `dedup`: De-duplicate reads on the basis of an exact match in read sequence.  This option differs from the de-duplication performed by Picard (see de-duplication above) because it a) considers only one read (for chimeric reads), rather than the pair and b) uses the read sequence rather than the mapped location as the basis for identifying duplicates
-3. `mask-exclude`: Specify a list of `bed` files in order to exclude any integrations that fall within the regions in those `bed` files
-4. `mask-include`: Specify a list of `bed` files in order to only include integrations that fall within the regions in those `bed` files
+1. `filter`: Remove any integrations not meeting user-defined criteria.  Criteria can be based on the following columns:
+	- TODO
+	
+2. `bed-exclude`: Specify a list of `bed` files in order to exclude any integrations that fall within the regions in those `bed` files
+3. `bed-include`: Specify a list of `bed` files in order to only include integrations that fall within the regions in those `bed` files
+
+TODO
 5. `nearest-bed`: Specify a list of `bed` files in order to annotate each integration with the nearest feature in each `bed` file, and the distance between the integration and that feature
 6. `nearest-bed`: Similar to `nearest-bed`, but with a `gtf` file rather than an `bed` file
 
 #### Merging
 
-Users may be interested only in integrations with a minimum number of supporting reads.  Include the `merge-dist` key to output a list of integrations where any integrations within the specified distance of each other (in the host) have been merged.  This file contains the number of reads merged, and the read IDs, so the user can refer back to the summary excel file for more information about each read.
+Integration events with overlapping coordinates and the same orientations are merged.  There are two modes of merging: in `exact` merging, integrations are only merged if their coordinates are exactly the same in both host and virus/vector, and in `common` merging, integrations are merged if they share common coordinates in both host and virus/vector.  The output coordinates in the latter case are the coordinates of the common bases.
+
+Users may be interested only in integrations with a minimum number of supporting reads. The key `merge-n-min` restricts output to integrations with at least this number of integrations.  This file contains the number of reads merged, and the read IDs, so the user can refer back to the summary excel file for more information about each read.
 
 #### Speical dataset options
 
