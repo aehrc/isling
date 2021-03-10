@@ -125,7 +125,7 @@ After detection, junction reads/read pairs may be filtered using post-processing
 
 1. `filter`: Remove any integrations not meeting user-defined criteria.  Criteria can be based on the following columns:
 	- *NoAmbiguousBases* (integer) - the number of bases in a gap or overlap between host and viral alignments
-	- *OverlapTyp* (‘none’, ‘gap’, ‘overlap’, ‘discordant’) - type of overlap between host and viral alignments
+	- *OverlapType* (‘none’, ‘gap’, ‘overlap’, ‘discordant’) - type of overlap between host and viral alignments
 	- *Orientation* (‘hv’, ‘vh’) - in the host, is the junction host-virus (+) or virus-host (-)
 	- *ViralOrientation* (‘+’, ‘-’) - orientation in which the virus/vector is integrated
 	- *HostEditDist* (integer) - edit distance of the alignemnt to the host
