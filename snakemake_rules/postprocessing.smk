@@ -25,7 +25,6 @@ rule sort_bed:
 		"docker://ubuntu:18.04"
 	shell:
 		"sort -k1,1 -k2,2n {input.unsorted} > {output.sorted}"
-		
 
 rule exclude_bed:
 	input:
