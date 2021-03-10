@@ -124,7 +124,20 @@ The parameter `cigar-tol` is relevant when there are a small number of non-mappe
 After detection, junction reads/read pairs may be filtered using post-processing.  The following types of post-processing are availble:
 
 1. `filter`: Remove any integrations not meeting user-defined criteria.  Criteria can be based on the following columns:
-	- TODO
+	- NoAmbiguousBases (integer)
+	- OverlapType (‘none’, ‘gap’, ‘overlap’, ‘discordant’)
+	- Orientation (‘hv’, ‘vh’)
+	- ViralOrientation (‘+’, ‘-’)
+	- HostEditDist (integer)
+	- ViralEditDist (integer)
+	- TotalEditDist (integer)
+	- PossibleHostTranslocation (‘yes’, ‘no’)
+	- PossibleVectorRearrangement (‘yes’, ‘no’)
+	- HostPossibleAmbiguous (‘yes’, ‘no’)
+	- ViralPossibleAmbiguous (‘yes’, ‘no’)
+	- Type (‘chimeric’, ‘discordant’)
+	- HostMapQ (integer)
+	- ViralMapQ (integer)
 	
 2. `bed-exclude`: Specify a list of `bed` files in order to exclude any integrations that fall within the regions in those `bed` files
 3. `bed-include`: Specify a list of `bed` files in order to only include integrations that fall within the regions in those `bed` files
