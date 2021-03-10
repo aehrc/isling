@@ -124,27 +124,28 @@ The parameter `cigar-tol` is relevant when there are a small number of non-mappe
 After detection, junction reads/read pairs may be filtered using post-processing.  The following types of post-processing are availble:
 
 1. `filter`: Remove any integrations not meeting user-defined criteria.  Criteria can be based on the following columns:
-	- NoAmbiguousBases (integer)
-	- OverlapType (‘none’, ‘gap’, ‘overlap’, ‘discordant’)
-	- Orientation (‘hv’, ‘vh’)
-	- ViralOrientation (‘+’, ‘-’)
-	- HostEditDist (integer)
-	- ViralEditDist (integer)
-	- TotalEditDist (integer)
-	- PossibleHostTranslocation (‘yes’, ‘no’)
-	- PossibleVectorRearrangement (‘yes’, ‘no’)
-	- HostPossibleAmbiguous (‘yes’, ‘no’)
-	- ViralPossibleAmbiguous (‘yes’, ‘no’)
-	- Type (‘chimeric’, ‘discordant’)
-	- HostMapQ (integer)
-	- ViralMapQ (integer)
+	- NoAmbiguousBases (integer) - the number of bases in a gap or overlap between host and viral alignments
+	- OverlapType (‘none’, ‘gap’, ‘overlap’, ‘discordant’) - type of overlap between host and viral alignments
+	- Orientation (‘hv’, ‘vh’) - in the host, is the junction host-virus (+) or virus-host (-)
+	- ViralOrientation (‘+’, ‘-’) - orientation in which the virus/vector is integrated
+	- HostEditDist (integer) - edit distance of the alignemnt to the host
+	- ViralEditDist (integer) - edit distnace of the alignment to the virus/vector
+	- TotalEditDist (integer) - sum of host and viral edit distances, plus the length of any bases in a gap between host and virus
+	- PossibleHostTranslocation (‘yes’, ‘no’) - does the read have two complementary alignments to the host genome?
+	- PossibleVectorRearrangement (‘yes’, ‘no’) - does the read have two complementary alignments to the virus/vector
+	- HostPossibleAmbiguous (‘yes’, ‘no’) - is there a secondary alignment equivalent (same CIGAR) to the primary alignment in the host?
+	- ViralPossibleAmbiguous (‘yes’, ‘no’) - is there a secondary alignment equivalent (same CIGAR) to the primary alignment in the virus/vector?
+	- Type (‘chimeric’, ‘discordant’) - is this read chimeric, or a discordant pair?
+	- HostMapQ (integer) - mapping quality of the host alignment
+	- ViralMapQ (integer) - mapping quality of the virus/vector alignment
 	
 2. `bed-exclude`: Specify a list of `bed` files in order to exclude any integrations that fall within the regions in those `bed` files
 3. `bed-include`: Specify a list of `bed` files in order to only include integrations that fall within the regions in those `bed` files
 
-TODO
+
+TODO:
 5. `nearest-bed`: Specify a list of `bed` files in order to annotate each integration with the nearest feature in each `bed` file, and the distance between the integration and that feature
-6. `nearest-bed`: Similar to `nearest-bed`, but with a `gtf` file rather than an `bed` file
+6. `nearest-gtf`: Similar to `nearest-bed`, but with a `gtf` file rather than an `bed` file
 
 #### Merging
 
