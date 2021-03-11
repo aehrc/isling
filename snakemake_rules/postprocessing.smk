@@ -41,7 +41,7 @@ rule exclude_bed:
 	container:
 		"docker://szsctt/bedtools:1"
 	conda:
-		"envs/bedtools.yml"
+		"../envs/bedtools.yml"
 	shell:
 		"""
 		cp {input.filt} {output.tmp}
@@ -86,7 +86,7 @@ rule include_bed:
 	container:
 		"docker://szsctt/bedtools:1"
 	conda:
-		"envs/bedtools.yml"
+		"../envs/bedtools.yml"
 	shell:
 		"""
 		cp {input.filt} {output.tmp}
