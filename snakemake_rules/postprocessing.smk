@@ -11,6 +11,7 @@ rule post_filter:
 		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 	container:
 		"docker://szsctt/simvi:1"
+	conda: "../envs/filter.yml"
 	shell:
 		"""
 		python3 scripts/filter.py -i {input.ints} -k {output.kept} -e {output.excluded} -c '{params.filterstring}'
@@ -190,7 +191,7 @@ rule summarise:
 		"Rscript scripts/summarise_ints.R {params.host} {params.virus} {input} {params.outdir}"
 
 rule ucsc_bed:
-	input: 		
+	input:
 		merged_beds = lambda wildcards: expand(rules.merged_bed.output.merged, zip,
 							samp = toDo.loc[toDo['dataset'] == wildcards.dset,'sample'],
 							host = toDo.loc[toDo['dataset'] == wildcards.dset,'host'],
