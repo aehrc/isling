@@ -144,9 +144,9 @@ rule post_final:
 		
 rule merged_bed:
 	input:
-		txt = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.txt"
+		txt = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt"
 	output:
-		merged = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations{post}.merged.txt"
+		merged = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.merged.txt"
 	params:
 		method = lambda wildcards: get_value_from_df(wildcards, 'merge_method'),
 		n = lambda wildcards: int(get_value_from_df(wildcards, 'merge_n_min')),
