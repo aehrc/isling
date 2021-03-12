@@ -11,11 +11,13 @@
 #		if neither specified, then neither rule is performed
 
 import functools
+import re
 
 
 
 # fuction to get mem_mb based on size of input files
 def resources_list_with_min_and_max(file_name_list, attempt, mult_factor=2, minimum = 1000, maximum = 50000):
+
 	resource = int(sum([os.stat(file).st_size/1e6 for file in file_name_list])) * attempt * mult_factor
 	
 	resource = min(maximum, resource)
@@ -92,6 +94,18 @@ def get_cat(wildcards):
 	else:
 		return get_value_from_df(wildcards, "cat")
 
+def strip_wildcard_constraints(string_with_constraints):
+	# when using the syntax rules.<rule>.output.<filename> to get the output of one rule for input to another
+	# snakemake adds the wildcard constrains in after a comma
+	# if we want to use these these as input to other rules, we need to strip out the commas
+	
+	string = string_with_constraints
+	
+	if re.search("\{\w+,\w+\}", string):
+		string = re.sub(",.+?\}", "}", string)
+	
+	return string
+
 rule write_analysis_summary:
 	output:
 		tsv = "{outpath}/summary/{dset}.analysis_conditions.tsv"
@@ -157,7 +171,7 @@ rule dedupe:
 		r2_dedup = "{outpath}/{dset}/dedup_reads/{samp}_2.fq"
 	params:
 		n_subs = lambda wildcards: get_value_from_df(wildcards, "dedup_subs"),
-		mem_mb = lambda wildcards, resources: int(resources.mem_mb * 0.8)
+		mem_mb = lambda wildcards, resources: max(int(resources.mem_mb * 0.8), 1000)
 	threads: cpus
 	conda:	
 		"../envs/bbmap.yml"

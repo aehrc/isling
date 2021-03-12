@@ -166,7 +166,7 @@ rule merged_bed:
 
 rule summarise:
 	input: 
-		merged_beds = lambda wildcards: expand(rules.merged_bed.output.merged, zip,
+		merged_beds = lambda wildcards: expand(strip_wildcard_constraints(rules.merged_bed.output.merged), zip,
 							samp = toDo.loc[toDo['dataset'] == wildcards.dset,'sample'],
 							host = toDo.loc[toDo['dataset'] == wildcards.dset,'host'],
 							virus = toDo.loc[toDo['dataset'] == wildcards.dset,'virus'],
@@ -192,7 +192,7 @@ rule summarise:
 
 rule ucsc_bed:
 	input:
-		merged_beds = lambda wildcards: expand(rules.merged_bed.output.merged, zip,
+		merged_beds = lambda wildcards: expand(strip_wildcard_constraints(rules.merged_bed.output.merged), zip,
 							samp = toDo.loc[toDo['dataset'] == wildcards.dset,'sample'],
 							host = toDo.loc[toDo['dataset'] == wildcards.dset,'host'],
 							virus = toDo.loc[toDo['dataset'] == wildcards.dset,'virus'],

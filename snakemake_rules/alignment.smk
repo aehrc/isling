@@ -257,7 +257,8 @@ rule combine_host:
 rule merge_virus_sams:
 	message: "Merging virus sam files to one single sam file."
 	input:
-		lambda wildcards: expand(rules.align_bwa_virus.output.combined, part = get_split(wildcards), allow_missing=True)
+		lambda wildcards: expand(strip_wildcard_constraints(rules.align_bwa_virus.output.combined), 
+					part = get_split(wildcards), allow_missing=True)
 	output:
 		temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.sam")
 	conda:
@@ -277,7 +278,8 @@ rule merge_virus_sams:
 rule merge_host_sams:
 	message: "Merging host sam files to one single sam file."
 	input:
-		lambda wildcards:  expand(rules.combine_host.output.combined, part = get_split(wildcards), allow_missing=True)
+		lambda wildcards:  expand(strip_wildcard_constraints(rules.combine_host.output.combined), 
+					part = get_split(wildcards), allow_missing=True)
 	output:
 		temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam")
 	conda:
