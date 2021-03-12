@@ -36,6 +36,7 @@ from os import path, getcwd
 import pandas as pd
 import pdb
 import sys
+import re
 
 # set working directory - directory in which snakefile is located
 if 'snakedir' not in config:
@@ -61,12 +62,12 @@ ref_names = make_reference_dict(toDo)
 #### global wildcard constraints ####
 
 wildcard_constraints:
-	virus = "|".join(set(toDo.loc[:,'virus'])),
-	samp = "|".join(set(toDo.loc[:,'sample'])),
-	dset = "|".join(set(toDo.loc[:,'dataset'])),
-	host = "|".join(set(toDo.loc[:,'host'])),
+	virus = "|".join([re.escape(i) for i in set(toDo.loc[:,'virus'])]),
+	samp = "|".join([re.escape(i) for i in set(toDo.loc[:,'sample'])]),
+	dset = "|".join([re.escape(i) for i in set(toDo.loc[:,'dataset'])]),
+	host = "|".join([re.escape(i) for i in set(toDo.loc[:,'host'])]),
 	align_type = "bwaPaired|bwaSingle",
-	outpath = "|".join(set(toDo.loc[:,'outdir'])),
+	outpath = "|".join([re.escape(i) for i in set(toDo.loc[:,'outdir'])]),
 	part = "\d+"
 
 #### local rules ####
