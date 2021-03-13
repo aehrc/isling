@@ -16,13 +16,13 @@ import re
 
 
 # fuction to get mem_mb based on size of input files
-def resources_list_with_min_and_max(file_name_list, attempt, mult_factor=2, minimum = 1000, maximum = 50000):
+def resources_list_with_min_and_max(file_name_list, attempt, mult_factor=2, minimum = 500, maximum = 50000):
 
 	resource = int(sum([os.stat(file).st_size/1e6 for file in file_name_list])) * attempt * mult_factor
 	
 	resource = min(maximum, resource)
 	
-	return max(minimum, resource)
+	return int(max(minimum, resource))
 	
 # function to get a value from the toDo df based on wildcards (to get correct row) and column_name
 def get_value_from_df(wildcards, column_name):

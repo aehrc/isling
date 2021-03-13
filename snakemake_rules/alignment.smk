@@ -119,7 +119,7 @@ rule combine_bwa_virus:
 	output:
 		combined = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.sam"),
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt, 1.2, 500),
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1.2, 500),
 		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 		nodes = 1
 	conda:
@@ -186,7 +186,7 @@ rule extract_vAligned_paired:
 		pvBam_bothMapped = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.B.bam"),
 		bam = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.mapped.bam"),
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1.2, 500),
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.2, 500)),
 		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
 		nodes = 1	
 	conda:
