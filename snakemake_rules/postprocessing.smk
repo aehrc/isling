@@ -34,8 +34,8 @@ rule exclude_bed:
 		excluded = rules.post_filter.output.excluded
 	output:
 		tmp = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.filter2.txt.tmp"),
-		kept = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.filter2.txt",
-		excluded = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.removed2.txt",
+		kept = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.filter2.txt"),
+		excluded = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.removed2.txt"),
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
 		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
@@ -79,8 +79,8 @@ rule include_bed:
 		excluded = lambda wildcards:  get_for_include_bed(wildcards, 'excluded')
 	output:
 		tmp = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.filter3.txt.tmp"),
-		kept = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.filter3.txt",
-		excluded = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.removed3.txt",
+		kept = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.filter3.txt"),
+		excluded = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.removed3.txt"),
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
 		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],

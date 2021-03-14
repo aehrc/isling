@@ -167,8 +167,8 @@ rule dedupe:
 		r1 = lambda wildcards: get_reads_input(wildcards, "1"),
 		r2 = lambda wildcards: get_reads_input(wildcards, "2")
 	output:
-		r1_dedup = "{outpath}/{dset}/dedup_reads/{samp}_1.fq",
-		r2_dedup = "{outpath}/{dset}/dedup_reads/{samp}_2.fq"
+		r1_dedup = temp("{outpath}/{dset}/dedup_reads/{samp}_1.fq"),
+		r2_dedup = temp("{outpath}/{dset}/dedup_reads/{samp}_2.fq")
 	params:
 		n_subs = lambda wildcards: get_value_from_df(wildcards, "dedup_subs"),
 		mem_mb = lambda wildcards, resources: max(int(resources.mem_mb * 0.8), 1000)
@@ -189,7 +189,7 @@ rule count_fastq:
 	input:
 		reads = lambda wildcards: get_for_split(wildcards, '1')
 	output:
-		count_reads = "{outpath}/{dset}/reads/{samp}_count.tmp"	
+		count_reads = temp("{outpath}/{dset}/reads/{samp}_count.tmp")	
 	params:
 		n_total =  lambda wildcards: get_value_from_df(wildcards, "split"),
 		cat = lambda wildcards: get_cat(wildcards),
@@ -218,7 +218,7 @@ rule split_fastq:
 		reads = lambda wildcards: get_for_split(wildcards, wildcards.read_num),
 		count_reads = "{outpath}/{dset}/reads/{samp}_count.tmp"	
 	output:
-		reads = "{outpath}/{dset}/split_reads/{samp}_{read_num}.{part}.fq",
+		reads = temp("{outpath}/{dset}/split_reads/{samp}_{read_num}.{part}.fq"),
 	params:
 		n_total =  lambda wildcards: get_value_from_df(wildcards, "split"),
 		cat = lambda wildcards: get_cat(wildcards),

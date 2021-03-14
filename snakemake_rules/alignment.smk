@@ -114,8 +114,8 @@ rule align_bwa_virus_paired:
 	
 rule combine_bwa_virus:
 	input:
-		single = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaSingle.sam"),
-		paired = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.sam"),
+		single = "{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaSingle.sam",
+		paired = "{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.sam",
 	output:
 		combined = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.sam"),
 	resources:

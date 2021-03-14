@@ -70,11 +70,11 @@ rule combine_ints:
 										part = get_split(wildcards), allow_missing = True),
 		discordant = lambda wildcards: expand(strip_wildcard_constraints(rules.run_discordant.output.discord), 
 										part = get_split(wildcards), allow_missing = True)
+	output:
+		all = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
 		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
-	output:
-		all = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
 	container:
 		"docker://ubuntu:18.04"
 	shell:
