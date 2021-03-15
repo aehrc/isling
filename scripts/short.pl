@@ -304,7 +304,6 @@ sub analyseShort{
 	
 	#calculate overlap type for each
 	#overlap is calculated based on matched regions
-	
 	my ($hMatch1Start, $hMatch1Stop) = split('xxx', $hMatched[0]);
 	my ($hMatch2Start, $hMatch2Stop) = split('xxx', $hMatched[-1]);
 
@@ -363,11 +362,21 @@ sub analyseShort{
 
 
 	## viral coordinates
-	my ($vgMatchStart, $vgMatchStop) = getGenomicCoords($vMatchStart, $vMatchStop, $vPos, $vDir, $vCig); 	
+	# can't assume that there is a single matched region - could be multiple regions broken up
+	# by insertions or deletions, so get coordinates of first matched region and last matched region
 	
-	#this assumes a single matched region, so could be problematic if there are more than one
+	# coordinates of first matched region
+	my ($start, $stop) = split('xxx', $vMatched[0]);
+	my $vgMatchStart = (getGenomicCoords($start, $stop, $vPos, $vDir, $vCig))[0]; 
+	
+	# coordinates of last matched region
+	($start, $stop) = split('xxx', $vMatched[-1]);
+	my $vgMatchStop = (getGenomicCoords($start, $stop, $vPos, $vDir, $vCig))[-1];
+
+	
 	($vg1Start, $vg1Stop) = getAmbigCoords($vgMatchStart, $ambig1, $overlap1);
 	($vg2Start, $vg2Stop) = getAmbigCoords($vgMatchStop, $ambig2, $overlap2);
+	
 	
 	#calculate total edit distance
 	my $totalNM1 = $vNM + $hNM;
