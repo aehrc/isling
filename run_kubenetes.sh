@@ -7,6 +7,10 @@ set -euo pipefail
 
 # script to run isling using kubernetes.  Pass through any other arguments passed the this script to snakemake
 
+if [ $# -lt 2 ]; then
+	echo "usage: ./run_kubernetes <config> <gs_bucket_name>"
+	exit 1
+fi
 
 CONFIG=$1
 BUCKET=$2
