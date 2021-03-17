@@ -8,10 +8,11 @@ rule post_filter:
 		filterstring = lambda wildcards: get_value_from_df(wildcards, 'filter')
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	container:
 		"docker://szsctt/simvi:1"
 	conda: "../envs/filter.yml"
+	group: "post"
 	shell:
 		"""
 		python3 scripts/filter.py -i {input.ints} -k {output.kept} -e {output.excluded} -c '{params.filterstring}'
@@ -24,6 +25,7 @@ rule sort_bed:
 		sorted = "{name}.sorted.bed"
 	container:
 		"docker://ubuntu:18.04"
+	group: "post"
 	shell:
 		"sort -k1,1 -k2,2n {input.unsorted} > {output.sorted}"
 
@@ -38,11 +40,12 @@ rule exclude_bed:
 		excluded = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.removed2.txt"),
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	container:
 		"docker://szsctt/bedtools:1"
 	conda:
 		"../envs/bedtools.yml"
+	group: "post"
 	shell:
 		"""
 		cp {input.filt} {output.tmp}
@@ -83,11 +86,12 @@ rule include_bed:
 		excluded = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.removed3.txt"),
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	container:
 		"docker://szsctt/bedtools:1"
 	conda:
 		"../envs/bedtools.yml"
+	group: "post"
 	shell:
 		"""
 		cp {input.filt} {output.tmp}
@@ -135,7 +139,8 @@ rule post_final:
 		excluded = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.excluded.txt"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+	group: "post"
 	shell:
 		"""
 		mv {input.kept} {output.kept}
@@ -156,8 +161,9 @@ rule merged_bed:
 		"docker://szsctt/bedtools:1"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5, 1000)),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	threads: 1
+	group: "post"
 	shell:
 		"""
 		python3 scripts/merge.py -i {input.txt} -o {output.merged} -c {params.method} -n {params.n}
@@ -185,7 +191,7 @@ rule summarise:
 		virus = lambda wildcards: set(toDo.loc[toDo['dataset'] == wildcards.dset,'virus']).pop()
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	threads: 1
 	shell:
 		"Rscript scripts/summarise_ints.R {params.host} {params.virus} {input} {params.outdir}"
@@ -210,7 +216,7 @@ rule ucsc_bed:
 		"docker://szsctt/rscripts:4"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	threads: 1
 	shell:
 		"""
