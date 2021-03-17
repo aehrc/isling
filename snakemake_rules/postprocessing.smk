@@ -1,6 +1,6 @@
 rule post_filter:
 	input:
-		ints = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
+		ints = rules.combine_ints.output.all,
 	output:
 		kept = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.filter.txt"),
 		excluded = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.removed.txt"),
@@ -145,7 +145,7 @@ rule post_final:
 		
 rule merged_bed:
 	input:
-		txt = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt"
+		txt = rules.post_final.output.kept
 	output:
 		merged = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.merged.txt"
 	params:

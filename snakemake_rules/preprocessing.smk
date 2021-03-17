@@ -17,9 +17,17 @@ import re
 
 # fuction to get mem_mb based on size of input files
 def resources_list_with_min_and_max(file_name_list, attempt, mult_factor=2, minimum = 500, maximum = 50000):
-
-	resource = int(sum([os.stat(file).st_size/1e6 for file in file_name_list])) * attempt * mult_factor
 	
+	# get sum of size of files in file_name_list
+	try:
+		print([file.size for file in file_name_list])
+		resource = int(sum([file.size for file in file_name_list])) * attempt * mult_factor
+	# sometimes this doesn't work - not sure why...
+	except WorkflowError:
+		
+		print(f"warning: couldn't get size of input files: using minimum {minimum}")
+		resource = minimum * attempt
+
 	resource = min(maximum, resource)
 	
 	return int(max(minimum, resource))
