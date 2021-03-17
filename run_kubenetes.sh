@@ -15,19 +15,12 @@ fi
 CONFIG=$1
 BUCKET=$2
 
+TMP_SNAKEFILE=$(python3 scripts/config_for_k8s.py -s Snakefile -c $CONFIG)
+SMK="snakemake --kubernetes --snakefile $TMP_SNAKEFILE --default-remote-provider GS --default-remote-prefix $BUCKET"
+
 if [ $# -gt 2 ]; then
-	ARGS="${@:3}"
-else
-	ARGS=""
+	SMK="${SMK} ${@:3}"
 fi
 
-
-TMP_SNAKEFILE=$(python3 scripts/config_for_k8s.py -s Snakefile -c $CONFIG)
-
-
-snakemake --kubernetes \
- --snakefile "$TMP_SNAKEFILE" \
- --default-remote-provider 'GS' \
- --default-remote-prefix "$BUCKET" \
- "$ARGS" && rm $TMP_SNAKEFILE || rm $TMP_SNAKEFILE
+$SMK && rm $TMP_SNAKEFILE || rm $TMP_SNAKEFILE
 
