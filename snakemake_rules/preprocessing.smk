@@ -125,7 +125,7 @@ rule check_bam_input_is_paired:
 	output:
 		ok = temp("{outpath}/{dset}/reads/{samp}.tmp"),
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 300),
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1.2, 300),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	conda:
 		"../envs/bwa.yml"
@@ -155,7 +155,7 @@ rule bam_to_fastq:
 		r1 = temp("{outpath}/{dset}/reads/{samp}_1.fq"),
 		r2 = temp("{outpath}/{dset}/reads/{samp}_2.fq"),
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000),
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1.2, 1000),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	conda:
 		"../envs/bwa.yml"
@@ -204,7 +204,7 @@ rule count_fastq:
 		n_total =  lambda wildcards: get_value_from_df(wildcards, "split"),
 		cat = lambda wildcards: get_cat(wildcards),
 	resources:
-		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1.5),
+		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 0.5, 500, 5000),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	group: "pre_split"
 	shell:
@@ -234,7 +234,7 @@ rule split_fastq:
 		n_total =  lambda wildcards: get_value_from_df(wildcards, "split"),
 		cat = lambda wildcards: get_cat(wildcards),
 	resources:
-		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 2),
+		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 0.5, 500, 5000),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	wildcard_constraints:
 		read_num = "1|2",
@@ -267,7 +267,7 @@ rule seqPrep:
 	container:
 		"docker://szsctt/seqprep:1"
 	resources:
-		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 2),
+		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 0.5, 500, 5000),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	params:
 		A = lambda wildcards: get_value_from_df(wildcards, "adapter_1"),
@@ -290,7 +290,7 @@ rule seqPrep_unmerged:
 	container:
 		"docker://szsctt/seqprep:1"
 	resources:
-		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 2),
+		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 0.5, 500, 5000),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	params:
 		A = lambda wildcards: get_value_from_df(wildcards, "adapter_1"),
@@ -307,7 +307,6 @@ rule touch_merged:
 		merged = temp("{outpath}/{dset}/combined_reads/{samp}.{part}.mockMerged.fastq.gz")
 	container:
 		"docker://ubuntu:18.04"	
-	group: "pre_trim-or-merge"
 	shell:
 		"""
 		touch {output.merged}

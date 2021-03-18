@@ -77,6 +77,7 @@ rule combine_ints:
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	container:
 		"docker://ubuntu:18.04"
+	group: "ints"
 	shell:
 		"""
 		(head -n1 {input.soft[0]} && awk '(FNR==1){{next}}{{print $0| "sort -k1,1 -k2,2n"}}' {input}) > {output.all}

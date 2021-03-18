@@ -287,7 +287,7 @@ rule combine_host:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.paired, input.single), attempt),
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.paired, input.single), attempt, 1.2, 500),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	group: "align_host"
@@ -308,7 +308,7 @@ rule merge_virus_sams:
 	conda:
 		"../envs/bwa.yml"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt),
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1.5),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	container:
@@ -329,7 +329,7 @@ rule merge_host_sams:
 	conda:
 		"../envs/bwa.yml"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt),
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1.5),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	container:
@@ -351,7 +351,7 @@ rule convert_virus_sam_to_bam:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt),
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 500),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	shell:
@@ -371,7 +371,7 @@ rule convert_host_sam_to_bam:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt),
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 500),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	shell:
