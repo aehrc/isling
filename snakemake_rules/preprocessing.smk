@@ -303,9 +303,6 @@ rule seqPrep_unmerged:
 
 # if we don't want to do merging, we still need to have an empty file of unmerged reads
 rule touch_merged:
-	input:
-		r1 = "{outpath}/{dset}/split_reads/{samp}_1.{part}.fq",
-		r2 = "{outpath}/{dset}/split_reads/{samp}_2.{part}.fq"
 	output:
 		merged = temp("{outpath}/{dset}/combined_reads/{samp}.{part}.mockMerged.fastq.gz")
 	container:
