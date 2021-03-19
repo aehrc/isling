@@ -12,7 +12,7 @@ The pipeline performs several steps in order to identify integration sites.  It 
 
 # Running
 
-To run with the test data, run:
+To run with the test data locally, run:
 
 ```
 snakemake --configfile test/config/test.yml --cores <cores>

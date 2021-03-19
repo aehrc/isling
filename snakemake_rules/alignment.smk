@@ -57,7 +57,7 @@ rule index:
 		prefix = lambda wildcards, output: path.splitext(output[0])[0]
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.fa,), attempt, 5, 2000),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	shell:
 		"bwa index -p {params.prefix} {input.fa}"
@@ -75,8 +75,9 @@ rule align_bwa_virus_single:
 		single_RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.virus}_merged\\tSM:{wildcards.samp}\\tPM:merged'",
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt, 2, 2000),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
+	group: "align_virus"	
 	conda:
 		"../envs/bwa.yml"
 	container:
@@ -100,13 +101,14 @@ rule align_bwa_virus_paired:
 		paired_RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.virus}_unmerged\\tSM:{wildcards.samp}\\tPM:unmerged'"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt, 2, 2000),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	conda:
-		"../envs/bwa.yml"
+		"../envs/bwa.yml"	
 	container:
 		"docker://szsctt/bwa:1"
 	threads: cpus
+	group: "align_virus"
 	shell:
 		"""
 		bwa mem -t {threads} {params.mapping} {params.paired_RG} -o {output.paired} {params.index} {input.r1} {input.r2} 
@@ -120,13 +122,14 @@ rule combine_bwa_virus:
 		combined = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.sam"),
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1.2, 500),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	conda:
 		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
 	threads: cpus
+	group: "align_virus"
 	shell:
 		"""
 		samtools merge {output.combined} {input.single} {input.paired}
@@ -163,12 +166,13 @@ rule extract_to_fastq_single:
 		fastq = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.bwaSingle.mappedTo{virus}.fastq.gz"),
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1.2, 500),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	conda:
 		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
+	group: "align_host"
 	shell:
 		"""
 		# 0x4 - read unmapped
@@ -187,12 +191,13 @@ rule extract_vAligned_paired:
 		bam = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.mapped.bam"),
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.2, 500)),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1	
 	conda:
 		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
+	group: "align_host"
 	shell:
 		"""
 		samtools view -hb -F 0x4 -f 0x8 -F 0x800 -o {output.pvBam_readMap_mateUnmap} {input.aligned}
@@ -209,7 +214,7 @@ rule extract_to_fastq_paired:
 		fastq2 = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.bwaPaired.mappedTo{virus}.2.fastq.gz")
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1.2, 500),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	conda:
 		"../envs/bwa.yml"
@@ -232,13 +237,14 @@ rule align_bwa_host_single:
 		"docker://szsctt/bwa:1"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 2, 2000),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	params:
 		index = lambda wildcards, input: os.path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
 		RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.host}_merged\\tSM:{wildcards.samp}\\tPM:merged'"
 	threads: cpus
+	group: "align_host"
 	shell:		
 		"""
 		bwa mem -t {threads} {params.mapping} {params.RG} -o {output.sam} {params.index} {input.all}
@@ -258,7 +264,8 @@ rule align_bwa_host_paired:
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt, 2, 2000),
 		nodes = 1,
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+	group: "align_host"
 	params:
 		index = lambda wildcards, input: os.path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
@@ -280,9 +287,10 @@ rule combine_host:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.paired, input.single), attempt),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.paired, input.single), attempt, 1.2, 500),
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
+	group: "align_host"
 	shell:		
 		"""
 		samtools merge {output.combined} {input.single} {input.paired}
@@ -300,8 +308,8 @@ rule merge_virus_sams:
 	conda:
 		"../envs/bwa.yml"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1.5),
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	container:
 		"docker://szsctt/bwa:1"
@@ -321,8 +329,8 @@ rule merge_host_sams:
 	conda:
 		"../envs/bwa.yml"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1.5),
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	container:
 		"docker://szsctt/bwa:1"
@@ -343,8 +351,8 @@ rule convert_virus_sam_to_bam:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 500),
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	shell:
 		"""
@@ -364,8 +372,8 @@ rule convert_host_sam_to_bam:
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 500),
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	shell:
 		"""

@@ -16,10 +16,17 @@ import re
 
 
 # fuction to get mem_mb based on size of input files
-def resources_list_with_min_and_max(file_name_list, attempt, mult_factor=2, minimum = 500, maximum = 50000):
-
-	resource = int(sum([os.stat(file).st_size/1e6 for file in file_name_list])) * attempt * mult_factor
+def resources_list_with_min_and_max(file_name_list, attempt, mult_factor=2, minimum = 100, maximum = 25000):
 	
+	# get sum of size of files in file_name_list
+	try:
+		resource = int(sum([file.size for file in file_name_list])) * attempt * mult_factor
+	# sometimes this doesn't work - not sure why...
+	except WorkflowError:
+		
+		print(f"warning: couldn't get size of input files: using minimum {minimum}")
+		resource = minimum * attempt
+
 	resource = min(maximum, resource)
 	
 	return int(max(minimum, resource))
@@ -118,12 +125,13 @@ rule check_bam_input_is_paired:
 	output:
 		ok = temp("{outpath}/{dset}/reads/{samp}.tmp"),
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1.2, 300),
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	conda:
 		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
+	group: "pre_convert"
 	shell:
 		"""
 		FWD=$(samtools view -c -f 0x40 {input})
@@ -147,14 +155,15 @@ rule bam_to_fastq:
 		r1 = temp("{outpath}/{dset}/reads/{samp}_1.fq"),
 		r2 = temp("{outpath}/{dset}/reads/{samp}_2.fq"),
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1.2, 1000),
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	conda:
 		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
+	group: "pre_convert"
 	shell:
 		"""
 		samtools view -b -F '0x900' {input.bam} |\
@@ -179,7 +188,8 @@ rule dedupe:
 		"docker://szsctt/bbmap:1"	
 	resources:
 		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 8),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+	group: "pre_dedup"
 	shell:
 		"""
 		clumpify.sh -Xmx{params.mem_mb}m in1={input.r1} in2={input.r2} out1={output.r1_dedup} out2={output.r2_dedup} dedupe=t ac=f subs={params.n_subs}{threads}
@@ -194,8 +204,9 @@ rule count_fastq:
 		n_total =  lambda wildcards: get_value_from_df(wildcards, "split"),
 		cat = lambda wildcards: get_cat(wildcards),
 	resources:
-		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 8),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 0.5, 500, 5000),
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+	group: "pre_split"
 	shell:
 		"""
 		rm -f {output.count_reads}
@@ -223,11 +234,12 @@ rule split_fastq:
 		n_total =  lambda wildcards: get_value_from_df(wildcards, "split"),
 		cat = lambda wildcards: get_cat(wildcards),
 	resources:
-		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 8),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 0.5, 500, 5000),
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	wildcard_constraints:
 		read_num = "1|2",
 		part = "\d+"
+	group: "pre_split"
 	shell:
 		"""
 		if [[ {params.n_total} -eq 1 ]]
@@ -255,11 +267,12 @@ rule seqPrep:
 	container:
 		"docker://szsctt/seqprep:1"
 	resources:
-		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 8),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 0.5, 500, 5000),
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	params:
 		A = lambda wildcards: get_value_from_df(wildcards, "adapter_1"),
 		B = lambda wildcards: get_value_from_df(wildcards, "adapter_2")
+	group: "pre_trim-or-merge"
 	shell:
 		"""
 		SeqPrep -A {params.A} -B {params.B} -f {input.r1} -r {input.r2} -1 {output.proc_r1} -2 {output.proc_r2} -s {output.merged}
@@ -277,11 +290,12 @@ rule seqPrep_unmerged:
 	container:
 		"docker://szsctt/seqprep:1"
 	resources:
-		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 8),
-		time = lambda wildcards, attempt: ('30:00', '2:00:00', '24:00:00', '7-00:00:00')[attempt - 1],
+		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 0.5, 500, 5000),
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	params:
 		A = lambda wildcards: get_value_from_df(wildcards, "adapter_1"),
 		B = lambda wildcards: get_value_from_df(wildcards, "adapter_2")
+	group: "pre_trim-or-merge"
 	shell:
 		"""
 		SeqPrep -A {params.A} -B {params.B} -f {input.r1} -r {input.r2} -1 {output.proc_r1} -2 {output.proc_r2}
@@ -289,9 +303,6 @@ rule seqPrep_unmerged:
 
 # if we don't want to do merging, we still need to have an empty file of unmerged reads
 rule touch_merged:
-	input:
-		r1 = "{outpath}/{dset}/split_reads/{samp}_1.{part}.fq",
-		r2 = "{outpath}/{dset}/split_reads/{samp}_2.{part}.fq"
 	output:
 		merged = temp("{outpath}/{dset}/combined_reads/{samp}.{part}.mockMerged.fastq.gz")
 	container:
