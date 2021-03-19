@@ -348,6 +348,7 @@ rule convert_virus_sam_to_bam:
 		nodes = 1
 	shell:
 		"""
+		rm -f {output.bam}*tmp*bam
 		samtools sort -o {output.bam} {input.sam}
 		samtools index {output.bam}
 		"""
@@ -368,6 +369,7 @@ rule convert_host_sam_to_bam:
 		nodes = 1
 	shell:
 		"""
+		rm -f {output.bam}*tmp*bam
 		samtools sort -o {output.bam} {input.sam}
 		samtools index {output.bam}
 		"""
