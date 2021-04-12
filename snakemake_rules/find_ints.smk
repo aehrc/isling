@@ -53,7 +53,6 @@ rule run_discordant:
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	container:
 		"docker://ubuntu:18.04"
-#	threads: workflow.cores
 	shell:
 		"""
 		perl -Iscripts scripts/discordant.pl --viral {input.virus} --host {input.host} --output {output.discord} {params}

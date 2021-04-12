@@ -16,7 +16,7 @@ import re
 
 
 # fuction to get mem_mb based on size of input files
-def resources_list_with_min_and_max(file_name_list, attempt, mult_factor=2, minimum = 100, maximum = 25000):
+def resources_list_with_min_and_max(file_name_list, attempt, mult_factor=2, minimum = 100, maximum = 120000):
 	
 	# get sum of size of files in file_name_list
 	try:
@@ -189,7 +189,7 @@ rule dedupe:
 	resources:
 		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 8),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
-		nodes = 1
+		nodes = 1 # need this for pearcey so that job doesn't get split over multiple nodes
 	shell:
 		"""
 		clumpify.sh -Xmx{params.mem_mb}m in1={input.r1} in2={input.r2} out1={output.r1_dedup} out2={output.r2_dedup} dedupe=t ac=f subs={params.n_subs}{threads}

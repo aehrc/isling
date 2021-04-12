@@ -48,7 +48,7 @@ rule index:
 	input:
 		fa = lambda wildcards: ref_names[wildcards.genome]
 	output:
-		temp(expand("{outpath}/references/{genome}/{genome}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True))
+		expand("{outpath}/references/{genome}/{genome}.{ext}", ext=["ann", "amb", "bwt", "pac", "sa"], allow_missing=True)
 	conda: 
 		"../envs/bwa.yml"
 	container:
@@ -57,11 +57,10 @@ rule index:
 		prefix = lambda wildcards, output: path.splitext(output[0])[0]
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.fa,), attempt, 5, 2000),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		time = lambda wildcards, attempt: (5, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	shell:
 		"bwa index -p {params.prefix} {input.fa}"
-
 
 rule align_bwa_virus_single:
 	input:
