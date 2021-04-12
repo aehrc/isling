@@ -127,11 +127,11 @@ rule check_bam_input_is_paired:
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1.2, 300),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		nodes = 1
 	conda:
 		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
-	group: "pre_convert"
 	shell:
 		"""
 		FWD=$(samtools view -c -f 0x40 {input})
@@ -157,13 +157,13 @@ rule bam_to_fastq:
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1.2, 1000),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		nodes = 1
 	conda:
 		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
-	group: "pre_convert"
 	shell:
 		"""
 		samtools view -b -F '0x900' {input.bam} |\
@@ -189,7 +189,7 @@ rule dedupe:
 	resources:
 		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 8),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
-	group: "pre_dedup"
+		nodes = 1
 	shell:
 		"""
 		clumpify.sh -Xmx{params.mem_mb}m in1={input.r1} in2={input.r2} out1={output.r1_dedup} out2={output.r2_dedup} dedupe=t ac=f subs={params.n_subs}{threads}
@@ -206,7 +206,7 @@ rule count_fastq:
 	resources:
 		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 0.5, 500, 5000),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
-	group: "pre_split"
+		nodes = 1
 	shell:
 		"""
 		rm -f {output.count_reads}
@@ -236,10 +236,10 @@ rule split_fastq:
 	resources:
 		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 0.5, 500, 5000),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		nodes = 1
 	wildcard_constraints:
 		read_num = "1|2",
 		part = "\d+"
-	group: "pre_split"
 	shell:
 		"""
 		if [[ {params.n_total} -eq 1 ]]
@@ -269,10 +269,10 @@ rule seqPrep:
 	resources:
 		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 0.5, 500, 5000),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		nodes = 1
 	params:
 		A = lambda wildcards: get_value_from_df(wildcards, "adapter_1"),
 		B = lambda wildcards: get_value_from_df(wildcards, "adapter_2")
-	group: "pre_trim-or-merge"
 	shell:
 		"""
 		SeqPrep -A {params.A} -B {params.B} -f {input.r1} -r {input.r2} -1 {output.proc_r1} -2 {output.proc_r2} -s {output.merged}
@@ -292,10 +292,10 @@ rule seqPrep_unmerged:
 	resources:
 		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 0.5, 500, 5000),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		nodes = 1
 	params:
 		A = lambda wildcards: get_value_from_df(wildcards, "adapter_1"),
 		B = lambda wildcards: get_value_from_df(wildcards, "adapter_2")
-	group: "pre_trim-or-merge"
 	shell:
 		"""
 		SeqPrep -A {params.A} -B {params.B} -f {input.r1} -r {input.r2} -1 {output.proc_r1} -2 {output.proc_r2}

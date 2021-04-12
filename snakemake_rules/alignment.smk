@@ -77,7 +77,6 @@ rule align_bwa_virus_single:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt, 2, 2000),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
-	group: "align_virus"	
 	conda:
 		"../envs/bwa.yml"
 	container:
@@ -108,7 +107,6 @@ rule align_bwa_virus_paired:
 	container:
 		"docker://szsctt/bwa:1"
 	threads: cpus
-	group: "align_virus"
 	shell:
 		"""
 		bwa mem -t {threads} {params.mapping} {params.paired_RG} -o {output.paired} {params.index} {input.r1} {input.r2} 
@@ -129,7 +127,6 @@ rule combine_bwa_virus:
 	container:
 		"docker://szsctt/bwa:1"
 	threads: cpus
-	group: "align_virus"
 	shell:
 		"""
 		samtools merge {output.combined} {input.single} {input.paired}
@@ -172,7 +169,6 @@ rule extract_to_fastq_single:
 		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
-	group: "align_host"
 	shell:
 		"""
 		# 0x4 - read unmapped
@@ -197,7 +193,6 @@ rule extract_vAligned_paired:
 		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/bwa:1"
-	group: "align_host"
 	shell:
 		"""
 		samtools view -hb -F 0x4 -f 0x8 -F 0x800 -o {output.pvBam_readMap_mateUnmap} {input.aligned}
@@ -244,7 +239,6 @@ rule align_bwa_host_single:
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
 		RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.host}_merged\\tSM:{wildcards.samp}\\tPM:merged'"
 	threads: cpus
-	group: "align_host"
 	shell:		
 		"""
 		bwa mem -t {threads} {params.mapping} {params.RG} -o {output.sam} {params.index} {input.all}
@@ -265,7 +259,6 @@ rule align_bwa_host_paired:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt, 2, 2000),
 		nodes = 1,
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
-	group: "align_host"
 	params:
 		index = lambda wildcards, input: os.path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
@@ -290,7 +283,6 @@ rule combine_host:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.paired, input.single), attempt, 1.2, 500),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
-	group: "align_host"
 	shell:		
 		"""
 		samtools merge {output.combined} {input.single} {input.paired}

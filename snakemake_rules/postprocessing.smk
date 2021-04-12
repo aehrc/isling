@@ -12,7 +12,6 @@ rule post_filter:
 	container:
 		"docker://szsctt/simvi:1"
 	conda: "../envs/filter.yml"
-	group: "post"
 	shell:
 		"""
 		python3 scripts/filter.py -i {input.ints} -k {output.kept} -e {output.excluded} -c '{params.filterstring}'
@@ -25,7 +24,6 @@ rule sort_bed:
 		sorted = "{name}.sorted.bed"
 	container:
 		"docker://ubuntu:18.04"
-	group: "post"
 	shell:
 		"sort -k1,1 -k2,2n {input.unsorted} > {output.sorted}"
 
@@ -45,7 +43,6 @@ rule exclude_bed:
 		"docker://szsctt/bedtools:1"
 	conda:
 		"../envs/bedtools.yml"
-	group: "post"
 	shell:
 		"""
 		cp {input.filt} {output.tmp}
@@ -91,7 +88,6 @@ rule include_bed:
 		"docker://szsctt/bedtools:1"
 	conda:
 		"../envs/bedtools.yml"
-	group: "post"
 	shell:
 		"""
 		cp {input.filt} {output.tmp}
@@ -140,7 +136,6 @@ rule post_final:
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
-	group: "post"
 	shell:
 		"""
 		mv {input.kept} {output.kept}
@@ -163,7 +158,6 @@ rule merged_bed:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5, 1000)),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	threads: 1
-	group: "post"
 	shell:
 		"""
 		python3 scripts/merge.py -i {input.txt} -o {output.merged} -c {params.method} -n {params.n}

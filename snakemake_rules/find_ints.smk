@@ -14,7 +14,6 @@ rule run_soft:
 		nodes = 1
 	container:
 		"docker://ubuntu:18.04"	
-	group: "ints"
 	shell:
 		"""
 		perl -Iscripts scripts/softClip.pl --viral {input.virus} --host {input.host} --output {output.soft} {params}
@@ -34,7 +33,6 @@ rule run_short:
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	container:
 		"docker://ubuntu:18.04"
-	group: "ints"
 	shell:
 		"""
 		perl -Iscripts scripts/short.pl --viral {input.virus} --host {input.host} --output {output.short} {params}
@@ -56,7 +54,6 @@ rule run_discordant:
 	container:
 		"docker://ubuntu:18.04"
 #	threads: workflow.cores
-	group: "ints"
 	shell:
 		"""
 		perl -Iscripts scripts/discordant.pl --viral {input.virus} --host {input.host} --output {output.discord} {params}
@@ -77,7 +74,6 @@ rule combine_ints:
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	container:
 		"docker://ubuntu:18.04"
-	group: "ints"
 	shell:
 		"""
 		(head -n1 {input.soft[0]} && awk '(FNR==1){{next}}{{print $0| "sort -k1,1 -k2,2n"}}' {input}) > {output.all}
