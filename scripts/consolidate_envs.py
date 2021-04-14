@@ -17,6 +17,8 @@ def main(args):
 	# check each yaml for new info
 	for y in yamls:
 		env = import_yaml(y)
+		if env is None:
+			continue
 		for c in env['channels']:
 			if c not in out['channels']:
 				out['channels'].append(c)
@@ -39,15 +41,6 @@ def import_yaml(config):
 		except yaml.YAMLError as exc:
 			print(exc)	
 			
-	# apply global options to in config
-	if 'global' in in_config:		
-		# get default (global) options
-		default = in_config.pop('global')
-		for dataset in in_config:
-			for key in default:
-				if key not in in_config[dataset]:
-					in_config[dataset][key] = default[key]
-	
 	return in_config
 
 	

@@ -1,5 +1,7 @@
 #### combine all integration sites in input files and write to excel spreadsheet ####
 
+# usage: Rscirpt summarise_ints.R host virus merged1 merged2 ... mergedn outdir
+
 #### Packages ####
 library(stringr)
 library(dplyr)
@@ -9,11 +11,13 @@ library(readr)
 library(writexl)
 library(tibble)
 library(tools)
+library(glue)
 
 #### import data ####
 args <- commandArgs(trailingOnly=TRUE)
-
-data_files <- args[1:(length(args) - 1)]
+host <- args[1]
+virus <- args[2]
+data_files <- args[3:(length(args) - 1)]
 out_path <- args[length(args)]
 out_path <- file.path(out_path)
 out_path <- paste0(out_path, "/")
@@ -30,18 +34,17 @@ getSamples <- function(data_files) {
 	return(data_files)
 }
 
+
 #import all datasets
 df <- tibble::tibble(filename = data_files) %>% # create a data frame holding the file names
   dplyr::mutate(integrations = purrr::map(filename, ~ readr::read_tsv(file.path(.), 
 						na = c("", "NA", "?"),
-						col_types = cols(Chr = col_character(), NoAmbiguousBases = col_integer(), .default =col_guess())))) %>%
-  dplyr::mutate(total_count = flatten_int(map(integrations, ~nrow(.)))) 
+						col_types = cols(Chr = col_character(), .default =col_guess())))) 
 
 #add extra columns with sample name, dataset, host
 df <- df %>% 
   dplyr::mutate(dataset = basename(dirname(dirname(filename)))) %>% 
-  dplyr::mutate(sample = stringr::str_extract(basename(filename), "^[\\w-_]+(?=\\.)")) %>% 
-  dplyr::mutate( host = ifelse(stringr::str_detect(basename(filename), "mouse|mm10|GRCm38"), "mm10", ifelse(stringr::str_detect(basename(filename), "macaque|macaca|macFas5"), "macFas5", "hg38")))
+  dplyr::mutate(sample = stringr::str_match(basename(filename), glue("(.+)\\.{host}\\.{virus}\\.integrations\\.post\\.merged\\.txt"))[,2])
 
 #select all integrations
 df <- df %>% 
@@ -57,7 +60,9 @@ for (i in unique(df$dataset)) {
     toWrite[[j]] <- data_filt  %>% 
       dplyr::filter(sample == j)
   }
-  writexl::write_xlsx(toWrite, path = paste(out_path, i, "_annotated.xlsx", sep = ""))
+  fn <- paste(out_path, i, "_annotated.xlsx", sep = "")
+  print(glue("saving to {fn}"))
+  writexl::write_xlsx(toWrite, path = fn)
 }
 
 # also write an excel spreadsheet for each dataset that doesn't contain the annotations
@@ -68,23 +73,28 @@ if (nrow(df) == 0) {
 	for (i in samples) {
 		toWrite[[i]] <- tibble()
 	}
-	writexl::write_xlsx(toWrite, path = paste(out_path, dset, ".xlsx", sep = ""))
-	writexl::write_xlsx(toWrite, path = paste(out_path, dset, "_annotated.xlsx", sep = ""))
+	fn1 <- paste(out_path, dset, ".xlsx", sep = "")
+	fn2 <- paste(out_path, dset, "_annotated.xlsx", sep = "")
+	print(glue("saving to {fn1}"))
+	print(glue("saving to {fn2}"))
+	writexl::write_xlsx(toWrite, path = fn1)
+	writexl::write_xlsx(toWrite, path = fn2)
 } else {
 	for (i in unique(df$dataset)) {
 	  toWrite <- list()
 	  data_filt <- df %>% 
 		    dplyr::filter(dataset == i) %>%
-    dplyr::select(dataset, sample, host, Chr, IntStart, IntStop, VirusRef, VirusStart, VirusStop, OverlapType, Orientation,
-	    				HostSeq, ViralSeq, AmbiguousSeq, HostEditDist, ViralEditDist, TotalEditDist, 
-	    				PossibleHostTranslocation, PossibleVectorRearrangement, HostPossibleAmbiguous, ViralPossibleAmbiguous,
-	    				Type, ReadID, merged)
+    dplyr::select(sample, Chr, IntStart, IntStop, Virus, VirusStart, VirusStop, nChimeric, nDiscordant, SiteID, ReadIDs)
 	  for (j in unique(data_filt$sample)) {
 	    toWrite[[j]] <- data_filt  %>% 
-	      dplyr::filter(sample == j)
+	      dplyr::filter(sample == j) %>% 
+	      dplyr::select(-sample)
 	  }
-	  writexl::write_xlsx(toWrite, path = paste(out_path, i, ".xlsx", sep = ""))
+	  fn <- paste(out_path, i, ".xlsx", sep = "")
+	  print(glue("saving to {fn}"))
+	  writexl::write_xlsx(toWrite, path = fn)
 	}
 }
 
+sessionInfo()
 

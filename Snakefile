@@ -36,6 +36,7 @@ from os import path, getcwd
 import pandas as pd
 import pdb
 import sys
+import re
 
 # set working directory - directory in which snakefile is located
 if 'snakedir' not in config:
@@ -46,8 +47,8 @@ snakedir = config['snakedir']
 config.pop('snakedir')
 
 
-sys.path.append(os.path.join(snakedir, "snakemake_rules/"))
-from snakemake_rules.make_df import make_df, make_reference_dict, make_post_args
+sys.path.append(os.path.join(snakedir, "scripts/"))
+from scripts.make_df import make_df, make_reference_dict
 
 
 # construct dataframe with wildcards and other information about how to run analysis
@@ -58,20 +59,15 @@ toDo = make_df(config)
 
 ref_names = make_reference_dict(toDo)
 
-# construct arguments for postprocess.R script for each dataset
-
-POSTARGS, TOSORT, SORTED = make_post_args(config)
-
-
 #### global wildcard constraints ####
 
 wildcard_constraints:
-	virus = "|".join(set(toDo.loc[:,'virus'])),
-	samp = "|".join(set(toDo.loc[:,'sample'])),
-	dset = "|".join(set(toDo.loc[:,'dataset'])),
-	host = "|".join(set(toDo.loc[:,'host'])),
+	virus = "|".join([re.escape(i) for i in set(toDo.loc[:,'virus'])]),
+	samp = "|".join([re.escape(i) for i in set(toDo.loc[:,'sample'])]),
+	dset = "|".join([re.escape(i) for i in set(toDo.loc[:,'dataset'])]),
+	host = "|".join([re.escape(i) for i in set(toDo.loc[:,'host'])]),
 	align_type = "bwaPaired|bwaSingle",
-	outpath = "|".join(set(toDo.loc[:,'outdir'])),
+	outpath = "|".join([re.escape(i) for i in set(toDo.loc[:,'outdir'])]),
 	part = "\d+"
 
 #### local rules ####
@@ -95,22 +91,22 @@ rule all:
 		summary_files,
 		ucsc_files,
 		merged_bed,
-		expand("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bam",
-			zip,
-			outpath = toDo.loc[:,'outdir'],
-			dset = toDo.loc[:,'dataset'],
-			samp = toDo.loc[:,'sample'],
-			virus = toDo.loc[:,'virus'],
-			host = toDo.loc[:,'host'],
-			),
-		expand("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bam",
-			zip,
-			outpath = toDo.loc[:,'outdir'],
-			dset = toDo.loc[:,'dataset'],
-			samp = toDo.loc[:,'sample'],
-			virus = toDo.loc[:,'virus'],
-			host = toDo.loc[:,'host'],
-			)
+#		expand("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bam",
+#			zip,
+#			outpath = toDo.loc[:,'outdir'],
+#			dset = toDo.loc[:,'dataset'],
+#			samp = toDo.loc[:,'sample'],
+#			virus = toDo.loc[:,'virus'],
+#			host = toDo.loc[:,'host'],
+#			),
+#		expand("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bam",
+#			zip,
+#			outpath = toDo.loc[:,'outdir'],
+#			dset = toDo.loc[:,'dataset'],
+#			samp = toDo.loc[:,'sample'],
+#			virus = toDo.loc[:,'virus'],
+#			host = toDo.loc[:,'host'],
+#			)
 
 #### read preprocessing ####
 include: "snakemake_rules/preprocessing.smk"

@@ -24,7 +24,6 @@ my $output = "short.txt";
 my $bed;
 my $merged;
 my $verbose;
-my $min_mapq = 0;
 my $help;
 
 GetOptions('cutoff=i' => \$cutoff,
@@ -36,7 +35,6 @@ GetOptions('cutoff=i' => \$cutoff,
 		   'merged=s' => \$merged,
 		   'verbose'  => \$verbose,
 		   'tol=i'    => \$tol,
-		   'min-mapq=i'    => \$min_mapq,
 		   'help',    => \$help);
 
 if ($help) { printHelp(); }
@@ -46,8 +44,6 @@ unless ($viral and $host) { printHelp(); }
 # check inputs
 if ($cutoff < 0) { die "Cutoff must be greater than zero"; }
 if ($tol < 0) { die "Tolerance must be greater than zero"; }
-if ($min_mapq < 0) { die "Minimum mapping quality must be greater than zero"; }
-if ($min_mapq > 60) { die "Minimum mapping quality must be less than 60"; }
 
 my %viralIntegrations;
 my %hostIntegrations;
@@ -78,9 +74,6 @@ while (my $vl = <VIRAL>) {
 	if ($parts[1] & 0x800) { next(); } # skip supplementary alignments
 	if ($parts[1] & 0x4) {next; } #skip unmapped alignments
 	if ($parts[2] eq "*") { next; } # skip unaligned reads
-	
-	# check mapping quality
-	if ($parts[4] < $min_mapq) { next; }
 
 	my ($cig, $combinedBases) = processCIGAR2($parts[5], $tol); # Process the CIGAR string to account for small insertions/deletions
 	unless ($cig) { next; } # keep checking to make sure double clipped reads don't sneak through
@@ -104,7 +97,7 @@ while (my $vl = <VIRAL>) {
 	}
 
 	#get read ID, aligned viral reference, alignment start
-	my ($readID, $ref, $start) = ($parts[0], $parts[2], $parts[3]);
+	my ($readID, $ref, $start, $mapq) = ($parts[0], $parts[2], $parts[3], $parts[4]);
 	
 	# append R1 or R2 to $readID if flag is set
 	if ($parts[1] & 0x40) { $readID = $readID."/1"; }
@@ -114,7 +107,7 @@ while (my $vl = <VIRAL>) {
 	my ($vSec, $vSup) = getSecSup($vl);
 	my $editDist = getEditDist($vl);
 	
-	$viralIntegrations{join("xxx",($readID,$seq))} = join("xxx", $seq, $dir, $ref, $start, $cig, $vSec, $vSup, ($editDist+$combinedBases)); 
+	$viralIntegrations{join("xxx",($readID,$seq))} = join("xxx", $seq, $dir, $ref, $start, $cig, $vSec, $vSup, ($editDist+$combinedBases, $mapq)); 
 }
 close VIRAL;
 
@@ -129,9 +122,6 @@ while (my $hl = <HOST>) {
 	
 	if ($parts[1] & 0x800) { next(); } # skip supplementary alignments
 	if ($parts[1] & 0x4) {next; } #skip unmapped alignments
-	
-	# check mapping quality
-	if ($parts[4] < $min_mapq) { next; }
 	
 	unless ($parts[5]) { next; }
 
@@ -160,7 +150,7 @@ while (my $hl = <HOST>) {
 	}
 	
 	#get read ID, aligned viral reference, alignment pos
-	my ($readID, $ref, $start) = ($parts[0], $parts[2], $parts[3]);
+	my ($readID, $ref, $start, $mapq) = ($parts[0], $parts[2], $parts[3], $parts[4]);
 	
 	# append R1 or R2 to $readID if flag is set
 	if ($parts[1] & 0x40) { $readID = $readID."/1"; }
@@ -185,7 +175,7 @@ while (my $hl = <HOST>) {
 		
 		$editDist -= $insertedBases;
 		
-		$hostIntegrations{join("xxx",($readID,$seq))} = join("xxx", $seq, $Dir, $ref, $start, $cig, $hSec, $hSup, ($editDist+$combinedBases));
+		$hostIntegrations{join("xxx",($readID,$seq))} = join("xxx", $seq, $Dir, $ref, $start, $cig, $hSec, $hSup, ($editDist+$combinedBases, $mapq));
 	}
 }
 close HOST;
@@ -217,7 +207,7 @@ foreach my $key (keys %viralIntegrations) {
 
 
 #print file
-my $header = "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNoAmbiguousBases\tOverlapType\tOrientation\tHostSeq\tViralSeq\tAmbiguousSeq\tHostEditDist\tViralEditDist\tTotalEditDist\tPossibleHostTranslocation\tPossibleVectorRearrangement\tHostPossibleAmbiguous\tViralPossibleAmbiguous\tType\tReadID\tmerged\n";		
+my $header = "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNoAmbiguousBases\tOverlapType\tOrientation\tVirusOrientation\tHostSeq\tVirusSeq\tAmbiguousSeq\tHostEditDist\tViralEditDist\tTotalEditDist\tPossibleHostTranslocation\tPossibleVectorRearrangement\tHostPossibleAmbiguous\tViralPossibleAmbiguous\tType\tHostMapQ\tViralMapQ\tReadID\tReadSeq\n";			
 
 if ($verbose) { print "Writing output...\n"; }
 
@@ -238,14 +228,12 @@ exit;
 sub printHelp {
 	print "Pipeline for detection of viral integration sites within a genome\n\n";
 	print "Usage:\n";
-	print "\tperl short.pl --viral <sam> --host <sam> --cutoff <n> --thresh <n> --tol <n> --min-mapq <n> --output <out> --bed <bed> --help\n\n";
+	print "\tperl short.pl --viral <sam> --host <sam> --cutoff <n> --tol <n> --output <out> --bed <bed> --help\n\n";
 	print "Arguments:\n";
 	print "\t--viral:   Alignment of reads to viral genomes (sam)\n";
 	print "\t--host:   Alignment of reads to host genome (sam)\n";
 	print "\t--cutoff:  Minimum number of clipped reads to be considered (default = 20)\n";
-	print "\t--thresh:	Amount of read that must be covered by one alignment to be considered rearrangement (default = 0.95)\n";
 	print "\t--tol:	Soft-clipped regions at either end of the read shorter than this will be absorbed into the nearest mapped region";
-	print "\t--min-maqp:	Minimum mapping quality to consider a read";	
 	print "\t--output:  Output file for results (default = short.txt\n";
 	print "\t--bed:     Print integrations sites to indicated bed file (default = NA)\n";
 	print "\t--merged:  Merge bedfile into overlapping integration sites (default = NA)\n";
@@ -262,8 +250,9 @@ sub analyseShort{
 	my ($viralData, $hostData, $ID, $seq) = @_;
 	
 	#get data from input
-	my ($vDir, $vRef, $vPos, $vCig, $vSec, $vSup, $vNM) = (split("xxx",$viralData))[1,2,3,4,5,6, -1];
-	my ($hDir, $hRef, $hPos, $hCig, $hSec, $hSup, $hNM) = (split("xxx",$hostData))[1,2,3,4,5,6, -1];
+
+	my ($vDir, $vRef, $vPos, $vCig, $vSec, $vSup, $vNM, $vMQ) = (split("xxx",$viralData))[1,2,3,4,5,6,7,8];
+	my ($hDir, $hRef, $hPos, $hCig, $hSec, $hSup, $hNM, $hMQ) = (split("xxx",$hostData))[1,2,3,4,5,6,7,8];
 	
 	#arrays to store output
 	#attributes of output:
@@ -315,7 +304,6 @@ sub analyseShort{
 	
 	#calculate overlap type for each
 	#overlap is calculated based on matched regions
-	
 	my ($hMatch1Start, $hMatch1Stop) = split('xxx', $hMatched[0]);
 	my ($hMatch2Start, $hMatch2Stop) = split('xxx', $hMatched[-1]);
 
@@ -374,11 +362,21 @@ sub analyseShort{
 
 
 	## viral coordinates
-	my ($vgMatchStart, $vgMatchStop) = getGenomicCoords($vMatchStart, $vMatchStop, $vPos, $vDir, $vCig); 	
+	# can't assume that there is a single matched region - could be multiple regions broken up
+	# by insertions or deletions, so get coordinates of first matched region and last matched region
 	
-	#this assumes a single matched region, so could be problematic if there are more than one
+	# coordinates of first matched region
+	my ($start, $stop) = split('xxx', $vMatched[0]);
+	my $vgMatchStart = (getGenomicCoords($start, $stop, $vPos, $vDir, $vCig))[0]; 
+	
+	# coordinates of last matched region
+	($start, $stop) = split('xxx', $vMatched[-1]);
+	my $vgMatchStop = (getGenomicCoords($start, $stop, $vPos, $vDir, $vCig))[-1];
+
+	
 	($vg1Start, $vg1Stop) = getAmbigCoords($vgMatchStart, $ambig1, $overlap1);
 	($vg2Start, $vg2Stop) = getAmbigCoords($vgMatchStop, $ambig2, $overlap2);
+	
 	
 	#calculate total edit distance
 	my $totalNM1 = $vNM + $hNM;
@@ -449,12 +447,23 @@ sub analyseShort{
 		$ambigSeq2 = substr($seq, $hMatch2Start - 1 - $ambig2, $ambig2);
 	}
 	
+	# get orientiation of inserted virus
+	my $vIntOri;
+	if ($hDir eq 'f') {
+		if ($vDir eq 'f') { $vIntOri = '+'; } 
+		else { $vIntOri = '-'; } 
+	} 
+	else {
+		if ($vDir eq 'f') { $vIntOri = '-'; } 
+		else { $vIntOri = '+'; } 
+	}
+	
 	#output:
 	## two arrays, one for each integration
 	## hRef, hStart, hStop, vRef, vStart, vStop, noAmbigbases, overlapType, orientation, hostseq, viralseq, ambigSeq, hostSec, viralSec, possible translocation, possible vector rearrangement, host ambiguous, viral ambiguous, readID, seq
 	
-	my $int1Data = join("\t", $hRef, $hg1Start, $hg1Stop, $vRef, $vg1Start, $vg1Stop, $ambig1, $overlap1, 'hv', $hostSeq1, $viralSeq, $ambigSeq1, $hNM, $vNM, $totalNM1, $hRe, $vRe, $hAmbig, $vAmbig, 'short', $ID, $seq);
-	my $int2Data = join("\t", $hRef, $hg2Start, $hg2Stop, $vRef, $vg2Start, $vg2Stop, $ambig2, $overlap2, 'vh', $hostSeq2, $viralSeq, $ambigSeq2, $hNM, $vNM, $totalNM2, $hRe, $vRe, $hAmbig, $vAmbig, 'short', $ID, $seq);
+	my $int1Data = join("\t", $hRef, $hg1Start, $hg1Stop, $vRef, $vg1Start, $vg1Stop, $ambig1, $overlap1, 'hv', $vIntOri, $hostSeq1, $viralSeq, $ambigSeq1, $hNM, $vNM, $totalNM1, $hRe, $vRe, $hAmbig, $vAmbig, 'short', $hMQ, $vMQ, $ID, $seq);
+	my $int2Data = join("\t", $hRef, $hg2Start, $hg2Stop, $vRef, $vg2Start, $vg2Stop, $ambig2, $overlap2, 'vh', $vIntOri, $hostSeq2, $viralSeq, $ambigSeq2, $hNM, $vNM, $totalNM2, $hRe, $vRe, $hAmbig, $vAmbig, 'short', $hMQ, $vMQ, $ID, $seq);
 	
 	return ($int1Data, $int2Data);
 }

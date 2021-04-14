@@ -12,7 +12,7 @@ The pipeline performs several steps in order to identify integration sites.  It 
 
 # Running
 
-To run with the test data, run:
+To run with the test data locally, run:
 
 ```
 snakemake --configfile test/config/test.yml --cores <cores>
@@ -45,28 +45,32 @@ dataset_name:
   	- "sample2"
   R1_suffix: "_L001_R1.fastq.gz"
   R2_suffix: "_L001_R2.fastq.gz"
-  split: 1
+  split: 2
   read1-adapt: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
   read2-adapt: "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
   mean-frag-len: "estimate"
+  dedup: True
+  dedup-subs: 2
   merge: True
   trim: True
   host_name: "macFas5"
   host_fasta: "/path/to/refs/macFas5.fa"
   virus_name: "pAAV2-OTC_flop"
   virus_fasta: "/path/to/refs/pAAV2-OTC.fa"
-  dedup: False
   clip-cutoff: 20
   min-mapq: 10
   cigar-tol: 3
-  post:
-    - filter
-    - dedup
-    - mask-exclude:
-      - "/path/to/exclude.bed"
-    - nearest-gtf:
-      - "/path/to/genes.gtf"
- merge-dist: 100
+  filter: 
+    - "HostEditDist <= 5"
+    - "ViralEditDist <= 5"
+    - "HostMapQ > 20"
+    - "NoAmbiguousBases < 20 or Type == discordant"
+  bed-include:
+    - "path/to/bed"
+  bed-exclude:
+    - "path/to/bed"
+  min-n-merge: 1
+  merge-method: 'common'
 ```
 
 #### Dataset name
@@ -105,7 +109,7 @@ Specify a name and one of either sequence (`fasta` format) or `bwa` index prefix
 
 #### De-duplication
 
-The key `dedup` indicates whether duplicate reads should be removed from the alignments before identifying integrations using [picard MarkDuplicates](https://gatk.broadinstitute.org/hc/en-us/articles/360036366192-MarkDuplicates-Picard-).  Note that only reads where both members of the pair are duplicates will be removed.
+The key `dedup` indicates whether duplicate reads should be removed from the reads before merging, trimming and alignment using  [bbmap Clumpify](https://jgi.doe.gov/data-and-tools/bbtools/bb-tools-user-guide/clumpify-guide/).  Sequence-based duplicate removal is necessary since separate alignments are performed to the host and virus, and removing duplicates from these alignments can result in missing reads, since a read pair may appear to be a duplicate in one alignment (and hence would be removed), but may not be a duplicate in the other alignment.  Note that only reads where both members of the pair are duplicates will be removed.  Use the parameter `dedup-subs` to set the number of substitutions allowed for reads to be considered duplicates.  Since this step is memory-intensive, it is not recommended for large datasets.
 
 #### Options for integration detection (`clip-cutoff`, `min-mapq`, `cigar-tol`)
 
@@ -117,24 +121,37 @@ The parameter `cigar-tol` is relevant when there are a small number of non-mappe
 
 #### Post-processing
 
-After detection, junction reads/read pairs may be filtered using post-processing.  The user may specify the types of post-processing to be performed in a list, consisting of one or more of the following types:
+After detection, junction reads/read pairs may be filtered using post-processing.  The following types of post-processing are availble:
 
-1. `filter`: Remove any integrations with the following properties:
-   - edit distance from host alignment more than 5
-   - edit distance from viral alignment more than 5
-   - if read is chimeric, more than 20 ambiguous bases
-   - not indicated to be a possible vector rearrangement
-   - not indicated to be a possible host translocation
-   These filters may be edited by the user by editing the R script `post/filter.R`
-2. `dedup`: De-duplicate reads on the basis of an exact match in read sequence.  This option differs from the de-duplication performed by Picard (see de-duplication above) because it a) considers only one read (for chimeric reads), rather than the pair and b) uses the read sequence rather than the mapped location as the basis for identifying duplicates
-3. `mask-exclude`: Specify a list of `bed` files in order to exclude any integrations that fall within the regions in those `bed` files
-4. `mask-include`: Specify a list of `bed` files in order to only include integrations that fall within the regions in those `bed` files
+1. `filter`: Remove any integrations not meeting user-defined criteria.  Criteria can be based on the following columns:
+	- *NoAmbiguousBases* (integer) - the number of bases in a gap or overlap between host and viral alignments
+	- *OverlapType* (‘none’, ‘gap’, ‘overlap’, ‘discordant’) - type of overlap between host and viral alignments
+	- *Orientation* (‘hv’, ‘vh’) - in the host, is the junction host-virus (+) or virus-host (-)
+	- *ViralOrientation* (‘+’, ‘-’) - orientation in which the virus/vector is integrated
+	- *HostEditDist* (integer) - edit distance of the alignemnt to the host
+	- *ViralEditDist* (integer) - edit distnace of the alignment to the virus/vector
+	- *TotalEditDist* (integer) - sum of host and viral edit distances, plus the length of any bases in a gap between host and virus
+	- *PossibleHostTranslocation* (‘yes’, ‘no’) - does the read have two complementary alignments to the host genome?
+	- *PossibleVectorRearrangement* (‘yes’, ‘no’) - does the read have two complementary alignments to the virus/vector
+	- *HostPossibleAmbiguous* (‘yes’, ‘no’) - is there a secondary alignment equivalent (same CIGAR) to the primary alignment in the host?
+	- *ViralPossibleAmbiguous* (‘yes’, ‘no’) - is there a secondary alignment equivalent (same CIGAR) to the primary alignment in the virus/vector?
+	- *Type* (‘chimeric’, ‘discordant’) - is this read chimeric, or a discordant pair?
+	- *HostMapQ* (integer) - mapping quality of the host alignment
+	- *ViralMapQ* (integer) - mapping quality of the virus/vector alignment
+	
+2. `bed-exclude`: Specify a list of `bed` files in order to exclude any integrations that fall within the regions in those `bed` files
+3. `bed-include`: Specify a list of `bed` files in order to only include integrations that fall within the regions in those `bed` files
+
+
+TODO:
 5. `nearest-bed`: Specify a list of `bed` files in order to annotate each integration with the nearest feature in each `bed` file, and the distance between the integration and that feature
-6. `nearest-bed`: Similar to `nearest-bed`, but with a `gtf` file rather than an `bed` file
+6. `nearest-gtf`: Similar to `nearest-bed`, but with a `gtf` file rather than an `bed` file
 
 #### Merging
 
-Users may be interested only in integrations with a minimum number of supporting reads.  Include the `merge-dist` key to output a list of integrations where any integrations within the specified distance of each other (in the host) have been merged.  This file contains the number of reads merged, and the read IDs, so the user can refer back to the summary excel file for more information about each read.
+Integration events with overlapping coordinates and the same orientations are merged.  There are two modes of merging: in `exact` merging, integrations are only merged if their coordinates are exactly the same in both host and virus/vector, and in `common` merging, integrations are merged if they share common coordinates in both host and virus/vector.  The output coordinates in the latter case are the coordinates of the common bases.
+
+Users may be interested only in integrations with a minimum number of supporting reads. The key `merge-n-min` restricts output to integrations with at least this number of integrations.  This file contains the number of reads merged, and the read IDs, so the user can refer back to the summary excel file for more information about each read.
 
 #### Speical dataset options
 

@@ -20,7 +20,6 @@ my $output = "integrationSites.txt";
 my $bed;
 my $merged;
 my $verbose;
-my $min_mapq = 0;
 my $help;
 
 GetOptions('cutoff=i' => \$cutoff,
@@ -31,7 +30,6 @@ GetOptions('cutoff=i' => \$cutoff,
 		   'bed=s'    => \$bed,
 		   'merged=s' => \$merged,
 		   'tol=i'    => \$tol,
-		   'min-mapq=i'    => \$min_mapq,
 		   'verbose'  => \$verbose,
 		   'help',    => \$help);
 
@@ -42,8 +40,6 @@ unless ($viral and $host) { printHelp(); }
 # check inputs
 if ($cutoff < 0) { die "Cutoff must be greater than zero\n"; }
 if ($tol < 0) { die "Tolerance must be greater than zero\n"; }
-if ($min_mapq < 0) { die "Minimum mapping quality must be greater than zero\n"; }
-if ($min_mapq > 60) { die "Minimum mapping quality must be less than 60\n"; }
 
 my %viralIntegrations;
 my %hostIntegrations;
@@ -75,9 +71,6 @@ while (my $vl = <VIRAL>) {
 
 	if ($parts[2] eq "*") { next; } # skip unaligned reads
 	
-	# check mapping quality
-	if ($parts[4] < $min_mapq) { next; }
-	
 	#get cigar
 	my ($cig1, $editDist2) = processCIGAR2($parts[5], $tol); # Note that could be a cigar or * if unmapped
 	my ($cig, $editDist3) = processCIGAR($cig1, $parts[9]);
@@ -100,6 +93,7 @@ while (my $vl = <VIRAL>) {
 	
 	#get readID
 	my $readID = $parts[0];
+	my $mapq = $parts[4];
 	
 	# append R1 or R2 to $ID if flag is set
 	if ($parts[1] & 0x40) { $readID = $readID."/1"; }
@@ -111,7 +105,7 @@ while (my $vl = <VIRAL>) {
 	#an unmapped read without coordinate.  If POS is 0, no assumptions can be made about RNAME and CIGAR
 	my $pos = $parts[3];
 	
-	$viralIntegrations{join("xxx", ($readID, $seq))} = join("\t",($parts[2], $pos, $dir, $cig, $vSec, $vSup, $editDist));
+	$viralIntegrations{join("xxx", ($readID, $seq))} = join("\t",($parts[2], $pos, $dir, $cig, $vSec, $vSup, $editDist, $mapq));
 	
 }
 close VIRAL;
@@ -131,9 +125,6 @@ while (my $hl = <HOST>) {
 	unless ($parts[5]) { next; }
 	
 	unless ($parts[5] =~ /^\d+[SH]|\d+[SH]$/) { next; }
-	
-	# check mapping quality
-	if ($parts[4] < $min_mapq) { next; }
 
 	my $seq;
 	my $dir;
@@ -171,8 +162,10 @@ while (my $hl = <HOST>) {
 		
 		#get 1-based mapping position
 		my $pos = $parts[3];
+		
+		my $mapq = $parts[4];
 
-		$hostIntegrations{join("xxx",($readID,$seq))} = join("\t",($parts[2], $pos, $dir, $cig, $hSec, $hSup, $editDist)); 
+		$hostIntegrations{join("xxx",($readID,$seq))} = join("\t",($parts[2], $pos, $dir, $cig, $hSec, $hSup, $editDist, $mapq)); 
 	}
 }
 close HOST;
@@ -194,7 +187,7 @@ foreach my $key (keys %viralIntegrations) {
 
 if ($verbose) { print "Writing output...\n"; }
 
-my $header = "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNoAmbiguousBases\tOverlapType\tOrientation\tHostSeq\tViralSeq\tAmbiguousSeq\tHostEditDist\tViralEditDist\tTotalEditDist\tPossibleHostTranslocation\tPossibleVectorRearrangement\tHostPossibleAmbiguous\tViralPossibleAmbiguous\tType\tReadID\tmerged\n";		
+my $header = "Chr\tIntStart\tIntStop\tVirusRef\tVirusStart\tVirusStop\tNoAmbiguousBases\tOverlapType\tOrientation\tVirusOrientation\tHostSeq\tVirusSeq\tAmbiguousSeq\tHostEditDist\tViralEditDist\tTotalEditDist\tPossibleHostTranslocation\tPossibleVectorRearrangement\tHostPossibleAmbiguous\tViralPossibleAmbiguous\tType\tHostMapQ\tViralMapQ\tReadID\tReadSeq\n";		
 
 printOutput($output, $header, @outLines); #write to outfile: if no sites detected will be header only
 
@@ -236,8 +229,8 @@ sub collectIntersect {
 ### BWA Alignments are 1-based
 	my ($viralData, $hostData, $key, $thresh) = @_;
 
-	my ($vRef, $vPos, $vDir, $vCig, $vSec, $vSup, $vNM)  = (split("\t",$viralData));
-	my ($hRef, $hPos, $hDir, $hCig, $hSec, $hSup, $hNM)  = (split("\t",$hostData));
+	my ($vRef, $vPos, $vDir, $vCig, $vSec, $vSup, $vNM, $vMapq)  = (split("\t",$viralData));
+	my ($hRef, $hPos, $hDir, $hCig, $hSec, $hSup, $hNM, $hMapq)  = (split("\t",$hostData));
 	
 	my ($readID, $seq) = split("xxx", $key);
 	
@@ -371,12 +364,21 @@ sub collectIntersect {
 	}
 	my ($vgStart, $vgStop) = extractCoords($vAlig, $overlap, $overlaptype, $vPos, $viralOrder);
 	
+	my $vIntOri;
+	if ($hDir eq 'f') {
+		if ($vDir eq 'f') { $vIntOri = '+'; }
+		else { $vIntOri = '-'; }
+	}
+	else {
+		if ($vDir eq 'f') { $vIntOri = '-'; }
+		else { $vIntOri = '+'; }
+	}
 
 	#generate output
 	my $outline = join("\t", ($hRef, $hgStart, $hgStop, $vRef, 
-				  $vgStart, $vgStop, $overlap, $overlaptype, $order, 
+				  $vgStart, $vgStop, $overlap, $overlaptype, $order, $vIntOri, 
 				  $hostSeq, $viralSeq, $overlapSeq, $hNM, $vNM, $totalNM, $isHumRearrange, 
-				  $isVecRearrange, $isHumAmbig, $isVirAmbig, 'chimeric'));
+				  $isVecRearrange, $isHumAmbig, $isVirAmbig, 'chimeric', $hMapq, $vMapq));
 
 }
 

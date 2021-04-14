@@ -1,40 +1,65 @@
 snakedir: "."
 
 global:
-  read_folder: "test/reads/"
   out_dir: "out/pipeline-test"
+  
+  # read information
+  read_folder: "test/reads/"
   R1_suffix: "_001.fastq"
   R2_suffix: "_002.fastq"
   read1-adapt: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
   read2-adapt: "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
+  split: 3
   mean-frag-len: "estimate"
+  
+  # read preprocessing options
   merge: True
   trim: True
+  dedup: True
+  dedup-subs: 2
+  
+  # alignment options
   host_name: "host"
   host_fasta: "test/references/test_human.fa"
   virus_name: "rep68"
   virus_fasta: "test/references/test_AAV.fa"
-  dedup: False
+  bwa-mem: "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 200"
+  align-cpus: 1
+  
+  # integration detection options
   clip-cutoff: 20
-  min-mapq: 10
   cigar-tol: 3
-  split: 3
-  post:
-    - filter
-    - dedup
-  merge-dist: 0
-  min-n-merge: 1
+
+  # postprocessing options
+  filter: 
+    - "HostEditDist <= 5"
+    - "ViralEditDist <= 5"
+    - "HostMapQ > 20"
+    - "NoAmbiguousBases < 20 or Type == discordant"
+    - "PossibleVectorRearrangement == no"
+    - "HostPossibleAmbiguous == no"
+    - "PossibleHostTranslocation == no"
+  bed-exclude:
+    - test/references/test.bed
+  merge-method: 'common'
+  merge-n-min: 1
 
 test-merge:
   merge-dist: 100
   min-n-merge: 2
+  filter: False
   
 test-trim:
   merge: False
   trim: True
+  dedup: True
+  filter: True
 
+  
 test-none:
   merge: False
   trim: False
+  dedup: False
   split: 1
+  merge-method: 'exact'
 

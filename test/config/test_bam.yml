@@ -1,0 +1,50 @@
+snakedir: "."
+
+test_bam_split:
+  read_folder: "test/bam"
+  out_dir: "out/pipeline-test"
+  bam_suffix: ".bam"
+  read1-adapt: ""
+  read2-adapt: ""
+  mean-frag-len: "estimate"
+  merge: False
+  trim: False
+  host_name: "host"
+  host_fasta: "test/references/test_human.fa"
+  virus_name: "rep68"
+  virus_fasta: "test/references/test_AAV.fa"
+  dedup: False
+  clip-cutoff: 20
+  min-mapq: 10
+  cigar-tol: 3
+  split: 3
+  post:
+    - filter
+    - dedup
+  merge-dist: 0
+  min-n-merge: 1
+
+test_bam:
+  read_folder: "test/bam"
+  out_dir: "out/pipeline-test"
+  bam_suffix: ".bam"
+  read1-adapt: ""
+  read2-adapt: ""
+  mean-frag-len: "estimate"
+  merge: False
+  trim: False
+  host_name: "host"
+  host_fasta: "test/references/test_human.fa"
+  virus_name: "rep68"
+  virus_fasta: "test/references/test_AAV.fa"
+  dedup: False
+  clip-cutoff: 20
+  min-mapq: 10
+  cigar-tol: 3
+  split: 1
+  post:
+    - filter
+    - dedup
+  merge-dist: 0
+  min-n-merge: 1
+

@@ -5,13 +5,13 @@ rule run_soft:
 		virus = lambda wildcards: get_sam(wildcards, "combined", "virus")
 	output:
 		soft = temp("{outpath}/{dset}/ints/{samp}.{part}.{host}.{virus}.soft.txt"),
-	group: "ints"
 	params:
 		cutoff = lambda wildcards: f"--cutoff {int(get_value_from_df(wildcards, 'clip_cutoff'))}",
 		tol = lambda wildcards: f"--tol {int(get_value_from_df(wildcards, 'cigar_tol'))}",
-		min_mapq = lambda wildcards: f"--min-mapq {int(get_value_from_df(wildcards, 'min_mapq'))}",
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.host, input.virus), attempt)
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		nodes = 1
 	container:
 		"docker://ubuntu:18.04"	
 	shell:
@@ -25,13 +25,12 @@ rule run_short:
 		virus = lambda wildcards: get_sam(wildcards, "combined", "virus"),
 	output:
 		short = temp("{outpath}/{dset}/ints/{samp}.{part}.{host}.{virus}.short.txt"),
-	group: "ints"
 	params:
 		cutoff = lambda wildcards: f"--cutoff {int(get_value_from_df(wildcards, 'clip_cutoff'))}",
 		tol = lambda wildcards: f"--tol {int(get_value_from_df(wildcards, 'cigar_tol'))}",
-		min_mapq = lambda wildcards: f"--min-mapq {int(get_value_from_df(wildcards, 'min_mapq'))}",
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.host, input.virus), attempt)
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	container:
 		"docker://ubuntu:18.04"
 	shell:
@@ -45,17 +44,15 @@ rule run_discordant:
 		virus = lambda wildcards: get_sam(wildcards, "paired", "virus"),
 	output:
 		discord = temp("{outpath}/{dset}/ints/{samp}.{part}.{host}.{virus}.discordant.txt"),
-	group: "ints"
 	params:
 		cutoff = lambda wildcards: f"--cutoff {int(get_value_from_df(wildcards, 'clip_cutoff'))}",
 		tol = lambda wildcards: f"--tol {int(get_value_from_df(wildcards, 'cigar_tol'))}",
-		min_mapq = lambda wildcards: f"--min-mapq {int(get_value_from_df(wildcards, 'min_mapq'))}",
 		tlen = lambda wildcards: f"--tlen {get_value_from_df(wildcards, 'mean_frag_len')}"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.host, input.virus), attempt)
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	container:
 		"docker://ubuntu:18.04"
-	threads: workflow.cores
 	shell:
 		"""
 		perl -Iscripts scripts/discordant.pl --viral {input.virus} --host {input.host} --output {output.discord} {params}
@@ -63,34 +60,21 @@ rule run_discordant:
 
 rule combine_ints:
 	input:
-		soft = rules.run_soft.output,
-		short = rules.run_short.output,
-		discordant = rules.run_discordant.output
-	group: "ints"
+		soft = lambda wildcards: expand(strip_wildcard_constraints(rules.run_soft.output.soft), 
+										part = get_split(wildcards), allow_missing = True),
+		short = lambda wildcards: expand(strip_wildcard_constraints(rules.run_short.output.short), 
+										part = get_split(wildcards), allow_missing = True),
+		discordant = lambda wildcards: expand(strip_wildcard_constraints(rules.run_discordant.output.discord), 
+										part = get_split(wildcards), allow_missing = True)
 	output:
-		all = temp("{outpath}/{dset}/ints/{samp}.{part}.{host}.{virus}.integrations.txt")
+		all = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
+	resources:
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	container:
 		"docker://ubuntu:18.04"
 	shell:
 		"""
-		awk 'FNR>1 || NR==1' {input} > {output.all}
+		(head -n1 {input.soft[0]} && awk '(FNR==1){{next}}{{print $0| "sort -k1,1 -k2,2n"}}' {input}) > {output.all}
 		"""
 
-rule merge_parts_ints:
-	message: "Merge the intergrations from each part into one file"
-	input:
-		files = lambda wildcards: expand("{{outpath}}/{{dset}}/ints/{{samp}}.{parts}.{{host}}.{{virus}}.integrations.txt", parts = get_split(wildcards)),
-	group: "ints"
-	output:
-		all = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt",
-		temp =  temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt.tmp"),
-	container:
-		"docker://ubuntu:18.04"
-	threads: 1
-	shell:
-		"""
-		echo {input.files}
-		awk 'FNR>1 || NR==1' {input.files} > {output.all}
-		sort -n -k1,1 -k2,2n {output.all} > {output.temp}
-		cp {output.temp} {output.all}
-		"""
