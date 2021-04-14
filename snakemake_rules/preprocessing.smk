@@ -8,19 +8,27 @@ def get_split(wildcards):
 # Input functions for if had a bam or fastq as input
 def get_for_split(wildcards, read_type):
 
+	assert read_type in ("1", "2")
 	bam_suffix = get_value_from_df(wildcards, 'bam_file')
+	dedup = bool(get_value_from_df(wildcards, 'dedup'))
 
-	# pass either reads extracted from bam or 
-	if bam_suffix != "":
+	if dedup:
 		if read_type == "1":
-			return rules.bam_to_fastq.output.r1
+			rules.dedupe.output.r1_dedup
 		else:
-			return rules.bam_to_fastq.output.r2
+			rules.dedupe.output.r2_dedup			
 	else:
-		if read_type == "1":
-			return get_value_from_df(wildcards, 'R1_file')
+		# pass either reads extracted from bam or 
+		if bam_suffix != "":
+			if read_type == "1":
+				return rules.bam_to_fastq.output.r1
+			else:
+				return rules.bam_to_fastq.output.r2
 		else:
-			return get_value_from_df(wildcards, 'R2_file')
+			if read_type == "1":
+				return get_value_from_df(wildcards, 'R1_file')
+			else:
+				return get_value_from_df(wildcards, 'R2_file')
 
 
 def get_input_reads(wildcards, read_type):
