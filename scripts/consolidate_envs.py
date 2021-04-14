@@ -12,7 +12,7 @@ def main(args):
 	yamls = args[1:-1]
 	outfile = args[-1]
 	
-	out = {'name': 'isling', 'channels': ['conda-forge', 'bioconda'], 'dependencies': []}
+	out = {'name': 'isling', 'channels': ['conda-forge', 'bioconda'], 'dependencies': ['pip']}
 
 	# check each yaml for new info
 	for y in yamls:
