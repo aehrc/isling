@@ -6,7 +6,7 @@ use warnings;
 package ViralIntegration;
 use Exporter;
 our @ISA = ('Exporter');
-our @EXPORT = qw(isRearrangeOrInt getEditDist processCIGAR processCIGAR2 extractSeqCoords extractCoords extractSequence gapOrOverlap getCigarParts getGenomicCoords getMatchedRegion getMatchedRegions getSecSup isAmbigLoc isRearrange printOutput printBed printMerged reverseComp reverseCigar);
+our @EXPORT = qw(isRearrangeOrInt getEditDist processCIGAR processCIGAR2 extractSeqCoords extractCoords extractSequence gapOrOverlap getCigarParts getGenomicCoords getMatchedRegion getMatchedRegions getSecSup isAmbigLoc isRearrange printOutput printBed printMerged reverseComp reverseCigar simplifyCIGAR);
 
 
 our $warn_flag = 0;
@@ -583,6 +583,35 @@ sub printMerged {
 	unlink($temp);
 }
 
+sub simplifyCIGAR {
+
+	# currently two ways of simplifying a CIGAR
+	
+	# processCIGAR assumes that a CIGAR should be made up of (only) a matched and soft-clipped region
+	# so it preserves the soft-clipped region, and calls everything else matched
+	
+	# processCIGAR2 is a more general way of simplifying a CIGAR.  it looks for short I, N, D, P elements in the CIGAR
+	# that break up a matched region (i.e. INDP elements between two matched regions)
+	# if the total length of these INDP elements between any two adjacent M regions is less than a tolerance $tol, it combines 
+	# them into this matched region
+	# this is useful because sometimes there are short soft-clipped regions at one end of the read that would 
+	# otherwise result in that read being ignored (i.e. 1S150M50S (which would be ignored) becomes 151M50S (considered for integration))
+	
+	# this subroutine combines these two methods of processing a CIGAR
+
+	my ($oriCig, $seq, $tol) = @_;
+	
+	# do processCIGAR2 first 
+	my ($cig1, $editDist2) = processCIGAR2($oriCig, $tol);
+	
+	# then processCIGAR
+	my ($cig, $editDist3) = processCIGAR($cig1, $seq);
+	
+	return $cig, ($editDist2 + $editDist3);
+	
+
+}
+
 sub processCIGAR {
 	my ($oriCig,$seq) = @_;
 
@@ -600,6 +629,7 @@ sub processCIGAR {
 	if ($oriCig !~ /[SH]/) { return ($oriCig, 0); } # if no soft-clipped region, we don't care about this cigar
 	elsif ($oriCig =~ /^(\d+)[SH](.+)$/) { ($clipped, $other, $order) = ($1,$2,1); }
 	elsif ($oriCig =~ /^(.+[MIDP])(\d+)[SH]$/) { ($other, $clipped, $order) = ($1,$2,2); }
+	
 	# Note I don't save if it's hard/soft clipped, only the number of bases
 	
 	# The CIGAR String can have multiple combinations of the following features:
@@ -618,7 +648,6 @@ sub processCIGAR {
 	# The full "matched" sequence, can be calculated as length(read) - length(clipped).
 	# This will give the total amount of the read that was aligned (matched) and the part of the read that wasn't (clipped)
 	# The assumption is that everything else is either matched or inserted (and therefore should still be counted)
-
 
 	my $matched =  length($seq) - $clipped;
 	$DB::single ||= $warn_flag;
@@ -652,7 +681,7 @@ sub processCIGAR2 {
 	# P - padding
 	# N - skipped region from reference (only relevant for introns)
 	
-	#process CIGAR to remove small I, D, P and N cigar operations that break up a matched region
+	#process CIGAR to remove small I, D, P and N CIGAR operations that break up a matched region
 	#total number of bases in small I, D, P and N operations should be less than $tol in order to be removed
 	
 	#don't assume that result of processing should be read with only one soft-clipped and one matched region 

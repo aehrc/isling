@@ -72,8 +72,7 @@ while (my $vl = <VIRAL>) {
 	if ($parts[2] eq "*") { next; } # skip unaligned reads
 	
 	#get cigar
-	my ($cig1, $editDist2) = processCIGAR2($parts[5], $tol); # Note that could be a cigar or * if unmapped
-	my ($cig, $editDist3) = processCIGAR($cig1, $parts[9]);
+	my ($cig, $extraNM) = simplifyCIGAR($parts[5], $parts[9], $tol);
 	
 	unless ($cig) { next; } # keep checking to make sure double clipped reads don't sneak through
 	if ($cig =~ /(^\d+[SH].*\d+[SH]$)/) { next; } # skip alignments where both ends are clipped
@@ -83,7 +82,7 @@ while (my $vl = <VIRAL>) {
 	
 	#get supplementary (SA) and secondary (XA) alignments in order to check for possible vector rearrangements
 	my ($vSec, $vSup) = getSecSup($vl);
-	my $editDist = getEditDist($vl) + $editDist2 + $editDist3;
+	my $editDist = getEditDist($vl) + $extraNM;
 	
 	# if read is mapped in reverse orientation, reverse-complement the sequence
 	my $seq;
@@ -147,8 +146,7 @@ while (my $hl = <HOST>) {
 	if (exists $viralIntegrations{join("xxx",($readID,$seq))}) { # only consider reads that were tagged from the viral alignment, no need to consider excess reads
 		
 		#get cigar
-		my ($cig1, $editDist2) = processCIGAR2($parts[5], $tol); # Note that could be a cigar or * if unmapped
-		my ($cig, $editDist3) = processCIGAR($cig1, $parts[9]);
+		my ($cig, $extraNM) = simplifyCIGAR($parts[5], $parts[9], $tol);
 		
 		unless ($cig) { next; }
 		if ($cig =~ /(^\d+[SH].*\d+[SH]$)/) { next; } #skip alignments where both ends are clipped
@@ -158,7 +156,7 @@ while (my $hl = <HOST>) {
 		my ($hSec, $hSup) = getSecSup($hl);
 		
 		#get the edit distance, and add to it the bases that were modified when processing the CIGAR
-		my $editDist = getEditDist($hl) + $editDist2 + $editDist3;
+		my $editDist = getEditDist($hl) + $extraNM;
 		
 		#get 1-based mapping position
 		my $pos = $parts[3];
