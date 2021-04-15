@@ -339,9 +339,9 @@ sub isAmbigLoc {
 		
 		#process cigar as appropriate for read type
 		my $secCigar1;
-		if ($type eq 'soft') { ($secCigar1, $dummy) = processCIGAR($secCigar,$seq);}
-		($secCigar, $dummy) = processCIGAR2($secCigar, $tol);
-	
+		if ($type eq 'soft') { ($secCigar1, $dummy) = simplifyCIGAR($secCigar, $seq, $tol); }
+		else { ($secCigar, $dummy) = processCIGAR2($secCigar, $tol); }
+		
 		if ($secSense eq '-') { $secCigar = reverseCigar($secCigar); } #reverse cigar if necessary
 		
 		#if cigars match, there is ambiguity
