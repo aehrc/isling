@@ -1,14 +1,21 @@
+#!/usr/bin/env python3
+
 import argparse
 import pysam
+import csv
 import pdb
 
+
 # note python 3.7+ is required
+
+
 
 def main():
 	
 	parser = argparse.ArgumentParser(description='Identify integrations by comparing a host and viral alignment')
 	parser.add_argument('--host', help="host alignment bam (query-sorted)", required=True)
 	parser.add_argument('--virus', help="virus alignment bam (query-sorted)", required=True)
+	parser.add_argument('--integrations', help='file to output integrations to', default='integrations.tsv')
 	parser.add_argument('--map-thresh', help="threshold for length of mapped region", default=20, type=int)
 	parser.add_argument('--mean-template-length', help="mean template length for library", default=0, type=int)
 	parser.add_argument('--tolerance', help="tolerance for short CIGAR operations (MIS ops with a combined length equal to or shorter than this will be combined into the nearest mapped region)", type=int, default=3)
@@ -19,6 +26,8 @@ def main():
 								args.mean_template_length, args.tolerance, args.verbose)
 	
 	pair.find_integrations()
+	
+	pair.write_integrations(args.integrations)
 		
 	pair.close()
 	
@@ -26,7 +35,7 @@ def main():
 class AlignmentFilePair:
 	""" A class to hold host and viral alignments, and look for integrations """
 	
-	def __init__(self, host, virus, map_thresh, tlen, tol, verbose):
+	def __init__(self, host, virus, map_thresh, tlen, tol = 3, verbose = False):
 		""" Open host and viral alignments, and check for query sorting """
 		
 		self.host = AlignmentFile(host, verbose)
@@ -39,6 +48,15 @@ class AlignmentFilePair:
 		self.tlen = tlen
 		self.tol = tol
 		self.ints = []
+		
+		self.default_header = [
+		'Chr', 'IntStart', 'IntStop', 'VirusRef', 'VirusStart', 'VirusStop', 
+		'NoAmbiguousBases', 'OverlapType', 'Orientation', 'VirusOrientation', 
+		'HostSeq', 'VirusSeq', 'AmbiguousSeq', 'HostEditDist', 'ViralEditDist', 
+		'TotalEditDist', 'PossibleHostTranslocation', 'PossibleVectorRearrangement', 
+		'HostAmbiguousLocation', 'ViralAmbiguousLocation', 'Type', 'HostMapQ', 
+		'ViralMapQ', 'ReadID', 'ReadSeq'
+		]
 		
 		if self.tlen == 0:
 			print(f"warning: template length is zero - the position for discordant integraiton sites will be at the end of the mapped read")
@@ -113,7 +131,25 @@ class AlignmentFilePair:
 					
 		
 		print(f"found {len(self.ints)} integrations")
+		
+	def write_integrations(self, filename, header = None):
+		""" Write integrations to file """
+		
+		if header is None:
+			header = self.default_header
 			
+		try:
+			with open(filename, 'w') as filehandle:
+				out = csv.DictWriter(filehandle, fieldnames = header, delimiter='\t')
+				out.writeheader()
+				for integration in self.ints:
+					out.writerow(integration.get_properties())
+		except AttributeError:
+			print("No file written: integrations have not been detected yet!")
+			return
+			
+		print(f"saved output to {filename}")
+				
 				
 	def _is_chimeric(self, hread, vread):	
 		""" 
@@ -341,16 +377,10 @@ class ChimericIntegration:
 		
 		self.hread = self._combine_short_CIGAR_elements(host, host_header)
 		self.hread = self._simplify_CIGAR(self.hread, host_header)
-
-		if self.hread.cigartuples != host.cigartuples:
-			print(f"{host.query_name} before: {host.cigartuples}, after: {self.hread.cigartuples}")
 		
 		self.vread = self._combine_short_CIGAR_elements(virus, virus_header)
 		self.vread = self._simplify_CIGAR(self.vread, virus_header)
 		
-		if self.vread.cigartuples != virus.cigartuples:
-			print(f"{virus.query_name} before: {virus.cigartuples}, after: {self.vread.cigartuples}")
-
 		assert self.tol >= 0
 		
 		# simple chimeric read has two CIGAR elements
@@ -472,7 +502,6 @@ class ChimericIntegration:
 		ReadSeq: query sequence (may be reverse complemented if the read is alignned in
 		reverse orientation in host alignment)
 		
-		
 		Note that coordinates are 0-based
 		Note that host/virus/ambig/read sequences might be reverse-complemented self.ints
 		compared to original read if host or virus alignment was in reverse orientation
@@ -501,14 +530,14 @@ class ChimericIntegration:
 			'PossibleHostTranslocation': self.is_possible_translocation(),
 			'PossibleVectorRearrangement': self.is_possible_virus_rearrangement(),
 			'HostAmbiguousLocation': self.is_host_ambig_loc(),
-			'ViralAmbiguousLocaiton': self.is_viral_ambig_loc(),
+			'ViralAmbiguousLocation': self.is_viral_ambig_loc(),
 			'Type': self.get_integration_type(),
 			'HostMapQ': self.get_host_mapq(),
 			'ViralMapQ': self.get_viral_mapq(),
 			'ReadID': self.get_read_id(),
 			'ReadSeq': self.hread.query_alignment_sequence
 		}
-	
+
 	def get_read_id(self):
 		"""  Return the query name, with /1 appended for integrations only involving R1 
 		and /2 appended for integrations only involving R2
@@ -810,8 +839,7 @@ class ChimericIntegration:
 			pos_offset = sum(pos_offset)
 		else:
 			pos_offset = 0
-		
-		print(f"simplifed {read.query_name}")
+
 		return self._edit_alignment(read, header, tmp_cigartuples, pos_offset, nm_offset)
 		
 	def _edit_alignment(self, read, header, cigartuples, pos_offset, nm_offset):
