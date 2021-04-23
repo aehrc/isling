@@ -10,10 +10,13 @@ def main():
 	parser.add_argument('--host', help="host alignment bam (query-sorted)", required=True)
 	parser.add_argument('--virus', help="virus alignment bam (query-sorted)", required=True)
 	parser.add_argument('--map-thresh', help="threshold for length of mapped region", default=20, type=int)
+	parser.add_argument('--mean-template-length', help="mean template length for library", default=0, type=int)
+	parser.add_argument('--tolerance', help="tolerance for short CIGAR operations (MIS ops with a combined length equal to or shorter than this will be combined into the nearest mapped region)", type=int, default=3)
 	parser.add_argument('--verbose', '-v', help="print extra messages?", action='store_true')
 	args = parser.parse_args()
 
-	pair = AlignmentFilePair(args.host, args.virus, args.map_thresh, args.verbose)
+	pair = AlignmentFilePair(args.host, args.virus, args.map_thresh, 
+								args.mean_template_length, args.tolerance, args.verbose)
 	
 	pair.find_integrations()
 		
@@ -23,14 +26,27 @@ def main():
 class AlignmentFilePair:
 	""" A class to hold host and viral alignments, and look for integrations """
 	
-	def __init__(self, host, virus, map_thresh, verbose):
+	def __init__(self, host, virus, map_thresh, tlen, tol, verbose):
 		""" Open host and viral alignments, and check for query sorting """
 		
 		self.host = AlignmentFile(host, verbose)
 		self.virus = AlignmentFile(virus, verbose)
+		self.href_lens = self.host.get_reference_lengths()
+		self.vref_lens = self.virus.get_reference_lengths()
 		self.map_thresh = map_thresh
 		self.verbose = verbose
+		self.tlen = tlen
+		self.tol = tol
 		self.ints = []
+		
+		if self.tlen == 0:
+			print(f"warning: template length is zero - the position for discordant integraiton sites will be at the end of the mapped read")
+		
+		if self.tlen < 0:
+			raise ValueError("Template length must be a positive integer")
+		
+		if self.tol < 0:
+			raise ValueError("Tolerance must be a positive integer")
 		
 		if self.verbose:
 			print(f"using host bam {host} and virus bam {virus}")
@@ -110,7 +126,7 @@ class AlignmentFilePair:
 		"""
 		
 		try:
-			return ChimericIntegration(hread, vread, self.map_thresh)
+			return ChimericIntegration(hread, vread, self.tol, self.map_thresh)
 		except AssertionError:
 			return None
 			
@@ -120,7 +136,11 @@ class AlignmentFilePair:
 		"""
 		
 		try:
-			return DiscordantIntegration(hread1, hread2, vread1, vread2, self.map_thresh)
+			return DiscordantIntegration(hread1, hread2, vread1, vread2, 
+										self.tol,
+										self.href_lens, self.vref_lens,
+										self.map_thresh, self.tlen
+										)
 		except AssertionError:
 			return None
 
@@ -218,6 +238,11 @@ class AlignmentFile:
 		
 		if self.verbose:
 			print(f"closing alignment file {self.filename}")
+	
+	def get_reference_lengths(self):
+		""" Get a dict of name:length for all references """
+		
+		return {ref:aln for ref, aln in zip(self.aln.references, self.aln.lengths)}
 		
 	def _get_next_align(self):
 		""" Get next alignment from file and assign to self.curr """
@@ -303,15 +328,20 @@ class ChimericIntegration:
 	(ie mapped/clipped and clipped/mapped) 
 	"""
 	
-	def __init__(self, host, virus, map_thresh=20):
+	def __init__(self, host, virus, tol, map_thresh=20):
 		""" Given a host and virus read that are chimeric, calculate the properties of the integration """
 
-		self.hread = host
-		self.vread = virus
+
 		self.map_thresh = map_thresh
+		self.tol = tol
+		self.hread = self._combine_short_CIGAR_elements(host)
+		self.vread = self._combine_short_CIGAR_elements(virus)
+
+
+		assert self.tol >= 0
 		
 		# simple chimeric read has two CIGAR elements
-		assert self._is_chimeric(self.hread, self.vread)
+		assert self._is_chimeric()
 		
 		self.chr = host.reference_name
 		self.virus = virus.reference_name
@@ -332,7 +362,6 @@ class ChimericIntegration:
 				self.vread.query_alignment_end
 				])
 
-		
 	def get_ambig_seq(self):
 		""" Get sequence of ambiguous base from read """
 
@@ -356,7 +385,6 @@ class ChimericIntegration:
 		# if less, there's a gap	
 		else:
 			return 'gap'
-	
 		
 	def get_host_coords(self):
 		""" Get coordinates of ambiguous bases in host """
@@ -491,12 +519,10 @@ class ChimericIntegration:
 		else:
 			return total_edit_dist 
 		
-		
 	def get_viral_coords(self):
 		""" Get coordinates of ambiguous bases in virus """
 		
-		return self._get_ambig_coords(self.vread)
-			
+		return self._get_ambig_coords(self.vread)		
 		
 	def get_viral_edit_dist(self):
 		""" Get the edit distance for the viral alignment """
@@ -626,26 +652,26 @@ class ChimericIntegration:
 					read.get_blocks()[0][0]
 				)
 					
-	def _is_chimeric(self, read1, read2):
+	def _is_chimeric(self):
 		"""
 		Return True if two alignments are chimeric (occupy complementary parts of the read)
 		Mapped parts of the read must be at least self.map_thresh bp long
 		
 		"""
-				
+		
 		# if not aligned, can't be chimeric
-		if read1.is_unmapped or read2.is_unmapped:
+		if self.vread.is_unmapped or self.hread.is_unmapped:
 			return False
 			
 		# viral and host alignment must have only mapped and clipped regions
-		if not (len(read2.cigartuples) == 2 and len(read1.cigartuples) == 2):
+		if not (len(self.vread.cigartuples) == 2 and len(self.hread.cigartuples) == 2):
 			return False
 		
 		# https://pysam.readthedocs.io/en/latest/api.html#api
 		# 0 = matched
 		# 4 = soft-clipped
-		cigarops1 = [i[0] for i in read1.cigartuples]
-		cigarops2 = [i[0] for i in read2.cigartuples]
+		cigarops1 = [i[0] for i in self.hread.cigartuples]
+		cigarops2 = [i[0] for i in self.vread.cigartuples]
 		
 		# must have one matched and one soft-clipped part
 		if set(cigarops1) != {0, 4}:
@@ -654,13 +680,13 @@ class ChimericIntegration:
 			return False
 			
 		# mapped regions must be at least 20 bp
-		if read1.query_alignment_length < self.map_thresh:
+		if self.hread.query_alignment_length < self.map_thresh:
 			return False
-		if read2.query_alignment_length < self.map_thresh:
+		if self.vread.query_alignment_length < self.map_thresh:
 			return False
 			
 		# if both forward or both reverse
-		if read1.is_reverse == read2.is_reverse:
+		if self.hread.is_reverse == self.vread.is_reverse:
 			# but cigar operations are the same, then no dice
 			if cigarops1 == cigarops2:
 				return False
@@ -670,6 +696,131 @@ class ChimericIntegration:
 				return False	
 
 		return True	
+	
+	def _combine_short_CIGAR_elements(self, read):
+		"""
+		Sometimes, short insertions, deletions and soft-clipped regions can cause a read
+		to be missed because it doesn't meet our rather strict criteria for a chimeric read
+		
+		For example, viral CIGAR 1S100M49S and host CIGAR 101S49M would be missed as a
+		potential integration because the viral cigar is clipped on both ends,
+		even though it really looks like an integration.  
+		
+		To address this issue, combine any non-mapped short CIGAR elements ()
+		that are shorter in length than a tolerance value (self.tol)
+		"""
+		
+		if read.cigartuples is None:
+			return read
+			
+		if len(read.cigartuples) == 1:
+			return read
+		
+		# first look for elements to simplify
+		curr_non_mapped = 0
+		curr = []
+		last_mapped = None
+		
+		# key is matched region to combine into, and value
+		# is a list of elements to combine
+		to_delete = []
+		
+		for i in range(len(read.cigartuples)):
+			# if mapped
+			if read.cigartuples[i][0] == 0:
+				# check if curr_non_mapped is more than zero and less than tol
+				if curr_non_mapped > 0 and curr_non_mapped <= self.tol:
+					to_delete.append((i, curr))
+				curr_non_mapped = 0
+				curr = []
+				last_mapped = i
+			# if not mapped
+			else:
+				curr.append(i)
+				curr_non_mapped += read.cigartuples[i][1]
+		
+		# check last element
+		if curr_non_mapped > 0 and curr_non_mapped <= self.tol:
+			to_delete.append((last_mapped, curr))
+		
+		if len(to_delete) == 0:
+			return read
+
+		# next, combine short elements with nearest matched region
+		tmp_cigartuples = list(read.cigartuples)
+		nm_offset = 0
+		
+		for elem in reversed(to_delete):
+
+			i_matched = elem[0]
+			assert read.cigartuples[i_matched][0] == 0
+			assert tmp_cigartuples[i_matched][0] == 0
+			i_del = elem[1]
+			
+			# if cigar operation consumes query, need to add to matched region			
+			matched = tmp_cigartuples[i_matched][1]
+			for idx in i_del:
+				# I (1) and S (4) operations consume query
+				if read.cigartuples[idx][0] in {1, 4}:
+					matched += read.cigartuples[idx][1]
+				
+				# if this is a soft-clip, we also need to add it to the edit distance offset
+				if read.cigartuples[idx][0] == 4:
+					nm_offset += read.cigartuples[idx][1]
+			
+			# update mapped length
+			tmp_cigartuples[i_matched] = (0, matched)
+			
+			# remove elements
+			for idx in i_del:
+				tmp_cigartuples.pop(idx)
+		
+		# check that we don't now have two matched regions next to each other
+		if len(tmp_cigartuples) > 1:
+			for i in reversed(range(len(tmp_cigartuples)-1)):
+				if tmp_cigartuples[i][0] == 0:
+					if tmp_cigartuples[i+1][0] == 0:
+						matched = tmp_cigartuples[i][1] + tmp_cigartuples[i+1][1]
+						tmp_cigartuples.pop(i+1)
+						tmp_cigartuples[i] = (0, matched)	
+			
+			
+		# if we're removing elements that consume the query and are before the first
+		# mapped region, we need to also adjust the mapping position
+		prev_mapped = [tup for tup in read.cigartuples[0:to_delete[0][0]]]
+		if len(prev_mapped) > 0 and 0 not in prev_mapped:
+			# only need to consider those that consume query
+			pos_offset = [tup[1] for tup in prev_mapped if tup[0] in (1, 4)]
+			pos_offset = sum(pos_offset)
+		else:
+			pos_offset = 0
+
+		return self._edit_alignment(read, tmp_cigartuples, pos_offset, nm_offset)
+
+		
+	def _edit_alignment(self, read, cigartuples, pos_offset, nm_offset):
+		""" Edit an alignment by modifying the cigartuples of an existing read """
+		a = pysam.AlignedSegment()
+		a.query_name = read.query_name
+		a.query_sequence = read.query_sequence
+		a.flag = read.flag
+		a.reference_id = read.reference_id
+		a.reference_start = read.reference_start - pos_offset
+		a.mapping_quality = read.mapping_quality
+		a.cigar = cigartuples
+		a.next_reference_id = read.next_reference_id
+		a.next_reference_start = read.next_reference_start 
+		a.template_length = read.template_length
+		a.query_qualities = read.query_qualities
+		
+		# update edit distance in NM tag (but not MD - this is not reliable!!)
+		tags = read.get_tags()
+		for i in range(len(tags)):
+			if tags[i][0] == 'NM':
+				tags[i] = ('NM', tags[i][1] + nm_offset)
+		a.tags = tags
+		
+		return a
 
 class DiscordantIntegration(ChimericIntegration):
 	""" 
@@ -680,13 +831,21 @@ class DiscordantIntegration(ChimericIntegration):
 	need to be implemented differently for a discordant pair
 	"""
 	
-	def __init__(self, host_r1, host_r2, virus_r1, virus_r2, map_thresh=20):
+	def __init__(self, host_r1, host_r2, virus_r1, virus_r2, tol,
+					href_lens, vref_lens, map_thresh=20, tlen=0):
 		
 		self.hread1 = host_r1
 		self.hread2 = host_r2
 		self.vread1 = virus_r1
 		self.vread2 = virus_r2
 		self.map_thresh = map_thresh
+		self.tlen = tlen
+		self.tol = tol
+		self.href_lens = href_lens
+		self.vref_lens = vref_lens
+		
+		assert tol >= 0
+		assert tlen >= 0
 		
 		# note that self._is_discordant() also assigns self.hread and self.vread
 		assert self._is_discordant()
@@ -694,10 +853,8 @@ class DiscordantIntegration(ChimericIntegration):
 		self.get_host_chr()
 		self.get_viral_ref()
 		
-		
-		#test = self.get_properties()
-		#print(test)
-		#pdb.set_trace()
+		test = self.get_properties()
+		pdb.set_trace()
 		
 	def is_host_ambig_loc(self):
 		""" 
@@ -733,20 +890,59 @@ class DiscordantIntegration(ChimericIntegration):
 		# TODO
 		return False
 		
-
 	def gap_or_overlap(self):
 		""" For a discordant pair, OverlapType is always discordant """
 		return 'discordant'
 	
 	def get_ambig_seq(self):
-		""" Get sequence of ambiguous bases (if present) """
-		#TODO
+		""" No ambiguous bases for a discordant pair"""
+
 		return None
+
+	def get_coords(self, read, ref_lens):
+		"""
+		Get the likely coordinates of integration.  This is the end of the aliged read
+		that faces the other read, plus the mean insert size
+		"""
+
+		# mean insert length is mean template length minus sum of R1 and R2 lengths
+		insert = self.tlen - self.vread.query_length - self.hread.query_length
+		# but can't be less than zero
+		if insert < 0:
+			insert = 0
+		
+		# if host read is R1, then we want the coordinate of the host base at the
+		# side of the read that faces R2
+		if read.is_read1:
+			if read.is_reverse:
+				stop = read.get_blocks()[0][0]
+				start = stop - insert
+			else:
+				start = read.get_blocks()[-1][-1]
+				stop = start + insert
+		else:
+			if read.is_reverse:
+				start = read.get_blocks()[-1][-1]
+				stop = start + insert
+			else:
+				stop = read.get_blocks()[0][0]
+				start = stop - insert
+			
+		# check the start isn't less than zero
+		if start < 0:
+			start = 0
+			
+		# check that the stop isn't more than the length of the reference
+		reference_length = ref_lens[read.reference_name]
+		if stop > reference_length:
+			stop = reference_length
+		
+		return (start, stop)
 
 	def get_host_coords(self):
 		""" Get likely coordinates of integration in host chromosome """
-		# TODO
-		return (None, None)
+		
+		return self.get_coords(self.hread, self.href_lens)
 
 	def get_host_chr(self):
 		""" Get reference name for host alignment """
@@ -799,16 +995,25 @@ class DiscordantIntegration(ChimericIntegration):
 	
 	def get_viral_coords(self):
 		""" Get likely coordinates of integration in viral reference """		
-		# TODO
-		return (None, None)
+
+		return self.get_coords(self.vread, self.vref_lens)
 
 	
 	def get_viral_orientation(self):
 		""" 
 		Figure out if the virus is integrated in forward (+) or reverse (-) orientation
 		"""
-		#TODO
-		return None
+
+		if self.get_integration_orientation() == 'vh':
+			if self.vread.is_reverse:
+				return '-'
+			else:
+				return '+'	
+		else:
+			if self.vread.is_reverse:
+				return '+'
+			else:
+				return '-'						
 			
 	def get_viral_ref(self):
 		""" Get reference name for viral alignment """
@@ -853,8 +1058,7 @@ class DiscordantIntegration(ChimericIntegration):
 		else:
 			self.hread = self.hread2
 			self.vread = self.vread1
-			
-		
+
 		return True
 		
 	def _is_mapped(self, read):
