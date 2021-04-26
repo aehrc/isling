@@ -3,6 +3,8 @@
 import argparse
 import pysam
 import csv
+import re
+import array
 import pdb
 
 
@@ -93,29 +95,41 @@ class AlignmentFilePair:
 				
 			# collect read 1 alignments
 			host_r1_primary  = self.curr_host.get_primary_r1()
+			host_r1_not_primary = self.curr_host.get_not_primary().get_read1()
+			
 			virus_r1_primary =  self.curr_virus.get_primary_r1()
+			virus_r1_not_primary = self.curr_virus.get_not_primary().get_read1()
 
 			# check if primary read 1 alignments appear to be chimeric	
 			if host_r1_primary is not None and virus_r1_primary is not None:
-				integration = self._is_chimeric(host_r1_primary, virus_r1_primary)
-				if integration is not None:
-					self.ints.append(integration)
+				integration = self._is_chimeric(host_r1_primary, virus_r1_primary,
+												host_r1_not_primary, virus_r1_not_primary)
 
 			# collect read2 alignments
 			host_r2_primary = self.curr_host.get_primary_r2()
+			host_r2_not_primary = self.curr_host.get_not_primary().get_read2()
+			
 			virus_r2_primary = self.curr_virus.get_primary_r2()
+			virus_r2_not_primary = self.curr_virus.get_not_primary().get_read2()			
+			
 			# check if primary read 1 alignments appear to be chimeric	
 			if host_r2_primary is not None and virus_r2_primary is not None:
-				integration =  self._is_chimeric(host_r2_primary, virus_r2_primary)
+				integration = self._is_chimeric(host_r2_primary, virus_r2_primary,
+												host_r2_not_primary, virus_r2_not_primary)
 				if integration is not None:
-					self.ints.append(integration)		
-
+					self.ints.append(integration)					
+						
 						
 			# if there are alignments that are neither read 1 nor read 2, check if chimeric
 			host_not12_primary = self.curr_host.get_primary_not_r1_or_r2()
+			host_not12_not_primary = self.curr_host.get_not_primary().get_not_read1_or_read2()
+			
 			virus_not12_primary = self.curr_virus.get_primary_not_r1_or_r2()
+			virus_not12_not_primary = self.curr_virus.get_not_primary().get_not_read1_or_read2()
+			
 			if host_not12_primary is not None and virus_not12_primary is not None:
-				integration = self._is_chimeric(host_not12_primary, virus_not12_primary)
+				integration = self._is_chimeric(host_not12_primary, virus_not12_primary,
+												host_not12_not_primary, virus_not12_not_primary)
 				if integration is not None:
 					self.ints.append(integration)
 					
@@ -124,11 +138,16 @@ class AlignmentFilePair:
 											virus_r1_primary, virus_r2_primary]]):
 				# check if integration
 				integration = self._is_discordant(host_r1_primary, host_r2_primary, 
-											virus_r1_primary, virus_r2_primary)
+											virus_r1_primary, virus_r2_primary,
+											host_r1_not_primary, host_r2_not_primary,
+											virus_r1_not_primary, virus_r2_not_primary)
 				if integration is not None:
 					self.ints.append(integration)
-					integration.get_properties()
-					
+					try:
+						integration.get_properties()
+					except:
+						pdb.set_trace()
+						integration.get_properties()
 		
 		print(f"found {len(self.ints)} integrations")
 		
@@ -151,7 +170,7 @@ class AlignmentFilePair:
 		print(f"saved output to {filename}")
 				
 				
-	def _is_chimeric(self, hread, vread):	
+	def _is_chimeric(self, hread, vread, hsec, vsec):	
 		""" 
 		Takes two alignments for the same read, one from the host and one from the virus, 
 		and decides if the read appears to be a simple chimera.  A 'simple chimera' means
@@ -165,11 +184,13 @@ class AlignmentFilePair:
 			return ChimericIntegration(hread, vread, 
 										self.host.aln.header, 
 										self.virus.aln.header,
+										hsec, vsec,
 										self.tol, self.map_thresh)
 		except AssertionError:
 			return None
 			
-	def _is_discordant(self, hread1, hread2, vread1, vread2):
+	def _is_discordant(self, hread1, hread2, vread1, vread2, 
+						host_sec1, host_sec2, virus_sec1, virus_sec2,):
 		"""
 		Checks if a pair looks like an discordant integration
 		"""
@@ -179,6 +200,7 @@ class AlignmentFilePair:
 										self.tol,
 										self.host.aln.header, 
 										self.virus.aln.header,
+										host_sec1, host_sec2, virus_sec1, virus_sec2,
 										self.map_thresh, self.tlen
 										)
 		except AssertionError:
@@ -313,9 +335,48 @@ class AlignmentPool(list):
 	Should only contain alignments from the same read-pair (i.e. qname should be the same for all reads in pool)
 	"""
 	
+	def add_read_from_XA(self, XA, primary, header):
+		""" Add a read based on an XA string (chr,pos,CIGAR,NM) """
+		
+		# get info from XA string
+		XA = XA.split(",")
+		assert len(XA) == 4
+		
+		chr = XA[0]
+		ori = XA[1][0]
+		pos = int(XA[1][1:]) - 1
+		cigar = XA[2]
+		nm = int(XA[3])
+		
+		new_seg = self._create_new_segment_from_primary(primary, header, chr, pos, ori,
+														cigar, nm)
+		self.append(new_seg)
+	
+	def add_read_from_SA(self, SA, primary, header):
+		""" Add a read based on an SA string (rname,pos,strand,CIGAR,mapQ,NM) """
+
+		# get info from SA string
+		SA = SA.split(",")
+		assert len(SA) == 6
+		
+		chr = SA[0]
+		pos = int(SA[1]) - 1
+		ori = SA[2]
+		cigar = SA[3]
+		mapq = int(SA[4])
+		nm = int(SA[5])
+		
+		new_seg = self._create_new_segment_from_primary(primary, header, chr, pos, ori,
+														cigar, nm, mapq)
+		self.append(new_seg)
+	
 	def get_primary(self):
-		""" Return an AlignmentPool with only the primary alignment(s) from a lignmentPool """
+		""" Return an AlignmentPool with only the primary alignment(s) from an AlignmentPool """
 		return AlignmentPool([read for read in self if not read.is_supplementary and not read.is_secondary])
+	
+	def get_not_primary(self):
+		""" Return an AlignmentPool with only the non-primary alignment(s) from an AlignmentPool """
+		return AlignmentPool([read for read in self if read.is_supplementary or read.is_secondary])		
 		
 	def get_read1(self):
 		""" Return an AlignmentPool with only read 1 alignment(s) from an AlignmentPool"""
@@ -362,24 +423,195 @@ class AlignmentPool(list):
 		else:
 			raise ValueError(f"found more than one primary alignment for {self[0].qname} (not read 1 or read 2)")	
 			
+	def remove_redundant_alignments(self):
+		""" 
+		Remove redundant alignments (those that have same pos, CIGAR and strand) 
+		Note that two alignments are also redundant if they have the same CIGAR, except that
+		soft-clipped operations are replaced by hard-clipped operations
+		"""
+		
+		# first, find groups of integrations that are the same
+		same = [] # to store pairs of alignments that are redundant
+		redundant = set()
+		hard_clips = [] # store which alignments contain hard-clips
+		for i in range(len(self)-1):
+			for j in range(i+1, len(self)):
+				if i == j:
+					continue
+				
+				# check for same mapping position
+				if self[i].reference_start != self[j].reference_start:
+					continue
+					
+				# check for same strand
+				if self[i].is_reverse != self[j].is_reverse:
+					continue
+				
+				# check for same cigar
+				i_cigartuples = self._convert_hard_clips_to_soft(self[i].cigartuples)
+				j_cigartuples = self._convert_hard_clips_to_soft(self[j].cigartuples)
+				if i_cigartuples != j_cigartuples:
+					continue
+					
+				# see if alignments contain hard clips
+				if i_cigartuples != self[i].cigartuples:
+					hard_clips.append(i)
+				if j_cigartuples != self[j].cigartuples:
+					hard_clips.append(j)
+				
+				# check if we've already decided if either of these alignments are
+				# redundant with another alignment
+				
+				if i in redundant:
+					pdb.set_trace()
+					i_found = [ind for ind in range(len(same)) if i in same[ind]]
+					assert len(i_found) == 1
+					ind = i_found[0]
+					if j not in same[ind]:
+						same[ind] = [*same[ind], j]
+				elif j in redundant:
+					pdb.set_trace()
+					j_found = [ind for ind in range(len(same)) if i in same[ind]]
+					assert len(j_found) == 1
+					if i not in same[ind]:
+						same[ind] = [*same[ind], i]				
+				else:
+					same.append([i, j])
+				
+				redundant.add(i)
+				redundant.add(j)
+				
+		# remove integrations from groups of redundant alignments, leaving only one
+		# integration per group
+		to_remove = []
+		for group in same:
+			
+			# on each loop, add one alignment to to_remove until there is only one left
+			while len(group) > 1:
+				removed = False
+				# preferentially remove any alignments that have hard clips
+				for i in range(len(group)):
+					if i in hard_clips:
+						to_add = group.pop(i)
+						to_remove.append(to_add)
+						removed=True
+						break
+					
+				
+				# if no hard clips, just remove the last integration
+				if not removed:
+					to_add = group.pop(-1)
+					to_remove.append(to_add)
+				
+		# now remove integrations
+		assert len(to_remove) == len(set(to_remove))
+		for i in reversed(sorted(to_remove)):
+			self.pop(i)		
+			
+			
+	def _convert_cigarstring_to_cigartuples(self, cigar):
+		""" Convert a CIGAR string to cigar tuples """
+		
+		assert re.match("^(\d+[MIDNSHP=X])+$", cigar)
+		
+		tuples = []
+		ops = { 'M': 0, 'I': 1, 'D': 2, 'N': 3, 'S': 4, 'H': 5, 'P': 6, '=': 7, 'X': 8}
+		for op in re.findall("\d+[MIDNSHP=X]", cigar):
+			tuples.append((ops[op[-1]], int(op[:-1])))
+			
+		return tuples
+		
+	def _convert_hard_clips_to_soft(self, cigartuples):
+		""" Return the cigartuples with hard clips converted to soft clips """
+
+		for i in range(len(cigartuples)):
+			if cigartuples[i][0] == 5:
+				cigartuples[i] = (4, cigartuples[i][1])
+				
+		return cigartuples
+		
+	def _create_new_segment_from_primary(self, primary, header, rname, pos, ori, cigar,
+											nm, mapq=None):
+		""" 
+		Create a new pysam.AlignedSegment from an existing (primary) pysam.AlignnedSegment
+		"""
+		
+		a = pysam.AlignedSegment(header=header)
+		a.query_name = primary.query_name
+		if mapq is not None:
+			a.mapping_quality = mapq
+		
+		assert ori == '-' or ori == '+'
+		
+		# if primary alignment has different orientation to this one, need to reverse complement
+		if primary.is_reverse == (ori == '-'):
+			a.query_sequence = primary.query_sequence
+			a.query_qualities = primary.query_qualities
+		else:
+			a.query_sequence = self._reverse_complement(primary.query_sequence)
+			quals = array.array('B', primary.query_qualities)
+			quals.reverse()
+			a.query_qualities = quals
+			
+		flag = 0x100 + 0x800
+		if primary.is_paired:
+			flag += 0x1
+		if primary.is_proper_pair:
+			flag += 0x2
+		if primary.mate_is_unmapped:
+			flag += 0x8
+		if ori == '-':
+			flag += 0x10
+		if primary.mate_is_reverse:
+			flag += 0x20
+		if primary.is_read1:
+			flag += 0x40
+		if primary.is_read2:
+			flag += 0x80
+		
+		a.flag = flag
+
+		a.reference_id = header.get_tid(rname)
+		a.reference_start = pos
+		a.cigar = self._convert_cigarstring_to_cigartuples(cigar)
+		
+		a.next_reference_id = primary.next_reference_id
+		a.next_reference_start = primary.next_reference_start 
+		a.template_length = primary.template_length
+		
+		if nm is not None:
+			a.tags = [('NM', nm)]
+		else:
+			a.tags = []
+
+		return a	
+		
+	def _reverse_complement(self, seq):
+		""" Return reverse complement """
+		nn = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N':'N' ,
+			  'a':'t', 'c':'g', 'g':'c', 't':'a', 'n':'n'}
+		return ''.join(reversed([nn[i] for i in seq]))			
+			
 class ChimericIntegration:
 	""" 
 	A class to store/calculate the properties of a simple chimeric integration 
 	(ie mapped/clipped and clipped/mapped) 
 	"""
 	
-	def __init__(self, host, virus, host_header, virus_header, tol, map_thresh=20):
+	def __init__(self, host, virus, host_header, virus_header, 
+					host_sec, virus_sec,  tol, map_thresh=20):
 		""" Given a host and virus read that are chimeric, calculate the properties of the integration """
 
 		self.map_thresh = map_thresh
 		self.tol = tol
 		
-		
 		self.hread = self._combine_short_CIGAR_elements(host, host_header)
 		self.hread = self._simplify_CIGAR(self.hread, host_header)
+		self.hsec = self._process_non_primary_alignments(self.hread, host_sec, host_header)
 		
 		self.vread = self._combine_short_CIGAR_elements(virus, virus_header)
 		self.vread = self._simplify_CIGAR(self.vread, virus_header)
+		self.vsec = self._process_non_primary_alignments(self.vread, virus_sec, virus_header)
 		
 		assert self.tol >= 0
 		
@@ -628,8 +860,7 @@ class ChimericIntegration:
 		Check if an integration has ambiguous location in host genome (i.e. host part of
 		read has multiple equivalent alignments to different parts of host genome)
 		"""
-		# TODO
-		return False
+		return self._is_ambiguous_location(self.hread, self.hsec)
 	
 	def is_possible_translocation(self):
 		""" 
@@ -653,92 +884,8 @@ class ChimericIntegration:
 		Check if an integration has ambiguous location in viral genome (i.e. viral part of
 		read has multiple equivalent alignments to different parts of viral genome)
 		"""	
+		return self._is_ambiguous_location(self.vread, self.vsec)
 
-		# TODO
-		return False
-		
-	def _get_ambig_coords(self, read):
-		""" Return a tuple of (start, stop) of ambiguous bases in host or virus """
-		# if aligned part of read is first
-		if read.cigartuples[0][0] == 0:
-			if self.gap_or_overlap() == 'gap':
-				return (
-					read.get_blocks()[0][1],
-					read.get_blocks()[0][1] + abs(self.num_ambig_bases())
-				)
-			elif self.gap_or_overlap() == 'overlap':
-				return (
-					read.get_blocks()[0][1] - abs(self.num_ambig_bases()),
-					read.get_blocks()[0][1]
-				)
-			else:
-				return (
-					read.get_blocks()[0][1],
-					read.get_blocks()[0][1]
-				)
-		# if aligned part of read is second
-		else:
-			if self.gap_or_overlap() == 'gap':
-				return (
-					read.get_blocks()[0][0],
-					read.get_blocks()[0][0] + abs(self.num_ambig_bases())
-				)
-			elif self.gap_or_overlap() == 'overlap':
-				return (
-					read.get_blocks()[0][0] - abs(self.num_ambig_bases()),
-					read.get_blocks()[0][0]
-				)
-			else:
-				return (
-					read.get_blocks()[0][0],
-					read.get_blocks()[0][0]
-				)
-					
-	def _is_chimeric(self):
-		"""
-		Return True if two alignments are chimeric (occupy complementary parts of the read)
-		Mapped parts of the read must be at least self.map_thresh bp long
-		
-		"""
-		
-		# if not aligned, can't be chimeric
-		if self.vread.is_unmapped or self.hread.is_unmapped:
-			return False
-			
-		# viral and host alignment must have only mapped and clipped regions
-		if not (len(self.vread.cigartuples) == 2 and len(self.hread.cigartuples) == 2):
-			return False
-		
-		# https://pysam.readthedocs.io/en/latest/api.html#api
-		# 0 = matched
-		# 4 = soft-clipped
-		cigarops1 = [i[0] for i in self.hread.cigartuples]
-		cigarops2 = [i[0] for i in self.vread.cigartuples]
-		
-		# must have one matched and one soft-clipped part
-		if set(cigarops1) != {0, 4}:
-			return False
-		if set(cigarops2) != {0, 4}:
-			return False
-			
-		# mapped regions must be at least 20 bp
-		if self.hread.query_alignment_length < self.map_thresh:
-			return False
-		if self.vread.query_alignment_length < self.map_thresh:
-			return False
-			
-		# if both forward or both reverse
-		if self.hread.is_reverse == self.vread.is_reverse:
-			# but cigar operations are the same, then no dice
-			if cigarops1 == cigarops2:
-				return False
-		# if aligned in opposite orientations
-		else:
-			if cigarops1 != cigarops2:
-				return False	
-
-		return True	
-	
 	def _combine_short_CIGAR_elements(self, read, header):
 		"""
 		Sometimes, short insertions, deletions and soft-clipped regions can cause a read
@@ -859,12 +1006,224 @@ class ChimericIntegration:
 		
 		# update edit distance in NM tag (but not MD - this is not reliable!!)
 		tags = read.get_tags()
+		updated_OA = False
+		orig_strand = '-' if read.is_reverse else '+'
+		OA_update = (read.query_name, str(read.reference_start), orig_strand, 
+						read.cigarstring, str(read.mapping_quality), 
+						str(read.get_tags('NM')))
+		OA_update = ",".join(OA_update) + ";"
 		for i in range(len(tags)):
 			if tags[i][0] == 'NM':
 				tags[i] = ('NM', tags[i][1] + nm_offset)
+			if tags[i][0] == 'OA':
+				tags[i] = ('OA', tags[i][1] + OA_update)
+				updated_OA = True
+		
+		if not updated_OA:
+			tags.append(('OA', OA_update))
+			
 		a.tags = tags
 		
 		return a
+		
+	def _get_ambig_coords(self, read):
+		""" Return a tuple of (start, stop) of ambiguous bases in host or virus """
+		# if aligned part of read is first
+		if read.cigartuples[0][0] == 0:
+			if self.gap_or_overlap() == 'gap':
+				return (
+					read.get_blocks()[0][1],
+					read.get_blocks()[0][1] + abs(self.num_ambig_bases())
+				)
+			elif self.gap_or_overlap() == 'overlap':
+				return (
+					read.get_blocks()[0][1] - abs(self.num_ambig_bases()),
+					read.get_blocks()[0][1]
+				)
+			else:
+				return (
+					read.get_blocks()[0][1],
+					read.get_blocks()[0][1]
+				)
+		# if aligned part of read is second
+		else:
+			if self.gap_or_overlap() == 'gap':
+				return (
+					read.get_blocks()[0][0],
+					read.get_blocks()[0][0] + abs(self.num_ambig_bases())
+				)
+			elif self.gap_or_overlap() == 'overlap':
+				return (
+					read.get_blocks()[0][0] - abs(self.num_ambig_bases()),
+					read.get_blocks()[0][0]
+				)
+			else:
+				return (
+					read.get_blocks()[0][0],
+					read.get_blocks()[0][0]
+				)
+				
+	def _is_ambiguous_location(self, read, sec):
+		"""  
+		An alignment is ambiguous if there's a secondary or supplementary alignment
+		that is equivalent to the primary one.
+		An equivalent alignment is one with the same CIGAR
+		"""	
+
+		if len(sec) == 0:
+			return False
+	
+		for sec_read in sec:
+		
+			# check for the same CIGAR
+			same_cigar = sec_read.cigartuples == read.cigartuples
+
+			# CIGAR must be the same
+			if not same_cigar:
+				continue
+				
+			same_pos = sec_read.reference_start == read.reference_start
+			same_dir = sec_read.is_reverse == read.is_reverse
+						
+			# if position or strand is different, then location is ambiguous
+			if (not same_pos) or (not same_dir):
+				return True
+			
+
+		# if we didn't find any equivalent alignments, location not ambiguous
+		return False
+					
+	def _is_chimeric(self):
+		"""
+		Return True if two alignments are chimeric (occupy complementary parts of the read)
+		Mapped parts of the read must be at least self.map_thresh bp long
+		
+		"""
+		
+		# if not aligned, can't be chimeric
+		if self.vread.is_unmapped or self.hread.is_unmapped:
+			return False
+			
+		# viral and host alignment must have only mapped and clipped regions
+		if not (len(self.vread.cigartuples) == 2 and len(self.hread.cigartuples) == 2):
+			return False
+		
+		# https://pysam.readthedocs.io/en/latest/api.html#api
+		# 0 = matched
+		# 4 = soft-clipped
+		cigarops1 = [i[0] for i in self.hread.cigartuples]
+		cigarops2 = [i[0] for i in self.vread.cigartuples]
+		
+		# must have one matched and one soft-clipped part
+		if set(cigarops1) != {0, 4}:
+			return False
+		if set(cigarops2) != {0, 4}:
+			return False
+			
+		# mapped regions must be at least 20 bp
+		if self.hread.query_alignment_length < self.map_thresh:
+			return False
+		if self.vread.query_alignment_length < self.map_thresh:
+			return False
+			
+		# if both forward or both reverse
+		if self.hread.is_reverse == self.vread.is_reverse:
+			# but cigar operations are the same, then no dice
+			if cigarops1 == cigarops2:
+				return False
+		# if aligned in opposite orientations
+		else:
+			if cigarops1 != cigarops2:
+				return False	
+
+		return True		
+		
+	def _process_non_primary_alignments(self, primary, not_primary, header):
+		""" 
+		Depending on aligner, secondary and supplementary alignments might be present in
+		tags from the primary alignment, or as separate alignments, or both.  
+		
+		We might also want to simplify these alignments using self._combine_short_CIGAR_elements()
+		and self._simplify_CIGAR()
+		"""
+		
+		# get supplementary alignments from SA tag
+		try:
+			SA = primary.get_tag('SA')
+			not_primary += self._process_SA(SA, primary, header)
+		except KeyError:
+			pass
+		
+		# get secondary alignments from XA tag
+		try:
+			XA = primary.get_tag('XA')
+			not_primary += self._process_XA(XA, primary, header)
+		except KeyError:
+			pass
+		
+		if len(not_primary) < 2:
+			return not_primary
+		# remove any redundant alignments from pool
+		# redundant alignments have same CIGAR, orientation (+/-) and pos		
+		not_primary.remove_redundant_alignments()
+		
+		return not_primary
+	
+	def _process_SA(self, SA, primary, header):
+		""" 
+		Create pysam.AlignedSegment objects for each XA alignment 
+		
+		SA has format (rname,pos,strand,CIGAR,mapQ,NM;)+
+		"""
+		
+		SA_segs = AlignmentPool()
+		
+		
+		SA = SA.split(";")
+		SA = [i for i in SA if i != '']
+		
+		for aln in SA:
+			SA_segs.add_read_from_SA(aln, primary, header)
+		
+		return SA_segs
+				
+	def _process_SA_and_XA(self, primary, header):
+		""" Create AlignmentPool objects with alignments from XA and SA """
+		
+		non_primary = AlignmentPool()
+		
+		# get supplementary alignments from SA tag
+		try:
+			SA = primary.get_tag('SA')
+			non_primary += self._process_SA(SA, primary, header)
+		except KeyError:
+			pass
+		
+		# get supplementary alignments from XA tag
+		try:
+			XA = primary.get_tag('XA')
+			non_primary += self._process_XA(XA, primary, header)
+		except KeyError:
+			pass
+			
+		return non_primary		
+	
+	def _process_XA(self, XA, primary, header):
+		""" 
+		Create pysam.AlignedSegment objects for each XA alignment 
+		
+		XA is bwa-specific and has format (chr,pos,CIGAR,NM;)*
+		"""
+		
+		XA = XA.split(";")
+		XA = [i for i in XA if i != '']
+		
+		XA_segs = AlignmentPool()
+		for aln in XA:
+			XA_segs.add_read_from_XA(aln, primary, header)			
+		
+		
+		return XA_segs		
 		
 	def _simplify_CIGAR(self, read, header):
 		""" 
@@ -916,7 +1275,9 @@ class DiscordantIntegration(ChimericIntegration):
 	"""
 	
 	def __init__(self, host_r1, host_r2, virus_r1, virus_r2, tol,
-					host_header, virus_header, map_thresh=20, tlen=0):
+					host_header, virus_header, 
+					host_sec1, host_sec2, virus_sec1, virus_sec2,
+					map_thresh=20, tlen=0):
 		
 
 		self.map_thresh = map_thresh
@@ -928,12 +1289,13 @@ class DiscordantIntegration(ChimericIntegration):
 		self.hread1 = self._combine_short_CIGAR_elements(host_r1, host_header)
 		self.hread2 = self._combine_short_CIGAR_elements(host_r2, host_header)
 		self.vread1 = self._combine_short_CIGAR_elements(virus_r1, virus_header)
-		self.vread2 = self._combine_short_CIGAR_elements(virus_r2, virus_header)		
+		self.vread2 = self._combine_short_CIGAR_elements(virus_r2, virus_header)	
+					
 		assert tol >= 0
 		assert tlen >= 0
 		
 		# note that self._is_discordant() also assigns self.hread and self.vread
-		assert self._is_discordant()
+		assert self._is_discordant(host_sec1, host_sec2, virus_sec1, virus_sec2)
 		
 		self.get_host_chr()
 		self.get_viral_ref()
@@ -1004,8 +1366,7 @@ class DiscordantIntegration(ChimericIntegration):
 		if h1_map:
 			self.chr = self.hread1.reference_name
 		else:
-			self.chr = self.hread2.reference_name
-			
+			self.chr = self.hread2.reference_name			
 			
 	def get_integration_orientation(self):
 		""" 
@@ -1017,7 +1378,6 @@ class DiscordantIntegration(ChimericIntegration):
 			return 'vh'
 		else:
 			return 'hv'
-
 	
 	def get_integration_type(self):
 		""" Get type of integration - in this case discordant """
@@ -1047,7 +1407,6 @@ class DiscordantIntegration(ChimericIntegration):
 		""" Get likely coordinates of integration in viral reference """		
 
 		return self.get_coords(self.vread, self.virus_header)
-
 	
 	def get_viral_orientation(self):
 		""" 
@@ -1076,9 +1435,8 @@ class DiscordantIntegration(ChimericIntegration):
 			self.virus = self.vread1.reference_name
 		else:
 			self.virus = self.vread2.reference_name
-		
-		
-	def _is_discordant(self):
+				
+	def _is_discordant(self, host_sec1, host_sec2, virus_sec1, virus_sec2):
 		""" 
 		Check if a read-pair is discordant integration (one read mapped to host, one
 		read mapped to virus)
@@ -1105,9 +1463,13 @@ class DiscordantIntegration(ChimericIntegration):
 		if h1_map:
 			self.hread = self.hread1
 			self.vread = self.vread2
+			self.hsec = self._process_non_primary_alignments(self.hread, host_sec1, self.host_header)
+			self.vsec = self._process_non_primary_alignments(self.vread, virus_sec2, self.virus_header)
 		else:
 			self.hread = self.hread2
 			self.vread = self.vread1
+			self.hsec = self._process_non_primary_alignments(self.hread, host_sec2, self.host_header)
+			self.vsec = self._process_non_primary_alignments(self.vread, virus_sec1, self.virus_header)
 
 		return True
 		
