@@ -104,6 +104,10 @@ class AlignmentFilePair:
 			if host_r1_primary is not None and virus_r1_primary is not None:
 				integration = self._is_chimeric(host_r1_primary, virus_r1_primary,
 												host_r1_not_primary, virus_r1_not_primary)
+												
+				if integration is not None:
+					self.ints.append(integration)
+					integration.get_properties()
 
 			# collect read2 alignments
 			host_r2_primary = self.curr_host.get_primary_r2()
@@ -117,8 +121,8 @@ class AlignmentFilePair:
 				integration = self._is_chimeric(host_r2_primary, virus_r2_primary,
 												host_r2_not_primary, virus_r2_not_primary)
 				if integration is not None:
-					self.ints.append(integration)					
-						
+					self.ints.append(integration)
+					integration.get_properties()						
 						
 			# if there are alignments that are neither read 1 nor read 2, check if chimeric
 			host_not12_primary = self.curr_host.get_primary_not_r1_or_r2()
@@ -132,6 +136,7 @@ class AlignmentFilePair:
 												host_not12_not_primary, virus_not12_not_primary)
 				if integration is not None:
 					self.ints.append(integration)
+					integration.get_properties()
 					
 			# check for a discordant pair
 			if all([i is not None for i in [host_r1_primary, host_r2_primary, 
@@ -143,11 +148,7 @@ class AlignmentFilePair:
 											virus_r1_not_primary, virus_r2_not_primary)
 				if integration is not None:
 					self.ints.append(integration)
-					try:
-						integration.get_properties()
-					except:
-						pdb.set_trace()
-						integration.get_properties()
+					integration.get_properties()
 		
 		print(f"found {len(self.ints)} integrations")
 		
@@ -423,12 +424,62 @@ class AlignmentPool(list):
 		else:
 			raise ValueError(f"found more than one primary alignment for {self[0].qname} (not read 1 or read 2)")	
 			
+	def get_rearrangement_nm(self):
+		""" 
+		For an AlignmentPool consisting of different alignments of the same read, get an 
+		edit distance for the case that those alignments cover the whole read
+		
+		This is done by collecting non-nested alignments using self.remove_query_nested(),
+		and then taking the sum of all the edit distances for those alignments, plus the
+		number of bases in the read not accounted for by any alignment (i.e. the number of
+		bases in the gaps between those alignments) 
+		
+		Return a tuple of the edit distance and the non-nested AlignmentPool (since it might
+		be different to self after removing nested alignments)
+		"""
+		
+		# check that we're dealing with the same query, and
+		# check that all are read1, read2, or neither
+		if len(self) > 1:
+			assert all([read.query_name == self[0].query_name for read in self[1:]])
+			assert all([read.is_read1 == self[0].is_read1 for read in self[1:]])
+			assert all([read.is_read2 == self[0].is_read2 for read in self[1:]])
+		
+		alns = AlignmentPool(self)
+		alns.remove_query_nested()
+		
+		# if there's a gap between the first alignment and the start of the read
+		nm = alns[0].query_alignment_start
+			
+		curr_pos = alns[0].query_alignment_end
+		for read in alns:
+			
+			# if there's a gap between this alignment and the previous one
+			if read.query_alignment_start > curr_pos:
+				nm += read.query_alignment_start - curr_pos
+				
+			# get an edit distance for the part of the read
+			try:
+				nm += read.get_tag('NM')
+			except KeyError:
+				pass
+				
+			curr_pos = read.query_alignment_end
+				
+		# if there's a gap between the last alignment and the end of the read
+		nm += alns[-1].query_length - alns[-1].query_alignment_end
+		
+		return nm, alns
+			
 	def remove_redundant_alignments(self):
 		""" 
 		Remove redundant alignments (those that have same pos, CIGAR and strand) 
 		Note that two alignments are also redundant if they have the same CIGAR, except that
 		soft-clipped operations are replaced by hard-clipped operations
 		"""
+		
+		if len(self) > 1:
+			assert all([read.query_name == self[0].query_name for read in self[1:]])
 		
 		# first, find groups of integrations that are the same
 		same = [] # to store pairs of alignments that are redundant
@@ -508,6 +559,67 @@ class AlignmentPool(list):
 		for i in reversed(sorted(to_remove)):
 			self.pop(i)		
 			
+	def remove_query_nested(self):
+		""" 
+		Remove any alignments that are encompassed by other alignments.  That is,
+		remove any alignments that cover the same part of the query, keeping the alignment 
+		that covers the larger part of the query
+		
+		For example, considering two alignments, one 150M and 130M20S, retain only 150M.
+		
+		For two alignments, 50M100S and 40S110M, keep both because neither alignment
+		completely encompasses the other
+		
+		If two alignments are equivalent (i.e. cover same part of read), remove the one
+		with the higher edit distance
+		
+		Note that this changes the order of alignments in the pool
+		"""
+		
+		if len(self) < 2:
+			return
+			
+		assert all([read.query_name == self[0].query_name for read in self[1:]])
+		
+		# sort alignments in order of query alignment start and query alignment end
+		self.sort(key = lambda elem: (elem.query_alignment_start, elem.query_alignment_end))
+		
+		# look for nested alignments
+		i = 1
+		while i  < len(self):
+
+			# if we have the same start
+			if self[i].query_alignment_start == self[i-1].query_alignment_start:
+			
+				# if alignments cover the same part of the read
+				if self[i].query_alignment_end == self[i-1].query_alignment_end:
+
+					# remove the one with the higher edit distance
+					try:
+						if self[i].get_tags('NM') > self[i-1].get_tags('NM'):
+							self.pop(i)
+							continue
+						else:
+							self.pop(i-1)
+							continue
+					# if there's no edit distance, just remove the ith one
+					except KeyError:
+						self.pop(i)
+						continue
+					
+				# if stop of (i) is equal to or before
+				elif self[i].query_alignment_end > self[i-1].query_alignment_end:
+					self.pop(i-1)
+					continue
+
+			# if start of ith alignment is after start of (i-1)th alignment	(because sorted)
+			else:
+				# but end is before, then nested
+				if self[i].query_alignment_end <= self[i-1].query_alignment_end:
+					self.pop(i)
+					continue
+			
+			i += 1
 			
 	def _convert_cigarstring_to_cigartuples(self, cigar):
 		""" Convert a CIGAR string to cigar tuples """
@@ -621,7 +733,6 @@ class ChimericIntegration:
 		self.chr = host.reference_name
 		self.virus = virus.reference_name
 
-		
 	def get_ambig_coords(self):
 		""" Get coordinates of ambiguous sequence relative to read """
 		
@@ -864,20 +975,21 @@ class ChimericIntegration:
 	
 	def is_possible_translocation(self):
 		""" 
-		A read is a possible translocation if most of the bases in the read can be accounted
-		for by alignments to the host
+		A read is a possible host transloaction if more bases in the read can be 
+		accounted for by alignments to the host than would be if the read was a host/virus
+		chimera
 		"""
-		#TODO
-		return False
+
+		return self._is_possible_rearrangement(self.hread, self.hsec)
 	
 	def is_possible_virus_rearrangement(self):
 		""" 
-		A read is a possible viral rearrangement if most of the bases in the read can be 
-		accounted for by alignments to the virus
+		A read is a possible viral rearrangement if more bases in the read can be 
+		accounted for by alignments to the virus than would be if the read was a host/virus
+		chimera
 		"""
-		
-		#TODO
-		return False
+
+		return self._is_possible_rearrangement(self.vread, self.vsec)
 		
 	def is_viral_ambig_loc(self):
 		"""
@@ -978,14 +1090,41 @@ class ChimericIntegration:
 			
 			
 		# if we're removing elements that consume the query and are before the first
-		# mapped region, we need to also adjust the mapping position
-		prev_mapped = [tup for tup in read.cigartuples[0:to_delete[0][0]]]
-		if len(prev_mapped) > 0 and 0 not in prev_mapped:
-			# only need to consider those that consume query
-			pos_offset = [tup[1] for tup in prev_mapped if tup[0] in (1, 4)]
-			pos_offset = sum(pos_offset)
+		# mapped region for a forward read or after the last mapped region for a reverse 
+		# read then we need to also adjust the mapping position
+		deleted_inds = [tup[1] for tup in to_delete]
+		#https://stackoverflow.com/questions/952914/how-to-make-a-flat-list-out-of-a-list-of-lists
+		deleted_inds = [item for sublist in deleted_inds for item in sublist]
+		mapped = [ind for ind in range(len(read.cigartuples)) if read.cigartuples[ind][0] == 0]
+
+		if read.is_reverse:
+			# check if there are any regions we deleted from after last mapped region
+			offset_op = range(mapped[-1], len(read.cigartuples))
+			offset_op = [i for i in offset_op if i in deleted_inds]
+			
+			if len(offset_op) > 0:
+			
+				# only need to consider those that consume query
+				pos_offset = [read.cigartuples[ind] for ind in offset_op]
+				pos_offset = [tup[1] for tup in pos_offset if tup[0] in (1, 4)]
+				pos_offset = -sum(pos_offset)
+				
+			else:
+				pos_offset = 0
 		else:
-			pos_offset = 0
+			# check if there are any regions we deleted from before first mapped region
+			offset_op = range(mapped[0])
+			offset_op = [i for i in offset_op if i in deleted_inds]
+		
+			if len(offset_op) > 0:
+				# only need to consider those that consume query
+				pos_offset = [read.cigartuples[ind] for ind in offset_op]
+				pos_offset = [tup[1] for tup in pos_offset if tup[0] in (1, 4)]
+				pos_offset = -sum(pos_offset)
+				
+			else:
+				pos_offset = 0
+
 
 		return self._edit_alignment(read, header, tmp_cigartuples, pos_offset, nm_offset)
 		
@@ -996,7 +1135,7 @@ class ChimericIntegration:
 		a.query_sequence = read.query_sequence
 		a.flag = read.flag
 		a.reference_id = read.reference_id
-		a.reference_start = read.reference_start - pos_offset
+		a.reference_start = read.reference_start + pos_offset
 		a.mapping_quality = read.mapping_quality
 		a.cigar = cigartuples
 		a.next_reference_id = read.next_reference_id
@@ -1010,7 +1149,7 @@ class ChimericIntegration:
 		orig_strand = '-' if read.is_reverse else '+'
 		OA_update = (read.query_name, str(read.reference_start), orig_strand, 
 						read.cigarstring, str(read.mapping_quality), 
-						str(read.get_tags('NM')))
+						str(read.get_tag('NM')))
 		OA_update = ",".join(OA_update) + ";"
 		for i in range(len(tags)):
 			if tags[i][0] == 'NM':
@@ -1092,6 +1231,38 @@ class ChimericIntegration:
 
 		# if we didn't find any equivalent alignments, location not ambiguous
 		return False
+		
+	def _is_possible_rearrangement(self, primary, sec):
+		""" 
+		Given a primary alignment and an AlignmentPool of secondary alignments, compare 
+		edit distances for the case that the read is an integration, and the case that the
+		read is a rearrangement
+		
+		Return True if rearrangement is more likely, otherwise False
+		"""
+		
+		# if no secondary alignments, not possible rearrangement
+		if len(sec) == 0:
+			return False
+			
+		# make alignment pool with secondary and primary alignments
+		all = AlignmentPool(sec)
+		all.append(primary)
+		
+		rearrange_nm, all = all.get_rearrangement_nm()
+		
+		# if there's only one alignment in pool after removing redundant alignments,
+		# can't be rearrangement
+		if len(all) == 1:
+			return False
+			
+		# compare integration edit distance with rearrangement edit distance
+		int_nm = self.get_total_edit_dist()
+		
+		if rearrange_nm <= int_nm:
+			return True
+		else:
+			return False
 					
 	def _is_chimeric(self):
 		"""
@@ -1147,22 +1318,15 @@ class ChimericIntegration:
 		and self._simplify_CIGAR()
 		"""
 		
-		# get supplementary alignments from SA tag
-		try:
-			SA = primary.get_tag('SA')
-			not_primary += self._process_SA(SA, primary, header)
-		except KeyError:
-			pass
+		not_primary = self._process_SA_and_XA(primary, header)
 		
-		# get secondary alignments from XA tag
-		try:
-			XA = primary.get_tag('XA')
-			not_primary += self._process_XA(XA, primary, header)
-		except KeyError:
-			pass
+		# combine any short elements in secondary alignments
+		for i in range(len(not_primary)):
+			not_primary[i] = self._combine_short_CIGAR_elements(not_primary[i], header)
 		
 		if len(not_primary) < 2:
 			return not_primary
+			
 		# remove any redundant alignments from pool
 		# redundant alignments have same CIGAR, orientation (+/-) and pos		
 		not_primary.remove_redundant_alignments()
@@ -1177,7 +1341,6 @@ class ChimericIntegration:
 		"""
 		
 		SA_segs = AlignmentPool()
-		
 		
 		SA = SA.split(";")
 		SA = [i for i in SA if i != '']
@@ -1261,9 +1424,7 @@ class ChimericIntegration:
 		# insert just one matched region
 		tmp_cigartuples.insert(matched[0], (0, n_match))
 				
-		return self._edit_alignment(read, header, tmp_cigartuples, 0, 0)
-		
-		
+		return self._edit_alignment(read, header, tmp_cigartuples, 0, 0)	
 
 class DiscordantIntegration(ChimericIntegration):
 	""" 
@@ -1400,6 +1561,9 @@ class DiscordantIntegration(ChimericIntegration):
 		""" 
 		Get total edit distance, which is equal sum of host edit distance, and viral edit
 		distance
+		
+		For now, we don't consider any soft-clipped bases in this edit distance, but
+		perhaps it is worth doing so?
 		"""
 		return self.get_viral_edit_dist() + self.get_host_edit_dist()
 	
@@ -1407,6 +1571,7 @@ class DiscordantIntegration(ChimericIntegration):
 		""" Get likely coordinates of integration in viral reference """		
 
 		return self.get_coords(self.vread, self.virus_header)
+		
 	
 	def get_viral_orientation(self):
 		""" 
@@ -1491,7 +1656,8 @@ class DiscordantIntegration(ChimericIntegration):
 		if read.query_length - read.query_alignment_length > self.map_thresh:
 			return False
 					
-		return True			
+		return True		
+		
 		
 if __name__ == "__main__":
 	main()
