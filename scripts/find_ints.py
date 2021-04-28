@@ -1572,7 +1572,6 @@ class DiscordantIntegration(ChimericIntegration):
 
 		return self.get_coords(self.vread, self.virus_header)
 		
-	
 	def get_viral_orientation(self):
 		""" 
 		Figure out if the virus is integrated in forward (+) or reverse (-) orientation
@@ -1658,6 +1657,23 @@ class DiscordantIntegration(ChimericIntegration):
 					
 		return True		
 		
+	def _is_possible_rearrangement(self):
+		""" 
+		For a DiscordantIntegration, rearrangements are unlikely since they would require 
+		both reads to be mapped to the same reference, but a DiscordantIntegration is one
+		in which one read in the pair is mapped and the other unmapped (when considering a
+		single reference).  
+		
+		The only way it would be possible is if there are several 
+		alignments which span the 'unmapped' read, each of which alone doesn't cover 
+		enough of the read for it to be considered mapped, but when considered together
+		they span most or all of the read.
+		
+		For now, assume that rearrangments are unlikey for DiscordantIntegrations and just
+		return False.  However, need to address this issue in a more nuanced way
+		"""	
+		#TODO
+		return False
 		
 if __name__ == "__main__":
 	main()
