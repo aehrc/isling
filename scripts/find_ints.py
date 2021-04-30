@@ -1839,8 +1839,8 @@ class DiscordantIntegration(ChimericIntegration):
 		of length 20bp to cover the whole read.  However, it's extremely unlikely that 8
 		short fragments of the vector were recombined to create the unmapped read.  
 		
-		Therefore, assume that rearrangments are unlikey for DiscordantIntegrations and just
-		return False.  
+		Therefore, assume that rearrangments are exceedingly unlikely for 
+		DiscordantIntegrations and just return False.  
 		"""	
 		
 		return False
@@ -1854,46 +1854,53 @@ class DiscordantIntegration(ChimericIntegration):
 		and each host alignment as constituting a possible alternative integration.
 		
 		In particular, in the case of a DiscordantIntegration, all the properties are
-		determined by 
+		determined by the mapped read (not the unmapped read), so only consider
+		the secondary and supplementary alignments for the mapped read for each reference 
 		
 		Return a list of DiscordantIntegration objects with alternative integrations
 		"""
 
 		alt_ints = []
 		
-		haln1 = AlignmentPool(self.hsec1)
-		haln1.append(self.hread1)
-		haln1.remove_redundant_alignments()
-		
-		haln2 = AlignmentPool(self.hsec2)
-		haln2.append(self.hread2)
-		haln2.remove_redundant_alignments()
-		
-		valn1 = AlignmentPool(self.vsec1)
-		valn1.append(self.vread1)
-		valn1.remove_redundant_alignments()
-		
-		valn2 = AlignmentPool(self.vsec2)
-		valn2.append(self.vread2)
-		valn2.remove_redundant_alignments()
-		
-		print(len(haln1))
-		print(len(haln2))
-		print(len(valn1))
-		print(len(valn2))
-		
 		hread1_map = (self.hread1 == self.hread)
+		
+		if hread1_map:
+			haln = AlignmentPool(self.hsec1)
+			haln.append(self.hread1)
+			haln.remove_redundant_alignments()
 			
-		pdb.set_trace()
-		for h1, h2, v1, v2 in itertools.product(haln1, haln2, valn1, valn2):
+			valn = AlignmentPool(self.vsec2)
+			valn.append(self.vread2)
+			valn.remove_redundant_alignments()
+			
+			h2 = self.hread2
+			v1 = self.vread1
+		
+		else:
+			haln = AlignmentPool(self.hsec2)
+			haln.append(self.hread2)
+			haln.remove_redundant_alignments()
+		
+			valn = AlignmentPool(self.vsec1)
+			valn.append(self.vread1)
+			valn.remove_redundant_alignments()
+			
+			h1 = self.hread1
+			v2 = self.vread2
+
+		if len(haln) == 1 and len(valn) == 1:
+			return alt_ints
+			
+		for host, virus in itertools.product(haln, valn):
 				
 				# don't do primary vs primary
+				if host == self.hread and virus == self.vread:
+					continue
+					
 				if hread1_map:
-					if h1 == self.hread and v2 == self.vread:
-						continue
+					h1, v2 = host, virus
 				else:
-					if h2 == self.hread and v2 == self.vread:
-						continue
+					h2, v1 = host, virus
 
 				# if host and virus reads constitute a valid integration, add to list
 				try:
@@ -1904,8 +1911,6 @@ class DiscordantIntegration(ChimericIntegration):
 					
 				except AssertionError:
 					pass
-			
-		pdb.set_trace()
 
 		return alt_ints
 		
