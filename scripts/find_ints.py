@@ -105,7 +105,12 @@ class AlignmentFilePair:
 												
 				if integration is not None:
 					self.ints.append(integration)
-					integration.get_properties()
+				
+				integration = self._is_full(host_r1_primary, virus_r1_primary,
+												host_r1_not_primary, virus_r1_not_primary)
+												
+				if integration is not None:
+					self.ints.append(integration)					
 
 			# collect read2 alignments
 			host_r2_primary = self.curr_host.get_primary_r2()
@@ -119,8 +124,13 @@ class AlignmentFilePair:
 				integration = self._is_chimeric(host_r2_primary, virus_r2_primary,
 												host_r2_not_primary, virus_r2_not_primary)
 				if integration is not None:
-					self.ints.append(integration)
-					integration.get_properties()						
+					self.ints.append(integration)						
+
+			if host_r2_primary is not None and virus_r2_primary is not None:
+				integration = self._is_full(host_r2_primary, virus_r2_primary,
+												host_r2_not_primary, virus_r2_not_primary)
+				if integration is not None:
+					self.ints.append(integration)	
 						
 			# if there are alignments that are neither read 1 nor read 2, check if chimeric
 			host_not12_primary = self.curr_host.get_primary_not_r1_or_r2()
@@ -134,7 +144,11 @@ class AlignmentFilePair:
 												host_not12_not_primary, virus_not12_not_primary)
 				if integration is not None:
 					self.ints.append(integration)
-					integration.get_properties()
+					
+				integration = self._is_full(host_not12_primary, virus_not12_primary,
+												host_not12_not_primary, virus_not12_not_primary)
+				if integration is not None:
+					self.ints.append(integration)
 					
 			# check for a discordant pair
 			if all([i is not None for i in [host_r1_primary, host_r2_primary, 
@@ -146,7 +160,6 @@ class AlignmentFilePair:
 											virus_r1_not_primary, virus_r2_not_primary)
 				if integration is not None:
 					self.ints.append(integration)
-					integration.get_properties()
 		
 		print(f"found {len(self.ints)} integrations")
 		
@@ -202,6 +215,26 @@ class AlignmentFilePair:
 										host_sec1, host_sec2, virus_sec1, virus_sec2,
 										self.map_thresh, self.tlen
 										)
+		except AssertionError:
+			return None
+			
+	def _is_full(self, hread, vread, hsec, vsec):
+		""" 
+		Takes two alignments for the same read, one from the host and one from the virus, 
+		and decides if the read appears to contain a 'full integration''.  A 'full 
+		integration' means that one part of the read is accounted for by the host alignment, 
+		the middle is accounted for by a viral alignment, and the other end is accounted 
+		for by a host alignment.  For example 30M80I30M for host and 30S80M30S for virus.
+		There might be some overlap or gap between the host and viral alignments, as
+		for a ChimericIntegration
+		"""	
+		
+		try:
+			return FullIntegration(hread, vread, 
+									self.host.aln.header, 
+									self.virus.aln.header,
+									hsec, vsec,
+									self.tol, self.map_thresh)
 		except AssertionError:
 			return None
 
@@ -1586,8 +1619,7 @@ class DiscordantIntegration(ChimericIntegration):
 		assert self._is_discordant(host_sec1, host_sec2, virus_sec1, virus_sec2)
 		
 		self.get_host_chr()
-		self.get_viral_ref()
-		
+		self.get_viral_ref()	
 		
 	def gap_or_overlap(self):
 		""" For a discordant pair, OverlapType is always discordant """
@@ -1891,6 +1923,7 @@ class DiscordantIntegration(ChimericIntegration):
 		if len(haln) == 1 and len(valn) == 1:
 			return alt_ints
 			
+		
 		for host, virus in itertools.product(haln, valn):
 				
 				# don't do primary vs primary
@@ -1898,10 +1931,17 @@ class DiscordantIntegration(ChimericIntegration):
 					continue
 					
 				if hread1_map:
-					h1, v2 = host, virus
+					h1 = self._combine_short_CIGAR_elements(host, self.host_header)
+					v2 = self._combine_short_CIGAR_elements(virus, self.virus_header)
 				else:
-					h2, v1 = host, virus
-
+					h2 = self._combine_short_CIGAR_elements(host, self.host_header)
+					v1 = self._combine_short_CIGAR_elements(virus, self.virus_header)
+				
+				print(h1)
+				print(h2)
+				print(v1)
+				print(v2)
+				pdb.set_trace()
 				# if host and virus reads constitute a valid integration, add to list
 				try:
 					alt_int = DiscordantIntegration(h1, h2, v1, v2, self.tol, 
@@ -1913,6 +1953,109 @@ class DiscordantIntegration(ChimericIntegration):
 					pass
 
 		return alt_ints
+
+class FullIntegration(ChimericIntegration):
+	"""
+	A 'full integration' is a read that looks like it contains both junctions (left and 
+	right) of an integration.
+	"""
+	
+	def __init__(self, host, virus, host_header, virus_header, 
+					host_sec, virus_sec, tol, map_thresh=20, primary=True):
+					
+		self.map_thresh = map_thresh		
+		self.tol = tol
+		
+		self.host_header = host_header
+		self.virus_header = virus_header
+		self.primary = primary	
+				
+		assert tol >= 0
+		
+		self.hread = self._combine_short_CIGAR_elements(host, host_header)
+		self.vread = self._combine_short_CIGAR_elements(virus, virus_header)
+		
+		assert self._is_chimeric()
+		
+		self.chr = host.reference_name
+		self.virus = virus.reference_name	
+		
+		
+	def _assign_jucntions(self):
+		"""
+		A FullIntegration is just two ChimericIntegrations in the same read.
+		
+		"""
+	
+	def _get_middle_region_read_coords(self, read):
+		"""
+		Get the part of the read occupied by the middle cigar operation, relative to 
+		the original read sequence (i.e. reverse cigar if read is mapped in reverse orientation).
+		E.g. for CIGAR 79S76M95S return (79, 155) for forward read and (95, 171) for
+		reverse read
+		"""
+		assert len(read.cigartuples) == 3
+		if read.is_reverse:
+			start = read.cigartuples[-1][1]
+		else:
+			start = read.cigartuples[0][1]
+			
+		stop = start + read.cigartuples[1][1]
+		
+		assert start < stop
+		
+		return start, stop
+		
+	def _is_chimeric(self):
+		"""
+		Check if the host and virus reads look like they contain an integration
+		where we can see both junctions.
+		
+		That is, the host alignment should be mapped/insertion/mapped, and the viral 
+		alignment should be clipped/mapped/clipped
+		"""	
+		
+		if None in (self.hread.cigartuples, self.vread.cigartuples):
+			return False
+		
+		# should be mapped/insertion/mapped
+		if len(self.hread.cigartuples) < 3:
+			return False
+			
+		# should be clipped/mapped/clipped
+		if len(self.vread.cigartuples) < 3:
+			return False
+		
+		# host should be mapped, insertion, mapped			
+		host_ops = [i[0] for i in self.hread.cigartuples]
+		if host_ops != [0, 1, 0]:
+			return False
+			
+		# virus should be clipped, mapped, clipped
+		virus_ops = [i[0] for i in self.vread.cigartuples]
+		if virus_ops != [4, 0, 4]:
+			return False
+		
+		# mapped regions must be at least self.map_thresh bp long
+		if self.hread.cigartuples[0][1] < self.map_thresh:
+			return False
+		if self.hread.cigartuples[-1][1] < self.map_thresh:
+			return False
+		if self.vread.cigartuples[1][1] < self.map_thresh:
+			return False
+			
+		# virus mapped region and host inserted region must overlap
+		vstart, vstop = self._get_middle_region_read_coords(self.vread)
+		hstart, hstop = self._get_middle_region_read_coords(self.hread)
+			
+		if vstart > hstop:
+			return False
+		if hstart > vstop:
+			return False
+		
+		return True
+		
+		
 		
 if __name__ == "__main__":
 	main()
