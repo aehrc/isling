@@ -742,7 +742,7 @@ class ChimericIntegration:
 	"""
 	
 	def __init__(self, host, virus, host_header, virus_header, 
-					host_sec, virus_sec,  tol, map_thresh=20, primary=True, side=None):
+					host_sec, virus_sec,  tol, map_thresh=20, primary=True):
 		""" 
 		Given a host and virus read that are chimeric, calculate the properties of the integration.
 		
@@ -755,9 +755,6 @@ class ChimericIntegration:
 		self.primary = primary
 		
 		assert self.tol >= 0
-		
-		assert side in ('left', 'right', None)
-		self.side = side
 		
 		self.hread = self._combine_short_CIGAR_elements(host, host_header)
 		self.hread = self._simplify_CIGAR(self.hread, host_header)
@@ -780,36 +777,24 @@ class ChimericIntegration:
 	def get_ambig_coords(self):
 		""" Get coordinates of ambiguous sequence relative to read """
 		
+		print(self.hread)
+		print(self.vread)
+		pdb.set_trace()
 		# if host/virus, want end of host alignment if forward
-		if self.side == 'left' or self.get_integration_orientation() == 'hv':
-			if not self.hread.is_reverse:
-				# positive ambig bases means overlap, negative ambig bases means gap
-				return sorted([
+		if self.get_integration_orientation() == 'hv':
+			return sorted([
 					self.hread.query_alignment_end,
 					self.hread.query_alignment_end - self.num_ambig_bases()
-				])
-			# or start if reverse
-			else:
-				return sorted([
-					self.hread.query_alignment_start,
-					self.hread.query_alignment_start - self.num_ambig_bases()
 				])	
 		# if virus/host, want start of host alignment if forward
-		elif self.side == 'right' or self.get_integration_orientation() == 'vh':
-			# positive ambig bases means overlap, negative ambig bases means gap
-			if not self.hread.is_reverse:
-				return sorted([
-					self.hread.query_alignment_start,
-					self.hread.query_alignment_start + self.num_ambig_bases()
-				])
-			else:
-				return sorted([
+		else:
+			return sorted([
 					self.hread.query_alignment_end,
 					self.hread.query_alignment_end + self.num_ambig_bases()
 				])			
 
 	def get_ambig_seq(self):
-		""" Get sequence of ambiguous base from read """
+		""" Get sequence of ambiguous base(s) from read """
 
 		ambig = self.get_ambig_coords()
 		
@@ -854,12 +839,15 @@ class ChimericIntegration:
 		return self.hread.mapping_quality
 
 	def get_host_seq(self):
-		""" Get the part of the read aligned to the host (excluding ambiguous bases) """
+		""" 
+		Get the part of the read aligned to the host 
+		(including ambiguous bases if overlap, excluding if gap)
+		"""
 		
-		# TODO - exclude ambiguous bases, reverse complement if reverse
-		pdb.set_trace()
-		
-		return self.hread.query_alignment_sequence
+		if self.hread.is_reverse:
+			return self._reverse_complement(self.hread.query_alignment_sequence)
+		else:
+			return self.hread.query_alignment_sequence		
 
 	def get_integration_orientation(self):
 		""" 
@@ -868,19 +856,11 @@ class ChimericIntegration:
 		
 		# if host alignment is matched, clipped
 		if self.hread.cigartuples[0][0] == 0:
-		
-			ori = 'hv'
+				return 'hv'
 		
 		# if host alignment is clipped, matched
 		else:
-			ori = 'vh'
-		
-		if self.side == 'left':
-			assert ori == 'hv'
-		elif self.side == 'right':
-			assert ori == 'vh'
-		
-		return ori
+				return 'vh'
 	
 	def get_integration_type(self):
 		""" Return type of integration (chimeric or discordant) """
@@ -1023,12 +1003,15 @@ class ChimericIntegration:
 				return '+'
 		
 	def get_viral_seq(self):
-		""" Get the part of the read aligned to the virus - excluding ambiguous bases"""
+		""" 
+		Get the part of the read aligned to the host 
+		(including ambiguous bases if overlap, excluding if gap)
+		"""
 		
-		# TODO - exclude ambiguous bases, reverse complement if reverse
-		pdb.set_trace()
-
-		return self.vread.query_alignment_sequence			
+		if self.vread.is_reverse:
+			return self._reverse_complement(self.vread.query_alignment_sequence)
+		else:
+			return self.vread.query_alignment_sequence		
 		
 	def num_ambig_bases(self, absolute = False):
 		""" 
@@ -1044,28 +1027,16 @@ class ChimericIntegration:
 		Normally host and virus reads should be the same length, because they are alignments
 		of the same read.  However, if this ChimericIntegration comes from a FullIntegration,
 		we have split up each host and virus read into two parts, which may be of different
-		lengths.  In this case, we need to allow for reads of different lengths - TODO
+		lengths.  In this case, we need to allow for reads of different lengths 
 		
 		"""
 
-		if self.side is None:
-			# make sure that read length is the same for host and viral reads
-			assert self.hread.infer_read_length() == self.vread.infer_read_length()
-		
-			# get total number of bases mapped in both alignments
-			total_mapped = self.hread.query_alignment_length + self.vread.query_alignment_length
-		
-			# ambig bases is total mapped - read length
-			ambig = total_mapped - self.hread.infer_read_length()
-		
-			return abs(ambig) if absolute else ambig
-			
-		elif self.side == 'left':
+		if self.get_integration_orientation() == 'hv':
 
 			if self.hread.is_reverse:
 				hop = self.hread.cigartuples[-1]
 			else:
-				hop= self.hread.cigartuples[0]
+				hop = self.hread.cigartuples[0]
 			if self.vread.is_reverse:
 				vop = self.vread.cigartuples[-1]
 			else:
@@ -1075,7 +1046,7 @@ class ChimericIntegration:
 			if self.hread.is_reverse:
 				hop = self.hread.cigartuples[0]
 			else:
-				hop= self.hread.cigartuples[-1]
+				hop = self.hread.cigartuples[-1]
 			if self.vread.is_reverse:
 				vop = self.vread.cigartuples[0]
 			else:
@@ -1146,6 +1117,74 @@ class ChimericIntegration:
 		)
 		
 		return ",".join(props)
+		
+	def _check_md_character(self, chr):
+		"""
+		Characters in MD tag can be integers, letters or '^'
+		Return 'int' if inter, 'let' if letter, or 'del' if '^'
+		"""
+		if chr == '^':
+			return 'del'
+		
+		try:
+			int(chr)
+			return 'int'
+		except ValueError:
+			return 'let'
+			
+	def _combine_MD_with_CIGAR(self, cigartuples, md):
+		"""
+		Split a CIGAR and MD tag to get the CIGAR operations and their corresponding
+		elements in the MD tag.  Combine into a list of tuples with length 3.
+		In each tuple, first element is CIGAR op type, second element is CIGAR op length,
+		and third element is list of MD elements
+		For example CIGAR 1S249M and MD tag 10T2G7T5G221 should become
+		[(4,1,[]), (0, 249, [10, 'T', 2, 'G', 7, 'T', 5, 'G', 221])]
+		"""		
+		
+		md_lst = self._split_md_tag(md)
+		md_ind = 0
+		md_cigartuples = []
+		
+		# loop over cigar operations and get corresponding 
+		for op in cigartuples:
+			
+			cigar_op_MD = []
+			# only ops that appear in MD tag are M and D
+			
+			# for a deletion, should be only one MD element for the CIGAR element
+			if op[0] == 2:
+				# deletion element looks like '^AGTG', where AGTG are deleted bases
+				# number of deleted bases should match length of CIGAR op
+				assert len(md_lst[md_ind]) - 1 == op[1]
+				cigar_op_MD.append(md_lst[md_ind])
+				md_ind += 1
+			
+			# for a mapped region, we need to collect the MD elements (matches (ints) and
+			# single letter mismatches)
+			elif op[0] == 0:
+				md_len = 0
+				while md_len < op[1]:
+					md_op = md_lst[md_ind]
+					
+					try:
+						# integer with a run of matched bases
+						md_len += md_op
+					except TypeError:
+						# single letter mismatch
+						assert len(md_op) == 1
+						md_len += 1
+						
+					
+					cigar_op_MD.append(md_op)
+					md_ind += 1
+				
+				# check we got the right number of bases from MD list
+				assert md_len == op[1]
+			
+			md_cigartuples.append((op[0], op[1], cigar_op_MD))
+		
+		return md_cigartuples
 
 	def _combine_short_CIGAR_elements(self, read, header):
 		"""
@@ -1162,8 +1201,37 @@ class ChimericIntegration:
 		Similar in spirit to '_simplify_CIGAR', but takes a slightly different approach (
 		for example, deals differently with reads that are soft-clipped on both ends)
 		
-		TODO - update MD tag when doing this!!! This is needed for splitting a read into
-		simpler portions
+		We might later on want to split this alignment into smaller ones, for example in
+		the case of a FullAlignment. When we do this, we will want an edit distance for
+		each mapped region of the alignment. Therefore, when editing we should update the
+		MD tag so that we can later compare query and reference for that mapped region.
+		
+ 		We don't have all the information to do this properly (since the MD tag stores 
+ 		information about the reference, but we don't have the reference).  
+ 		We could solve this by asking the user for the reference as well and extracting 
+ 		the appropriate bases, but since we only care about the edit distance in this case, 
+ 		this is probably overkill.  
+		
+		So instead, just add 'X's to the MD tag when combining soft-clip elements with
+		a mapped region.
+		
+		For deletion elements (D, 2), these are already included in MD tag but will be removed
+		when we remove the element. Use the 'CO' (free-text comment tag) to keep track of
+		how long these elements are and into which mapped region they were combined
+		so that we can later add them into the edit distance if we split the read.
+		For insertion elements (I, 1), these will not be included in the MD tag but we also
+		need to keep track of which mapped element they were combined into so that we
+		can later add them into the edit distance if we split the read.
+		
+		For insertions and deletions, use the CO tag to keep track of how many inserted
+		and deleted bases were combined into a mapped region.  Do this in the format
+		CO: '0:2,2:3, 5:0' - a comma separated list of mapped regions in the new CIGAR, with
+		the index of the mapped region in the cigartuples and the number of inserted or
+		deleted bases merged separated by a colon.  For example, '0:2,2:3, 5:0' means
+		that 2 inserted or deleted bases were combined into the mapped region at index 0,
+		3 were combined into the mapped region at index 2, and 0 were combined into the 
+		mapped region at index 5.  Mapped regions referred to in the CO should be AFTER
+		editing the alignment - i.e. index 0 really should be a mapped region
 		"""
 		
 		if read.cigartuples is None:
@@ -1203,8 +1271,15 @@ class ChimericIntegration:
 			return read
 
 		# next, combine short elements with nearest matched region
-		tmp_cigartuples = list(read.cigartuples)
+		try:
+			tmp_cigartuples = self._combine_MD_with_CIGAR(read.cigartuples, read.get_tag('MD'))
+			has_md = True
+		except KeyError:
+			has_md = False
+			tmp_cigartuples = [(i[0], i[1], [i[0]]) if i[0] == 0 else (i[0], i[1], [])  for i in read.cigartuples]
+			
 		nm_offset = 0
+		co = {}
 		
 		for elem in reversed(to_delete):
 
@@ -1212,34 +1287,135 @@ class ChimericIntegration:
 			assert read.cigartuples[i_matched][0] == 0
 			assert tmp_cigartuples[i_matched][0] == 0
 			i_del = elem[1]
+			i_md = tmp_cigartuples[i_matched][2]
+			
+			# for CO tag - keep track of number of I or D bases combined
+			i_co = i_matched # keep track of which mapped element CO will refer to AFTER deletion
+			try:
+				num_ins_or_del = co[i_matched]
+				del co[i_matched]
+			except KeyError:
+				num_ins_or_del = 0
 			
 			# if cigar operation consumes query, need to add to matched region			
 			matched = tmp_cigartuples[i_matched][1]
 			for idx in i_del:
-				# I (1) and S (4) operations consume query
+			
+				## update cigar operation 
+			
+				# I (1) and S (4) operations consume query - add to matched length
 				if read.cigartuples[idx][0] in {1, 4}:
 					matched += read.cigartuples[idx][1]
+				
+				## update edit distance offset
 				
 				# if this is a soft-clip, we also need to add it to the edit distance offset
 				if read.cigartuples[idx][0] == 4:
 					nm_offset += read.cigartuples[idx][1]
-			
-			# update mapped length
-			tmp_cigartuples[i_matched] = (0, matched)
+					
+				# if this is a deletion from reference (was previously in MD tag but will be 
+				# removed), we will account for this in the CO tag so remove from NM offset
+				if read.cigartuples[idx][0] == 2:
+					nm_offset -= read.cigartuples[idx][1]
+				
+				## update MD tag
+				# if we're combining a soft-clip with a matched region, add to MD tag
+				if read.cigartuples[idx][0] == 4:
+					
+					# need to add bases to MD tag, but don't know what reference was at
+					# this position.  So just add a string of 'X's, which need to be 
+					# separated by 0's as per sam specification
+					md_add = [0, 'X'] * read.cigartuples[idx][1] + [0]
+					
+					# if we're combining something after the mapped region
+					if idx > i_matched:
+					
+						# don't need 0 at end
+						md_add.pop(-1)
+						# if last element of i_md is an int, don't need 0 at start
+						if isinstance(i_md[-1], int):
+							md_add.pop(0)
+					
+						i_md = i_md + md_add
+					
+					# if we're combining something before the mapped region
+					else:
+						# don't need 0 at start
+						md_add.pop(0)
+						# if first element of i_md is an int, don't need 0 at end
+						if isinstance(i_md[0], int):
+							md_add.pop(-1)
+							
+						i_md = md_add + i_md
+					
+				# for an insertion or deletion, keep track of the number of bases added
+				# for adding to the CO tag
+				if read.cigartuples[idx][0] in (1, 2):
+					num_ins_or_del += read.cigartuples[idx][1]
+					
+					# if we're deleting something from before the mapped region, we also
+					# need to offset our mapped region index in the CO tag
+					if idx < i_matched:
+						i_co -= 1
+				
+			# update mapped length and md tag
+			tmp_cigartuples[i_matched] = (0, matched, i_md)
 			
 			# remove elements
 			for idx in i_del:
 				tmp_cigartuples.pop(idx)
+
+			# update our CO tag
+			co[i_co] = num_ins_or_del
 		
 		# check that we don't now have two matched regions next to each other
 		if len(tmp_cigartuples) > 1:
 			for i in reversed(range(len(tmp_cigartuples)-1)):
 				if tmp_cigartuples[i][0] == 0:
 					if tmp_cigartuples[i+1][0] == 0:
+						# add matched regions together
 						matched = tmp_cigartuples[i][1] + tmp_cigartuples[i+1][1]
+				
+						# check that we wont't have two int md elements next to each other
+						if isinstance(tmp_cigartuples[i][2][-1], int):
+							if isinstance(tmp_cigartuples[i+1][2][0], int):
+								tmp_cigartuples[i+1][2][0] += tmp_cigartuples[i][2].pop(-1)
+								
+						# add MD for adjacent regions
+						md =  tmp_cigartuples[i][2] + tmp_cigartuples[i+1][2]
+						
+						# we also need to adjust CO tag to make sure it refers to correct
+						# mapped region
+						if i in co.keys() and i+1 in co.keys():
+							# if we have both, combine them
+							co[i] += co[i+1]
+							del co[i+1]
+						
+						# if we have only i+1 in co
+						elif i+1 in co.keys():
+							co[i] = co[i+1]
+							del co[i+1]
+						
+						# remove one of regions
 						tmp_cigartuples.pop(i+1)
-						tmp_cigartuples[i] = (0, matched)	
-			
+						# update other with new matched and md
+						tmp_cigartuples[i] = (0, matched, md)	
+		
+		# separate out md tag from cigartuples
+		md = []
+		for i in tmp_cigartuples:
+			md += i[2]
+		md = ''.join([str(i) for i in md])
+		
+		# if we didn't have an MD tag in the first place, don't add one
+		if not has_md:
+			md = ''
+		
+		tmp_cigartuples = [(i[0], i[1]) for i in tmp_cigartuples]
+		
+		# join CO tag elements
+		co = [f"{key}:{val}" for key, val in co.items()]
+		co = ','.join(co)
 			
 		# if we're removing elements that consume the query and are before the first
 		# mapped region for a forward read or after the last mapped region for a reverse 
@@ -1277,10 +1453,9 @@ class ChimericIntegration:
 			else:
 				pos_offset = 0
 
-
-		return self._edit_alignment(read, header, tmp_cigartuples, pos_offset, nm_offset)
+		return self._edit_alignment(read, header, tmp_cigartuples, pos_offset, nm_offset, co, md)
 		
-	def _edit_alignment(self, read, header, cigartuples, pos_offset, nm_offset):
+	def _edit_alignment(self, read, header, cigartuples, pos_offset, nm_offset, co, md):
 		""" Edit an alignment by modifying the cigartuples of an existing read """
 		a = pysam.AlignedSegment(header=header)
 		a.query_name = read.query_name
@@ -1295,7 +1470,7 @@ class ChimericIntegration:
 		a.template_length = read.template_length
 		a.query_qualities = read.query_qualities
 		
-		# update edit distance in NM tag (but not MD - this is not reliable!!)
+		# update MD, NM, OA, CO tags
 		tags = read.get_tags()
 		updated_OA = False
 		orig_strand = '-' if read.is_reverse else '+'
@@ -1309,9 +1484,13 @@ class ChimericIntegration:
 			if tags[i][0] == 'OA':
 				tags[i] = ('OA', tags[i][1] + OA_update)
 				updated_OA = True
-		
+			if tags[i][0] == 'MD':
+				assert md != ''
+				tags[i] = ('MD', md)		
 		if not updated_OA:
 			tags.append(('OA', OA_update))
+			
+		tags.append(('CO', co))
 			
 		a.tags = tags
 		
@@ -1421,7 +1600,7 @@ class ChimericIntegration:
 				return (
 					read.get_blocks()[0][0],
 					read.get_blocks()[0][0]
-				)
+				)		
 				
 	def _is_ambiguous_location(self, read, sec):
 		"""  
@@ -1626,10 +1805,60 @@ class ChimericIntegration:
 		
 	def _reverse_complement(self, seq):
 		""" Return reverse complement """
-		nn = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N':'N' ,
+		nn = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N':'N' , 'X':'X',
 			  'a':'t', 'c':'g', 'g':'c', 't':'a', 'n':'n'}
 		return ''.join(reversed([nn[i] for i in seq]))		
 		
+	def _split_md_tag(self, md):
+		"""
+		Split MD tag into individual elements for ease of manipulation
+		e.g. '10A5^AC6' should become 
+		[10, 'A', 5, '^AC', 6]
+		"""
+		assert len(md) > 0
+		md_lst = []
+		val = md[0]
+		# keep track of what the previous character was
+		prev_type = self._check_md_character(md[0])
+		
+		
+		for i in md[1:]:
+			curr_type = self._check_md_character(i)
+			# if previous type was a number
+			if prev_type == 'int':
+				# if this is also a number, it's part of the same number
+				if curr_type == 'int':
+					val = val + i
+				# if it's not part of a number add the previous number and start the new 
+				# element
+				else:
+					md_lst.append(int(val))
+					val = i
+			# if this is part of a deletion
+			elif prev_type == 'del':
+				# if it's a letter, then add to the deletion
+				if curr_type == 'let':
+					val = val + i
+				# otherwise has to be a number - add the deletion to the list and start
+				# the new number
+				else:
+					md_lst.append(val)
+					val = i
+			# otherwise has to be a single letter mismatch
+			else:
+				md_lst.append(val)
+				val = i
+			
+			prev_type = curr_type
+		
+		# append last element
+		try:
+			md_lst.append(int(val))
+		except ValueError:
+			md_lst.append(val)
+				
+		return md_lst	
+				
 	def _simplify_CIGAR(self, read, header):
 		""" 
 		Simplify CIGAR by combining all matched regions into one, leaving any
@@ -1666,7 +1895,7 @@ class ChimericIntegration:
 		# insert just one matched region
 		tmp_cigartuples.insert(matched[0], (0, n_match))
 				
-		return self._edit_alignment(read, header, tmp_cigartuples, 0, 0)	
+		return self._edit_alignment(read, header, tmp_cigartuples, 0, 0, '', '')	
 		
 	def __str__(self):
 		
@@ -2100,40 +2329,46 @@ class FullIntegration(ChimericIntegration):
 				self.left = ChimericIntegration(hread1, vread1, self.host_header, 
 												self.virus_header, AlignmentPool(), 
 												AlignmentPool(), self.tol, self.map_thresh,
-												True, 'left')
+												True)
 				self.right = ChimericIntegration(hread2, vread2, self.host_header, 
 												self.virus_header, AlignmentPool(), 
 												AlignmentPool(), self.tol, self.map_thresh, 
-												True, 'right')	
+												True)	
 			else:				
 				self.left = ChimericIntegration(hread1, vread2, self.host_header, 
 												self.virus_header, AlignmentPool(), 
 												AlignmentPool(), self.tol, self.map_thresh, 
-												True, 'left')
+												True)
 				self.right = ChimericIntegration(hread2, vread1, self.host_header, 
 													self.virus_header, AlignmentPool(), 
 													AlignmentPool(), self.tol, 
-													self.map_thresh, True, 'right')	
+													self.map_thresh, True)	
 		else:
 			if not self.vread.is_reverse:
 				self.left = ChimericIntegration(hread2, vread1, self.host_header, 
 												self.virus_header, AlignmentPool(), 
 												AlignmentPool(), self.tol, self.map_thresh,
-												True, 'left')
+												True)
 				self.right = ChimericIntegration(hread1, vread2, self.host_header, 
 												self.virus_header, AlignmentPool(), 
 												AlignmentPool(), self.tol, self.map_thresh, 
-												True, 'right')						
+												True)						
 			else:				
 				self.left = ChimericIntegration(hread2, vread2, self.host_header, 
 												self.virus_header, AlignmentPool(), 
 												AlignmentPool(), self.tol, self.map_thresh, 
-												True, 'left')
+												True)
 				self.right = ChimericIntegration(hread1, vread1, self.host_header, 
 													self.virus_header, AlignmentPool(), 
 													AlignmentPool(), self.tol, 
-													self.map_thresh, True, 'right')		
+													self.map_thresh, True)	
+		print('left')	
+		print(self.left.hread)
+		print(self.left.vread)
 		print(self.left.get_properties())
+		print('right')
+		print(self.right.hread)
+		print(self.right.vread)
 		print(self.right.get_properties())		
 		
 		pdb.set_trace()
@@ -2172,6 +2407,8 @@ class FullIntegration(ChimericIntegration):
 			
 		# get an edit distance for the mapped part by comparing query sequence with 
 		# reference sequence
+		# also need to add in any bases from CO if we combined any insertions or deletions
+		# into a mapped region in self._combine_short_CIGAR_elements
 		nm = 0
 		for i in range(len(read.cigartuples)):
 			
@@ -2198,6 +2435,22 @@ class FullIntegration(ChimericIntegration):
 			# compare query and reference
 			assert len(query) == len(ref)
 			nm += sum([1 for i in range(len(query)) if query[i] != ref[i]])
+			
+		# get CO tag bases between start and stop
+		print(read)
+		pdb.set_trace()
+		try:
+			co = read.get_tag('CO')
+		except KeyError:
+			co = ''
+			
+		for elem in co.split(","):
+			if elem == '':
+				continue
+			i_map, bp = elem.split(":")
+			i_map = int(i_map)
+			if i_map >= start and i_map < stop:
+				nm += int(bp)
 			
 		# get subset of query sequence for assigning to new read
 		query_start = sum([i[1] for i in read.cigartuples[:start] if i[0] in (0, 1, 4)])
