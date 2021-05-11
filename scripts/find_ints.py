@@ -2448,10 +2448,6 @@ class FullIntegration(ChimericIntegration):
 		
 		# if we're getting a mapped region that isn't the first one, will also need
 		# to adjust the mapping position - new_pos
-		print(read)
-		print(read.is_reverse)
-		pdb.set_trace()
-		
 		
 		# get indices of mapped cigar elements
 		mapped_idx = [i for i in range(len(read.cigartuples)) if read.cigartuples[i][0] == 0]
