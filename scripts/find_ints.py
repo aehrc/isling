@@ -105,12 +105,13 @@ class AlignmentFilePair:
 												
 				if integration is not None:
 					self.ints.append(integration)
+
 				
 				integration = self._is_full(host_r1_primary, virus_r1_primary,
 												host_r1_not_primary, virus_r1_not_primary)
 												
 				if integration is not None:
-					self.ints.append(integration)					
+					self.ints.append(integration)
 
 			# collect read2 alignments
 			host_r2_primary = self.curr_host.get_primary_r2()
@@ -124,7 +125,7 @@ class AlignmentFilePair:
 				integration = self._is_chimeric(host_r2_primary, virus_r2_primary,
 												host_r2_not_primary, virus_r2_not_primary)
 				if integration is not None:
-					self.ints.append(integration)						
+					self.ints.append(integration)		
 
 			if host_r2_primary is not None and virus_r2_primary is not None:
 				integration = self._is_full(host_r2_primary, virus_r2_primary,
@@ -773,30 +774,11 @@ class ChimericIntegration:
 		
 		self.chr = host.reference_name
 		self.virus = virus.reference_name
-
-	def get_ambig_coords(self):
-		""" Get coordinates of ambiguous sequence relative to read """
-		
-		print(self.hread)
-		print(self.vread)
-		pdb.set_trace()
-		# if host/virus, want end of host alignment if forward
-		if self.get_integration_orientation() == 'hv':
-			return sorted([
-					self.hread.query_alignment_end,
-					self.hread.query_alignment_end - self.num_ambig_bases()
-				])	
-		# if virus/host, want start of host alignment if forward
-		else:
-			return sorted([
-					self.hread.query_alignment_end,
-					self.hread.query_alignment_end + self.num_ambig_bases()
-				])			
-
+					
 	def get_ambig_seq(self):
 		""" Get sequence of ambiguous base(s) from read """
 
-		ambig = self.get_ambig_coords()
+		ambig = self._get_ambig_coords_read()
 		
 		if not self.hread.is_reverse:
 			return self.hread.query_sequence[ambig[0]:ambig[1]]
@@ -824,7 +806,7 @@ class ChimericIntegration:
 	def get_host_coords(self):
 		""" Get coordinates of ambiguous bases in host """
 		
-		return self._get_ambig_coords(self.hread)
+		return self._get_ambig_coords_ref(self.hread)
 
 	def get_host_edit_dist(self):
 		""" Get the edit distance for the host alignment """
@@ -856,11 +838,11 @@ class ChimericIntegration:
 		
 		# if host alignment is matched, clipped
 		if self.hread.cigartuples[0][0] == 0:
-				return 'hv'
+			return 'hv'
 		
 		# if host alignment is clipped, matched
 		else:
-				return 'vh'
+			return 'vh'
 	
 	def get_integration_type(self):
 		""" Return type of integration (chimeric or discordant) """
@@ -974,7 +956,7 @@ class ChimericIntegration:
 	def get_viral_coords(self):
 		""" Get coordinates of ambiguous bases in virus """
 		
-		return self._get_ambig_coords(self.vread)		
+		return self._get_ambig_coords_ref(self.vread)		
 		
 	def get_viral_edit_dist(self):
 		""" Get the edit distance for the viral alignment """
@@ -1033,30 +1015,25 @@ class ChimericIntegration:
 
 		if self.get_integration_orientation() == 'hv':
 
-			if self.hread.is_reverse:
-				hop = self.hread.cigartuples[-1]
-			else:
-				hop = self.hread.cigartuples[0]
-			if self.vread.is_reverse:
-				vop = self.vread.cigartuples[-1]
-			else:
+			hop = self.hread.cigartuples[0]
+			if self.vread.is_reverse == self.hread.is_reverse:
 				vop = self.vread.cigartuples[0]
+			else:
+				vop = self.vread.cigartuples[-1]
 				
 		else:
-			if self.hread.is_reverse:
-				hop = self.hread.cigartuples[0]
-			else:
-				hop = self.hread.cigartuples[-1]
-			if self.vread.is_reverse:
-				vop = self.vread.cigartuples[0]
-			else:
+			hop = self.hread.cigartuples[-1]
+			if self.vread.is_reverse == self.hread.is_reverse:
 				vop = self.vread.cigartuples[-1]
-
-			
+			else:
+				vop = self.vread.cigartuples[0]				
+		
 		# subtract mapped from soft-clipped 
 		if hop[0] == 0:
+			assert vop[0] == 4
 			return hop[1] - vop[1]
 		else:
+			assert hop[0] == 4
 			return vop[1] - hop[1]
 		
 	def is_host_ambig_loc(self):
@@ -1271,6 +1248,8 @@ class ChimericIntegration:
 			return read
 
 		# next, combine short elements with nearest matched region
+		
+		# get MD tag for manipulating
 		try:
 			tmp_cigartuples = self._combine_MD_with_CIGAR(read.cigartuples, read.get_tag('MD'))
 			has_md = True
@@ -1564,9 +1543,29 @@ class ChimericIntegration:
 					alt_ints[i].primary = False	
 
 		return alt_ints
+
+	def _get_ambig_coords_read(self):
+		""" Get coordinates of ambiguous sequence relative to read """
+		
+		# if host/virus, want end of host alignment if forward
+		if self.get_integration_orientation() == 'hv':
+			return sorted([
+				self.hread.query_alignment_end,
+				self.hread.query_alignment_end - self.num_ambig_bases()
+				])
+		# if virus/host, want start of host alignment if forward
+		else:
+			return sorted([
+				self.hread.query_alignment_start,
+				self.hread.query_alignment_start + self.num_ambig_bases()
+				])	
 			
-	def _get_ambig_coords(self, read):
-		""" Return a tuple of (start, stop) of ambiguous bases in host or virus """
+	def _get_ambig_coords_ref(self, read):
+		""" 
+		Return a tuple of (start, stop) of ambiguous bases in host or virus 
+		(i.e. in coords in reference) 
+		"""
+
 		# if aligned part of read is first
 		if read.cigartuples[0][0] == 0:
 			if self.gap_or_overlap() == 'gap':
@@ -1600,7 +1599,7 @@ class ChimericIntegration:
 				return (
 					read.get_blocks()[0][0],
 					read.get_blocks()[0][0]
-				)		
+				)	
 				
 	def _is_ambiguous_location(self, read, sec):
 		"""  
@@ -2265,11 +2264,12 @@ class DiscordantIntegration(ChimericIntegration):
 					h2 = self._combine_short_CIGAR_elements(host, self.host_header)
 					v1 = self._combine_short_CIGAR_elements(virus, self.virus_header)
 				
-				print(h1)
-				print(h2)
-				print(v1)
-				print(v2)
-				pdb.set_trace()
+				#print(h1)
+				#print(h2)
+				#print(v1)
+				#print(v2)
+				#pdb.set_trace()
+				
 				# if host and virus reads constitute a valid integration, add to list
 				try:
 					alt_int = DiscordantIntegration(h1, h2, v1, v2, self.tol, 
@@ -2320,12 +2320,19 @@ class FullIntegration(ChimericIntegration):
 
 		# split viral read into MS ans SM
 		vread1, vread2 = self._split_read(self.vread, self.virus_header)
-		# split host read into SM and SM
+		# split host read into SM and MS
 		hread1, hread2 = self._split_read(self.hread, self.host_header)
 		
-		# if host is forward, first is left and second is right
-		if not self.hread.is_reverse:
-			if not self.vread.is_reverse:
+		print()
+		print("before splitting:")
+		print(f"{'reverse' if self.vread.is_reverse else 'forward'}")
+		print(self.vread)
+		print(f"{'reverse' if self.hread.is_reverse else 'forward'}")
+		print(self.hread)
+		
+		# if host and virus are aligned in same orientation, first part of host read
+		# goes with first part of virus read
+		if self.hread.is_reverse == self.vread.is_reverse:
 				self.left = ChimericIntegration(hread1, vread1, self.host_header, 
 												self.virus_header, AlignmentPool(), 
 												AlignmentPool(), self.tol, self.map_thresh,
@@ -2333,45 +2340,26 @@ class FullIntegration(ChimericIntegration):
 				self.right = ChimericIntegration(hread2, vread2, self.host_header, 
 												self.virus_header, AlignmentPool(), 
 												AlignmentPool(), self.tol, self.map_thresh, 
-												True)	
-			else:				
-				self.left = ChimericIntegration(hread1, vread2, self.host_header, 
-												self.virus_header, AlignmentPool(), 
-												AlignmentPool(), self.tol, self.map_thresh, 
 												True)
-				self.right = ChimericIntegration(hread2, vread1, self.host_header, 
-													self.virus_header, AlignmentPool(), 
-													AlignmentPool(), self.tol, 
-													self.map_thresh, True)	
+		# otherwise, first part of host read goes with second part of virus read and
+		# vice versa
 		else:
-			if not self.vread.is_reverse:
-				self.left = ChimericIntegration(hread2, vread1, self.host_header, 
+				self.left = ChimericIntegration(hread1, vread2, self.host_header, 
 												self.virus_header, AlignmentPool(), 
 												AlignmentPool(), self.tol, self.map_thresh,
 												True)
-				self.right = ChimericIntegration(hread1, vread2, self.host_header, 
+				self.right = ChimericIntegration(hread2, vread1, self.host_header, 
 												self.virus_header, AlignmentPool(), 
 												AlignmentPool(), self.tol, self.map_thresh, 
 												True)						
-			else:				
-				self.left = ChimericIntegration(hread2, vread2, self.host_header, 
-												self.virus_header, AlignmentPool(), 
-												AlignmentPool(), self.tol, self.map_thresh, 
-												True)
-				self.right = ChimericIntegration(hread1, vread1, self.host_header, 
-													self.virus_header, AlignmentPool(), 
-													AlignmentPool(), self.tol, 
-													self.map_thresh, True)	
+		
+		
 		print('left')	
-		print(self.left.hread)
-		print(self.left.vread)
 		print(self.left.get_properties())
 		print('right')
-		print(self.right.hread)
-		print(self.right.vread)
-		print(self.right.get_properties())		
-		
-		pdb.set_trace()
+		print(self.right.get_properties())
+		pdb.set_trace()	
+			
 		
 
 		
@@ -2437,8 +2425,8 @@ class FullIntegration(ChimericIntegration):
 			nm += sum([1 for i in range(len(query)) if query[i] != ref[i]])
 			
 		# get CO tag bases between start and stop
-		print(read)
-		pdb.set_trace()
+# 		print(read)
+# 		pdb.set_trace()
 		try:
 			co = read.get_tag('CO')
 		except KeyError:
@@ -2460,17 +2448,17 @@ class FullIntegration(ChimericIntegration):
 		
 		# if we're getting a mapped region that isn't the first one, will also need
 		# to adjust the mapping position - new_pos
-		first_mapped_idx = [i for i in range(len(read.cigartuples)) if read.cigartuples[i][0] == 0][0]
-		if first_mapped_idx >=start and first_mapped_idx < end:
-			new_pos = read.reference_start
-		else:
-			# get length of deleted segments that consume reference 
-			len_del = sum([i[1] for i in read.cigartuples[:start] if i[0] in (0, 2, 3)])
-			
-			if read.is_reverse:
-				new_pos = read.reference_start - len_del
-			else:
-				new_pos = read.reference_start + len_del
+		print(read)
+		print(read.is_reverse)
+		pdb.set_trace()
+		
+		
+		# get indices of mapped cigar elements
+		mapped_idx = [i for i in range(len(read.cigartuples)) if read.cigartuples[i][0] == 0]
+		for i, map_i in enumerate(mapped_idx):
+			if map_i >= start:
+				new_pos = read.get_blocks()[i][0]
+				break
 
 		# update tags - keep track of original alignment in OA
 		orig_strand = '-' if read.is_reverse else '+'
