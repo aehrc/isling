@@ -105,14 +105,16 @@ class AlignmentFilePair:
 												
 				if integration is not None:
 					self.ints.append(integration)
-					integration.get_properties()	
+
 				
+				# or are a full integration
 				integration = self._is_full(host_r1_primary, virus_r1_primary,
 												host_r1_not_primary, virus_r1_not_primary)
 												
 				if integration is not None:
 					self.ints.append(integration)
-
+					integration.get_properties()
+					
 			# collect read2 alignments
 			host_r2_primary = self.curr_host.get_primary_r2()
 			host_r2_not_primary = self.curr_host.get_not_primary().get_read2()
@@ -126,15 +128,15 @@ class AlignmentFilePair:
 												host_r2_not_primary, virus_r2_not_primary)
 				if integration is not None:
 					self.ints.append(integration)
-					integration.get_properties()		
+		
 
 			if host_r2_primary is not None and virus_r2_primary is not None:
 				integration = self._is_full(host_r2_primary, virus_r2_primary,
 												host_r2_not_primary, virus_r2_not_primary)
 				if integration is not None:
 					self.ints.append(integration)	
-					
-						
+					integration.get_properties()
+										
 			# if there are alignments that are neither read 1 nor read 2, check if chimeric
 			host_not12_primary = self.curr_host.get_primary_not_r1_or_r2()
 			host_not12_not_primary = self.curr_host.get_not_primary().get_not_read1_or_read2()
@@ -171,19 +173,20 @@ class AlignmentFilePair:
 		
 		if header is None:
 			header = self.default_header
-			
-		try:
-			with open(filename, 'w') as filehandle:
-				out = csv.DictWriter(filehandle, fieldnames = header, delimiter='\t')
-				out.writeheader()
-				for integration in self.ints:
-					out.writerow(integration.get_properties())
-		except AttributeError:
+	
+		if not hasattr(self, 'ints'):
 			print("No file written: integrations have not been detected yet!")
 			return
 			
-		print(f"saved output to {filename}")
-				
+		with open(filename, 'w') as filehandle:
+			out = csv.DictWriter(filehandle, fieldnames = header, delimiter='\t')
+			out.writeheader()
+			for integration in self.ints:
+				props = integration.get_properties()
+				for prop in props:
+					out.writerow(prop)
+			
+		print(f"saved output to {filename}")				
 				
 	def _is_chimeric(self, hread, vread, hsec, vsec):	
 		""" 
@@ -808,7 +811,16 @@ class ChimericIntegration:
 	def get_host_coords(self):
 		""" Get coordinates of ambiguous bases in host """
 		
-		return self._get_ambig_coords_ref(self.hread)
+		coords = self._get_ambig_coords_ref(self.hread, self.hhead)
+		
+		# check that we're not beyond the coordinates of the chromosome
+		if coords[0] < 0:
+			coords = (0, coords[1])
+		
+		if coords[1] > self.hhead.get_reference_length(self.chr):
+			coords = (coords[0], self.hhead.get_reference_length(self.chr))
+		
+		return coords
 
 	def get_host_edit_dist(self):
 		""" Get the edit distance for the host alignment """
@@ -894,7 +906,7 @@ class ChimericIntegration:
 		host_coords = self.get_host_coords()
 		virus_coords = self.get_viral_coords()
 		
-		return {
+		return [{
 			'Chr': self.chr,
 			'IntStart': host_coords[0],
 			'IntStop': host_coords[1],
@@ -921,7 +933,7 @@ class ChimericIntegration:
 			'ViralMapQ': self.get_viral_mapq(),
 			'ReadID': self.get_read_id(),
 			'ReadSeq': self.get_read_sequence()
-		}
+		}]
 
 	def get_read_id(self):
 		"""  Return the query name, with /1 appended for integrations only involving R1 
@@ -958,7 +970,19 @@ class ChimericIntegration:
 	def get_viral_coords(self):
 		""" Get coordinates of ambiguous bases in virus """
 		
-		return self._get_ambig_coords_ref(self.vread)		
+		coords = self._get_ambig_coords_ref(self.vread, self.vhead)	
+		
+		if coords[1] > 10000:
+			pdb.set_trace()
+		
+		# check that we're not beyond the coordinates of the chromosome
+		if coords[0] < 0:
+			coords = (0, coords[1])
+		
+		if coords[1] > self.vhead.get_reference_length(self.virus):
+			coords = (coords[0], self.vhead.get_reference_length(self.virus))
+		
+		return coords
 		
 	def get_viral_edit_dist(self):
 		""" Get the edit distance for the viral alignment """
@@ -1507,6 +1531,9 @@ class ChimericIntegration:
 		
 		alt_ints = []
 		
+		if len(self.hsec) == 0 and len(self.vsec) == 0:
+			return alt_ints
+		
 		host_alns = AlignmentPool(self.hsec)
 		host_alns.append(self.hread)
 		host_alns.remove_redundant_alignments()
@@ -1579,45 +1606,56 @@ class ChimericIntegration:
 				self.hread.query_alignment_start + self.num_ambig_bases()
 				])	
 			
-	def _get_ambig_coords_ref(self, read):
+	def _get_ambig_coords_ref(self, read, header):
 		""" 
 		Return a tuple of (start, stop) of ambiguous bases in host or virus 
 		(i.e. in coords in reference) 
 		"""
+		# decide if aligned part of read is first or second
+		if read.cigartuples[0][0] == 0:
+			first = True
+		else:
+			first = False
+
+		# if read has OA, we should use this for getting coordinates rather than
+		read = self._read_from_OA(read, header)
+			
+		# get start and end of aligned part of read in host coords
+		aligned_coords = (read.get_blocks()[0][0], read.get_blocks()[-1][-1])
 
 		# if aligned part of read is first
-		if read.cigartuples[0][0] == 0:
+		if first:
 			if self.gap_or_overlap() == 'gap':
 				return (
-					read.get_blocks()[0][1] ,
-					read.get_blocks()[0][1] + self.num_ambig_bases(absolute=True)
+					aligned_coords[1] ,
+					aligned_coords[1] + self.num_ambig_bases(absolute=True)
 				)
 			elif self.gap_or_overlap() == 'overlap':
 				return (
-					read.get_blocks()[0][1] - self.num_ambig_bases(absolute=True),
-					read.get_blocks()[0][1]
+					aligned_coords[1] - self.num_ambig_bases(absolute=True),
+					aligned_coords[1]
 				)
 			else:
 				return (
-					read.get_blocks()[0][1],
-					read.get_blocks()[0][1]
+					aligned_coords[1],
+					aligned_coords[1]
 				)
 		# if aligned part of read is second
 		else:
 			if self.gap_or_overlap() == 'gap':
 				return (
-					read.get_blocks()[0][0] - self.num_ambig_bases(absolute=True),
-					read.get_blocks()[0][0] 
+					aligned_coords[0] - self.num_ambig_bases(absolute=True),
+					aligned_coords[0] 
 				)
 			elif self.gap_or_overlap() == 'overlap':
 				return (
-					read.get_blocks()[0][0],
-					read.get_blocks()[0][0] + self.num_ambig_bases(absolute=True)
+					aligned_coords[0],
+					aligned_coords[0] + self.num_ambig_bases(absolute=True)
 				)
 			else:
 				return (
-					read.get_blocks()[0][0],
-					read.get_blocks()[0][0]
+					aligned_coords[0],
+					aligned_coords[0]
 				)	
 				
 	def _is_ambiguous_location(self, read, sec):
@@ -1820,6 +1858,33 @@ class ChimericIntegration:
 		
 		
 		return XA_segs		
+
+	def _read_from_OA(self, read, header):
+		"""
+		Create back the original pysam.AlignedSegment from an OA tag
+		"""
+		try:
+			oa = read.get_tag('OA')
+		except KeyError:
+			return read
+		
+		oa = oa[:-1].split(';')[-1]
+		oa = oa.split(',')
+			
+		a = pysam.AlignedSegment(header)
+		a.query_name = read.query_name
+		a.query_sequence = read.query_sequence
+		a.flag = read.flag
+		a.reference_id = read.reference_id
+		a.reference_start = int(oa[1])
+		a.cigarstring = oa[3]
+		a.next_reference_id = read.next_reference_id
+		a.next_reference_start = read.next_reference_start
+		a.template_length = read.template_length
+		a.query_qualities = read.query_qualities
+		a.tags = read.tags
+		
+		return a
 		
 	def _reverse_complement(self, seq):
 		""" Return reverse complement """
@@ -1940,8 +2005,8 @@ class DiscordantIntegration(ChimericIntegration):
 		self.map_thresh = map_thresh
 		self.tlen = tlen
 		self.tol = tol
-		self.host_header = host_header
-		self.virus_header = virus_header
+		self.hhead = host_header
+		self.vhead = virus_header
 		self.primary = primary
 		
 		self.hread1 = self._combine_short_CIGAR_elements(host_r1, host_header)
@@ -1978,28 +2043,32 @@ class DiscordantIntegration(ChimericIntegration):
 		that faces the other read, plus the mean insert size
 		"""
 
-
 		# mean insert length is mean template length minus sum of R1 and R2 lengths
 		insert = self.tlen - self.vread.query_length - self.hread.query_length
 		# but can't be less than zero
 		if insert < 0:
 			insert = 0
+			
+		# if we modified the read by combining small CIGAR elements, we modified
+		# the mapping positions, in which case we want to use the original mapping positions
+		read = self._read_from_OA(read, header)
+		blocks = (read.get_blocks()[0][0], read.get_blocks()[-1][-1])
 		
 		# if host read is R1, then we want the coordinate of the host base at the
 		# side of the read that faces R2
 		if read.is_read1:
 			if read.is_reverse:
-				stop = read.get_blocks()[0][0]
+				stop = blocks[0]
 				start = stop - insert
 			else:
-				start = read.get_blocks()[-1][-1]
+				start = blocks[-1]
 				stop = start + insert
 		else:
 			if read.is_reverse:
-				start = read.get_blocks()[-1][-1]
+				start = blocks[-1]
 				stop = start + insert
 			else:
-				stop = read.get_blocks()[0][0]
+				stop = blocks[0]
 				start = stop - insert
 			
 		# check the start isn't less than zero
@@ -2016,7 +2085,7 @@ class DiscordantIntegration(ChimericIntegration):
 	def get_host_coords(self):
 		""" Get likely coordinates of integration in host chromosome """
 		
-		return self.get_coords(self.hread, self.host_header)
+		return self.get_coords(self.hread, self.hhead)
 
 	def get_host_chr(self):
 		""" Get reference name for host alignment """
@@ -2116,7 +2185,7 @@ class DiscordantIntegration(ChimericIntegration):
 	def get_viral_coords(self):
 		""" Get likely coordinates of integration in viral reference """		
 
-		return self.get_coords(self.vread, self.virus_header)
+		return self.get_coords(self.vread, self.vhead)
 		
 	def get_viral_orientation(self):
 		""" 
@@ -2173,13 +2242,13 @@ class DiscordantIntegration(ChimericIntegration):
 		if h1_map:
 			self.hread = self.hread1
 			self.vread = self.vread2
-			self.hsec = self._process_non_primary_alignments(self.hread, host_sec1, self.host_header)
-			self.vsec = self._process_non_primary_alignments(self.vread, virus_sec2, self.virus_header)
+			self.hsec = self._process_non_primary_alignments(self.hread, host_sec1, self.hhead)
+			self.vsec = self._process_non_primary_alignments(self.vread, virus_sec2, self.vhead)
 		else:
 			self.hread = self.hread2
 			self.vread = self.vread1
-			self.hsec = self._process_non_primary_alignments(self.hread, host_sec2, self.host_header)
-			self.vsec = self._process_non_primary_alignments(self.vread, virus_sec1, self.virus_header)
+			self.hsec = self._process_non_primary_alignments(self.hread, host_sec2, self.hhead)
+			self.vsec = self._process_non_primary_alignments(self.vread, virus_sec1, self.vhead)
 
 		return True
 		
@@ -2270,7 +2339,6 @@ class DiscordantIntegration(ChimericIntegration):
 
 		if len(haln) == 1 and len(valn) == 1:
 			return alt_ints
-			
 		
 		for host, virus in itertools.product(haln, valn):
 				
@@ -2279,11 +2347,11 @@ class DiscordantIntegration(ChimericIntegration):
 					continue
 					
 				if hread1_map:
-					h1 = self._combine_short_CIGAR_elements(host, self.host_header)
-					v2 = self._combine_short_CIGAR_elements(virus, self.virus_header)
+					h1 = self._combine_short_CIGAR_elements(host, self.hhead)
+					v2 = self._combine_short_CIGAR_elements(virus, self.vhead)
 				else:
-					h2 = self._combine_short_CIGAR_elements(host, self.host_header)
-					v1 = self._combine_short_CIGAR_elements(virus, self.virus_header)
+					h2 = self._combine_short_CIGAR_elements(host, self.hhead)
+					v1 = self._combine_short_CIGAR_elements(virus, self.vhead)
 				
 				#print(h1)
 				#print(h2)
@@ -2294,7 +2362,7 @@ class DiscordantIntegration(ChimericIntegration):
 				# if host and virus reads constitute a valid integration, add to list
 				try:
 					alt_int = DiscordantIntegration(h1, h2, v1, v2, self.tol, 
-					self.host_header, self.virus_header, AlignmentPool(), AlignmentPool(),  
+					self.hhead, self.vhead, AlignmentPool(), AlignmentPool(),  
 					AlignmentPool(), AlignmentPool(), self.tol, self.map_thresh, False)
 					alt_ints.append(alt_int)
 					
@@ -2315,8 +2383,9 @@ class FullIntegration(ChimericIntegration):
 		self.map_thresh = map_thresh		
 		self.tol = tol
 		
-		self.host_header = host_header
-		self.virus_header = virus_header
+		self.hhead = host_header
+		
+		self.vhead = virus_header
 		self.primary = primary	
 				
 		assert tol >= 0
@@ -2326,11 +2395,13 @@ class FullIntegration(ChimericIntegration):
 		
 		assert self._is_chimeric()
 		
+		self.hsec = host_sec
+		self.vsec = virus_sec
+		
 		self.chr = host.reference_name
 		self.virus = virus.reference_name	
 		
 		self._assign_junctions()
-		
 		
 	def _assign_junctions(self):
 		"""
@@ -2340,49 +2411,51 @@ class FullIntegration(ChimericIntegration):
 		"""
 
 		# split viral read into MS ans SM
-		vread1, vread2 = self._split_read(self.vread, self.virus_header)
+		vread1, vread2 = self._split_read(self.vread, self.vhead)
 		# split host read into SM and MS
-		hread1, hread2 = self._split_read(self.hread, self.host_header)
-		
-		print()
-		print("before splitting:")
-		print(f"{'reverse' if self.vread.is_reverse else 'forward'}")
-		print(self.vread)
-		print(f"{'reverse' if self.hread.is_reverse else 'forward'}")
-		print(self.hread)
+		hread1, hread2 = self._split_read(self.hread, self.hhead)
 		
 		# if host and virus are aligned in same orientation, first part of host read
 		# goes with first part of virus read
 		if self.hread.is_reverse == self.vread.is_reverse:
-				self.left = ChimericIntegration(hread1, vread1, self.host_header, 
-												self.virus_header, AlignmentPool(), 
+				self.left = ChimericIntegration(hread1, vread1, self.hhead, 
+												self.vhead, AlignmentPool(), 
 												AlignmentPool(), self.tol, self.map_thresh,
 												True)
-				self.right = ChimericIntegration(hread2, vread2, self.host_header, 
-												self.virus_header, AlignmentPool(), 
+				self.right = ChimericIntegration(hread2, vread2, self.hhead, 
+												self.vhead, AlignmentPool(), 
 												AlignmentPool(), self.tol, self.map_thresh, 
 												True)
 		# otherwise, first part of host read goes with second part of virus read and
 		# vice versa
 		else:
-				self.left = ChimericIntegration(hread1, vread2, self.host_header, 
-												self.virus_header, AlignmentPool(), 
+				self.left = ChimericIntegration(hread1, vread2, self.hhead, 
+												self.vhead, AlignmentPool(), 
 												AlignmentPool(), self.tol, self.map_thresh,
 												True)
-				self.right = ChimericIntegration(hread2, vread1, self.host_header, 
-												self.virus_header, AlignmentPool(), 
+				self.right = ChimericIntegration(hread2, vread1, self.hhead, 
+												self.vhead, AlignmentPool(), 
 												AlignmentPool(), self.tol, self.map_thresh, 
 												True)						
 		
+	def get_properties(self):
+		"""
+		Get a list of properties for each junction.  Properties for each junction is a list
+		output by ChimericIntegration.get_properties()
+		"""	
 		
-		print('left')	
-		print(self.left.get_properties())
-		print('right')
-		print(self.right.get_properties())
-		pdb.set_trace()	
+		props = self.left.get_properties() + self.right.get_properties()
+		alt_ints = self._get_alt_ints()
+		
+		# set integration type to 'short' for each type
+		for prop in props:
+			prop['Type'] = 'short'
 			
+		# assign alternative integrations for each junction
+		props[0]['AlternativeInts'] = ";".join([int.left.short_str() for int in alt_ints])
+		props[1]['AlternativeInts'] = ";".join([int.right.short_str() for int in alt_ints])			
 		
-
+		return props
 		
 	def _create_segment(self, read, header, start, end):
 		"""
@@ -2519,6 +2592,73 @@ class FullIntegration(ChimericIntegration):
 
 		return a
 	
+	def _get_alt_ints(self):
+		"""
+		Get alternative integrations for the host and viral read - this is different
+		to the alternative integrations for each junction
+		"""
+		
+		alt_ints = []
+		
+		if len(self.hsec) == 0 and len(self.vsec) == 0:
+			return alt_ints
+		
+		host_alns = AlignmentPool(self.hsec)
+		host_alns.append(self.hread)
+		host_alns.remove_redundant_alignments()
+		
+		virus_alns = AlignmentPool(self.vsec)
+		virus_alns.append(self.vread)
+		virus_alns.remove_redundant_alignments()
+		
+		for hst in host_alns:
+			for vrs in virus_alns:
+				
+				# don't do primary vs primary
+				if hst == self.hread and vrs == self.vread:
+					continue
+			
+				# if hst and vrs constitute a valid integration, add to list
+				try:
+					alt_int = FullIntegration(hst, vrs, self.hhead, self.vhead,
+					AlignmentPool(), AlignmentPool(), self.tol, self.map_thresh, False)
+					alt_ints.append(alt_int)
+					
+				except AssertionError:
+					pass
+			
+		# if this integration is a primary one, but we found an alternative integration with
+		# a lower edit distance, then the alternate one becomes primary
+		primary_nm = self.get_total_edit_dist()
+		if self.primary:
+		
+			for i in range(len(alt_ints)):
+				
+				alt_nm = alt_ints[i].get_total_edit_dist()
+			
+				if alt_nm < primary_nm:
+			
+					print('found better integration than primary one: swapping')
+				
+					# add secondary alignments to alt_int (not added during instatiation)
+					host_alns.append(self.hread)
+					host_alns.remove(alt_ints[i].hread)
+				
+					virus_alns.append(self.vread)
+					virus_alns.remove(alt_ints[i].vread)
+				
+					alt_ints[i].hsec = host_alns
+					alt_ints[i].vsec = virus_alns
+				
+					# swap self with alt_int
+					tmp = self
+					self = alt_ints[i]
+					self.primary = True
+					alt_ints[i] = tmp
+					alt_ints[i].primary = False	
+
+		return alt_ints
+	
 	def _get_middle_region_read_coords(self, read):
 		"""
 		Get the part of the read occupied by the middle cigar operation, relative to 
@@ -2537,6 +2677,19 @@ class FullIntegration(ChimericIntegration):
 		assert start < stop
 		
 		return start, stop
+		
+	def _get_total_edit_dist(self):
+		""" 
+		Get total edit distance, which is equal sum of host edit distance, viral edit
+		distance, and number of bases in gaps at junctions (if present)
+		"""
+		
+		total = self.left.get_total_edit_dist() + self.right.get_total_edit_dist()
+		
+		# this double-counts the virus edit distance, so subtract this 
+		total -= self.left.get_viral_edit_dist()
+		
+		return total
 		
 	def _is_chimeric(self):
 		"""
@@ -2586,6 +2739,22 @@ class FullIntegration(ChimericIntegration):
 			return False
 		
 		return True
+		
+	def _is_possible_rearrangement(self, hread, vread):
+		""" 
+		A read is a possible rearrangement if it can be accounted for entirely by alignments
+		to one reference.
+		
+		In the case of a FullIntegration, we should check the read as a whole, rather
+		than checking each junction individually.  The method for checking is still the same
+		- we compare edit distances in the case of rearrangements and for the integration.
+		"""	
+		
+		primary_nm = self._get_total_edit_dist()
+		
+		pdb.set_trace()
+		
+		return False
 		
 	def _split_read(self, read, header):
 		"""
