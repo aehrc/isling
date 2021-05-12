@@ -105,7 +105,7 @@ class AlignmentFilePair:
 												
 				if integration is not None:
 					self.ints.append(integration)
-
+					integration.get_properties()	
 				
 				integration = self._is_full(host_r1_primary, virus_r1_primary,
 												host_r1_not_primary, virus_r1_not_primary)
@@ -125,13 +125,15 @@ class AlignmentFilePair:
 				integration = self._is_chimeric(host_r2_primary, virus_r2_primary,
 												host_r2_not_primary, virus_r2_not_primary)
 				if integration is not None:
-					self.ints.append(integration)		
+					self.ints.append(integration)
+					integration.get_properties()		
 
 			if host_r2_primary is not None and virus_r2_primary is not None:
 				integration = self._is_full(host_r2_primary, virus_r2_primary,
 												host_r2_not_primary, virus_r2_not_primary)
 				if integration is not None:
 					self.ints.append(integration)	
+					
 						
 			# if there are alignments that are neither read 1 nor read 2, check if chimeric
 			host_not12_primary = self.curr_host.get_primary_not_r1_or_r2()
@@ -1031,10 +1033,15 @@ class ChimericIntegration:
 		# subtract mapped from soft-clipped 
 		if hop[0] == 0:
 			assert vop[0] == 4
-			return hop[1] - vop[1]
+			ambig = hop[1] - vop[1]
 		else:
 			assert hop[0] == 4
-			return vop[1] - hop[1]
+			ambig = vop[1] - hop[1]
+			
+		if absolute:
+			return abs(ambig)
+		
+		return ambig
 		
 	def is_host_ambig_loc(self):
 		""" 
@@ -1151,13 +1158,17 @@ class ChimericIntegration:
 						# single letter mismatch
 						assert len(md_op) == 1
 						md_len += 1
-						
-					
+										
 					cigar_op_MD.append(md_op)
 					md_ind += 1
 				
-				# check we got the right number of bases from MD list
-				assert md_len == op[1]
+				#it's possible to have md_len be longer than the operation, 
+				# for example if two mapped regions are separated by an insertion
+				if md_len > op[1]:
+					cigar_op_MD[-1] -= md_len - op[1]
+					md_ind -= 1
+					md_lst[md_ind] -= cigar_op_MD[-1]
+
 			
 			md_cigartuples.append((op[0], op[1], cigar_op_MD))
 		
@@ -1250,13 +1261,21 @@ class ChimericIntegration:
 		# next, combine short elements with nearest matched region
 		
 		# get MD tag for manipulating
+
 		try:
-			tmp_cigartuples = self._combine_MD_with_CIGAR(read.cigartuples, read.get_tag('MD'))
+			md = read.get_tag('MD')
 			has_md = True
 		except KeyError:
 			has_md = False
-			tmp_cigartuples = [(i[0], i[1], [i[0]]) if i[0] == 0 else (i[0], i[1], [])  for i in read.cigartuples]
 			
+		if has_md:
+			try:
+				tmp_cigartuples = self._combine_MD_with_CIGAR(read.cigartuples, md)
+			except AssertionError:
+				pdb.set_trace()
+		else:
+			tmp_cigartuples = [(i[0], i[1], [i[0]]) if i[0] == 0 else (i[0], i[1], [])  for i in read.cigartuples]
+				
 		nm_offset = 0
 		co = {}
 		
@@ -1570,12 +1589,12 @@ class ChimericIntegration:
 		if read.cigartuples[0][0] == 0:
 			if self.gap_or_overlap() == 'gap':
 				return (
-					read.get_blocks()[0][1],
-					read.get_blocks()[0][1] + abs(self.num_ambig_bases())
+					read.get_blocks()[0][1] ,
+					read.get_blocks()[0][1] + self.num_ambig_bases(absolute=True)
 				)
 			elif self.gap_or_overlap() == 'overlap':
 				return (
-					read.get_blocks()[0][1] - abs(self.num_ambig_bases()),
+					read.get_blocks()[0][1] - self.num_ambig_bases(absolute=True),
 					read.get_blocks()[0][1]
 				)
 			else:
@@ -1587,13 +1606,13 @@ class ChimericIntegration:
 		else:
 			if self.gap_or_overlap() == 'gap':
 				return (
-					read.get_blocks()[0][0],
-					read.get_blocks()[0][0] + abs(self.num_ambig_bases())
+					read.get_blocks()[0][0] - self.num_ambig_bases(absolute=True),
+					read.get_blocks()[0][0] 
 				)
 			elif self.gap_or_overlap() == 'overlap':
 				return (
-					read.get_blocks()[0][0] - abs(self.num_ambig_bases()),
-					read.get_blocks()[0][0]
+					read.get_blocks()[0][0],
+					read.get_blocks()[0][0] + self.num_ambig_bases(absolute=True)
 				)
 			else:
 				return (
@@ -1820,6 +1839,7 @@ class ChimericIntegration:
 		# keep track of what the previous character was
 		prev_type = self._check_md_character(md[0])
 		
+
 		
 		for i in md[1:]:
 			curr_type = self._check_md_character(i)
@@ -1838,6 +1858,7 @@ class ChimericIntegration:
 				# if it's a letter, then add to the deletion
 				if curr_type == 'let':
 					val = val + i
+					curr_type = 'del'
 				# otherwise has to be a number - add the deletion to the list and start
 				# the new number
 				else:
@@ -2425,10 +2446,10 @@ class FullIntegration(ChimericIntegration):
 			nm += sum([1 for i in range(len(query)) if query[i] != ref[i]])
 			
 		# get CO tag bases between start and stop
-# 		print(read)
-# 		pdb.set_trace()
 		try:
 			co = read.get_tag('CO')
+			print(read)
+			pdb.set_trace()
 		except KeyError:
 			co = ''
 			
@@ -2451,6 +2472,7 @@ class FullIntegration(ChimericIntegration):
 		
 		# get indices of mapped cigar elements
 		mapped_idx = [i for i in range(len(read.cigartuples)) if read.cigartuples[i][0] == 0]
+		# get start of first mapped block which falls between start and stop
 		for i, map_i in enumerate(mapped_idx):
 			if map_i >= start:
 				new_pos = read.get_blocks()[i][0]
