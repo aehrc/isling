@@ -16,7 +16,7 @@ default_header = ['Chr', 'IntStart', 'IntStop', 'VirusRef', 'VirusStart', 'Virus
 		'HostSeq', 'VirusSeq', 'AmbiguousSeq', 'HostEditDist', 'ViralEditDist', 
 		'TotalEditDist', 'PossibleHostTranslocation', 'PossibleVectorRearrangement', 
 		'HostAmbiguousLocation', 'ViralAmbiguousLocation', 'Type', 
-		'HostMapQ', 'ViralMapQ', 'ReadID', 'AlternativeInts', 'ReadSeq']
+		'HostMapQ', 'ViralMapQ', 'ReadID', 'AltLocs', 'ReadSeq']
 
 def main():
 	
@@ -731,6 +731,7 @@ class ChimericIntegration:
 	A class to store/calculate the properties of a simple chimeric integration 
 	(ie mapped/clipped and clipped/mapped) 
 	"""
+	__slots__ = 'map_thresh', 'tol', 'primary', 'hread', 'vread', 'hsec', 'hhead', 'vsec', 'vhead', 'chr', 'virus'
 	
 	def __init__(self, host, virus, host_header, virus_header, 
 					host_sec, virus_sec,  tol, map_thresh=20, primary=True):
@@ -874,7 +875,7 @@ class ChimericIntegration:
 		ViralAmbiguousLocation: True if primary alignment has one or more equivalent (same
 		edit distance and CIGAR) alignments elsewhere in the virus genome, or a different
 		provided viral reference
-		AlternativeInts: A list of the alternative integrations
+		AltLocs: A list of the alternative integrations
 		Type: 'chimeric' or 'discordant'
 		HostMapQ: Mapping quality for host alignment
 		ViralMapQ: Mapping quality for viral alignment
@@ -912,7 +913,7 @@ class ChimericIntegration:
 			'PossibleVectorRearrangement': self.is_possible_virus_rearrangement(),
 			'HostAmbiguousLocation': self.is_host_ambig_loc(),
 			'ViralAmbiguousLocation': self.is_viral_ambig_loc(),
-			'AlternativeInts': ";".join([int.short_str() for int in alt_ints]),
+			'AltLocs': ";".join([int.short_str() for int in alt_ints]),
 			'Type': self.get_integration_type(),
 			'HostMapQ': self.get_host_mapq(),
 			'ViralMapQ': self.get_viral_mapq(),
@@ -1976,7 +1977,7 @@ class DiscordantIntegration(ChimericIntegration):
 	This class inherits methods from ChimericIntegration, but re-defines methods that
 	need to be implemented differently for a discordant pair
 	"""
-	
+	__slots__ = 'hread1', 'hread2', 'vread1', 'vread2', 'hsec1', 'hsec2', 'vsec1', 'vsec2', 'tlen'
 	def __init__(self, host_r1, host_r2, virus_r1, virus_r2, tol,
 					host_header, virus_header, 
 					host_sec1, host_sec2, virus_sec1, virus_sec2,
@@ -2350,7 +2351,7 @@ class FullIntegration(ChimericIntegration):
 	A 'full integration' is a read that looks like it contains both junctions (left and 
 	right) of an integration.
 	"""
-	
+	__slots__ = 'left', 'right'
 	def __init__(self, host, virus, host_header, virus_header, 
 					host_sec, virus_sec, tol, map_thresh=20, primary=True):
 					
