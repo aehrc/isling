@@ -2,7 +2,6 @@
 
 # merge integration sites:
 
-
 # output coordinates is the range encompassing coordinates common to all ranges included in the cluster.  
 # eg if a cluster consists of the host coordinates 0-1, 0-150 and 0-10, the output coordinates will be 0-1.
 
@@ -162,7 +161,6 @@ def merge_same_coords(clust, row):
 		return False
 	
 	return True
-
 
 
 def get_overlap(start1, stop1, start2, stop2):
