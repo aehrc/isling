@@ -100,21 +100,13 @@ class AlignmentFilePair:
 
 			# check if primary read 1 alignments appear to be chimeric	
 			if host_r1_primary is not None and virus_r1_primary is not None:
-				integration = self._is_chimeric(host_r1_primary, virus_r1_primary,
-												host_r1_not_primary, virus_r1_not_primary)
+				self._is_chimeric(host_r1_primary, virus_r1_primary,
+									host_r1_not_primary, virus_r1_not_primary)
 												
-				if integration is not None:
-					self.ints.append(integration)
-
-				
 				# or are a full integration
-				integration = self._is_full(host_r1_primary, virus_r1_primary,
-												host_r1_not_primary, virus_r1_not_primary)
-												
-				if integration is not None:
-					self.ints.append(integration)
-					integration.get_properties()
-					
+				self._is_full(host_r1_primary, virus_r1_primary,
+									host_r1_not_primary, virus_r1_not_primary)
+														
 			# collect read2 alignments
 			host_r2_primary = self.curr_host.get_primary_r2()
 			host_r2_not_primary = self.curr_host.get_not_primary().get_read2()
@@ -124,18 +116,13 @@ class AlignmentFilePair:
 			
 			# check if primary read 1 alignments appear to be chimeric	
 			if host_r2_primary is not None and virus_r2_primary is not None:
-				integration = self._is_chimeric(host_r2_primary, virus_r2_primary,
-												host_r2_not_primary, virus_r2_not_primary)
-				if integration is not None:
-					self.ints.append(integration)
+				self._is_chimeric(host_r2_primary, virus_r2_primary,
+									host_r2_not_primary, virus_r2_not_primary)
 		
 
 			if host_r2_primary is not None and virus_r2_primary is not None:
-				integration = self._is_full(host_r2_primary, virus_r2_primary,
+				self._is_full(host_r2_primary, virus_r2_primary,
 												host_r2_not_primary, virus_r2_not_primary)
-				if integration is not None:
-					self.ints.append(integration)	
-					integration.get_properties()
 										
 			# if there are alignments that are neither read 1 nor read 2, check if chimeric
 			host_not12_primary = self.curr_host.get_primary_not_r1_or_r2()
@@ -145,26 +132,21 @@ class AlignmentFilePair:
 			virus_not12_not_primary = self.curr_virus.get_not_primary().get_not_read1_or_read2()
 			
 			if host_not12_primary is not None and virus_not12_primary is not None:
-				integration = self._is_chimeric(host_not12_primary, virus_not12_primary,
-												host_not12_not_primary, virus_not12_not_primary)
-				if integration is not None:
-					self.ints.append(integration)
+				self._is_chimeric(host_not12_primary, virus_not12_primary,
+									host_not12_not_primary, virus_not12_not_primary)
 					
-				integration = self._is_full(host_not12_primary, virus_not12_primary,
-												host_not12_not_primary, virus_not12_not_primary)
-				if integration is not None:
-					self.ints.append(integration)
+				self._is_full(host_not12_primary, virus_not12_primary,
+									host_not12_not_primary, virus_not12_not_primary)
 					
 			# check for a discordant pair
 			if all([i is not None for i in [host_r1_primary, host_r2_primary, 
 											virus_r1_primary, virus_r2_primary]]):
 				# check if integration
-				integration = self._is_discordant(host_r1_primary, host_r2_primary, 
-											virus_r1_primary, virus_r2_primary,
-											host_r1_not_primary, host_r2_not_primary,
-											virus_r1_not_primary, virus_r2_not_primary)
-				if integration is not None:
-					self.ints.append(integration)
+				self._is_discordant(host_r1_primary, host_r2_primary, 
+										virus_r1_primary, virus_r2_primary,
+										host_r1_not_primary, host_r2_not_primary,
+										virus_r1_not_primary, virus_r2_not_primary)
+
 		
 		print(f"found {len(self.ints)} integrations")
 		
@@ -179,12 +161,10 @@ class AlignmentFilePair:
 			return
 			
 		with open(filename, 'w') as filehandle:
-			out = csv.DictWriter(filehandle, fieldnames = header, delimiter='\t')
-			out.writeheader()
+			filehandle.write("\t".join(header) + "\n")
 			for integration in self.ints:
-				props = integration.get_properties()
-				for prop in props:
-					out.writerow(prop)
+				filehandle.write(str(integration) + "\n")
+			
 			
 		print(f"saved output to {filename}")				
 				
@@ -199,13 +179,14 @@ class AlignmentFilePair:
 		22M132S for virus would indicate a 2 bp overlap
 		"""
 		try:
-			return ChimericIntegration(hread, vread, 
+			integration = ChimericIntegration(hread, vread, 
 										self.host.aln.header, 
 										self.virus.aln.header,
 										hsec, vsec,
 										self.tol, self.map_thresh)
+			self.ints.append(integration)
 		except AssertionError:
-			return None
+			pass
 			
 	def _is_discordant(self, hread1, hread2, vread1, vread2, 
 						host_sec1, host_sec2, virus_sec1, virus_sec2,):
@@ -214,15 +195,16 @@ class AlignmentFilePair:
 		"""
 		
 		try:
-			return DiscordantIntegration(hread1, hread2, vread1, vread2, 
+			integration = DiscordantIntegration(hread1, hread2, vread1, vread2, 
 										self.tol,
 										self.host.aln.header, 
 										self.virus.aln.header,
 										host_sec1, host_sec2, virus_sec1, virus_sec2,
 										self.map_thresh, self.tlen
 										)
+			self.ints.append(integration)
 		except AssertionError:
-			return None
+			pass
 			
 	def _is_full(self, hread, vread, hsec, vsec):
 		""" 
@@ -236,13 +218,14 @@ class AlignmentFilePair:
 		"""	
 		
 		try:
-			return FullIntegration(hread, vread, 
+			integration = FullIntegration(hread, vread, 
 									self.host.aln.header, 
 									self.virus.aln.header,
 									hsec, vsec,
 									self.tol, self.map_thresh)
+			self.ints.append(integration)
 		except AssertionError:
-			return None
+			pass
 
 	def _get_aligns(self):
 		""" A generator to get alignments for the same read from both host and virus"""
@@ -549,16 +532,15 @@ class AlignmentPool(list):
 				
 				# check if we've already decided if either of these alignments are
 				# redundant with another alignment
-				
 				if i in redundant:
-					pdb.set_trace()
+					#pdb.set_trace()
 					i_found = [ind for ind in range(len(same)) if i in same[ind]]
 					assert len(i_found) == 1
 					ind = i_found[0]
 					if j not in same[ind]:
 						same[ind] = [*same[ind], j]
 				elif j in redundant:
-					pdb.set_trace()
+					#pdb.set_trace()
 					j_found = [ind for ind in range(len(same)) if i in same[ind]]
 					assert len(j_found) == 1
 					if i not in same[ind]:
@@ -906,7 +888,7 @@ class ChimericIntegration:
 		host_coords = self.get_host_coords()
 		virus_coords = self.get_viral_coords()
 		
-		return [{
+		return {
 			'Chr': self.chr,
 			'IntStart': host_coords[0],
 			'IntStop': host_coords[1],
@@ -933,7 +915,7 @@ class ChimericIntegration:
 			'ViralMapQ': self.get_viral_mapq(),
 			'ReadID': self.get_read_id(),
 			'ReadSeq': self.get_read_sequence()
-		}]
+		}
 
 	def get_read_id(self):
 		"""  Return the query name, with /1 appended for integrations only involving R1 
@@ -971,9 +953,6 @@ class ChimericIntegration:
 		""" Get coordinates of ambiguous bases in virus """
 		
 		coords = self._get_ambig_coords_ref(self.vread, self.vhead)	
-		
-		if coords[1] > 10000:
-			pdb.set_trace()
 		
 		# check that we're not beyond the coordinates of the chromosome
 		if coords[0] < 0:
@@ -1076,7 +1055,7 @@ class ChimericIntegration:
 	
 	def is_possible_translocation(self):
 		""" 
-		A read is a possible host transloaction if more bases in the read can be 
+		A read is a possible host translocation if more bases in the read can be 
 		accounted for by alignments to the host than would be if the read was a host/virus
 		chimera
 		"""
@@ -1293,10 +1272,8 @@ class ChimericIntegration:
 			has_md = False
 			
 		if has_md:
-			try:
-				tmp_cigartuples = self._combine_MD_with_CIGAR(read.cigartuples, md)
-			except AssertionError:
-				pdb.set_trace()
+			tmp_cigartuples = self._combine_MD_with_CIGAR(read.cigartuples, md)
+
 		else:
 			tmp_cigartuples = [(i[0], i[1], [i[0]]) if i[0] == 0 else (i[0], i[1], [])  for i in read.cigartuples]
 				
@@ -2353,12 +2330,6 @@ class DiscordantIntegration(ChimericIntegration):
 					h2 = self._combine_short_CIGAR_elements(host, self.hhead)
 					v1 = self._combine_short_CIGAR_elements(virus, self.vhead)
 				
-				#print(h1)
-				#print(h2)
-				#print(v1)
-				#print(v2)
-				#pdb.set_trace()
-				
 				# if host and virus reads constitute a valid integration, add to list
 				try:
 					alt_int = DiscordantIntegration(h1, h2, v1, v2, self.tol, 
@@ -2368,7 +2339,7 @@ class DiscordantIntegration(ChimericIntegration):
 					
 				except AssertionError:
 					pass
-
+			
 		return alt_ints
 
 class FullIntegration(ChimericIntegration):
@@ -2444,7 +2415,7 @@ class FullIntegration(ChimericIntegration):
 		output by ChimericIntegration.get_properties()
 		"""	
 		
-		props = self.left.get_properties() + self.right.get_properties()
+		props = [self.left.get_properties(), self.right.get_properties()]
 		alt_ints = self._get_alt_ints()
 		
 		# set integration type to 'short' for each type
@@ -2521,8 +2492,6 @@ class FullIntegration(ChimericIntegration):
 		# get CO tag bases between start and stop
 		try:
 			co = read.get_tag('CO')
-			print(read)
-			pdb.set_trace()
 		except KeyError:
 			co = ''
 			
@@ -2752,7 +2721,7 @@ class FullIntegration(ChimericIntegration):
 		
 		primary_nm = self._get_total_edit_dist()
 		
-		pdb.set_trace()
+		# TODO
 		
 		return False
 		
@@ -2772,6 +2741,17 @@ class FullIntegration(ChimericIntegration):
 		second = self._create_segment(read, header, 1, 3)
 
 		return first, second
+		
+	def __str__(self):
+		"""
+		string representation of an integration
+		"""
+		
+		props = self.get_properties()
+		
+		props = ["\t".join([str(prop[i]) for i in default_header]) for prop in props]
+		
+		return "\n".join(props)
 		
 if __name__ == "__main__":
 	main()
