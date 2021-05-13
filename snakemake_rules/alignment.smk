@@ -42,7 +42,6 @@ def get_for_align(wildcards, read_type):
 		else:
 			return rules.touch_merged.output.merged
 
-
 #### alignments ####
 rule index:
 	input:
@@ -116,7 +115,7 @@ rule combine_bwa_virus:
 		single = "{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaSingle.sam",
 		paired = "{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.sam",
 	output:
-		combined = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.sam"),
+		combined = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bam"),
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1.2, 500),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
@@ -128,7 +127,8 @@ rule combine_bwa_virus:
 	threads: cpus
 	shell:
 		"""
-		samtools merge {output.combined} {input.single} {input.paired}
+		samtools merge - {input.single} {input.paired} |\
+		samtools sort -n -o {output.combined} -
 		"""
 
 def get_sam(wildcards, readType, genome):
@@ -284,7 +284,8 @@ rule combine_host:
 		nodes = 1
 	shell:		
 		"""
-		samtools merge {output.combined} {input.single} {input.paired}
+		samtools merge - {input.single} {input.paired} |\
+		samtools sort -n -o {output.combined} -
 		"""
 	
 

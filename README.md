@@ -131,11 +131,11 @@ After detection, junction reads/read pairs may be filtered using post-processing
 	- *HostEditDist* (integer) - edit distance of the alignemnt to the host
 	- *ViralEditDist* (integer) - edit distnace of the alignment to the virus/vector
 	- *TotalEditDist* (integer) - sum of host and viral edit distances, plus the length of any bases in a gap between host and virus
-	- *PossibleHostTranslocation* (‘yes’, ‘no’) - does the read have two complementary alignments to the host genome?
-	- *PossibleVectorRearrangement* (‘yes’, ‘no’) - does the read have two complementary alignments to the virus/vector
-	- *HostPossibleAmbiguous* (‘yes’, ‘no’) - is there a secondary alignment equivalent (same CIGAR) to the primary alignment in the host?
-	- *ViralPossibleAmbiguous* (‘yes’, ‘no’) - is there a secondary alignment equivalent (same CIGAR) to the primary alignment in the virus/vector?
-	- *Type* (‘chimeric’, ‘discordant’) - is this read chimeric, or a discordant pair?
+	- *PossibleHostTranslocation* ('True', 'False') - does the read have two complementary alignments to the host genome?
+	- *PossibleVectorRearrangement* ('True', 'False') - does the read have two complementary alignments to the virus/vector
+	- *HostAmbiguousLocation* ('True', 'False') - is there a secondary alignment equivalent (same CIGAR) to the primary alignment in the host?
+	- *ViralAmbiguousLocation* ('True', 'False') - is there a secondary alignment equivalent (same CIGAR) to the primary alignment in the virus/vector?
+	- *Type* (‘chimeric’, ‘discordant’, 'short') - is this read chimeric, a discordant pair, or does it span both junctions (host/virus/host)?
 	- *HostMapQ* (integer) - mapping quality of the host alignment
 	- *ViralMapQ* (integer) - mapping quality of the virus/vector alignment
 	

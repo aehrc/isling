@@ -16,7 +16,7 @@ default_header = ['Chr', 'IntStart', 'IntStop', 'VirusRef', 'VirusStart', 'Virus
 		'HostSeq', 'VirusSeq', 'AmbiguousSeq', 'HostEditDist', 'ViralEditDist', 
 		'TotalEditDist', 'PossibleHostTranslocation', 'PossibleVectorRearrangement', 
 		'HostAmbiguousLocation', 'ViralAmbiguousLocation', 'Type', 
-		'HostMapQ', 'ViralMapQ', 'ReadID', 'ReadSeq', 'AlternativeInts']
+		'HostMapQ', 'ViralMapQ', 'ReadID', 'AlternativeInts', 'ReadSeq']
 
 def main():
 	

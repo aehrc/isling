@@ -12,7 +12,7 @@ from filter import Criteria
 
 
 #### defaults ####
-bwa_mem_default = "-A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -U 9 -T 10 -h 200"
+bwa_mem_default = "-a -Y -A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -U 9 -T 10 -h 1,200"
 merge_dist_default = 100
 tol_default = 3
 cutoff_default = 20
@@ -24,8 +24,7 @@ align_cpus_default = 5
 dedup_subs_default = 2
 filter_default = ["NoAmbiguousBases < 20 or Type == discordant",
 									"HostMapQ > 20",
-									"HostPossibleAmbiguous == no",
-									"PossibleVectorRearrangement == no"]
+									"PossibleVectorRearrangement == False"]
 bed_exclude_default = []
 bed_include_default = []
 

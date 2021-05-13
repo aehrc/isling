@@ -18,10 +18,10 @@
 ### HostEditDist (integer)
 ### ViralEditDist (integer)
 ### TotalEditDist (integer)
-### PossibleHostTranslocation ('yes', 'no')
-### PossibleVectorRearrangement ('yes', 'no')
-### HostPossibleAmbiguous ('yes', 'no')
-### ViralPossibleAmbiguous ('yes', 'no')
+### PossibleHostTranslocation ('True', 'False')
+### PossibleVectorRearrangement ('True', 'False')
+### HostPossibleAmbiguous ('True', 'False')
+### ViralPossibleAmbiguous ('True', 'False')
 ### Type ('chimeric', 'discordant')
 ### HostMapQ (integer)
 ### ViralMapQ (integer)
@@ -43,11 +43,11 @@ columns = {
 	'HostEditDist': 'integer',
 	'ViralEditDist': 'integer',
 	'TotalEditDist': 'integer',
-	'PossibleHostTranslocation': {'yes', 'no'},
-	'PossibleVectorRearrangement': {'yes', 'no'},
-	'HostPossibleAmbiguous': {'yes', 'no'},
-	'ViralPossibleAmbiguous': {'yes', 'no'},
-	'Type': {'chimeric', 'discordant'},
+	'PossibleHostTranslocation': {'True', 'False'},
+	'PossibleVectorRearrangement': {'True', 'False'},
+	'HostAmbiguousLocation': {'True', 'False'},
+	'ViralAmbiguousLocation': {'True', 'False'},
+	'Type': {'chimeric', 'discordant', 'short'},
 	'HostMapQ': 'integer',
 	'ViralMapQ': 'integer'
 }
