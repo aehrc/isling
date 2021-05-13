@@ -8,7 +8,6 @@ import array
 import itertools
 import pdb
 
-
 # note python 3.7+ is required
 
 default_header = ['Chr', 'IntStart', 'IntStop', 'VirusRef', 'VirusStart', 'VirusStop', 
