@@ -30,15 +30,12 @@ def main():
 	parser.add_argument('--verbose', '-v', help="print extra messages?", action='store_true')
 	args = parser.parse_args()
 
-	pair = AlignmentFilePair(args.host, args.virus, args.map_thresh, 
-								args.mean_template_length, args.tolerance, args.verbose)
-	
-	pair.find_integrations()
-	
-	pair.write_integrations(args.integrations)
+	with AlignmentFilePair(args.host, args.virus, args.map_thresh, args.mean_template_length,
+							args.tolerance, args.verbose) as pair:		
 		
-	pair.close()
-	
+		pair.find_integrations()
+		pair.write_integrations(args.integrations)
+
 		
 class AlignmentFilePair:
 	""" A class to hold host and viral alignments, and look for integrations """
@@ -263,6 +260,12 @@ class AlignmentFilePair:
 
 		self.host.close()
 		self.virus.close()	
+		
+	def __enter__(self):
+		return self
+	
+	def __exit__(self, exception, error, traceback):
+		self.close()
 
 class AlignmentFile:
 	""" Basically just pysam.AlignmentFile, but with a few extra methods """
