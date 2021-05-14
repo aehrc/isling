@@ -179,10 +179,13 @@ class AlignmentFilePair:
 										self.host.aln.header, 
 										self.virus.aln.header,
 										hsec, vsec,
-										self.tol, self.map_thresh)
-			self.ints.append(integration)
+										self.tol, self.map_thresh)	
+
 		except AssertionError:
-			pass
+			return
+			
+		self.ints.append(integration)
+		integration.get_properties()
 			
 	def _is_discordant(self, hread1, hread2, vread1, vread2, 
 						host_sec1, host_sec2, virus_sec1, virus_sec2,):
@@ -198,9 +201,11 @@ class AlignmentFilePair:
 										host_sec1, host_sec2, virus_sec1, virus_sec2,
 										self.map_thresh, self.tlen
 										)
-			self.ints.append(integration)
+
 		except AssertionError:
-			pass
+			return
+			
+		self.ints.append(integration)
 			
 	def _is_full(self, hread, vread, hsec, vsec):
 		""" 
@@ -219,9 +224,11 @@ class AlignmentFilePair:
 									self.virus.aln.header,
 									hsec, vsec,
 									self.tol, self.map_thresh)
-			self.ints.append(integration)
+
 		except AssertionError:
-			pass
+			return
+			
+		self.ints.append(integration)
 
 	def _get_aligns(self):
 		""" A generator to get alignments for the same read from both host and virus"""
@@ -451,13 +458,19 @@ class AlignmentPool(list):
 		For an AlignmentPool consisting of different alignments of the same read, get an 
 		edit distance for the case that those alignments cover the whole read
 		
-		This is done by collecting non-nested alignments using self.remove_query_nested(),
-		and then taking the sum of all the edit distances for those alignments, plus the
-		number of bases in the read not accounted for by any alignment (i.e. the number of
-		bases in the gaps between those alignments) 
+		First, we check each read to see if it has multiple mapped regions.  If it does,
+		we split it into multiple reads, each of which has one of the mapped regions.
 		
-		Return a tuple of the edit distance and the non-nested AlignmentPool (since it might
-		be different to self after removing nested alignments)
+		Then remove any nested alignments using self.remove_query_nested().  Nested
+		alignments are those that account for the same part of the read, or one accounts
+		for a subset of the part of the read that is accounted for by the other.
+		
+		Finally, the rearrangement edit distnace is the sum of the edit distances for all 
+		alignments, plus the number of bases in the read not accounted for by any alignment 
+		(i.e. the number of bases in the gaps between those alignments) 
+		
+		Return a tuple of the edit distance and the processed (split, non-nested) AlignmentPool 
+		(since it might be different to self after removing nested alignments)
 		"""
 		
 		# check that we're dealing with the same query, and
@@ -467,8 +480,11 @@ class AlignmentPool(list):
 			assert all([read.is_read1 == self[0].is_read1 for read in self[1:]])
 			assert all([read.is_read2 == self[0].is_read2 for read in self[1:]])
 		
+		query_length = self[0].query_length
+		
 		alns = AlignmentPool(self)
-		alns.remove_query_nested()
+		alns._split_mapped()
+		alns._remove_query_nested()
 		
 		# if there's a gap between the first alignment and the start of the read
 		nm = alns[0].query_alignment_start
@@ -489,7 +505,7 @@ class AlignmentPool(list):
 			curr_pos = read.query_alignment_end
 				
 		# if there's a gap between the last alignment and the end of the read
-		nm += alns[-1].query_length - alns[-1].query_alignment_end
+		nm += query_length - alns[-1].query_alignment_end
 		
 		return nm, alns
 			
@@ -535,7 +551,7 @@ class AlignmentPool(list):
 				# check if we've already decided if either of these alignments are
 				# redundant with another alignment
 				if i in redundant:
-					#pdb.set_trace()
+					#pdb.set_trace() - haven't double-checked this because it didn't come up in test data
 					i_found = [ind for ind in range(len(same)) if i in same[ind]]
 					assert len(i_found) == 1
 					ind = i_found[0]
@@ -580,7 +596,7 @@ class AlignmentPool(list):
 		for i in reversed(sorted(to_remove)):
 			self.pop(i)		
 			
-	def remove_query_nested(self):
+	def _remove_query_nested(self):
 		""" 
 		Remove any alignments that are encompassed by other alignments.  That is,
 		remove any alignments that cover the same part of the query, keeping the alignment 
@@ -594,13 +610,25 @@ class AlignmentPool(list):
 		If two alignments are equivalent (i.e. cover same part of read), remove the one
 		with the higher edit distance
 		
-		Note that this changes the order of alignments in the pool
+		Note that this changes the order of alignments in the pool (they will be sorted
+		by query alignment start position)
+		
+		It also reverses any reads that are mapped in the reverse orientation, which will 
+		mess up the mapping positions
 		"""
 		
 		if len(self) < 2:
 			return
 			
 		assert all([read.query_name == self[0].query_name for read in self[1:]])
+		
+		# reverse CIGAR for any reads that are mapped in the reverse orientation
+		for i in range(len(self)):
+			
+			if self[i].is_reverse:
+				 read = self.pop(i)
+				 self.insert(i, self._reverse_cigar(read))
+
 		
 		# sort alignments in order of query alignment start and query alignment end
 		self.sort(key = lambda elem: (elem.query_alignment_start, elem.query_alignment_end))
@@ -641,6 +669,25 @@ class AlignmentPool(list):
 					continue
 			
 			i += 1
+			
+	def _split_mapped(self):
+		"""
+		For each alignment in the pool, check if it has multiple mapped regions. 
+		If it does, remove the alignment from the pool, create multiple reads which each
+		have one of the mapped regions, and add these to the pool.
+		"""
+		
+		for i, read in enumerate(self):
+			mapped = [op for op in read.cigartuples if op[0] == 0]
+			if len(mapped) <= 1:
+				continue
+			
+			self.pop(i)
+			
+			split_reads = self._split_read(read)
+
+			for splt in split_reads:
+				self.insert(i, splt)		
 			
 	def _convert_cigarstring_to_cigartuples(self, cigar):
 		""" Convert a CIGAR string to cigar tuples """
@@ -723,8 +770,111 @@ class AlignmentPool(list):
 		""" Return reverse complement """
 		nn = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N':'N' ,
 			  'a':'t', 'c':'g', 'g':'c', 't':'a', 'n':'n'}
-		return ''.join(reversed([nn[i] for i in seq]))			
+		return ''.join(reversed([nn[i] for i in seq]))	
+		
+	def _reverse_cigar(self, read):
+		"""
+		Create a new pysam.AlignedSegment with the CIGAR string reversed.  Nothing
+		else is changed, so this alignment doesn't really make sense anymore. Use only
+		for finding edit distance for rearrangement!
+		"""	
+		cig = read.cigartuples
+		cig.reverse()
+		
+		a = pysam.AlignedSegment()
+		a.cigartuples = cig
+		a.set_tag('NM', read.get_tag('NM'))
+		
+		return a
+		
+	def _split_read(self, read):
+		"""
+		Split a read with multiple mapped regions into multiple alignments, one for
+		each mapped region
+		
+		Each mapped region will be soft-clipped either side, regardless of what was
+		previously in the CIGAR
+		"""	
+		
+		mapped_idxs = [i for i in range(len(read.cigartuples)) if read.cigartuples[i][0] == 0]
+		
+		assert len(mapped_idxs) > 1
+		
+		new_reads = AlignmentPool()
+
+		for i, cigar_op_idx in enumerate(mapped_idxs):
 			
+			# create new cigartuples
+			new_cigartuples = []
+			# get the number of bases consumed by CIGAR operations before this mapped region
+			num_before = [i[1] for i in read.cigartuples[:cigar_op_idx] if i[0] in (0, 1, 4)]
+			num_before = sum(num_before)
+			
+			# soft-clipped region preceeds mapped region
+			if num_before != 0:
+				new_cigartuples.append((4, num_before))
+			
+			# add mapped region
+			mapped = read.cigartuples[cigar_op_idx][1]
+			new_cigartuples.append((0, mapped))
+		
+			# get number of bases after
+			num_after = len(read.query_sequence) - mapped - num_before
+			
+			if num_after > 0:
+				new_cigartuples.append((4, num_after))
+				
+			# get an edit distance for this operation only
+			map_nm = 0
+			
+			# get CO tag bases for this mapped element to add to edit distance
+			try:
+				co = read.get_tag('CO')
+			except KeyError:
+				co = ''
+			
+			for elem in co.split(","):
+				if elem == '':
+					continue
+				i_map, bp = elem.split(":")
+				if int(i_map) == cigar_op_idx:
+					map_nm = int(bp)
+					break
+					
+			# add number of mismatches for edit distance
+			
+			# get reference sequence
+			prev_mapped = sum([op[1] for op in read.cigartuples[:cigar_op_idx] if op[0] == 0])
+			ref = read.get_reference_sequence()[prev_mapped:prev_mapped+mapped]
+
+			# get length of previous mapped, inserted operations (that consume query)
+			query = read.query_alignment_sequence[num_before:num_before + mapped]
+
+			# compare query and reference
+			assert len(query) == len(ref)
+			map_nm += sum([1 for i in range(len(query)) if query[i] != ref[i]])			
+			
+			# create new read
+			a = pysam.AlignedSegment()
+			a.query_name = read.query_name
+			a.query_sequence = read.query_sequence
+			a.flag = read.flag
+			a.reference_id = read.reference_id
+			a.reference_start = read.get_blocks()[i][0]
+			a.mapping_quality = read.mapping_quality
+			a.cigartuples = new_cigartuples
+			a.next_reference_id = read.next_reference_id
+			a.next_reference_start = read.next_reference_start
+			a.template_length = read.template_length
+			a.query_qualities = read.query_qualities
+			a.tags = read.tags
+			a.set_tag("NM", map_nm)
+			
+			new_reads.append(a)
+
+		return new_reads
+			
+					
 class ChimericIntegration:
 	""" 
 	A class to store/calculate the properties of a simple chimeric integration 
@@ -1219,7 +1369,7 @@ class ChimericIntegration:
 		
 		For insertions and deletions, use the CO tag to keep track of how many inserted
 		and deleted bases were combined into a mapped region.  Do this in the format
-		CO: '0:2,2:3, 5:0' - a comma separated list of mapped regions in the new CIGAR, with
+		CO: '0:2,2:3,5:0' - a comma separated list of mapped regions in the new CIGAR, with
 		the index of the mapped region in the cigartuples and the number of inserted or
 		deleted bases merged separated by a colon.  For example, '0:2,2:3, 5:0' means
 		that 2 inserted or deleted bases were combined into the mapped region at index 0,
@@ -1696,13 +1846,14 @@ class ChimericIntegration:
 		if len(sec) == 0:
 			return False
 			
-		# make alignment pool with secondary and primary alignments
+		# make alignment pool with secondary and primary alignments - this will be modified
+		# during get_arrangement_nm() so we need to make a copy
 		all = AlignmentPool(sec)
 		all.append(primary)
 		
 		rearrange_nm, all = all.get_rearrangement_nm()
 		
-		# if there's only one alignment in pool after removing redundant alignments,
+		# if there's only one alignment in pool after removing nested alignments,
 		# can't be rearrangement
 		if len(all) == 1:
 			return False
@@ -2144,22 +2295,37 @@ class DiscordantIntegration(ChimericIntegration):
 		host:  xxxxxxxxxxxxxxxxxxooo ooooooooooooooooooooo
 		virus: ooooooooooooooooooxxx xxxxxxxxxxxxxxxxxxxxx
                                  ^^^
-        In this case, these soft-clipped bases are probably not unexpected - they indicate 
-        that the host/virus junction lies just before the end of read 1.  In practice, 
-        we are not likely to actually see evidence of arrangement though, because there is 
-        a minimum length of alignments (e.g. the seed length of the aligner).  For example,
-        if the junction is 5bp from the right of read 1, all we will see is that the
-        viral alignment is soft-clipped (5bp), but since 5bp is smaller than our seed length
-        we won't see the 5bp alignment in the host alignment for read 1.  So we might 
-        conclude that we should add 5 to the edit distance for the 5 soft-clipped bases
-        on the right end of the viral alignment for read 1, but we'd probably be wrong.
+    	or this:
+    	
+		              read 1                 read 2
+		host:  xxxxxxxxxxxxxxxxxxxxx xxxoooooooooooooooooo
+		virus: ooooooooooooooooooooo oooxxxxxxxxxxxxxxxxxx
+                                     ^^^    	
+    	
+        In this case, these soft-clipped bases (top) and mapped bases (bottom) 
+        are probably not unexpected - they indicate that the host/virus junction lies just 
+        before the end of read 1.  In practice, we are not likely to actually see evidence 
+        of arrangement though, because there is a minimum length of alignments (e.g. the 
+        seed length of the aligner).  For example, if the junction is 5bp from the right of 
+        read 1, all we will see is that the viral alignment is soft-clipped (5bp), but since 
+        5bp is smaller than our seed length we won't see the 5bp alignment in the host
+        alignment for read 1.  So we might conclude that we should add 5 to the edit 
+        distance for the 5 soft-clipped bases on the right end of the viral alignment for 
+        read 1, but we'd probably be wrong.
         
         We therefore don't have enough information to calculate an edit distance analogous
         to the chimeric case for a discordant integration (most of the time). We could
         output the sum of the host and viral alignment edit distances, but I think this
-        is misleading because it doesn't (and can't) capture the whole picture.  So instead,
-        just output None
+        is misleading because it doesn't (and can't) capture the whole picture. But,
+        a total edit distance would be useful for deciding which of a list of alternate
+        integrations (constructed using secondary alignments) are more likely.  So 
+        output a
 		"""
+		
+		# TODO
+		pdb.set_trace()
+		
+		
 		return None
 	
 	def get_viral_coords(self):
@@ -2252,7 +2418,7 @@ class DiscordantIntegration(ChimericIntegration):
 					
 		return True		
 		
-	def _is_possible_rearrangement(self, hread, vread):
+	def _is_possible_rearrangement(self, primary, sec):
 		""" 
 		For a DiscordantIntegration, rearrangements are unlikely since they would require 
 		both reads to be mapped to the same reference, but a DiscordantIntegration is one
@@ -2421,9 +2587,16 @@ class FullIntegration(ChimericIntegration):
 		props = [self.left.get_properties(), self.right.get_properties()]
 		alt_ints = self._get_alt_ints()
 		
-		# set integration type to 'short' for each type
+		# we want to check for rearrangements for the read as a whole, not for individual 
+		# junctions
+		host_rearrange = self.is_possible_translocation()
+		virus_rerrange = self.is_possible_virus_rearrangement()
+		
+		# set integration properties that are the same for both junctions
 		for prop in props:
 			prop['Type'] = 'short'
+			prop['PossibleVectorRearrangement'] = virus_rerrange
+			prop['PossibleHostTranslocation'] = host_rearrange
 			
 		# assign alternative integrations for each junction
 		props[0]['AlternativeInts'] = ";".join([int.left.short_str() for int in alt_ints])
@@ -2711,22 +2884,6 @@ class FullIntegration(ChimericIntegration):
 			return False
 		
 		return True
-		
-	def _is_possible_rearrangement(self, hread, vread):
-		""" 
-		A read is a possible rearrangement if it can be accounted for entirely by alignments
-		to one reference.
-		
-		In the case of a FullIntegration, we should check the read as a whole, rather
-		than checking each junction individually.  The method for checking is still the same
-		- we compare edit distances in the case of rearrangements and for the integration.
-		"""	
-		
-		primary_nm = self._get_total_edit_dist()
-		
-		# TODO
-		
-		return False
 		
 	def _split_read(self, read, header):
 		"""
