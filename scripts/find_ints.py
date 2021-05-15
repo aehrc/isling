@@ -185,7 +185,7 @@ class AlignmentFilePair:
 			return
 			
 		self.ints.append(integration)
-		integration.get_properties()
+
 			
 	def _is_discordant(self, hread1, hread2, vread1, vread2, 
 						host_sec1, host_sec2, virus_sec1, virus_sec2,):
@@ -872,8 +872,7 @@ class AlignmentPool(list):
 			
 			new_reads.append(a)
 
-		return new_reads
-			
+		return new_reads			
 					
 class ChimericIntegration:
 	""" 
@@ -1687,36 +1686,8 @@ class ChimericIntegration:
 					
 				except AssertionError:
 					pass
-			
-		# if this integration is a primary one, but we found an alternative integration with
-		# a lower edit distance, then the alternate one becomes primary
-		primary_nm = self.get_total_edit_dist()
-		if self.primary:
-		
-			for i in range(len(alt_ints)):
-				
-				alt_nm = alt_ints[i].get_total_edit_dist()
-			
-				if alt_nm < primary_nm:
-			
-					print('found better integration than primary one: swapping')
-				
-					# add secondary alignments to alt_int (not added during instatiation)
-					host_alns.append(self.hread)
-					host_alns.remove(alt_ints[i].hread)
-				
-					virus_alns.append(self.vread)
-					virus_alns.remove(alt_ints[i].vread)
-				
-					alt_ints[i].hsec = host_alns
-					alt_ints[i].vsec = virus_alns
-				
-					# swap self with alt_int
-					tmp = self
-					self = alt_ints[i]
-					self.primary = True
-					alt_ints[i] = tmp
-					alt_ints[i].primary = False	
+
+		alt_ints = self._swap_self_with_primary(self, alt_ints)
 
 		return alt_ints
 
@@ -2113,6 +2084,44 @@ class ChimericIntegration:
 				
 		return self._edit_alignment(read, header, tmp_cigartuples, 0, 0, '', '')	
 		
+	def _swap_self_with_primary(self, alt_ints):
+		"""
+		Check each alternate integration to see if it has an edit distance lower than 
+		the primary edit distance.  If it does, the one with the lower edit distance
+		becomes the primary and the other becomes an alternate
+		"""
+		# if this integration is a primary one, but we found an alternative integration with
+		# a lower edit distance, then the alternate one becomes primary
+		primary_nm = self.get_total_edit_dist()
+		if self.primary:
+		
+			for i in range(len(alt_ints)):
+				
+				alt_nm = alt_ints[i].get_total_edit_dist()
+			
+				if alt_nm < primary_nm:
+			
+					print('found better integration than primary one: swapping')
+				
+					# add secondary alignments to alt_int (not added during instatiation)
+					host_alns.append(self.hread)
+					host_alns.remove(alt_ints[i].hread)
+				
+					virus_alns.append(self.vread)
+					virus_alns.remove(alt_ints[i].vread)
+				
+					alt_ints[i].hsec = host_alns
+					alt_ints[i].vsec = virus_alns
+				
+					# swap self with alt_int
+					tmp = self
+					self = alt_ints[i]
+					self.primary = True
+					alt_ints[i] = tmp
+					alt_ints[i].primary = False	
+		
+		return alt_ints
+		
 	def __str__(self):
 		
 		props = self.get_properties()
@@ -2185,22 +2194,13 @@ class DiscordantIntegration(ChimericIntegration):
 		read = self._read_from_OA(read, header)
 		blocks = (read.get_blocks()[0][0], read.get_blocks()[-1][-1])
 		
-		# if host read is R1, then we want the coordinate of the host base at the
-		# side of the read that faces R2
-		if read.is_read1:
-			if read.is_reverse:
-				stop = blocks[0]
-				start = stop - insert
-			else:
-				start = blocks[-1]
-				stop = start + insert
+		# we want the coordinate of the host/virus base closest to integration
+		if read.is_reverse:
+			stop = blocks[0]
+			start = stop - insert
 		else:
-			if read.is_reverse:
-				start = blocks[-1]
-				stop = start + insert
-			else:
-				stop = blocks[0]
-				start = stop - insert
+			start = blocks[-1]
+			stop = start + insert
 			
 		# check the start isn't less than zero
 		if start < 0:
@@ -2322,11 +2322,29 @@ class DiscordantIntegration(ChimericIntegration):
         output a
 		"""
 		
-		# TODO
-		pdb.set_trace()
+		# check for unmapped bases on the part of the read that is furtherest from the
+		# integration
+		h1_map = self._is_mapped(self.hread1)
 		
+		# first, add the edit distances of the two mapped reads
+		# this includes any insertions or deletions, but not soft-clipped bases
+		nm = self.hread.get_tag('NM') + self.vread.get_tag('NM')
+
+		# if we have a CO tag for host or virus, add those bases too
+		nm += self._get_co_bases(self.hread)
+		nm += self._get_co_bases(self.vread)
 		
-		return None
+		# check if there are any bases mapped at one end of the unmapped read (closest
+		# to the mapped read) that are mapped in the other alignment
+		if h1_map:
+		
+			nm += self._check_overlap_in_unmapped(self.hread1, self.vread1)
+			nm += self._check_overlap_in_unmapped(self.vread2, self.hread2)
+		else:
+			nm += self._check_overlap_in_unmapped(self.vread1, self.hread1)
+			nm += self._check_overlap_in_unmapped(self.hread2, self.vread2)			
+		
+		return nm
 	
 	def get_viral_coords(self):
 		""" Get likely coordinates of integration in viral reference """		
@@ -2360,6 +2378,122 @@ class DiscordantIntegration(ChimericIntegration):
 			self.virus = self.vread1.reference_name
 		else:
 			self.virus = self.vread2.reference_name
+			
+	def _check_overlap_in_unmapped(self, mapped, unmapped):
+		"""
+		Check if there are any soft-clipped bases in the 'mapped' read that actually overlap
+		with mapped bases in the 'unmapped' one, e.g.
+		
+		              read 1                 read 2
+		host:  xxxxxxxxxxxxxxxxxxxxx xxxoooooooooooooooooo
+		virus: ooooooooooooooooooooo oooxxxxxxxxxxxxxxxxxx		
+									 ^^^
+									 
+		Where o is mapped and x is unmapped.
+		
+		The following is also fine - indicates overlap in read 2
+		
+		              read 1                 read 2
+		host:  xxxxxxxxxxxxxxxxxxxxx ooooooooooooooooooooo
+		virus: ooooooooooooooooooooo oooxxxxxxxxxxxxxxxxxx	
+									 ^^^
+
+		The following is not fine - soft-clipped bases in R2 in host are not mapped in virus
+		
+		              read 1                 read 2
+		host:  xxxxxxxxxxxxxxxxxxxxx xxxoooooooooooooooooo
+		virus: ooooooooooooooooooooo xxxxxxxxxxxxxxxxxxxxx	
+									 ^^^		
+		Return the number of bases in this read that should be added to the edit distance.
+		This is any mapped bases in the unmapped read that don't overlap in the read
+		with soft-clipped bases in the mapped read, as well as any soft-clipped bases in
+		the mapped read that don't overlap with soft-clipped bases in the overlapped read.
+		In other words, it's any bases that don't match the first two scenarios above.
+		"""
+		
+		# get index soft-clipped elements in mapped read
+		soft_map = [ind for ind in range(len(mapped.cigartuples)) if mapped.cigartuples[ind][0] == 4]
+			
+		# get index of mapped elements in unmapped read
+		try:
+			map_unmap = [ind for ind in range(len(unmapped.cigartuples)) if unmapped.cigartuples[ind][0] == 0]
+		# if read is completely unmapped, cigartuples is None
+		except TypeError:
+			map_unmap = []
+		
+		# if there aren't any of either, return 0
+		if len(map_unmap) == 0 and len(soft_map) == 0:
+			return 0
+
+		# if we don't have any mapped bases in the unmapped read, then any soft-clipped
+		# bases in the mapped read are unexplained
+		if len(map_unmap) == 0:
+			total_mapped = mapped.query_alignment_end - mapped.query_alignment_start
+			return mapped.query_length - total_mapped
+				
+		# check if the mapped part of the unmapped read is in the 'correct' part - i.e.
+		# closest part of read to integration junction / other read
+		if unmapped.is_reverse:
+			# if mapped in reverse, mapped should be first element in cigar
+			if map_unmap[0] == 0:
+
+				mapped_correct_pos = True
+				
+				# we won't consider these bases when calculating edit distance
+				map_unmap.pop(0)
+				
+				# if there are soft-clipped bases in the same part of the mapped read,
+				# we won't consider these either
+				if len(soft_map) > 0:
+					if mapped.is_reverse:
+						if soft_map[-1] == len(mapped.cigartuples) - 1:
+							soft_map.pop(-1)
+					else:
+						if soft_map[0] == 0:
+							soft_map.pop(0)			
+				
+			else:
+				mapped_correct_pos = False
+		else:
+			# otherwise, mapped should be last element in cigar
+			if map_unmap[-1] == len(unmapped.cigartuples) - 1:
+				
+				mapped_correct_pos = True	
+				
+				map_unmap.pop(-1)	
+				
+				# also check if there's a matching soft-clipped part of read
+				if len(soft_map) > 0:
+					if mapped.is_reverse:
+						if soft_map[0] == 0:
+							soft_map.pop(0)
+					else:
+						if soft_map[-1] == len(mapped.cigartuples) - 1:
+							soft_map.pop(-1)	
+			else:
+				mapped_correct_pos = False		
+		
+		# if mapped part of unmapped read isn't
+		# in correct place, then we just add all unmapped bases in mapped read and
+		# mapped bases in unmapped read
+		if not mapped_correct_pos:
+			# get number of mapped bases in unmapped read
+			nm = unmapped.query_alignment_end - unmapped.query_alignment_start
+			
+			# get number of unmapped bases in mapped read
+			total_mapped = mapped.query_alignment_end - mapped.query_alignment_start
+			nm += mapped.query_length - total_mapped
+			
+			return nm
+			
+		# otherwise, count bases in remaining soft-clips and mapped regions
+		nm = 0
+		for idx in soft_map:
+			nm += mapped.cigartuples[idx][1]
+		for idx in map_unmap:
+			nm += unmapped.cigartuples[idx][1]
+			
+		return nm
 					
 	def _is_discordant(self, host_sec1, host_sec2, virus_sec1, virus_sec2):
 		""" 
@@ -2508,8 +2642,51 @@ class DiscordantIntegration(ChimericIntegration):
 					
 				except AssertionError:
 					pass
+
+		alt_ints = self._swap_self_with_primary(self, alt_ints)
 			
 		return alt_ints
+		
+	def _get_co_bases(self, read):
+		"""
+		Get the total number of bases in the CO tag (insertions that were removed during
+		processing of read)
+		"""
+		nm = 0
+		# try to get CO tag
+		try:
+			co = read.get_tag('CO')
+		except KeyError:
+			return nm
+			
+		# get each operation from CO
+		co = co.split(",")
+		for op in co:
+			nm += int(op.split(":")[1])
+			
+		return nm
+		
+	def _get_last_mapped(self, read):
+		"""
+		Get the number of bases in the query between the last mapped region and the end
+		of the read.  Consider only cigar operations that consume query (I/S)
+		"""
+		cigar = read.cigartuples
+		mapped = [ind for ind in range(len(cigar)) if cigar[ind][0] == 0]
+		last_mapped = mapped[-1]
+		
+		return sum([op[1] for op in cigar[last_mapped:] if op[0] in (1, 4)])
+		
+	def _get_first_mapped(self, read):
+		"""
+		Get the number of bases in the query between the start of the read and the first
+		mapped region.  Consider only cigar operations that consume query (I/S)
+		"""		
+		cigar = read.cigartuples
+		mapped = [ind for ind in range(len(cigar)) if cigar[ind][0] == 0]
+		first_mapped = mapped[0]
+		
+		return sum([op[1] for op in cigar[first_mapped:] if op[0] in (1, 4)])		
 
 class FullIntegration(ChimericIntegration):
 	"""
@@ -2770,37 +2947,9 @@ class FullIntegration(ChimericIntegration):
 					alt_ints.append(alt_int)
 					
 				except AssertionError:
-					pass
-			
-		# if this integration is a primary one, but we found an alternative integration with
-		# a lower edit distance, then the alternate one becomes primary
-		primary_nm = self.get_total_edit_dist()
-		if self.primary:
-		
-			for i in range(len(alt_ints)):
-				
-				alt_nm = alt_ints[i].get_total_edit_dist()
-			
-				if alt_nm < primary_nm:
-			
-					print('found better integration than primary one: swapping')
-				
-					# add secondary alignments to alt_int (not added during instatiation)
-					host_alns.append(self.hread)
-					host_alns.remove(alt_ints[i].hread)
-				
-					virus_alns.append(self.vread)
-					virus_alns.remove(alt_ints[i].vread)
-				
-					alt_ints[i].hsec = host_alns
-					alt_ints[i].vsec = virus_alns
-				
-					# swap self with alt_int
-					tmp = self
-					self = alt_ints[i]
-					self.primary = True
-					alt_ints[i] = tmp
-					alt_ints[i].primary = False	
+					pass	
+
+		alt_ints = self._swap_self_with_primary(self, alt_ints)
 
 		return alt_ints
 	
