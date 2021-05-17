@@ -25,6 +25,11 @@
 ### Type ('chimeric', 'discordant')
 ### HostMapQ (integer)
 ### ViralMapQ (integer)
+### AmbigLoc (None, uniqueHost, uniqueVirus)
+
+## For AmbigLoc, we can either check if there aren't any (None), or if the coordinates
+## of all the alternative locations share the same host coordinate as the primary location
+## (uniqueHost), or the same but for the virus (uniqueVirus)
 
 ## critera may be separaterated by AND and OR
 ## brackets may be used to group criteria
@@ -49,7 +54,8 @@ columns = {
 	'ViralAmbiguousLocation': {'True', 'False'},
 	'Type': {'chimeric', 'discordant', 'short'},
 	'HostMapQ': 'integer',
-	'ViralMapQ': 'integer'
+	'ViralMapQ': 'integer',
+	'AmbigLoc': {'None', 'uniqueHost', 'uniqueVirus'}
 }
 
 def main(args):
@@ -65,8 +71,10 @@ def main(args):
 	
 	with open(args.input, 'r') as in_handle, open(args.keep, 'w') as keep_handle, open(args.exclude, 'w') as exclude_handle:
 		in_csv = csv.DictReader(in_handle, delimiter = '\t')
+		
 		keep = csv.DictWriter(keep_handle, delimiter = '\t', fieldnames = in_csv.fieldnames)
 		keep.writeheader()
+		
 		exclude = csv.DictWriter(exclude_handle, delimiter = '\t', fieldnames = in_csv.fieldnames)
 		exclude.writeheader()
 		
@@ -104,9 +112,11 @@ class Criteria():
 			self.criteria_list += [i for i in string.split() if i != '']
 		self.column_spec = column_spec
 		
+		self.unique_virus = False
+		self.unique_host = False
+		
 		# check that criteria are valid
 		self.__check_criteria_valid()
-		
 		
 	def filter_row(self, row_original):
 
@@ -121,7 +131,13 @@ class Criteria():
 			except ValueError:
 				row[int_col] = np.nan
 		
-		return eval(self.criteria)		
+		if self.unique_host or self.unique_virus:
+			row_criteria = self._update_criteria_for_row(row)
+		else:
+			row_criteria = self.criteria
+
+		# evaluate a logical statement about row to check if we should keep or remove it
+		return eval(row_criteria)
 	
 	def __check_criteria_valid(self):
 		"""
@@ -140,6 +156,8 @@ class Criteria():
 		self.logical = {'and', 'or', 'not'}
 		self.paren = {'(', ')'}
 		self.categorical_values = set()
+		
+		# make a set of all possible categorical values
 		for values in self.column_spec.values():
 			if isinstance(values, set):
 				self.categorical_values = self.categorical_values | values
@@ -153,7 +171,7 @@ class Criteria():
 		if not all([isinstance(i, str) for i in self.criteria_list]):
 			raise ValueError("Invalid criteria: {" ".join(self.criteria_list)}")
 			
-		# split any brackets from the end of terms
+		# split any brackets from the start or end of terms
 		self.__split_brackets()
 				
 		# check that the number of open brackets equals the number of closed brackets
@@ -197,6 +215,18 @@ class Criteria():
 		# create string used for filtering
 		self.criteria = list(self.criteria_list)
 		for i in range(len(self.criteria_list)):
+			# if we are filtering for ambiguous location uniqueHost or uniqueVirus,
+			# set self.unique_host or self.unique_virus, respectively
+			if self.criteria_list[i] == 'AmbigLoc':
+				if self.criteria_list[i+2] == 'None':
+					self.criteria[i+2] = ''
+				
+				# take note if we want to check for unique location in host or vector
+				elif self.criteria_list[i+2] == 'uniqueVirus':
+					self.unique_virus = True
+
+				elif self.criteria_list[i+2] == 'uniqueHost':
+					self.unique_host = True
 			
 			# need to replace row names with row['row_name']
 			if self.criteria[i] in self.column_spec.keys():
@@ -209,8 +239,8 @@ class Criteria():
 				if self.column_spec[col] != 'integer':
 					self.criteria[i+1] = f"'{val}'"
 					
+		self.criteria_list = self.criteria
 		self.criteria = " ".join(self.criteria)
-		
 
 	def __split_brackets(self):
 		"""
@@ -248,8 +278,7 @@ class Criteria():
 			if self.criteria_list[i][-1] == ")" :
 				brackets[i] = "end"
 				
-		return brackets
-		
+		return brackets	
 
 	def __check_value(self, i):
 		"""
@@ -266,8 +295,7 @@ class Criteria():
 					"values must be followed by ')', 'and' or 'or'")
 					
 		# part of a valid criterion
-		self.__check_valid_criterion(i-2)
-		
+		self.__check_valid_criterion(i-2)		
 	
 	def __check_column_name(self, i):
 		"""
@@ -312,9 +340,7 @@ class Criteria():
 			except ValueError:
 				raise ValueError("Invalid criteria: "
 					"'not' must be followed by '(' or a valid criterion"
-				)
-				
-		
+				)		
 		
 	def __check_and_or(self, i):	
 		"""
@@ -346,9 +372,7 @@ class Criteria():
 				self.__check_valid_criterion(i+1)
 			except ValueError:
 				raise ValueError(f"Invalid criteria"
-					"'and' and 'or' must be followed by by an open bracket, 'not', or a valid criterion")					
-					
-					
+					"'and' and 'or' must be followed by by an open bracket, 'not', or a valid criterion")														
 
 	def __check_comparator(self, i):
 		"""
@@ -366,8 +390,7 @@ class Criteria():
 			raise ValueError("Invalid criteria: "
 						f"Comparator {self.criteria_list[i]} has nothing following it, " 
 						"but it should be followed by a value")	
-		self.__check_valid_criterion(i-1)
-				
+		self.__check_valid_criterion(i-1)				
 	
 	def __check_closed_paren(self, i):
 		"""
@@ -403,8 +426,7 @@ class Criteria():
 			next_term = self.criteria_list[i + 1]
 			if not next_term in (self .logical | { ')'}):
 				raise ValueError("Invalid criteria: "
-				"Closed parentheses must be followed by 'and', 'or', or another closed parenthesis")
-		
+				"Closed parentheses must be followed by 'and', 'or', or another closed parenthesis")		
 		
 	def __check_open_paren(self, i):
 		"""
@@ -432,8 +454,29 @@ class Criteria():
 			if prev_term not in {'and', 'or', 'not', '('}:
 				raise ValueError("Invalid criteria: "
 				"Open parentheses must be preceeded by 'and', 'or', 'not', or another open parenthesis")
+				
+	def __check_unique_host(self, row):
+		"""
+		Check if all of the alternate locations in the viral reference are the same 
+		as the primary one
+		"""
 		
+		if row['AltLocs'] == '':
+			return True
 			
+		pdb.set_trace()
+		
+	def __check_unique_virus(self, row):
+		"""
+		Check if all of the alternate locations in the viral reference are the same 
+		as the primary one
+		"""
+		
+		if row['AltLocs'] == '':
+			return True
+			
+		pdb.set_trace()	
+		
 	def __contains_redundant_brackets(self):
 		"""
 		Check if a criteria list contains redundant brackets.
@@ -504,7 +547,55 @@ class Criteria():
 		if not self.__valid_value(criteria_sublist[0], criteria_sublist[2]):
 			raise ValueError(error_str + f"value '{criteria_sublist[2]}' is "
 						f"invalid for column '{criteria_sublist[0]}'")
-
+	
+	def _update_criteria_for_row(self, row):
+		"""
+		If we're checking for a unique location in host or virus, we need to replace
+		["row['AmbigLoc']", '==', 'uniqueVirus'] or "[row['AmbigLoc']", '==', 'uniqueHost']
+		with an appropriate expression that checks if this is the case for this particular
+		row
+		"""
+		criteria = list(self.criteria_list)
+		
+		rowvar = self.row_var_name
+		empty = f"{rowvar}['AltLocs'] == '' or "
+		
+		hprimary = f"{row['Chr']}:{row['IntStart']}-{row['IntStop']},{row['Orientation']}"
+		
+		if self.unique_host:
+		
+			# check if host primary location matches all host alternate locations
+			host_cond = f"all([host_from_alt(alt) == '{hprimary}' for alt in {rowvar}['AltLocs'].split(';')])"
+			
+			host_cond = "(" + empty + host_cond + ")"
+			
+			# replace "[row['AmbigLoc']", '==', 'uniqueHost']" with this criteria for the row
+			i = 0
+			while i < len(criteria):
+				if criteria[i] == "'uniqueHost'":
+					del criteria[i-2:i+1]
+					criteria.insert(i-2, host_cond)
+					
+				i += 1
+			
+		if self.unique_virus:
+		
+			vprimary = f"{row['VirusRef']}:{row['VirusStart']}-{row['VirusStop']},{row['VirusOrientation']}"
+			
+			virus_cond = f"all([virus_from_alt(alt) == '{vprimary}' for alt in {rowvar}['AltLocs'].split(';')])"
+	
+			virus_cond = "(" + empty + virus_cond + ")"
+	
+			# replace "[row['AmbigLoc']", '==', 'uniqueVirus']" with this criteria for the row
+			i = 0
+			while i < len(criteria):
+				if criteria[i] == "'uniqueVirus'":
+					del criteria[i-2:i+1]
+					criteria.insert(i-2, virus_cond)		
+				i += 1	
+				
+		return " ".join(criteria)
+		
 		
 	def __valid_value(self, column_name, value):
 		"""
@@ -533,9 +624,22 @@ class Criteria():
 			return False
 			
 		return True
+	
 		
 	def __repr__(self):
 		return "Criteria: " + " ".join(self.criteria_list)
+
+def host_from_alt(alt):
+	alt = alt.split(",")
+	if len(alt) < 2:
+		return ""
+	return f"{alt[0]},{alt[1]}"	
+
+def virus_from_alt(alt):
+	alt = alt.split(",")
+	if len(alt) < 4:
+		return ""
+	return f"{alt[2]},{alt[3]}"
 
 if __name__ == "__main__":
 	main(argv)
