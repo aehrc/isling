@@ -15,7 +15,7 @@ rule find_ints:
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	container:
-		"docker://simvi:2"
+		"docker://szsctt/simvi:2"
 	shell:
 		"""
 		HOST=$(perl -ne '/^SN\sinsert size average:\t(\d+\.\d+)/ && print "$1"' {input.host_stats})

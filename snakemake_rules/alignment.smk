@@ -273,7 +273,7 @@ rule combine_host:
 		paired = rules.align_bwa_host_paired.output.sam,
 		single = rules.align_bwa_host_single.output.sam
 	output:
-		combined = temp("{outpath}/{dset}/host_aligned/{samp}.{part}.{host}.readsFrom{virus}.sam")
+		combined = temp("{outpath}/{dset}/host_aligned/{samp}.{part}.{host}.readsFrom{virus}.bam")
 	conda: 
 		"../envs/bwa.yml"
 	container:

@@ -188,6 +188,7 @@ class AlignmentFilePair:
 			return
 			
 		self.ints.append(integration)
+		integration.get_properties()
 
 			
 	def _is_discordant(self, hread1, hread2, vread1, vread2, 
@@ -209,6 +210,7 @@ class AlignmentFilePair:
 			return
 			
 		self.ints.append(integration)
+		integration.get_properties()
 			
 	def _is_full(self, hread, vread, hsec, vsec):
 		""" 
@@ -232,6 +234,7 @@ class AlignmentFilePair:
 			return
 			
 		self.ints.append(integration)
+		integration.get_properties()
 
 	def _get_aligns(self):
 		""" A generator to get alignments for the same read from both host and virus"""
@@ -888,16 +891,22 @@ class AlignmentPool(list):
 					
 			# add number of mismatches for edit distance
 			
-			# get reference sequence
+			# get reference sequence - we can only do this for reads for which we have an MD tag
 			prev_mapped = sum([op[1] for op in read.cigartuples[:cigar_op_idx] if op[0] == 0])
-			ref = read.get_reference_sequence()[prev_mapped:prev_mapped+mapped]
+			try:
+				ref = read.get_reference_sequence()[prev_mapped:prev_mapped+mapped]
+			except ValueError:
+				ref = None
 
 			# get length of previous mapped, inserted operations (that consume query)
 			query = read.query_alignment_sequence[num_before:num_before + mapped]
 
 			# compare query and reference
-			assert len(query) == len(ref)
-			map_nm += sum([1 for i in range(len(query)) if query[i] != ref[i]])			
+			if ref is not None:
+				assert len(query) == len(ref)
+				map_nm += sum([1 for i in range(len(query)) if query[i] != ref[i]])	
+			else:
+				map_nm = None		
 			
 			# create new read
 			a = pysam.AlignedSegment()
@@ -913,7 +922,9 @@ class AlignmentPool(list):
 			a.template_length = read.template_length
 			a.query_qualities = read.query_qualities
 			a.tags = read.tags
-			a.set_tag("NM", map_nm)
+			
+			if map_nm is not None:
+				a.set_tag("NM", map_nm)
 			
 			new_reads.append(a)
 
@@ -2923,7 +2934,10 @@ class FullIntegration(ChimericIntegration):
 			mapped = prev_mapped + read.cigartuples[i][1]
 			
 			# get reference sequence
-			ref = read.get_reference_sequence()[prev_mapped:mapped]
+			try:
+				ref = read.get_reference_sequence()[prev_mapped:mapped]
+			except ValueError:
+				pdb.set_trace()
 
 			# get length of previous mapped, inserted operations (that consume query)
 			prev_query = sum([i[1] for i in read.cigartuples[:i] if i[0] in (0,1)])
