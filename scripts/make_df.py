@@ -10,7 +10,6 @@ import subprocess
 
 from filter import Criteria
 
-
 #### defaults ####
 bwa_mem_default = "-a -Y -A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -U 9 -T 10 -h 1,200"
 merge_dist_default = 100
@@ -23,10 +22,10 @@ mean_frag_len_default = 'estimate'
 align_cpus_default = 5
 dedup_subs_default = 2
 filter_default = ["NoAmbiguousBases < 20 or Type == discordant",
-									"HostMapQ > 20",
-									"PossibleVectorRearrangement == False"]
+				   "PossibleVectorRearrangement == False"]
 bed_exclude_default = []
 bed_include_default = []
+mapq_thresh_default = 20
 
 
 #### check file extensions ####
@@ -114,6 +113,7 @@ def make_df(config):
 		filter_str = get_filter(config, dataset, filter_default)
 		bed_exclude = tuple(get_value_or_default(config, dataset, 'bed-exclude', bed_exclude_default))
 		bed_include = tuple(get_value_or_default(config, dataset, 'bed-include', bed_include_default))
+		mapq = get_value_or_default(config, dataset, 'mapq-threshold', mapq_thresh_default)
 		
 		# check values are integers greater than a minimum value
 		check_int_gt(merge_dist, -1, 'merge-dist', dataset)
@@ -121,6 +121,7 @@ def make_df(config):
 		check_int_gt(cigar_tol, 0, 'cigar-tol', dataset)
 		check_int_gt(merge_n_min, -1, 'merge-n-min', dataset)
 		check_int_gt(split, 0, 'split', dataset)
+		check_int_gt(mapq, -1, 'mapq-threshold', dataset)
 
 		if mean_frag_len != 'estimate':
 			if mean_frag_len < 0:
@@ -164,12 +165,11 @@ def make_df(config):
 			virus_prefix = config[dataset]["virus_prefixes"][virus]	
 			
 			# append combinations of each sample, host and virus		
-			rows.append((dataset_name, dataset, sample, host, host_fasta, host_prefix, virus, virus_fasta, virus_prefix, merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, merge_method, merge_n_min, clip_cutoff, cigar_tol, split, mean_frag_len, align_cpus, cat, dedup_subs, filter_str, bed_exclude, bed_include))
+			rows.append((dataset_name, dataset, sample, host, host_fasta, host_prefix, virus, virus_fasta, virus_prefix, merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, merge_method, merge_n_min, clip_cutoff, cigar_tol, split, mean_frag_len, align_cpus, cat, dedup_subs, filter_str, bed_exclude, bed_include, mapq))
 
 				
 	# make dataframe
-	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'merge_method', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'split', 'mean_frag_len', 'align_cpus', 'cat', 'dedup_subs', 'filter', 'bed_exclude', 'bed_include'])
-	
+	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'merge_method', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'split', 'mean_frag_len', 'align_cpus', 'cat', 'dedup_subs', 'filter', 'bed_exclude', 'bed_include', 'mapq_thresh'])
 	
 	# do checks on dataframe
 	check_dataset_sample_unique(toDo)

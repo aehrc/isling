@@ -2,7 +2,9 @@
 rule find_ints:
 	input:
 		host = lambda wildcards: get_sam(wildcards, "combined", "host"),
-		virus = lambda wildcards: get_sam(wildcards, "combined", "virus")
+		virus = lambda wildcards: get_sam(wildcards, "combined", "virus"),
+		host_stats = rules.host_stats.output.stats,
+		virus_stats =  rules.virus_stats.output.stats,
 	output:
 		ints = temp("{outpath}/{dset}/ints/{samp}.{part}.{host}.{virus}.txt"),
 	params:
@@ -16,7 +18,14 @@ rule find_ints:
 		"docker://simvi:2"
 	shell:
 		"""
-		python3 scripts/find_ints.py --host {input.host} --virus {input.virus} --integrations {output.ints} {params}
+		HOST=$(perl -ne '/^SN\sinsert size average:\t(\d+\.\d+)/ && print "$1"' {input.host_stats})
+		VIRUS=$(perl -ne '/^SN\sinsert size average:\t(\d+\.\d+)/ && print "$1"' {input.virus_stats})		
+		FRAG=$(echo $HOST $VIRUS | awk '{{print ($1 + $2) / 2}}')
+		python3 scripts/find_ints.py \
+		--host {input.host} \
+		--virus {input.virus}\
+		--mean-template-length $FRAG \
+		--integrations {output.ints} {params}
 		"""
 
 rule combine_ints:
