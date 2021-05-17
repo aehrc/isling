@@ -25,7 +25,7 @@
 ### Type ('chimeric', 'discordant')
 ### HostMapQ (integer)
 ### ViralMapQ (integer)
-### AmbigLoc (None, uniqueHost, uniqueVirus)
+### AltLocs (None, uniqueHost, uniqueVirus)
 
 ## For AmbigLoc, we can either check if there aren't any (None), or if the coordinates
 ## of all the alternative locations share the same host coordinate as the primary location
@@ -55,7 +55,7 @@ columns = {
 	'Type': {'chimeric', 'discordant', 'short'},
 	'HostMapQ': 'integer',
 	'ViralMapQ': 'integer',
-	'AmbigLoc': {'None', 'uniqueHost', 'uniqueVirus'}
+	'AltLocs': {'None', 'uniqueHost', 'uniqueVirus'}
 }
 
 def main(args):
@@ -217,9 +217,9 @@ class Criteria():
 		for i in range(len(self.criteria_list)):
 			# if we are filtering for ambiguous location uniqueHost or uniqueVirus,
 			# set self.unique_host or self.unique_virus, respectively
-			if self.criteria_list[i] == 'AmbigLoc':
+			if self.criteria_list[i] == 'AltLocs':
 				if self.criteria_list[i+2] == 'None':
-					self.criteria[i+2] = ''
+					self.criteria[i+2] = ""			
 				
 				# take note if we want to check for unique location in host or vector
 				elif self.criteria_list[i+2] == 'uniqueVirus':
@@ -231,11 +231,12 @@ class Criteria():
 			# need to replace row names with row['row_name']
 			if self.criteria[i] in self.column_spec.keys():
 				self.criteria[i] = f"{self.row_var_name}['{self.criteria_list[i]}']"
+				
 			
 			# need to quote values that are strings
 			if self.criteria_list[i] in self.comparators:
 				col = self.criteria_list[i-1]
-				val = self.criteria_list[i+1]
+				val = self.criteria[i+1]
 				if self.column_spec[col] != 'integer':
 					self.criteria[i+1] = f"'{val}'"
 					
@@ -551,7 +552,7 @@ class Criteria():
 	def _update_criteria_for_row(self, row):
 		"""
 		If we're checking for a unique location in host or virus, we need to replace
-		["row['AmbigLoc']", '==', 'uniqueVirus'] or "[row['AmbigLoc']", '==', 'uniqueHost']
+		["row['AltLocs]", '==', 'uniqueVirus'] or "[row['AltLocs']", '==', 'uniqueHost']
 		with an appropriate expression that checks if this is the case for this particular
 		row
 		"""
@@ -569,7 +570,7 @@ class Criteria():
 			
 			host_cond = "(" + empty + host_cond + ")"
 			
-			# replace "[row['AmbigLoc']", '==', 'uniqueHost']" with this criteria for the row
+			# replace "[row['AltLocs']", '==', 'uniqueHost']" with this criteria for the row
 			i = 0
 			while i < len(criteria):
 				if criteria[i] == "'uniqueHost'":
@@ -586,7 +587,7 @@ class Criteria():
 	
 			virus_cond = "(" + empty + virus_cond + ")"
 	
-			# replace "[row['AmbigLoc']", '==', 'uniqueVirus']" with this criteria for the row
+			# replace "[row['AltLocs']", '==', 'uniqueVirus']" with this criteria for the row
 			i = 0
 			while i < len(criteria):
 				if criteria[i] == "'uniqueVirus'":
@@ -595,8 +596,7 @@ class Criteria():
 				i += 1	
 				
 		return " ".join(criteria)
-		
-		
+			
 	def __valid_value(self, column_name, value):
 		"""
 		check if a value is valid for a particular column
@@ -624,7 +624,6 @@ class Criteria():
 			return False
 			
 		return True
-	
 		
 	def __repr__(self):
 		return "Criteria: " + " ".join(self.criteria_list)
