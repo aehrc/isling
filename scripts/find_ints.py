@@ -6,6 +6,7 @@ import csv
 import re
 import array
 import itertools
+import copy
 import pdb
 
 # note python 3.7+ is required
@@ -24,7 +25,7 @@ def main():
 	parser.add_argument('--virus', help="virus alignment bam (query-sorted)", required=True)
 	parser.add_argument('--integrations', help='file to output integrations to', default='integrations.tsv')
 	parser.add_argument('--map-thresh', help="threshold for length of mapped region", default=20, type=int)
-	parser.add_argument('--mean-template-length', help="mean template length for library", default=0, type=int)
+	parser.add_argument('--mean-template-length', help="mean template length for library", default=0, type=float)
 	parser.add_argument('--tolerance', help="tolerance for short CIGAR operations (MIS ops with a combined length equal to or shorter than this will be combined into the nearest mapped region)", type=int, default=3)
 	parser.add_argument('--verbose', '-v', help="print extra messages?", action='store_true')
 	args = parser.parse_args()
@@ -56,10 +57,10 @@ class AlignmentFilePair:
 		self.default_header = default_header
 		
 		if self.tlen == 0:
-			print(f"warning: template length is zero - the position for discordant integraiton sites will be at the end of the mapped read")
+			print(f"warning: insert size is zero - the position for discordant integraiton sites will be at the end of the mapped read")
 		
 		if self.tlen < 0:
-			raise ValueError("Template length must be a positive integer")
+			raise ValueError("Mean template length must be a positive integer")
 		
 		if self.tol < 0:
 			raise ValueError("Tolerance must be a positive integer")
@@ -102,23 +103,24 @@ class AlignmentFilePair:
 				# or are a full integration
 				self._is_full(host_r1_primary, virus_r1_primary,
 									host_r1_not_primary, virus_r1_not_primary)
-														
+
+																				
 			# collect read2 alignments
 			host_r2_primary = self.curr_host.get_primary_r2()
 			host_r2_not_primary = self.curr_host.get_not_primary().get_read2()
 			
 			virus_r2_primary = self.curr_virus.get_primary_r2()
 			virus_r2_not_primary = self.curr_virus.get_not_primary().get_read2()			
+
 			
 			# check if primary read 1 alignments appear to be chimeric	
 			if host_r2_primary is not None and virus_r2_primary is not None:
 				self._is_chimeric(host_r2_primary, virus_r2_primary,
 									host_r2_not_primary, virus_r2_not_primary)
 		
-
-			if host_r2_primary is not None and virus_r2_primary is not None:
 				self._is_full(host_r2_primary, virus_r2_primary,
 												host_r2_not_primary, virus_r2_not_primary)
+
 										
 			# if there are alignments that are neither read 1 nor read 2, check if chimeric
 			host_not12_primary = self.curr_host.get_primary_not_r1_or_r2()
@@ -134,6 +136,7 @@ class AlignmentFilePair:
 				self._is_full(host_not12_primary, virus_not12_primary,
 									host_not12_not_primary, virus_not12_not_primary)
 					
+			
 			# check for a discordant pair
 			if all([i is not None for i in [host_r1_primary, host_r2_primary, 
 											virus_r1_primary, virus_r2_primary]]):
@@ -142,8 +145,8 @@ class AlignmentFilePair:
 										virus_r1_primary, virus_r2_primary,
 										host_r1_not_primary, host_r2_not_primary,
 										virus_r1_not_primary, virus_r2_not_primary)
-
-		
+						
+								
 		print(f"found {len(self.ints)} integrations")
 		
 	def write_integrations(self, filename, header = None):
@@ -236,6 +239,7 @@ class AlignmentFilePair:
 		# collect alignments from file
 		self.curr_host = self.host.collect_next_read_alignments()
 		self.curr_virus = self.virus.collect_next_read_alignments()
+		
 
 		# continue until we've either found the same read or reached the end of one of the files
 		while True:
@@ -245,6 +249,7 @@ class AlignmentFilePair:
 		
 			# check if the query names are the same for host and viral alignments
 			if self.curr_host[0].qname == self.curr_virus[0].qname:
+				
 				yield
 				self.curr_host = self.host.collect_next_read_alignments()
 				self.curr_virus = self.virus.collect_next_read_alignments()
@@ -319,6 +324,28 @@ class AlignmentFile:
 			self._get_next_align()
 			if self.end:
 				break
+				
+		# check for reads that don't have a read sequence
+		for read in alns:
+			# if reads don't have a query sequence
+			if read.query_length == 0:
+				# try to get read sequence from another read
+				for read2 in alns:
+					if read == read2:
+						continue
+					
+					if not (read.is_read1 == read2.is_read1 and read.is_read2 == read2.is_read2):
+						continue
+					if read2.query_length == 0:
+						continue
+					if read.is_reverse == read2.is_reverse: 
+						read.query_sequence = str(read2.query_sequence)
+						read.query_qualities = read2.query_qualities
+					else:
+						seq = _reverse_complement(str(read2.query_sequence))
+						read.query_sequence = seq
+						read.query_qualities = read2.query_qualities	
+					break					
 				
 		return alns
 
@@ -406,8 +433,9 @@ class AlignmentPool(list):
 	
 	def get_not_primary(self):
 		""" Return an AlignmentPool with only the non-primary alignment(s) from an AlignmentPool """
+
 		return AlignmentPool([read for read in self if read.is_supplementary or read.is_secondary])		
-		
+			
 	def get_read1(self):
 		""" Return an AlignmentPool with only read 1 alignment(s) from an AlignmentPool"""
 		return AlignmentPool([read for read in self if read.is_read1])
@@ -453,7 +481,7 @@ class AlignmentPool(list):
 		else:
 			raise ValueError(f"found more than one primary alignment for {self[0].qname} (not read 1 or read 2)")	
 			
-	def get_rearrangement_nm(self):
+	def get_rearrangement_nm(self, header):
 		""" 
 		For an AlignmentPool consisting of different alignments of the same read, get an 
 		edit distance for the case that those alignments cover the whole read
@@ -482,7 +510,9 @@ class AlignmentPool(list):
 		
 		query_length = self[0].query_length
 		
-		alns = AlignmentPool(self)
+		alns = AlignmentPool()
+		for aln in self:
+			alns.append(self._copy_alignment(aln, header))
 		alns._split_mapped()
 		alns._remove_query_nested()
 		
@@ -595,6 +625,26 @@ class AlignmentPool(list):
 		assert len(to_remove) == len(set(to_remove))
 		for i in reversed(sorted(to_remove)):
 			self.pop(i)		
+			
+	def _copy_alignment(self, read, header):
+		"""
+		Copy the attributes of a pysam.AlignedSegment into a new one
+		"""
+		a = pysam.AlignedSegment(header)
+		a.query_name = str(read.query_name)
+		a.query_sequence = str(read.query_sequence)
+		a.flag = int(read.flag)
+		a.reference_id = int(read.reference_id)
+		a.reference_start = int(read.reference_start)
+		a.mapping_quality = int(read.mapping_quality)
+		a.cigartuples = list(read.cigartuples)
+		a.next_reference_id = int(read.next_reference_id)
+		a.template_length = int(read.template_length)
+		a.query_qualities = read.query_qualities
+		for tag in read.get_tags():
+			a.set_tag(tag[0], tag[1])
+			
+		return a	
 			
 	def _remove_query_nested(self):
 		""" 
@@ -713,7 +763,8 @@ class AlignmentPool(list):
 	def _create_new_segment_from_primary(self, primary, header, rname, pos, ori, cigar,
 											nm, mapq=None):
 		""" 
-		Create a new pysam.AlignedSegment from an existing (primary) pysam.AlignnedSegment
+		Create a new pysam.AlignedSegment from an existing (primary) pysam.AlignnedSegment,
+		but modify one or more of its properties
 		"""
 		
 		a = pysam.AlignedSegment(header=header)
@@ -728,7 +779,7 @@ class AlignmentPool(list):
 			a.query_sequence = primary.query_sequence
 			a.query_qualities = primary.query_qualities
 		else:
-			a.query_sequence = self._reverse_complement(primary.query_sequence)
+			a.query_sequence = _reverse_complement(primary.query_sequence)
 			quals = array.array('B', primary.query_qualities)
 			quals.reverse()
 			a.query_qualities = quals
@@ -765,12 +816,6 @@ class AlignmentPool(list):
 			a.tags = []
 
 		return a	
-		
-	def _reverse_complement(self, seq):
-		""" Return reverse complement """
-		nn = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N':'N' ,
-			  'a':'t', 'c':'g', 'g':'c', 't':'a', 'n':'n'}
-		return ''.join(reversed([nn[i] for i in seq]))	
 		
 	def _reverse_cigar(self, read):
 		"""
@@ -922,7 +967,7 @@ class ChimericIntegration:
 		if not self.hread.is_reverse:
 			return self.hread.query_sequence[ambig[0]:ambig[1]]
 		else:
-			return self._reverse_complement(self.hread.query_sequence[ambig[0]:ambig[1]])
+			return _reverse_complement(self.hread.query_sequence[ambig[0]:ambig[1]])
 
 	def gap_or_overlap(self):
 		""" Return 'gap' if there is a gap between host and viral alignments, 'overlap'
@@ -975,7 +1020,7 @@ class ChimericIntegration:
 		"""
 		
 		if self.hread.is_reverse:
-			return self._reverse_complement(self.hread.query_alignment_sequence)
+			return _reverse_complement(self.hread.query_alignment_sequence)
 		else:
 			return self.hread.query_alignment_sequence		
 
@@ -1087,7 +1132,7 @@ class ChimericIntegration:
 		if not self.hread.is_reverse:
 			return self.hread.query_sequence
 		else:
-			return self._reverse_complement(self.hread.query_sequence)
+			return _reverse_complement(self.hread.query_sequence)
 	
 	def get_total_edit_dist(self):
 		""" 
@@ -1148,7 +1193,7 @@ class ChimericIntegration:
 		"""
 		
 		if self.vread.is_reverse:
-			return self._reverse_complement(self.vread.query_alignment_sequence)
+			return _reverse_complement(self.vread.query_alignment_sequence)
 		else:
 			return self.vread.query_alignment_sequence		
 		
@@ -1212,7 +1257,7 @@ class ChimericIntegration:
 		chimera
 		"""
 
-		return self._is_possible_rearrangement(self.hread, self.hsec)
+		return self._is_possible_rearrangement(self.hread, self.hsec, self.hhead)
 	
 	def is_possible_virus_rearrangement(self):
 		""" 
@@ -1221,7 +1266,7 @@ class ChimericIntegration:
 		chimera
 		"""
 
-		return self._is_possible_rearrangement(self.vread, self.vsec)
+		return self._is_possible_rearrangement(self.vread, self.vsec, self.vhead)
 		
 	def is_viral_ambig_loc(self):
 		"""
@@ -1687,7 +1732,7 @@ class ChimericIntegration:
 				except AssertionError:
 					pass
 
-		alt_ints = self._swap_self_with_primary(self, alt_ints)
+		alt_ints = self._swap_self_with_primary(alt_ints, host_alns, virus_alns)
 
 		return alt_ints
 
@@ -1804,7 +1849,7 @@ class ChimericIntegration:
 		# if we didn't find any equivalent alignments, location not ambiguous
 		return False
 		
-	def _is_possible_rearrangement(self, primary, sec):
+	def _is_possible_rearrangement(self, primary, sec, header):
 		""" 
 		Given a primary alignment and an AlignmentPool of secondary alignments, compare 
 		edit distances for the case that the read is an integration, and the case that the
@@ -1817,12 +1862,11 @@ class ChimericIntegration:
 		if len(sec) == 0:
 			return False
 			
-		# make alignment pool with secondary and primary alignments - this will be modified
-		# during get_arrangement_nm() so we need to make a copy
+		# make alignment pool with secondary and primary alignments
 		all = AlignmentPool(sec)
 		all.append(primary)
 		
-		rearrange_nm, all = all.get_rearrangement_nm()
+		rearrange_nm, all = all.get_rearrangement_nm(header)
 		
 		# if there's only one alignment in pool after removing nested alignments,
 		# can't be rearrangement
@@ -1986,13 +2030,7 @@ class ChimericIntegration:
 		a.query_qualities = read.query_qualities
 		a.tags = read.tags
 		
-		return a
-		
-	def _reverse_complement(self, seq):
-		""" Return reverse complement """
-		nn = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N':'N' , 'X':'X',
-			  'a':'t', 'c':'g', 'g':'c', 't':'a', 'n':'n'}
-		return ''.join(reversed([nn[i] for i in seq]))		
+		return a	
 		
 	def _split_md_tag(self, md):
 		"""
@@ -2084,7 +2122,7 @@ class ChimericIntegration:
 				
 		return self._edit_alignment(read, header, tmp_cigartuples, 0, 0, '', '')	
 		
-	def _swap_self_with_primary(self, alt_ints):
+	def _swap_self_with_primary(self, alt_ints, host_alns, virus_alns):
 		"""
 		Check each alternate integration to see if it has an edit distance lower than 
 		the primary edit distance.  If it does, the one with the lower edit distance
@@ -2342,7 +2380,7 @@ class DiscordantIntegration(ChimericIntegration):
 			nm += self._check_overlap_in_unmapped(self.vread2, self.hread2)
 		else:
 			nm += self._check_overlap_in_unmapped(self.vread1, self.hread1)
-			nm += self._check_overlap_in_unmapped(self.hread2, self.vread2)			
+			nm += self._check_overlap_in_unmapped(self.hread2, self.vread2)
 		
 		return nm
 	
@@ -2429,7 +2467,7 @@ class DiscordantIntegration(ChimericIntegration):
 		# bases in the mapped read are unexplained
 		if len(map_unmap) == 0:
 			total_mapped = mapped.query_alignment_end - mapped.query_alignment_start
-			return mapped.query_length - total_mapped
+			return mapped.infer_query_length() - total_mapped
 				
 		# check if the mapped part of the unmapped read is in the 'correct' part - i.e.
 		# closest part of read to integration junction / other read
@@ -2482,7 +2520,7 @@ class DiscordantIntegration(ChimericIntegration):
 			
 			# get number of unmapped bases in mapped read
 			total_mapped = mapped.query_alignment_end - mapped.query_alignment_start
-			nm += mapped.query_length - total_mapped
+			nm += mapped.infer_query_length() - total_mapped
 			
 			return nm
 			
@@ -2552,7 +2590,7 @@ class DiscordantIntegration(ChimericIntegration):
 					
 		return True		
 		
-	def _is_possible_rearrangement(self, primary, sec):
+	def _is_possible_rearrangement(self, primary, sec, header):
 		""" 
 		For a DiscordantIntegration, rearrangements are unlikely since they would require 
 		both reads to be mapped to the same reference, but a DiscordantIntegration is one
@@ -2587,7 +2625,7 @@ class DiscordantIntegration(ChimericIntegration):
 		the secondary and supplementary alignments for the mapped read for each reference 
 		
 		Return a list of DiscordantIntegration objects with alternative integrations
-		"""
+		"""	
 
 		alt_ints = []
 		
@@ -2643,7 +2681,7 @@ class DiscordantIntegration(ChimericIntegration):
 				except AssertionError:
 					pass
 
-		alt_ints = self._swap_self_with_primary(self, alt_ints)
+		alt_ints = self._swap_self_with_primary(alt_ints, haln, valn)
 			
 		return alt_ints
 		
@@ -2688,6 +2726,50 @@ class DiscordantIntegration(ChimericIntegration):
 		
 		return sum([op[1] for op in cigar[first_mapped:] if op[0] in (1, 4)])		
 
+	def _swap_self_with_primary(self, alt_ints, host_alns, virus_alns):
+		"""
+		Check each alternate integration to see if it has an edit distance lower than 
+		the primary edit distance.  If it does, the one with the lower edit distance
+		becomes the primary and the other becomes an alternate
+		"""
+		# if this integration is a primary one, but we found an alternative integration with
+		# a lower edit distance, then the alternate one becomes primary
+		primary_nm = self.get_total_edit_dist()
+		if self.primary:
+			
+			hread1_map = (self.hread1 == self.hread)		
+			for i in range(len(alt_ints)):
+				
+				alt_nm = alt_ints[i].get_total_edit_dist()
+			
+				if alt_nm < primary_nm:
+			
+					print('found better integration than primary one: swapping')
+				
+					# add secondary alignments to alt_int (not added during instatiation)
+					pdb.set_trace()
+					host_alns.append(self.hread)
+					host_alns.remove(alt_ints[i].hread)
+				
+					virus_alns.append(self.vread)
+					virus_alns.remove(alt_ints[i].vread)
+				
+					if hread1_map:
+						alt_ints[i].hsec1 = host_alns
+						alt_ints[i].vsec2 = virus_alns
+					else:
+						alt_ints[i].hsec2 = host_alns
+						alt_ints[i].vsec1 = virus_alns					
+				
+					# swap self with alt_int
+					tmp = self
+					self = alt_ints[i]
+					self.primary = True
+					alt_ints[i] = tmp
+					alt_ints[i].primary = False	
+		
+		return alt_ints
+
 class FullIntegration(ChimericIntegration):
 	"""
 	A 'full integration' is a read that looks like it contains both junctions (left and 
@@ -2701,8 +2783,8 @@ class FullIntegration(ChimericIntegration):
 		self.tol = tol
 		
 		self.hhead = host_header
-		
 		self.vhead = virus_header
+		
 		self.primary = primary	
 				
 		assert tol >= 0
@@ -2714,6 +2796,16 @@ class FullIntegration(ChimericIntegration):
 		
 		self.hsec = host_sec
 		self.vsec = virus_sec
+		
+
+		for read in self.hsec:
+			if read.query_length == 0:
+				print(read)
+				pdb.set_trace()
+		for read in self.vsec:
+			if read.query_length == 0:
+				print(read)
+				pdb.set_trace()
 		
 		self.chr = host.reference_name
 		self.virus = virus.reference_name	
@@ -2949,7 +3041,7 @@ class FullIntegration(ChimericIntegration):
 				except AssertionError:
 					pass	
 
-		alt_ints = self._swap_self_with_primary(self, alt_ints)
+		alt_ints = self._swap_self_with_primary(alt_ints, host_alns, virus_alns)
 
 		return alt_ints
 	
@@ -3061,6 +3153,12 @@ class FullIntegration(ChimericIntegration):
 		props = ["\t".join([str(prop[i]) for i in default_header]) for prop in props]
 		
 		return "\n".join(props)
+
+def _reverse_complement(seq):
+	""" Return reverse complement """
+	nn = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N':'N' , 'X':'X',
+			'a':'t', 'c':'g', 'g':'c', 't':'a', 'n':'n'}
+	return ''.join(reversed([nn[i] for i in seq]))	
 		
 if __name__ == "__main__":
 	main()
