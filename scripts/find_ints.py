@@ -589,18 +589,16 @@ class AlignmentPool(list):
 				# check if we've already decided if either of these alignments are
 				# redundant with another alignment
 				if i in redundant:
-					pdb.set_trace() # - haven't double-checked this because it didn't come up in test data
 					i_found = [ind for ind in range(len(same)) if i in same[ind]]
 					assert len(i_found) == 1
 					ind = i_found[0]
 					if j not in same[ind]:
-						same[ind] = [*same[ind], j]
+						same[ind].append(j)
 				elif j in redundant:
-					pdb.set_trace()
 					j_found = [ind for ind in range(len(same)) if i in same[ind]]
 					assert len(j_found) == 1
 					if i not in same[ind]:
-						same[ind] = [*same[ind], i]				
+						same[ind].append(i)			
 				else:
 					same.append([i, j])
 				
@@ -623,7 +621,6 @@ class AlignmentPool(list):
 						to_remove.append(to_add)
 						removed=True
 						break
-					
 				
 				# if no hard clips, just remove the last integration
 				if not removed:
