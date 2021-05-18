@@ -30,21 +30,21 @@ def main():
 	parser.add_argument('--verbose', '-v', help="print extra messages?", action='store_true')
 	args = parser.parse_args()
 
-	with AlignmentFilePair(args.host, args.virus, args.map_thresh, args.mean_template_length,
+	with AlignmentFilePair(args.host, args.virus, args.integrations, args.map_thresh, args.mean_template_length,
 							args.tolerance, args.verbose) as pair:		
 		
 		pair.find_integrations()
-		pair.write_integrations(args.integrations)
 
 		
 class AlignmentFilePair:
 	""" A class to hold host and viral alignments, and look for integrations """
 	
-	def __init__(self, host, virus, map_thresh, tlen, tol = 3, verbose = False):
+	def __init__(self, host, virus, outfile, map_thresh, tlen, tol = 3, verbose = False):
 		""" Open host and viral alignments, and check for query sorting """
 		
 		self.host = AlignmentFile(host, verbose)
 		self.virus = AlignmentFile(virus, verbose)	
+		
 		
 		self.href_lens = self.host.get_reference_lengths()
 		self.vref_lens = self.virus.get_reference_lengths()
@@ -54,7 +54,11 @@ class AlignmentFilePair:
 		self.tol = tol
 		self.ints = []
 		
-		self.default_header = default_header
+		# open outfile and write a header
+		self.outfile = outfile
+		self.out = open(outfile, 'w')
+		self.header = default_header
+		self.out.write("\t".join(self.header) + "\n")
 		
 		if self.tlen == 0:
 			print(f"warning: insert size is zero - the position for discordant intergration sites will be at the end of the mapped read")
@@ -74,6 +78,7 @@ class AlignmentFilePair:
 		
 		counter = 0
 		progress = 100000
+		ints = 0
 		
 		# iterate over reads that have alignments to both host and virus
 		for alns in self._get_aligns():
@@ -97,12 +102,14 @@ class AlignmentFilePair:
 
 			# check if primary read 1 alignments appear to be chimeric	
 			if host_r1_primary is not None and virus_r1_primary is not None:
-				self._is_chimeric(host_r1_primary, virus_r1_primary,
-									host_r1_not_primary, virus_r1_not_primary)
+				if self._is_chimeric(host_r1_primary, virus_r1_primary,
+									host_r1_not_primary, virus_r1_not_primary):
+					ints += 1
 												
 				# or are a full integration
-				self._is_full(host_r1_primary, virus_r1_primary,
-									host_r1_not_primary, virus_r1_not_primary)
+				if self._is_full(host_r1_primary, virus_r1_primary,
+									host_r1_not_primary, virus_r1_not_primary):
+					ints += 1
 
 																				
 			# collect read2 alignments
@@ -115,11 +122,13 @@ class AlignmentFilePair:
 			
 			# check if primary read 1 alignments appear to be chimeric	
 			if host_r2_primary is not None and virus_r2_primary is not None:
-				self._is_chimeric(host_r2_primary, virus_r2_primary,
-									host_r2_not_primary, virus_r2_not_primary)
+				if self._is_chimeric(host_r2_primary, virus_r2_primary,
+									host_r2_not_primary, virus_r2_not_primary):
+					ints += 1
 		
-				self._is_full(host_r2_primary, virus_r2_primary,
-												host_r2_not_primary, virus_r2_not_primary)
+				if self._is_full(host_r2_primary, virus_r2_primary,
+												host_r2_not_primary, virus_r2_not_primary):
+					ints += 1
 
 										
 			# if there are alignments that are neither read 1 nor read 2, check if chimeric
@@ -130,42 +139,35 @@ class AlignmentFilePair:
 			virus_not12_not_primary = self.curr_virus.get_not_primary().get_not_read1_or_read2()
 			
 			if host_not12_primary is not None and virus_not12_primary is not None:
-				self._is_chimeric(host_not12_primary, virus_not12_primary,
-									host_not12_not_primary, virus_not12_not_primary)
+				if self._is_chimeric(host_not12_primary, virus_not12_primary,
+									host_not12_not_primary, virus_not12_not_primary):
+					ints += 1
 					
-				self._is_full(host_not12_primary, virus_not12_primary,
-									host_not12_not_primary, virus_not12_not_primary)
+				if self._is_full(host_not12_primary, virus_not12_primary,
+									host_not12_not_primary, virus_not12_not_primary):
+					ints += 1
 					
 			
 			# check for a discordant pair
 			if all([i is not None for i in [host_r1_primary, host_r2_primary, 
 											virus_r1_primary, virus_r2_primary]]):
 				# check if integration
-				self._is_discordant(host_r1_primary, host_r2_primary, 
+				if self._is_discordant(host_r1_primary, host_r2_primary, 
 										virus_r1_primary, virus_r2_primary,
 										host_r1_not_primary, host_r2_not_primary,
-										virus_r1_not_primary, virus_r2_not_primary)
+										virus_r1_not_primary, virus_r2_not_primary):
+					ints += 1
 						
 								
-		print(f"found {len(self.ints)} integrations")
-		
-	def write_integrations(self, filename, header = None):
-		""" Write integrations to file """
-		
-		if header is None:
-			header = self.default_header
+		print(f"found {ints} integrations")
+		print(f"saved output to {self.outfile}")				
 	
-		if not hasattr(self, 'ints'):
-			print("No file written: integrations have not been detected yet!")
-			return
-			
-		with open(filename, 'w') as filehandle:
-			filehandle.write("\t".join(header) + "\n")
-			for integration in self.ints:
-				filehandle.write(str(integration) + "\n")
-			
-			
-		print(f"saved output to {filename}")				
+	def _write_integration(self, int):
+		"""
+		Write an integration to file
+		"""
+				
+		self.out.write(str(int) + "\n") 
 				
 	def _is_chimeric(self, hread, vread, hsec, vsec):	
 		""" 
@@ -185,9 +187,11 @@ class AlignmentFilePair:
 										self.tol, self.map_thresh)	
 
 		except AssertionError:
-			return
+			return False
 			
-		self.ints.append(integration)
+		self._write_integration(integration)
+		
+		return True
 			
 	def _is_discordant(self, hread1, hread2, vread1, vread2, 
 						host_sec1, host_sec2, virus_sec1, virus_sec2,):
@@ -205,9 +209,11 @@ class AlignmentFilePair:
 										)
 
 		except AssertionError:
-			return
+			return False
 			
-		self.ints.append(integration)
+		self._write_integration(integration)
+		
+		return True
 			
 	def _is_full(self, hread, vread, hsec, vsec):
 		""" 
@@ -228,9 +234,11 @@ class AlignmentFilePair:
 									self.tol, self.map_thresh)
 
 		except AssertionError:
-			return
+			return False
 			
-		self.ints.append(integration)s
+		self._write_integration(integration)
+		
+		return True
 
 	def _get_aligns(self):
 		""" A generator to get alignments for the same read from both host and virus"""
@@ -270,6 +278,7 @@ class AlignmentFilePair:
 
 		self.host.close()
 		self.virus.close()	
+		self.out.close()
 		
 	def __enter__(self):
 		return self
