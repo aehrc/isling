@@ -57,7 +57,7 @@ class AlignmentFilePair:
 		self.default_header = default_header
 		
 		if self.tlen == 0:
-			print(f"warning: insert size is zero - the position for discordant integraiton sites will be at the end of the mapped read")
+			print(f"warning: insert size is zero - the position for discordant intergration sites will be at the end of the mapped read")
 		
 		if self.tlen < 0:
 			raise ValueError("Mean template length must be a positive integer")
@@ -188,8 +188,6 @@ class AlignmentFilePair:
 			return
 			
 		self.ints.append(integration)
-		integration.get_properties()
-
 			
 	def _is_discordant(self, hread1, hread2, vread1, vread2, 
 						host_sec1, host_sec2, virus_sec1, virus_sec2,):
@@ -210,7 +208,6 @@ class AlignmentFilePair:
 			return
 			
 		self.ints.append(integration)
-		integration.get_properties()
 			
 	def _is_full(self, hread, vread, hsec, vsec):
 		""" 
@@ -233,8 +230,7 @@ class AlignmentFilePair:
 		except AssertionError:
 			return
 			
-		self.ints.append(integration)
-		integration.get_properties()
+		self.ints.append(integration)s
 
 	def _get_aligns(self):
 		""" A generator to get alignments for the same read from both host and virus"""
@@ -584,14 +580,14 @@ class AlignmentPool(list):
 				# check if we've already decided if either of these alignments are
 				# redundant with another alignment
 				if i in redundant:
-					#pdb.set_trace() - haven't double-checked this because it didn't come up in test data
+					pdb.set_trace() # - haven't double-checked this because it didn't come up in test data
 					i_found = [ind for ind in range(len(same)) if i in same[ind]]
 					assert len(i_found) == 1
 					ind = i_found[0]
 					if j not in same[ind]:
 						same[ind] = [*same[ind], j]
 				elif j in redundant:
-					#pdb.set_trace()
+					pdb.set_trace()
 					j_found = [ind for ind in range(len(same)) if i in same[ind]]
 					assert len(j_found) == 1
 					if i not in same[ind]:
@@ -610,6 +606,7 @@ class AlignmentPool(list):
 			# on each loop, add one alignment to to_remove until there is only one left
 			while len(group) > 1:
 				removed = False
+				
 				# preferentially remove any alignments that have hard clips
 				for i in range(len(group)):
 					if i in hard_clips:
@@ -894,12 +891,14 @@ class AlignmentPool(list):
 			# get reference sequence - we can only do this for reads for which we have an MD tag
 			prev_mapped = sum([op[1] for op in read.cigartuples[:cigar_op_idx] if op[0] == 0])
 			try:
-				ref = read.get_reference_sequence()[prev_mapped:prev_mapped+mapped]
+				ref = read.get_reference_sequence()[prev_mapped:prev_mapped+mapped].upper()
 			except ValueError:
 				ref = None
+			except AssertionError:
+				pdb.set_trace()
 
 			# get length of previous mapped, inserted operations (that consume query)
-			query = read.query_alignment_sequence[num_before:num_before + mapped]
+			query = read.query_sequence[num_before:num_before + mapped].upper()
 
 			# compare query and reference
 			if ref is not None:
@@ -935,10 +934,10 @@ class ChimericIntegration:
 	A class to store/calculate the properties of a simple chimeric integration 
 	(ie mapped/clipped and clipped/mapped) 
 	"""
-	__slots__ = 'map_thresh', 'tol', 'primary', 'hread', 'vread', 'hsec', 'hhead', 'vsec', 'vhead', 'chr', 'virus'
+	__slots__ = 'map_thresh', 'tol', 'primary', 'hread', 'vread', 'hsec', 'hhead', 'vsec', 'vhead', 'chr', 'virus', 'verbose'
 	
 	def __init__(self, host, virus, host_header, virus_header, 
-					host_sec, virus_sec,  tol, map_thresh=20, primary=True):
+					host_sec, virus_sec,  tol, map_thresh=20, primary=True, verbose=False):
 		""" 
 		Given a host and virus read that are chimeric, calculate the properties of the integration.
 		
@@ -949,6 +948,7 @@ class ChimericIntegration:
 		self.map_thresh = map_thresh
 		self.tol = tol
 		self.primary = primary
+		self.verbose = verbose
 		
 		assert self.tol >= 0
 		
@@ -1612,6 +1612,14 @@ class ChimericIntegration:
 		md = []
 		for i in tmp_cigartuples:
 			md += i[2]
+		# check if we now have two numbers next to each other in the MD string 
+		i = 1
+		while i < len(md):
+			if isinstance(md[i-1], int) and isinstance(md[i], int):
+				md[i] = md[i] + md[i-1]
+				md.pop(i-1)
+				continue
+			i += 1
 		md = ''.join([str(i) for i in md])
 		
 		# if we didn't have an MD tag in the first place, don't add one
@@ -1681,7 +1689,7 @@ class ChimericIntegration:
 		tags = read.get_tags()
 		updated_OA = False
 		orig_strand = '-' if read.is_reverse else '+'
-		OA_update = (read.query_name, str(read.reference_start), orig_strand, 
+		OA_update = (read.reference_name, str(read.reference_start), orig_strand, 
 						read.cigarstring, str(read.mapping_quality), 
 						str(read.get_tag('NM')))
 		OA_update = ",".join(OA_update) + ";"
@@ -1825,6 +1833,7 @@ class ChimericIntegration:
 		if len(sec) == 0:
 			return False
 			
+		# get edit distance for primary alignment
 		try:
 			primary_nm = read.get_tag('NM')
 		except KeyError:
@@ -1946,13 +1955,13 @@ class ChimericIntegration:
 		and self._simplify_CIGAR()
 		"""
 		
-		not_primary = self._process_SA_and_XA(primary, header)
+		not_primary += self._process_SA_and_XA(primary, header)
 		
 		# combine any short elements in secondary alignments
 		for i in range(len(not_primary)):
 			not_primary[i] = self._combine_short_CIGAR_elements(not_primary[i], header)
 		
-		if len(not_primary) < 2:
+		if len(not_primary) <= 1:
 			return not_primary
 			
 		# remove any redundant alignments from pool
@@ -2141,6 +2150,8 @@ class ChimericIntegration:
 		"""
 		# if this integration is a primary one, but we found an alternative integration with
 		# a lower edit distance, then the alternate one becomes primary
+		
+		
 		primary_nm = self.get_total_edit_dist()
 		if self.primary:
 		
@@ -2150,7 +2161,8 @@ class ChimericIntegration:
 			
 				if alt_nm < primary_nm:
 			
-					print('found better integration than primary one: swapping')
+					if self.verbose:
+						print('found better integration than primary one: swapping')
 				
 					# add secondary alignments to alt_int (not added during instatiation)
 					host_alns.append(self.hread)
@@ -2189,7 +2201,7 @@ class DiscordantIntegration(ChimericIntegration):
 	def __init__(self, host_r1, host_r2, virus_r1, virus_r2, tol,
 					host_header, virus_header, 
 					host_sec1, host_sec2, virus_sec1, virus_sec2,
-					map_thresh=20, tlen=0, primary=True):
+					map_thresh=20, tlen=0, primary=True, verbose=False):
 
 		self.map_thresh = map_thresh
 		self.tlen = tlen
@@ -2197,6 +2209,7 @@ class DiscordantIntegration(ChimericIntegration):
 		self.hhead = host_header
 		self.vhead = virus_header
 		self.primary = primary
+		self.verbose = verbose
 		
 		self.hread1 = self._combine_short_CIGAR_elements(host_r1, host_header)
 		self.hread2 = self._combine_short_CIGAR_elements(host_r2, host_header)
@@ -2566,18 +2579,23 @@ class DiscordantIntegration(ChimericIntegration):
 			return False
 		if h2_map != v1_map:
 			return False
+
+		self.hsec1 = self._process_non_primary_alignments(self.hread1, host_sec1, self.hhead)
+		self.hsec2 = self._process_non_primary_alignments(self.hread2, host_sec2, self.hhead)
+		self.vsec1 = self._process_non_primary_alignments(self.vread1, virus_sec1, self.vhead)
+		self.vsec2 = self._process_non_primary_alignments(self.vread2, virus_sec2, self.vhead)	
 			
 		# assign self.hread and self.vread to help with some methods inherited from ChimericIntegration
 		if h1_map:
 			self.hread = self.hread1
 			self.vread = self.vread2
-			self.hsec = self._process_non_primary_alignments(self.hread, host_sec1, self.hhead)
-			self.vsec = self._process_non_primary_alignments(self.vread, virus_sec2, self.vhead)
+			self.hsec = self.hsec1
+			self.vsec = self.vsec2
 		else:
 			self.hread = self.hread2
 			self.vread = self.vread1
-			self.hsec = self._process_non_primary_alignments(self.hread, host_sec2, self.hhead)
-			self.vsec = self._process_non_primary_alignments(self.vread, virus_sec1, self.vhead)
+			self.hsec = self.hsec2
+			self.vsec = self.vsec1
 
 		return True
 		
@@ -2642,12 +2660,14 @@ class DiscordantIntegration(ChimericIntegration):
 		
 		hread1_map = (self.hread1 == self.hread)
 		
+		haln = AlignmentPool(self.hsec)
+		valn = AlignmentPool(self.vsec)
+		
 		if hread1_map:
-			haln = AlignmentPool(self.hsec1)
+			
 			haln.append(self.hread1)
 			haln.remove_redundant_alignments()
 			
-			valn = AlignmentPool(self.vsec2)
 			valn.append(self.vread2)
 			valn.remove_redundant_alignments()
 			
@@ -2655,11 +2675,10 @@ class DiscordantIntegration(ChimericIntegration):
 			v1 = self.vread1
 		
 		else:
-			haln = AlignmentPool(self.hsec2)
+
 			haln.append(self.hread2)
 			haln.remove_redundant_alignments()
-		
-			valn = AlignmentPool(self.vsec1)
+
 			valn.append(self.vread1)
 			valn.remove_redundant_alignments()
 			
@@ -2669,28 +2688,40 @@ class DiscordantIntegration(ChimericIntegration):
 		if len(haln) == 1 and len(valn) == 1:
 			return alt_ints
 		
-		for host, virus in itertools.product(haln, valn):
+		for h_i, v_i in itertools.product(range(len(haln)), range(len(valn))):
 				
 				# don't do primary vs primary
-				if host == self.hread and virus == self.vread:
+				if haln[h_i] == self.hread and valn[v_i] == self.vread:
 					continue
 					
 				if hread1_map:
-					h1 = self._combine_short_CIGAR_elements(host, self.hhead)
-					v2 = self._combine_short_CIGAR_elements(virus, self.vhead)
+					h1 = self._combine_short_CIGAR_elements(haln[h_i], self.hhead)
+					v2 = self._combine_short_CIGAR_elements(valn[v_i], self.vhead)
 				else:
-					h2 = self._combine_short_CIGAR_elements(host, self.hhead)
-					v1 = self._combine_short_CIGAR_elements(virus, self.vhead)
+					h2 = self._combine_short_CIGAR_elements(haln[h_i], self.hhead)
+					v1 = self._combine_short_CIGAR_elements(valn[v_i], self.vhead)
 				
 				# if host and virus reads constitute a valid integration, add to list
 				try:
 					alt_int = DiscordantIntegration(h1, h2, v1, v2, self.tol, 
 					self.hhead, self.vhead, AlignmentPool(), AlignmentPool(),  
 					AlignmentPool(), AlignmentPool(), self.tol, self.map_thresh, False)
-					alt_ints.append(alt_int)
-					
+	
 				except AssertionError:
-					pass
+					alt_int = None
+			
+				if alt_int is not None:
+					# replace host and virus alignments in haln/valn with the edited version
+					haln.pop(h_i)
+					valn.pop(v_i)
+					if hread1_map:
+						haln.insert(h_i, h1)
+						valn.insert(v_i, v2)
+					else:
+						haln.insert(h_i, h2)
+						valn.insert(v_i, v1)						
+				
+					alt_ints.append(alt_int)				
 
 		alt_ints = self._swap_self_with_primary(alt_ints, haln, valn)
 			
@@ -2737,50 +2768,6 @@ class DiscordantIntegration(ChimericIntegration):
 		
 		return sum([op[1] for op in cigar[first_mapped:] if op[0] in (1, 4)])		
 
-	def _swap_self_with_primary(self, alt_ints, host_alns, virus_alns):
-		"""
-		Check each alternate integration to see if it has an edit distance lower than 
-		the primary edit distance.  If it does, the one with the lower edit distance
-		becomes the primary and the other becomes an alternate
-		"""
-		# if this integration is a primary one, but we found an alternative integration with
-		# a lower edit distance, then the alternate one becomes primary
-		primary_nm = self.get_total_edit_dist()
-		if self.primary:
-			
-			hread1_map = (self.hread1 == self.hread)		
-			for i in range(len(alt_ints)):
-				
-				alt_nm = alt_ints[i].get_total_edit_dist()
-			
-				if alt_nm < primary_nm:
-			
-					print('found better integration than primary one: swapping')
-				
-					# add secondary alignments to alt_int (not added during instatiation)
-					pdb.set_trace()
-					host_alns.append(self.hread)
-					host_alns.remove(alt_ints[i].hread)
-				
-					virus_alns.append(self.vread)
-					virus_alns.remove(alt_ints[i].vread)
-				
-					if hread1_map:
-						alt_ints[i].hsec1 = host_alns
-						alt_ints[i].vsec2 = virus_alns
-					else:
-						alt_ints[i].hsec2 = host_alns
-						alt_ints[i].vsec1 = virus_alns					
-				
-					# swap self with alt_int
-					tmp = self
-					self = alt_ints[i]
-					self.primary = True
-					alt_ints[i] = tmp
-					alt_ints[i].primary = False	
-		
-		return alt_ints
-
 class FullIntegration(ChimericIntegration):
 	"""
 	A 'full integration' is a read that looks like it contains both junctions (left and 
@@ -2788,7 +2775,7 @@ class FullIntegration(ChimericIntegration):
 	"""
 	__slots__ = 'left', 'right'
 	def __init__(self, host, virus, host_header, virus_header, 
-					host_sec, virus_sec, tol, map_thresh=20, primary=True):
+					host_sec, virus_sec, tol, map_thresh=20, primary=True, verbose=False):
 					
 		self.map_thresh = map_thresh		
 		self.tol = tol
@@ -2797,6 +2784,8 @@ class FullIntegration(ChimericIntegration):
 		self.vhead = virus_header
 		
 		self.primary = primary	
+		
+		self.verbose = verbose
 				
 		assert tol >= 0
 		
