@@ -152,7 +152,7 @@ rule separate_unique_locations:
 		both_ambig = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.both_ambig.txt",
 		tmp_both = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.both_ambig.txt.tmp")
 	params:
-		mapq = lambda wildcards: get_value_from_df(wildcards, 'mapq_thresh')
+		mapq = lambda wildcards: int(get_value_from_df(wildcards, 'mapq_thresh'))
 	container:
 		"docker://szsctt/simvi:1"
 	conda: "../envs/filter.yml"
