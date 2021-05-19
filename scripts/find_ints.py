@@ -50,7 +50,7 @@ class AlignmentFilePair:
 		self.vref_lens = self.virus.get_reference_lengths()
 		self.map_thresh = map_thresh
 		self.verbose = verbose
-		self.tlen = tlen
+		self.tlen = int(tlen) # tlen needs to be int so that output coords are ints
 		self.tol = tol
 		self.ints = []
 		
@@ -162,12 +162,11 @@ class AlignmentFilePair:
 		print(f"found {ints} integrations")
 		print(f"saved output to {self.outfile}")				
 	
-	def _write_integration(self, int):
+	def _write_integration(self, integration):
 		"""
 		Write an integration to file
 		"""
-				
-		self.out.write(str(int) + "\n") 
+		self.out.write(str(integration) + "\n") 
 				
 	def _is_chimeric(self, hread, vread, hsec, vsec):	
 		""" 
@@ -900,8 +899,6 @@ class AlignmentPool(list):
 				ref = read.get_reference_sequence()[prev_mapped:prev_mapped+mapped].upper()
 			except ValueError:
 				ref = None
-			except AssertionError:
-				pdb.set_trace()
 
 			# get length of previous mapped, inserted operations (that consume query)
 			query = read.query_sequence[num_before:num_before + mapped].upper()
@@ -1123,7 +1120,7 @@ class ChimericIntegration:
 			'PossibleVectorRearrangement': self.is_possible_virus_rearrangement(),
 			'HostAmbiguousLocation': self.is_host_ambig_loc(),
 			'ViralAmbiguousLocation': self.is_viral_ambig_loc(),
-			'AltLocs': ";".join([int.short_str() for int in alt_ints]),
+			'AltLocs': ";".join([integ.short_str() for integ in alt_ints]),
 			'Type': self.get_integration_type(),
 			'HostMapQ': self.get_host_mapq(),
 			'ViralMapQ': self.get_viral_mapq(),
@@ -2803,16 +2800,6 @@ class FullIntegration(ChimericIntegration):
 		self.hsec = host_sec
 		self.vsec = virus_sec
 		
-
-		for read in self.hsec:
-			if read.query_length == 0:
-				print(read)
-				pdb.set_trace()
-		for read in self.vsec:
-			if read.query_length == 0:
-				print(read)
-				pdb.set_trace()
-		
 		self.chr = host.reference_name
 		self.virus = virus.reference_name	
 		
@@ -2874,8 +2861,8 @@ class FullIntegration(ChimericIntegration):
 			prop['PossibleHostTranslocation'] = host_rearrange
 			
 		# assign alternative integrations for each junction
-		props[0]['AlternativeInts'] = ";".join([int.left.short_str() for int in alt_ints])
-		props[1]['AlternativeInts'] = ";".join([int.right.short_str() for int in alt_ints])			
+		props[0]['AlternativeInts'] = ";".join([alt_int.left.short_str() for alt_int in alt_ints])
+		props[1]['AlternativeInts'] = ";".join([alt_int.right.short_str() for alt_int in alt_ints])			
 		
 		return props
 		
@@ -2929,10 +2916,7 @@ class FullIntegration(ChimericIntegration):
 			mapped = prev_mapped + read.cigartuples[i][1]
 			
 			# get reference sequence
-			try:
-				ref = read.get_reference_sequence()[prev_mapped:mapped]
-			except ValueError:
-				pdb.set_trace()
+			ref = read.get_reference_sequence()[prev_mapped:mapped]
 
 			# get length of previous mapped, inserted operations (that consume query)
 			prev_query = sum([i[1] for i in read.cigartuples[:i] if i[0] in (0,1)])
