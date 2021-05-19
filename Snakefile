@@ -89,7 +89,7 @@ rule all:
 	input:
 		conditions,
 #		summary_files,
-		ucsc_files,
+#		ucsc_files,
 		merged_bed,
 #		expand("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bam",
 #			zip,
