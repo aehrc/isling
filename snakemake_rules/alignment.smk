@@ -127,6 +127,7 @@ rule combine_bwa_virus:
 	threads: cpus
 	shell:
 		"""
+		rm -f {output.combined}*tmp*bam
 		samtools merge - {input.single} {input.paired} |\
 		samtools sort -n -o {output.combined} -
 		"""
@@ -284,6 +285,7 @@ rule combine_host:
 		nodes = 1
 	shell:		
 		"""
+		rm -f {output.combined}*tmp*bam
 		samtools merge - {input.single} {input.paired} |\
 		samtools sort -n -o {output.combined} -
 		"""
