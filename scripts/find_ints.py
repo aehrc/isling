@@ -640,20 +640,22 @@ class AlignmentPool(list):
 		"""
 		Copy the attributes of a pysam.AlignedSegment into a new one
 		"""
-		a = pysam.AlignedSegment(header)
-		a.query_name = str(read.query_name)
-		a.query_sequence = str(read.query_sequence)
-		a.flag = int(read.flag)
-		a.reference_id = int(read.reference_id)
-		a.reference_start = int(read.reference_start)
-		a.mapping_quality = int(read.mapping_quality)
+
+		a = pysam.AlignedSegment(header.to_dict())
+		a.query_name = read.query_name
+		a.query_sequence = read.query_sequence
+		a.flag = read.flag
+		a.reference_id = read.reference_id
+		a.reference_start = read.reference_start
+		a.mapping_quality = read.mapping_quality
 		a.cigartuples = list(read.cigartuples)
-		a.next_reference_id = int(read.next_reference_id)
-		a.template_length = int(read.template_length)
-		a.query_qualities = copy.copy(read.query_qualities)
+		a.next_reference_id = read.next_reference_id
+		a.template_length = read.template_length
+		a.query_qualities = read.query_qualities
 		for tag in read.get_tags():
 			a.set_tag(tag[0], tag[1])
-			
+		
+		pdb.set_trace()
 		return a	
 			
 	def _remove_query_nested(self):
@@ -777,7 +779,7 @@ class AlignmentPool(list):
 		but modify one or more of its properties
 		"""
 		
-		a = pysam.AlignedSegment(header=header)
+		a = pysam.AlignedSegment(header=header.to_dict())
 		a.query_name = primary.query_name
 		if mapq is not None:
 			a.mapping_quality = mapq
@@ -1683,7 +1685,7 @@ class ChimericIntegration:
 		
 	def _edit_alignment(self, read, header, cigartuples, pos_offset, nm_offset, co, md):
 		""" Edit an alignment by modifying the cigartuples of an existing read """
-		a = pysam.AlignedSegment(header=header)
+		a = pysam.AlignedSegment(header=header.to_dict())
 		a.query_name = read.query_name
 		a.query_sequence = read.query_sequence
 		a.flag = read.flag
@@ -2046,7 +2048,7 @@ class ChimericIntegration:
 		oa = oa[:-1].split(';')[-1]
 		oa = oa.split(',')
 			
-		a = pysam.AlignedSegment(header)
+		a = pysam.AlignedSegment(header.to_dict())
 		a.query_name = str(read.query_name)
 		a.query_sequence = str(read.query_sequence)
 		a.flag = int(read.flag)
@@ -3000,7 +3002,7 @@ class FullIntegration(ChimericIntegration):
 			tags.append(('OA', OA_update))
 			
 		#create new pysam.AlignedSegment
-		a = pysam.AlignedSegment(header = header)
+		a = pysam.AlignedSegment(header = header.to_dict())
 		a.query_name = read.query_name
 		a.query_sequence= new_query
 		a.flag = read.flag
