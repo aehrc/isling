@@ -347,11 +347,11 @@ class AlignmentFile:
 						continue
 					if read.is_reverse == read2.is_reverse: 
 						read.query_sequence = str(read2.query_sequence)
-						read.query_qualities = read2.query_qualities
+						read.query_qualities = copy.copy(read2.query_qualities)
 					else:
 						seq = _reverse_complement(str(read2.query_sequence))
 						read.query_sequence = seq
-						read.query_qualities = read2.query_qualities	
+						read.query_qualities = reversed(copy.copy(read2.query_qualities))
 					break					
 				
 		return alns
@@ -650,7 +650,7 @@ class AlignmentPool(list):
 		a.cigartuples = list(read.cigartuples)
 		a.next_reference_id = int(read.next_reference_id)
 		a.template_length = int(read.template_length)
-		a.query_qualities = read.query_qualities
+		a.query_qualities = copy.copy(read.query_qualities)
 		for tag in read.get_tags():
 			a.set_tag(tag[0], tag[1])
 			
@@ -927,8 +927,9 @@ class AlignmentPool(list):
 			a.next_reference_id = read.next_reference_id
 			a.next_reference_start = read.next_reference_start
 			a.template_length = read.template_length
-			a.query_qualities = read.query_qualities
-			a.tags = read.tags
+			a.query_qualities = copy.copy(read.query_qualities)
+			for tag in read.tags:
+				a.set_tag(tag[0], tag[1])
 			
 			if map_nm is not None:
 				a.set_tag("NM", map_nm)
@@ -1693,7 +1694,7 @@ class ChimericIntegration:
 		a.next_reference_id = read.next_reference_id
 		a.next_reference_start = read.next_reference_start 
 		a.template_length = read.template_length
-		a.query_qualities = read.query_qualities
+		a.query_qualities = copy.copy(read.query_qualities)
 		
 		# update MD, NM, OA, CO tags
 		tags = read.get_tags()
@@ -2046,17 +2047,18 @@ class ChimericIntegration:
 		oa = oa.split(',')
 			
 		a = pysam.AlignedSegment(header)
-		a.query_name = read.query_name
-		a.query_sequence = read.query_sequence
-		a.flag = read.flag
-		a.reference_id = read.reference_id
+		a.query_name = str(read.query_name)
+		a.query_sequence = str(read.query_sequence)
+		a.flag = int(read.flag)
+		a.reference_id = int(read.reference_id)
 		a.reference_start = int(oa[1])
 		a.cigarstring = oa[3]
-		a.next_reference_id = read.next_reference_id
-		a.next_reference_start = read.next_reference_start
-		a.template_length = read.template_length
-		a.query_qualities = read.query_qualities
-		a.tags = read.tags
+		a.next_reference_id = int(read.next_reference_id)
+		a.next_reference_start = int(read.next_reference_start)
+		a.template_length = int(read.template_length)
+		a.query_qualities =  copy.copy(read.query_qualities)
+		for tag in read.get_tags():
+			a.set_tag(tag[0], tag[1])
 		
 		return a	
 		
@@ -2960,7 +2962,7 @@ class FullIntegration(ChimericIntegration):
 		query_start = sum([i[1] for i in read.cigartuples[:start] if i[0] in (0, 1, 4)])
 		query_end = sum([i[1] for i in read.cigartuples[:end] if i[0] in (0, 1, 4)])
 		new_query = read.query_sequence[query_start:query_end]
-		new_quals = read.query_qualities[query_start:query_end]
+		new_quals = copy.copy(read.query_qualities[query_start:query_end])
 		
 		# if we're getting a mapped region that isn't the first one, will also need
 		# to adjust the mapping position - new_pos
