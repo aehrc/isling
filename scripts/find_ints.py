@@ -608,13 +608,18 @@ class AlignmentPool(list):
 		# integration per group
 		to_remove = []
 		for group in same:
+		
+			# want to preferentially keep primary alignments, so if there's primary
+			# alignments put them at the front of the list
+			group = sorted(group, key=lambda x: self[x].is_supplementary or self[x].is_secondary)
 			
 			# on each loop, add one alignment to to_remove until there is only one left
 			while len(group) > 1:
 				removed = False
 				
-				# preferentially remove any alignments that have hard clips
 				for i in range(len(group)):
+					
+					# preferentially remove any alignments that have hard clips
 					if i in hard_clips:
 						to_add = group.pop(i)
 						to_remove.append(to_add)
@@ -937,7 +942,7 @@ class ChimericIntegration:
 	A class to store/calculate the properties of a simple chimeric integration 
 	(ie mapped/clipped and clipped/mapped) 
 	"""
-	__slots__ = 'map_thresh', 'tol', 'primary', 'hread', 'vread', 'hsec', 'hhead', 'vsec', 'vhead', 'chr', 'virus', 'verbose'
+	__slots__ = 'map_thresh', 'tol', 'primary', 'hread', 'vread', 'hsec', 'hhead', 'vsec', 'vhead', 'chr', 'virus', 'verbose', 'original_hread', 'original_vread'
 	
 	def __init__(self, host, virus, host_header, virus_header, 
 					host_sec, virus_sec,  tol, map_thresh=20, primary=True, verbose=False):
@@ -955,9 +960,11 @@ class ChimericIntegration:
 		
 		assert self.tol >= 0
 		
+		self.original_hread = host
 		self.hread = self._combine_short_CIGAR_elements(host, host_header)
 		self.hread = self._simplify_CIGAR(self.hread, host_header)
 
+		self.original_vread = virus
 		self.vread = self._combine_short_CIGAR_elements(virus, virus_header)
 		self.vread = self._simplify_CIGAR(self.vread, virus_header)
 
@@ -1696,21 +1703,19 @@ class ChimericIntegration:
 						read.cigarstring, str(read.mapping_quality), 
 						str(read.get_tag('NM')))
 		OA_update = ",".join(OA_update) + ";"
-		for i in range(len(tags)):
-			if tags[i][0] == 'NM':
-				tags[i] = ('NM', tags[i][1] + nm_offset)
-			if tags[i][0] == 'OA':
-				tags[i] = ('OA', tags[i][1] + OA_update)
-				updated_OA = True
-			if tags[i][0] == 'MD':
-				assert md != ''
-				tags[i] = ('MD', md)		
-		if not updated_OA:
-			tags.append(('OA', OA_update))
+		
+		try:
+			a.set_tag('NM', read.get_tag('NM') + nm_offset)
+		except KeyError:
+			pass
 			
-		tags.append(('CO', co))
-			
-		a.tags = tags
+		try:
+			a.set_tag('OA', read.get_tag('OA') + OA_update)
+		except KeyError:
+			a.set_tag('OA', OA_update)
+		
+		a.set_tag('MD', md)
+		a.set_tag('CO', co)
 		
 		return a
 		
@@ -2169,10 +2174,10 @@ class ChimericIntegration:
 				
 					# add secondary alignments to alt_int (not added during instatiation)
 					host_alns.append(self.hread)
-					host_alns.remove(alt_ints[i].hread)
+					host_alns.remove(alt_ints[i].original_hread)
 				
 					virus_alns.append(self.vread)
-					virus_alns.remove(alt_ints[i].vread)
+					virus_alns.remove(alt_ints[i].original_vread)
 				
 					alt_ints[i].hsec = host_alns
 					alt_ints[i].vsec = virus_alns
@@ -2228,7 +2233,8 @@ class DiscordantIntegration(ChimericIntegration):
 		assert tlen >= 0
 		
 		# note that self._is_discordant() also assigns self.hread and self.vread
-		assert self._is_discordant(host_sec1, host_sec2, virus_sec1, virus_sec2)
+		assert self._is_discordant(host_sec1, host_sec2, virus_sec1, virus_sec2,
+									host_r1, host_r2, virus_r1, virus_r2)
 		
 		self.get_host_chr()
 		self.get_viral_ref()	
@@ -2560,7 +2566,8 @@ class DiscordantIntegration(ChimericIntegration):
 			
 		return nm
 					
-	def _is_discordant(self, host_sec1, host_sec2, virus_sec1, virus_sec2):
+	def _is_discordant(self, host_sec1, host_sec2, virus_sec1, virus_sec2, 
+							orig_hread1, orig_hread2, orig_vread1, orig_vread2):
 		""" 
 		Check if a read-pair is discordant integration (one read mapped to host, one
 		read mapped to virus)
@@ -2590,15 +2597,20 @@ class DiscordantIntegration(ChimericIntegration):
 			
 		# assign self.hread and self.vread to help with some methods inherited from ChimericIntegration
 		if h1_map:
+			
 			self.hread = self.hread1
 			self.vread = self.vread2
 			self.hsec = self.hsec1
-			self.vsec = self.vsec2
+			self.vsec = self.vsec2			
+			self.original_hread = orig_hread1
+			self.original_vread = orig_vread2
 		else:
 			self.hread = self.hread2
 			self.vread = self.vread1
 			self.hsec = self.hsec2
 			self.vsec = self.vsec1
+			self.original_hread = orig_hread2
+			self.original_vread = orig_vread1			
 
 		return True
 		
@@ -2791,6 +2803,9 @@ class FullIntegration(ChimericIntegration):
 		self.verbose = verbose
 				
 		assert tol >= 0
+		
+		self.original_hread = host
+		self.original_vread = virus
 		
 		self.hread = self._combine_short_CIGAR_elements(host, host_header)
 		self.vread = self._combine_short_CIGAR_elements(virus, virus_header)
