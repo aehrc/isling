@@ -34,32 +34,31 @@ global:
   filter: 
     - "HostEditDist <= 5"
     - "ViralEditDist <= 5"
-    - "HostMapQ > 20"
     - "NoAmbiguousBases < 20 or Type == discordant"
-    - "PossibleVectorRearrangement == no"
-    - "HostPossibleAmbiguous == no"
-    - "PossibleHostTranslocation == no"
+    - "PossibleVectorRearrangement == False"
+    - "PossibleHostTranslocation == False"
   bed-exclude:
     - test/references/test.bed
   merge-method: 'common'
   merge-n-min: 1
+  mapq-threshold: 20
 
 test-merge:
   merge-dist: 100
   min-n-merge: 2
   filter: False
   
-test-trim:
-  merge: False
-  trim: True
-  dedup: True
-  filter: True
+#test-trim:
+#  merge: False
+#  trim: True
+#  dedup: True
+#  filter: True
 
   
-test-none:
-  merge: False
-  trim: False
-  dedup: False
-  split: 1
-  merge-method: 'exact'
-
+#test-none:
+#  merge: False
+#  trim: False
+#  dedup: False
+#  split: 1
+#  merge-method: 'exact'
+#
