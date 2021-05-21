@@ -28,10 +28,11 @@ def main():
 	parser.add_argument('--mean-template-length', help="mean template length for library", default=0, type=float)
 	parser.add_argument('--tolerance', help="tolerance for short CIGAR operations (MIS ops with a combined length equal to or shorter than this will be combined into the nearest mapped region)", type=int, default=3)
 	parser.add_argument('--verbose', '-v', help="print extra messages?", action='store_true')
+	parser.add_argument('--debug', '-d', help="print lots of extra messages?", action='store_true')
 	args = parser.parse_args()
 
 	with AlignmentFilePair(args.host, args.virus, args.integrations, args.map_thresh, args.mean_template_length,
-							args.tolerance, args.verbose) as pair:		
+							args.tolerance, args.verbose, args.debug) as pair:		
 		
 		pair.find_integrations()
 
@@ -39,7 +40,7 @@ def main():
 class AlignmentFilePair:
 	""" A class to hold host and viral alignments, and look for integrations """
 	
-	def __init__(self, host, virus, outfile, map_thresh, tlen, tol = 3, verbose = False):
+	def __init__(self, host, virus, outfile, map_thresh, tlen, tol = 3, verbose = False, debug=False):
 		""" Open host and viral alignments, and check for query sorting """
 		
 		self.host = AlignmentFile(host, verbose)
@@ -50,6 +51,7 @@ class AlignmentFilePair:
 		self.vref_lens = self.virus.get_reference_lengths()
 		self.map_thresh = map_thresh
 		self.verbose = verbose
+		self.debug = debug
 		self.tlen = int(tlen) # tlen needs to be int so that output coords are ints
 		self.tol = tol
 		self.ints = []
@@ -83,6 +85,9 @@ class AlignmentFilePair:
 		# iterate over reads that have alignments to both host and virus
 		for alns in self._get_aligns():
 		
+			if self.debug:
+				print(f"{self.__repr__()}: find_integrations {self.curr_host[0].query_name}")
+		
 			counter += 1
 			if counter % progress == 0:
 				print(f"checked {counter} reads")
@@ -101,6 +106,7 @@ class AlignmentFilePair:
 			virus_r1_not_primary = self.curr_virus.get_not_primary().get_read1()
 
 			# check if primary read 1 alignments appear to be chimeric	
+			
 			if host_r1_primary is not None and virus_r1_primary is not None:
 				if self._is_chimeric(host_r1_primary, virus_r1_primary,
 									host_r1_not_primary, virus_r1_not_primary):
@@ -121,6 +127,7 @@ class AlignmentFilePair:
 
 			
 			# check if primary read 1 alignments appear to be chimeric	
+			
 			if host_r2_primary is not None and virus_r2_primary is not None:
 				if self._is_chimeric(host_r2_primary, virus_r2_primary,
 									host_r2_not_primary, virus_r2_not_primary):
@@ -131,7 +138,7 @@ class AlignmentFilePair:
 					ints += 1
 
 										
-			# if there are alignments that are neither read 1 nor read 2, check if chimeric
+			# if there are alignments that are neither read 1 nor read 2, check if chimeric		
 			host_not12_primary = self.curr_host.get_primary_not_r1_or_r2()
 			host_not12_not_primary = self.curr_host.get_not_primary().get_not_read1_or_read2()
 			
@@ -178,38 +185,45 @@ class AlignmentFilePair:
 		or gap between the host and viral alignments, for example 132M18S for host and
 		22M132S for virus would indicate a 2 bp overlap
 		"""
+		if self.debug:
+			print("\tchecking for chimeric integration")	
 		try:
-			integration = ChimericIntegration(hread, vread, 
-										self.host.aln.header, 
-										self.virus.aln.header,
-										hsec, vsec,
-										self.tol, self.map_thresh)	
-
+			integration = ChimericIntegration(hread, vread, map_thresh = self.map_thresh,
+												tol = self.tol)	
 		except AssertionError:
 			return False
-			
+
+		if self.debug:
+			print("\t setting secondary alignments")				
+		integration.set_sec_alns(hsec, vsec)
+		
+		if self.debug:
+			print("\t writing integration")		
 		self._write_integration(integration)
 		
 		return True
 			
 	def _is_discordant(self, hread1, hread2, vread1, vread2, 
-						host_sec1, host_sec2, virus_sec1, virus_sec2,):
+						hsec1, hsec2, vsec1, vsec2):
 		"""
 		Checks if a pair looks like an discordant integration
 		"""
-		
+		if self.debug:
+			print("\tchecking for discordant integration")				
 		try:
 			integration = DiscordantIntegration(hread1, hread2, vread1, vread2, 
-										self.tol,
-										self.host.aln.header, 
-										self.virus.aln.header,
-										host_sec1, host_sec2, virus_sec1, virus_sec2,
-										self.map_thresh, self.tlen
-										)
+										map_thresh = self.map_thresh, tlen = self.tlen,
+										tol = self.tol)
 
 		except AssertionError:
 			return False
-			
+
+		if self.debug:
+			print("\t setting secondary alignments")			
+		integration.set_sec_alns(hsec1, hsec2, vsec1, vsec2)
+
+		if self.debug:
+			print("\t writing integration")			
 		self._write_integration(integration)
 		
 		return True
@@ -223,18 +237,22 @@ class AlignmentFilePair:
 		for by a host alignment.  For example 30M80I30M for host and 30S80M30S for virus.
 		There might be some overlap or gap between the host and viral alignments, as
 		for a ChimericIntegration
-		"""	
-		
+		"""					
+		if self.debug:
+			print("\tchecking for full integration")	
 		try:
-			integration = FullIntegration(hread, vread, 
-									self.host.aln.header, 
-									self.virus.aln.header,
-									hsec, vsec,
-									self.tol, self.map_thresh)
+			integration = FullIntegration(hread, vread, map_thresh = self.map_thresh,
+											tol = self.tol)
 
 		except AssertionError:
 			return False
+		
+		if self.debug:
+			print("\t setting secondary alignments")
+		integration.set_sec_alns(hsec, vsec)
 			
+		if self.debug:
+			print("\t writing integration")
 		self._write_integration(integration)
 		
 		return True
@@ -313,7 +331,6 @@ class AlignmentFile:
 			self.end = True
 			self.curr = None
 
-
 	def collect_next_read_alignments(self):
 		""" Collect the alignments (primary, secondary, supplementary) for the next read (pair) in the file """	
 		
@@ -347,15 +364,14 @@ class AlignmentFile:
 						continue
 					if read.is_reverse == read2.is_reverse: 
 						read.query_sequence = str(read2.query_sequence)
-						read.query_qualities = copy.copy(read2.query_qualities)
+#						read.query_qualities = copy.copy(read2.query_qualities)
 					else:
 						seq = _reverse_complement(str(read2.query_sequence))
 						read.query_sequence = seq
-						read.query_qualities = reversed(copy.copy(read2.query_qualities))
+#						read.query_qualities = copy.copy(read2.query_qualities).reverse()
 					break					
 				
 		return alns
-
 		
 	def close(self):
 		""" Close alignment file """
@@ -399,8 +415,9 @@ class AlignmentPool(list):
 	Should only contain alignments from the same read-pair (i.e. qname should be the same for all reads in pool)
 	"""
 	
-	def add_read_from_XA(self, XA, primary, header):
+	def add_read_from_XA(self, XA, primary):
 		""" Add a read based on an XA string (chr,pos,CIGAR,NM) """
+		print("\t\taddig read from XA")
 		
 		# get info from XA string
 		XA = XA.split(",")
@@ -412,13 +429,22 @@ class AlignmentPool(list):
 		cigar = XA[2]
 		nm = int(XA[3])
 		
-		new_seg = self._create_new_segment_from_primary(primary, header, chr, pos, ori,
-														cigar, nm)
+		new_seg = self._create_new_segment_from_primary(primary, ref_name=chr, pos=pos, 
+														ori=ori,cigar=cigar, nm=nm)
+		
+		# we copied all flags from primary, so need to update this												
+		print("\t\t setting to supplementary")	
+		new_seg.is_supplementary = True
+		# remove MD tag since it only applies to primary alignment
+		print("\t\t removing MD tag")		
+		new_seg = self._remove_MD_tag(new_seg)
+		
 		self.append(new_seg)
 	
-	def add_read_from_SA(self, SA, primary, header):
+	def add_read_from_SA(self, SA, primary):
 		""" Add a read based on an SA string (rname,pos,strand,CIGAR,mapQ,NM) """
 
+		print("\t\taddig read from SA")
 		# get info from SA string
 		SA = SA.split(",")
 		assert len(SA) == 6
@@ -430,9 +456,23 @@ class AlignmentPool(list):
 		mapq = int(SA[4])
 		nm = int(SA[5])
 		
-		new_seg = self._create_new_segment_from_primary(primary, header, chr, pos, ori,
-														cigar, nm, mapq)
+		new_seg = self._create_new_segment_from_primary(primary, ref_name=chr, pos=pos, 
+														ori=ori, cigar=cigar, nm=nm, 
+														mapq=mapq)
+		print("\t\t setting to secondary")														
+		new_seg.is_secondary = True
+		print("\t\t removing MD tag")
+		new_seg = self._remove_MD_tag(new_seg)
+		
 		self.append(new_seg)
+		
+	def combine_short_CIGAR_elements(self, tol):
+		"""
+		combine short cigar elements in all reads in pool
+		"""
+		
+		for read in self:
+			read = self._combine_short_CIGAR_elements(tol, read)
 	
 	def get_primary(self):
 		""" Return an AlignmentPool with only the primary alignment(s) from an AlignmentPool """
@@ -488,7 +528,7 @@ class AlignmentPool(list):
 		else:
 			raise ValueError(f"found more than one primary alignment for {self[0].qname} (not read 1 or read 2)")	
 			
-	def get_rearrangement_nm(self, header):
+	def get_rearrangement_nm(self):
 		""" 
 		For an AlignmentPool consisting of different alignments of the same read, get an 
 		edit distance for the case that those alignments cover the whole read
@@ -510,16 +550,16 @@ class AlignmentPool(list):
 		
 		# check that we're dealing with the same query, and
 		# check that all are read1, read2, or neither
-		if len(self) > 1:
-			assert all([read.query_name == self[0].query_name for read in self[1:]])
-			assert all([read.is_read1 == self[0].is_read1 for read in self[1:]])
-			assert all([read.is_read2 == self[0].is_read2 for read in self[1:]])
+		try:
+			assert self._is_same_read()
+		except:
+			pdb.set_trace()
 		
 		query_length = self[0].query_length
 		
 		alns = AlignmentPool()
 		for aln in self:
-			alns.append(self._copy_alignment(aln, header))
+			alns.append(self._copy_alignment(aln))
 		alns._split_mapped()
 		alns._remove_query_nested()
 		
@@ -545,6 +585,31 @@ class AlignmentPool(list):
 		nm += query_length - alns[-1].query_alignment_end
 		
 		return nm, alns
+		
+	def process_non_primary_alignments(self, tol, primary=None):
+		"""
+		add alignments from XA or SA of a primary alignment to the pool
+		
+		either provide a primary alignment, or do this based on the primary alignments
+		already in the pool
+		"""
+		
+		if primary is not None:
+			assert self._is_same_read()
+		
+			self._process_non_primary_alignments(tol, primary)
+			
+			# remove any redundant alignments from pool
+			# redundant alignments have same CIGAR, orientation (+/-) and pos		
+			self.remove_redundant_alignments()
+		
+		else:
+			for read in self:
+				if read.is_secondary: 
+					continue
+				if read.is_supplementary:
+					continue
+				self._process_non_primary_alignments(tol, read)	
 			
 	def remove_redundant_alignments(self):
 		""" 
@@ -553,8 +618,10 @@ class AlignmentPool(list):
 		soft-clipped operations are replaced by hard-clipped operations
 		"""
 		
-		if len(self) > 1:
-			assert all([read.query_name == self[0].query_name for read in self[1:]])
+		assert self._is_same_read()
+		
+		if len(self) < 2:
+			return
 		
 		# first, find groups of integrations that are the same
 		same = [] # to store pairs of alignments that are redundant
@@ -634,30 +701,576 @@ class AlignmentPool(list):
 		# now remove integrations
 		assert len(to_remove) == len(set(to_remove))
 		for i in reversed(sorted(to_remove)):
-			self.pop(i)		
+			self.pop(i)	
 			
-	def _copy_alignment(self, read, header):
+	def _check_md_character(self, chr):
+		"""
+		Characters in MD tag can be integers, letters or '^'
+		Return 'int' if inter, 'let' if letter, or 'del' if '^'
+		"""
+		if chr == '^':
+			return 'del'
+		
+		try:
+			int(chr)
+			return 'int'
+		except ValueError:
+			return 'let'	
+			
+	def _combine_MD_with_CIGAR(self, cigartuples, md):
+		"""
+		Split a CIGAR and MD tag to get the CIGAR operations and their corresponding
+		elements in the MD tag.  Combine into a list of tuples with length 3.
+		In each tuple, first element is CIGAR op type, second element is CIGAR op length,
+		and third element is list of MD elements
+		For example CIGAR 1S249M and MD tag 10T2G7T5G221 should become
+		[(4,1,[]), (0, 249, [10, 'T', 2, 'G', 7, 'T', 5, 'G', 221])]
+		"""		
+		
+		md_lst = self._split_md_tag(md)
+		
+		# if no md, just return empty lists for each element
+		if len(md_lst) == 0:
+			return [(op[0], op[1], []) for op in cigartuples]
+		
+		md_ind = 0
+		md_cigartuples = []
+		
+		# loop over cigar operations and get corresponding 
+		for op in cigartuples:
+			
+			cigar_op_MD = []
+			# only ops that appear in MD tag are M and D
+			
+			# for a deletion, should be only one MD element for the CIGAR element
+			if op[0] == 2:
+				# deletion element looks like '^AGTG', where AGTG are deleted bases
+				# number of deleted bases should match length of CIGAR op
+				assert len(md_lst[md_ind]) - 1 == op[1]
+				cigar_op_MD.append(md_lst[md_ind])
+				md_ind += 1
+			
+			# for a mapped region, we need to collect the MD elements (matches (ints) and
+			# single letter mismatches)
+			elif op[0] == 0:
+				md_len = 0
+				while md_len < op[1]:
+					md_op = md_lst[md_ind]
+					
+					try:
+						# integer with a run of matched bases
+						md_len += md_op
+					except TypeError:
+						# single letter mismatch
+						assert len(md_op) == 1
+						md_len += 1
+										
+					cigar_op_MD.append(md_op)
+					md_ind += 1
+				
+				#it's possible to have md_len be longer than the operation, 
+				# for example if two mapped regions are separated by an insertion
+				if md_len > op[1]:
+					cigar_op_MD[-1] -= md_len - op[1]
+					md_ind -= 1
+					md_lst[md_ind] -= cigar_op_MD[-1]
+
+			
+			md_cigartuples.append((op[0], op[1], cigar_op_MD))
+		
+		return md_cigartuples
+				
+	def _combine_short_CIGAR_elements(self, tol, read):
+		"""
+		Sometimes, short insertions, deletions and soft-clipped regions can cause a read
+		to be missed because it doesn't meet our rather strict criteria for a chimeric read
+		
+		For example, viral CIGAR 1S100M49S and host CIGAR 101S49M would be missed as a
+		potential integration because the viral cigar is clipped on both ends,
+		even though it really looks like an integration.  
+		
+		To address this issue, combine any non-mapped short CIGAR elements ()
+		that are shorter in length than a tolerance value (self.tol)
+		
+		Similar in spirit to '_simplify_CIGAR', but takes a slightly different approach (
+		for example, deals differently with reads that are soft-clipped on both ends)
+		
+		We might later on want to split this alignment into smaller ones, for example in
+		the case of a FullAlignment. When we do this, we will want an edit distance for
+		each mapped region of the alignment. Therefore, when editing we should update the
+		MD tag so that we can later compare query and reference for that mapped region.
+		
+ 		We don't have all the information to do this properly (since the MD tag stores 
+ 		information about the reference, but we don't have the reference).  
+ 		We could solve this by asking the user for the reference as well and extracting 
+ 		the appropriate bases, but since we only care about the edit distance in this case, 
+ 		this is probably overkill.  
+		
+		So instead, just add 'X's to the MD tag when combining soft-clip elements with
+		a mapped region.
+		
+		For deletion elements (D, 2), these are already included in MD tag but will be removed
+		when we remove the element. Use the 'CO' (free-text comment tag) to keep track of
+		how long these elements are and into which mapped region they were combined
+		so that we can later add them into the edit distance if we split the read.
+		For insertion elements (I, 1), these will not be included in the MD tag but we also
+		need to keep track of which mapped element they were combined into so that we
+		can later add them into the edit distance if we split the read.
+		
+		For insertions and deletions, use the CO tag to keep track of how many inserted
+		and deleted bases were combined into a mapped region.  Do this in the format
+		CO: '0:2,2:3,5:0' - a comma separated list of mapped regions in the new CIGAR, with
+		the index of the mapped region in the cigartuples and the number of inserted or
+		deleted bases merged separated by a colon.  For example, '0:2,2:3, 5:0' means
+		that 2 inserted or deleted bases were combined into the mapped region at index 0,
+		3 were combined into the mapped region at index 2, and 0 were combined into the 
+		mapped region at index 5.  Mapped regions referred to in the CO should be AFTER
+		editing the alignment - i.e. index 0 really should be a mapped region
+		"""
+		
+		if read.cigartuples is None:
+			return read
+			
+		if len(read.cigartuples) == 1:
+			return read
+		
+		# first look for elements to simplify
+		curr_non_mapped = 0
+		curr = []
+		last_mapped = None
+		
+		# key is matched region to combine into, and value
+		# is a list of elements to combine
+		to_delete = []
+		
+		for i in range(len(read.cigartuples)):
+			# if mapped
+			if read.cigartuples[i][0] == 0:
+				# check if curr_non_mapped is more than zero and less than tol
+				if curr_non_mapped > 0 and curr_non_mapped <= tol:
+					to_delete.append((i, curr))
+				curr_non_mapped = 0
+				curr = []
+				last_mapped = i
+			# if not mapped
+			else:
+				curr.append(i)
+				curr_non_mapped += read.cigartuples[i][1]
+		
+		# check last element
+		if curr_non_mapped > 0 and curr_non_mapped <= tol:
+			to_delete.append((last_mapped, curr))
+		
+		if len(to_delete) == 0:
+			return read
+
+		# next, combine short elements with nearest matched region
+		
+		# get MD tag for manipulating
+		try:
+			md = read.get_tag('MD')
+
+			has_md = True
+		except KeyError:
+			has_md = False
+			
+		if has_md:
+		
+			if md == '':
+				pdb.set_trace()
+		
+			tmp_cigartuples = self._combine_MD_with_CIGAR(read.cigartuples, md)
+
+		else:
+			tmp_cigartuples = [(i[0], i[1], []) for i in read.cigartuples]
+				
+		nm_offset = 0
+		co = {}
+		
+		for elem in reversed(to_delete):
+
+			i_matched = elem[0]
+			assert read.cigartuples[i_matched][0] == 0
+			assert tmp_cigartuples[i_matched][0] == 0
+			i_del = elem[1]
+			i_md = tmp_cigartuples[i_matched][2]
+			
+			# for CO tag - keep track of number of I or D bases combined
+			i_co = i_matched # keep track of which mapped element CO will refer to AFTER deletion
+			try:
+				num_ins_or_del = co[i_matched]
+				del co[i_matched]
+			except KeyError:
+				num_ins_or_del = 0
+			
+			# if cigar operation consumes query, need to add to matched region			
+			matched = tmp_cigartuples[i_matched][1]
+			for idx in i_del:
+			
+				## update cigar operation 
+			
+				# I (1) and S (4) operations consume query - add to matched length
+				if read.cigartuples[idx][0] in {1, 4}:
+					matched += read.cigartuples[idx][1]
+				
+				## update edit distance offset
+				
+				# if this is a soft-clip, we also need to add it to the edit distance offset
+				if read.cigartuples[idx][0] == 4:
+					nm_offset += read.cigartuples[idx][1]
+					
+				# if this is a deletion from reference (was previously in MD tag but will be 
+				# removed), we will account for this in the CO tag so remove from NM offset
+				if read.cigartuples[idx][0] == 2:
+					nm_offset -= read.cigartuples[idx][1]
+				
+				## update MD tag
+				# if we're combining a soft-clip with a matched region, add to MD tag
+				if read.cigartuples[idx][0] == 4:
+					
+					# need to add bases to MD tag, but don't know what reference was at
+					# this position.  So just add a string of 'X's, which need to be 
+					# separated by 0's as per sam specification
+					md_add = [0, 'X'] * read.cigartuples[idx][1] + [0]
+					
+					# if we're combining something after the mapped region
+					if idx > i_matched:
+					
+						# don't need 0 at end
+						md_add.pop(-1)
+						# if last element of i_md is an int, don't need 0 at start
+						if has_md:
+							if isinstance(i_md[-1], int):
+								md_add.pop(0)
+					
+						i_md = i_md + md_add
+					
+					# if we're combining something before the mapped region
+					else:
+						# don't need 0 at start
+						md_add.pop(0)
+						# if first element of i_md is an int, don't need 0 at end
+						if has_md:
+							if isinstance(i_md[0], int):
+								md_add.pop(-1)
+							
+						i_md = md_add + i_md
+					
+				# for an insertion or deletion, keep track of the number of bases added
+				# for adding to the CO tag
+				if read.cigartuples[idx][0] in (1, 2):
+					num_ins_or_del += read.cigartuples[idx][1]
+					
+					# if we're deleting something from before the mapped region, we also
+					# need to offset our mapped region index in the CO tag
+					if idx < i_matched:
+						i_co -= 1
+				
+			# update mapped length and md tag
+			tmp_cigartuples[i_matched] = (0, matched, i_md)
+			
+			# remove elements
+			for idx in i_del:
+				tmp_cigartuples.pop(idx)
+
+			# update our CO tag
+			co[i_co] = num_ins_or_del
+		
+		# check that we don't now have two matched regions next to each other
+		if len(tmp_cigartuples) > 1:
+			for i in reversed(range(len(tmp_cigartuples)-1)):
+				if tmp_cigartuples[i][0] == 0:
+					if tmp_cigartuples[i+1][0] == 0:
+						# add matched regions together
+						matched = tmp_cigartuples[i][1] + tmp_cigartuples[i+1][1]
+				
+						# check that we wont't have two int md elements next to each other
+						if has_md:
+							if isinstance(tmp_cigartuples[i][2][-1], int):
+								if isinstance(tmp_cigartuples[i+1][2][0], int):
+									tmp_cigartuples[i+1][2][0] += tmp_cigartuples[i][2].pop(-1)
+								
+						# add MD for adjacent regions
+						md =  tmp_cigartuples[i][2] + tmp_cigartuples[i+1][2]
+						
+						# we also need to adjust CO tag to make sure it refers to correct
+						# mapped region
+						if i in co.keys() and i+1 in co.keys():
+							# if we have both, combine them
+							co[i] += co[i+1]
+							del co[i+1]
+						
+						# if we have only i+1 in co
+						elif i+1 in co.keys():
+							co[i] = co[i+1]
+							del co[i+1]
+						
+						# remove one of regions
+						tmp_cigartuples.pop(i+1)
+						# update other with new matched and md
+						tmp_cigartuples[i] = (0, matched, md)	
+		
+		# separate out md tag from cigartuples
+		md = []
+		for i in tmp_cigartuples:
+			md += i[2]
+		# check if we now have two numbers next to each other in the MD string 
+		i = 1
+		while i < len(md):
+			if isinstance(md[i-1], int) and isinstance(md[i], int):
+				md[i] = md[i] + md[i-1]
+				md.pop(i-1)
+				continue
+			i += 1
+		md = ''.join([str(i) for i in md])
+		
+		
+		# if we didn't have an MD tag in the first place, don't add one
+		if not has_md:
+			md = None
+		
+		tmp_cigartuples = [(i[0], i[1]) for i in tmp_cigartuples]
+		
+		# join CO tag elements
+		co = [f"{key}:{val}" for key, val in co.items()]
+		co = ','.join(co)
+			
+		# if we're removing elements that consume the query and are before the first
+		# mapped region for a forward read or after the last mapped region for a reverse 
+		# read then we need to also adjust the mapping position
+		deleted_inds = [tup[1] for tup in to_delete]
+		#https://stackoverflow.com/questions/952914/how-to-make-a-flat-list-out-of-a-list-of-lists
+		deleted_inds = [item for sublist in deleted_inds for item in sublist]
+		mapped = [ind for ind in range(len(read.cigartuples)) if read.cigartuples[ind][0] == 0]
+
+		if read.is_reverse:
+			# check if there are any regions we deleted from after last mapped region
+			offset_op = range(mapped[-1], len(read.cigartuples))
+			offset_op = [i for i in offset_op if i in deleted_inds]
+			
+			if len(offset_op) > 0:
+			
+				# only need to consider those that consume query
+				pos_offset = [read.cigartuples[ind] for ind in offset_op]
+				pos_offset = [tup[1] for tup in pos_offset if tup[0] in (1, 4)]
+				pos_offset = -sum(pos_offset)
+				
+			else:
+				pos_offset = 0
+		else:
+			# check if there are any regions we deleted from before first mapped region
+			offset_op = range(mapped[0])
+			offset_op = [i for i in offset_op if i in deleted_inds]
+		
+			if len(offset_op) > 0:
+				# only need to consider those that consume query
+				pos_offset = [read.cigartuples[ind] for ind in offset_op]
+				pos_offset = [tup[1] for tup in pos_offset if tup[0] in (1, 4)]
+				pos_offset = -sum(pos_offset)
+				
+			else:
+				pos_offset = 0
+
+		nm = read.get_tag('NM') + nm_offset
+		return self._create_new_segment_from_primary(read, cigartuples=tmp_cigartuples,
+														nm=nm, co=co, md=md)
+			
+	def _convert_cigarstring_to_cigartuples(self, cigar):
+		""" Convert a CIGAR string to cigar tuples """
+		
+		assert re.match("^(\d+[MIDNSHP=X])+$", cigar)
+		
+		tuples = []
+		ops = { 'M': 0, 'I': 1, 'D': 2, 'N': 3, 'S': 4, 'H': 5, 'P': 6, '=': 7, 'X': 8}
+		for op in re.findall("\d+[MIDNSHP=X]", cigar):
+			tuples.append((ops[op[-1]], int(op[:-1])))
+			
+		return tuples
+		
+	def _convert_hard_clips_to_soft(self, cigartuples):
+		""" Return the cigartuples with hard clips converted to soft clips """
+
+		for i in range(len(cigartuples)):
+			if cigartuples[i][0] == 5:
+				cigartuples[i] = (4, cigartuples[i][1])
+				
+		return cigartuples
+		
+	def _copy_alignment(self, read):
 		"""
 		Copy the attributes of a pysam.AlignedSegment into a new one
 		"""
 
-		a = pysam.AlignedSegment(header.to_dict())
-		a.query_name = read.query_name
-		a.query_sequence = read.query_sequence
-		a.flag = read.flag
-		a.reference_id = read.reference_id
-		a.reference_start = read.reference_start
-		a.mapping_quality = read.mapping_quality
-		a.cigartuples = list(read.cigartuples)
-		a.next_reference_id = read.next_reference_id
-		a.template_length = read.template_length
-		a.query_qualities = read.query_qualities
-		for tag in read.get_tags():
-			a.set_tag(tag[0], tag[1])
+		return copy.deepcopy(read)	
 		
-		pdb.set_trace()
-		return a	
+	def _create_new_segment_from_primary(self, primary, ref_name=None, pos=None, ori=None, 
+											cigar=None, cigartuples=None, nm=None, 
+											co=None, mapq=None, md=None):
+		""" 
+		Create a new pysam.AlignedSegment from an existing (primary) pysam.AlignnedSegment,
+		but modify one or more of its properties
+		"""
+		
+		# can't set both cigar (string) and cigartuples
+		assert cigar is None or cigartuples is None
+		
+		a = self._copy_alignment(primary)
+		
+		if mapq is not None:
+			a.mapping_quality = mapq
+		
+		if ori is None:
+			ori = '-' if primary.is_reverse else '+'
+		
+		assert ori == '-' or ori == '+'
+		
+		# if primary alignment has different orientation to this one, need to reverse complement
+		if primary.is_reverse != (ori == '-'):
+			a.query_sequence = _reverse_complement(primary.query_sequence)
+#			a.query_qualities = copy.copy(primary.query_qualities)
+#			a.query_qualities.reverse()
 			
+			# if we're reversing orientation, need to reverse CO tag as well
+			if co is not None:
+				pdb.set_trace()
+				
+				# we need to know the length of cigartuples (updated or otherwise)
+				if cigar is not None:
+					cigar_len = len(self._convert_cigarstring_to_cigartuples(cigar))
+				elif cigartuples is not None:
+					cigar_len = len(cigartuples)
+				else:
+					cigar_len = len(primary.cigartuples)
+				
+				co = co.split(";")
+				if co != ['']:
+					for i in range(len(co)):
+						map_i, nm = co[i].split(",")
+						# get index in reversed cigar
+						map_i = abs(cigar_len - int(map_i))
+						
+						co[i] = f"{map_i},{nm}"
+						
+					co = co.join(";")
+
+		if pos is not None:
+			a.reference_start = pos
+		
+		if ref_name is not None:
+			a.reference_id = primary.header.get_tid(ref_name)
+		
+		if cigar is not None:
+			a.cigartuples = self._convert_cigarstring_to_cigartuples(cigar)
+		
+		if nm is not None:
+			a.set_tag('NM', nm)
+			
+		if co is not None:
+			a.set_tag('CO', co)
+			
+		if md is not None:
+			a.set_tag('MD', md)
+
+		return a	
+		
+	def _is_same_read(self):
+		"""
+		check if all the reads in self are the same read - this means
+		that they all have the same query name, and read1/read2 status
+		"""
+		if len(self) == 1:
+			return True
+		
+		if not all([self[0].query_name == read.query_name for read in self[1:]]):
+			return False
+			
+		if not all([self[0].is_read1 == read.is_read1 for read in self[1:]]):
+			return False
+
+		if not all([self[0].is_read2 == read.is_read2 for read in self[1:]]):
+			return False		
+		
+		return True
+
+	def _process_non_primary_alignments(self, tol, primary):
+		""" 
+		Depending on aligner, secondary and supplementary alignments might be present in
+		tags from the primary alignment, or as separate alignments, or both.  
+		
+		We might also want to simplify these alignments using self._combine_short_CIGAR_elements()
+		and self._simplify_CIGAR()
+		"""
+		
+		self._process_SA_and_XA(primary)
+		
+		# combine any short elements in secondary alignments
+		for i in range(len(self)):
+			self[i] = self._combine_short_CIGAR_elements(tol, self[i])
+	
+	def _process_SA(self, SA, primary):
+		""" 
+		Create pysam.AlignedSegment objects for each XA alignment 
+		
+		SA has format (rname,pos,strand,CIGAR,mapQ,NM;)+
+		"""
+		
+		SA_segs = AlignmentPool()
+		
+		SA = SA.split(";")
+		SA = [i for i in SA if i != '']
+		
+		for aln in SA:
+			self.add_read_from_SA(aln, primary)
+				
+	def _process_SA_and_XA(self, primary):
+		""" Create AlignmentPool objects with alignments from XA and SA """
+		
+		# get supplementary alignments from SA tag
+		try:
+			SA = primary.get_tag('SA')
+			self._process_SA(SA, primary)
+		except KeyError:
+			pass
+		
+		# get supplementary alignments from XA tag
+		try:
+			XA = primary.get_tag('XA')
+			self._process_XA(XA, primary)
+		except KeyError:
+			pass				
+	
+	def _process_XA(self, XA, primary):
+		""" 
+		Create pysam.AlignedSegment objects for each XA alignment 
+		
+		XA is bwa-specific and has format (chr,pos,CIGAR,NM;)*
+		"""
+		
+		XA = XA.split(";")
+		XA = [i for i in XA if i != '']
+		
+		XA_segs = AlignmentPool()
+		for aln in XA:
+			self.add_read_from_XA(aln, primary)			
+		
+		
+		return XA_segs
+		
+	def _remove_MD_tag(self, read):
+		"""
+		remove MD tag from read where it's not appropriate anymore
+		"""
+		# remove MD tag from read - don't apply to this alignment
+		tags = read.get_tags()
+		MD = [i for i in range(len(tags)) if tags[i][0] == 'MD']
+		assert len(MD) == 0 or len(MD) == 1
+		if len(MD) == 1:
+			tags.pop(MD[0])
+			
+		read.tags = tags
+		
+		return read
+		
 	def _remove_query_nested(self):
 		""" 
 		Remove any alignments that are encompassed by other alignments.  That is,
@@ -678,6 +1291,10 @@ class AlignmentPool(list):
 		It also reverses any reads that are mapped in the reverse orientation, which will 
 		mess up the mapping positions
 		"""
+		try:
+			assert self._is_same_read()
+		except: 
+			pdb.set_trace()
 		
 		if len(self) < 2:
 			return
@@ -731,7 +1348,22 @@ class AlignmentPool(list):
 					continue
 			
 			i += 1
-			
+		
+	def _reverse_cigar(self, read):
+		"""
+		Create a new pysam.AlignedSegment with the CIGAR string reversed.  Nothing
+		else is changed, so this alignment doesn't really make sense anymore. Use only
+		for finding edit distance for rearrangement!
+		"""	
+		cig = read.cigartuples
+		cig.reverse()
+		
+		a = pysam.AlignedSegment()
+		a.cigartuples = cig
+		a.set_tag('NM', read.get_tag('NM'))
+		
+		return a
+		
 	def _split_mapped(self):
 		"""
 		For each alignment in the pool, check if it has multiple mapped regions. 
@@ -750,99 +1382,61 @@ class AlignmentPool(list):
 
 			for splt in split_reads:
 				self.insert(i, splt)		
-			
-	def _convert_cigarstring_to_cigartuples(self, cigar):
-		""" Convert a CIGAR string to cigar tuples """
-		
-		assert re.match("^(\d+[MIDNSHP=X])+$", cigar)
-		
-		tuples = []
-		ops = { 'M': 0, 'I': 1, 'D': 2, 'N': 3, 'S': 4, 'H': 5, 'P': 6, '=': 7, 'X': 8}
-		for op in re.findall("\d+[MIDNSHP=X]", cigar):
-			tuples.append((ops[op[-1]], int(op[:-1])))
-			
-		return tuples
-		
-	def _convert_hard_clips_to_soft(self, cigartuples):
-		""" Return the cigartuples with hard clips converted to soft clips """
-
-		for i in range(len(cigartuples)):
-			if cigartuples[i][0] == 5:
-				cigartuples[i] = (4, cigartuples[i][1])
 				
-		return cigartuples
-		
-	def _create_new_segment_from_primary(self, primary, header, rname, pos, ori, cigar,
-											nm, mapq=None):
-		""" 
-		Create a new pysam.AlignedSegment from an existing (primary) pysam.AlignnedSegment,
-		but modify one or more of its properties
+	def _split_md_tag(self, md):
 		"""
+		Split MD tag into individual elements for ease of manipulation
+		e.g. '10A5^AC6' should become 
+		[10, 'A', 5, '^AC', 6]
+		"""
+
+		md_lst = []
 		
-		a = pysam.AlignedSegment(header=header.to_dict())
-		a.query_name = primary.query_name
-		if mapq is not None:
-			a.mapping_quality = mapq
-		
-		assert ori == '-' or ori == '+'
-		
-		# if primary alignment has different orientation to this one, need to reverse complement
-		if primary.is_reverse == (ori == '-'):
-			a.query_sequence = primary.query_sequence
-			a.query_qualities = primary.query_qualities
-		else:
-			a.query_sequence = _reverse_complement(primary.query_sequence)
-			quals = array.array('B', primary.query_qualities)
-			quals.reverse()
-			a.query_qualities = quals
+		# if no md tag, return empty list
+		if len(md) == 0:
+			return md_lst
 			
-		flag = 0x100 + 0x800
-		if primary.is_paired:
-			flag += 0x1
-		if primary.is_proper_pair:
-			flag += 0x2
-		if primary.mate_is_unmapped:
-			flag += 0x8
-		if ori == '-':
-			flag += 0x10
-		if primary.mate_is_reverse:
-			flag += 0x20
-		if primary.is_read1:
-			flag += 0x40
-		if primary.is_read2:
-			flag += 0x80
-		
-		a.flag = flag
+		val = md[0]
+		# keep track of what the previous character was
+		prev_type = self._check_md_character(md[0])
 
-		a.reference_id = header.get_tid(rname)
-		a.reference_start = pos
-		a.cigar = self._convert_cigarstring_to_cigartuples(cigar)
+		for i in md[1:]:
+			curr_type = self._check_md_character(i)
+			# if previous type was a number
+			if prev_type == 'int':
+				# if this is also a number, it's part of the same number
+				if curr_type == 'int':
+					val = val + i
+				# if it's not part of a number add the previous number and start the new 
+				# element
+				else:
+					md_lst.append(int(val))
+					val = i
+			# if this is part of a deletion
+			elif prev_type == 'del':
+				# if it's a letter, then add to the deletion
+				if curr_type == 'let':
+					val = val + i
+					curr_type = 'del'
+				# otherwise has to be a number - add the deletion to the list and start
+				# the new number
+				else:
+					md_lst.append(val)
+					val = i
+			# otherwise has to be a single letter mismatch
+			else:
+				md_lst.append(val)
+				val = i
+			
+			prev_type = curr_type
 		
-		a.next_reference_id = primary.next_reference_id
-		a.next_reference_start = primary.next_reference_start 
-		a.template_length = primary.template_length
-		
-		if nm is not None:
-			a.tags = [('NM', nm)]
-		else:
-			a.tags = []
-
-		return a	
-		
-	def _reverse_cigar(self, read):
-		"""
-		Create a new pysam.AlignedSegment with the CIGAR string reversed.  Nothing
-		else is changed, so this alignment doesn't really make sense anymore. Use only
-		for finding edit distance for rearrangement!
-		"""	
-		cig = read.cigartuples
-		cig.reverse()
-		
-		a = pysam.AlignedSegment()
-		a.cigartuples = cig
-		a.set_tag('NM', read.get_tag('NM'))
-		
-		return a
+		# append last element
+		try:
+			md_lst.append(int(val))
+		except ValueError:
+			md_lst.append(val)
+				
+		return md_lst	
 		
 	def _split_read(self, read):
 		"""
@@ -918,37 +1512,28 @@ class AlignmentPool(list):
 				map_nm = None		
 			
 			# create new read
-			a = pysam.AlignedSegment()
-			a.query_name = read.query_name
-			a.query_sequence = read.query_sequence
-			a.flag = read.flag
-			a.reference_id = read.reference_id
+			a = self._copy_alignment(read)
+			
 			a.reference_start = read.get_blocks()[i][0]
-			a.mapping_quality = read.mapping_quality
 			a.cigartuples = new_cigartuples
-			a.next_reference_id = read.next_reference_id
-			a.next_reference_start = read.next_reference_start
-			a.template_length = read.template_length
-			a.query_qualities = copy.copy(read.query_qualities)
-			for tag in read.tags:
-				a.set_tag(tag[0], tag[1])
 			
 			if map_nm is not None:
 				a.set_tag("NM", map_nm)
 			
 			new_reads.append(a)
 
-		return new_reads			
+		return new_reads	
+
 					
 class ChimericIntegration:
 	""" 
 	A class to store/calculate the properties of a simple chimeric integration 
 	(ie mapped/clipped and clipped/mapped) 
 	"""
-	__slots__ = 'map_thresh', 'tol', 'primary', 'hread', 'vread', 'hsec', 'hhead', 'vsec', 'vhead', 'chr', 'virus', 'verbose', 'original_hread', 'original_vread'
+	__slots__ = 'map_thresh', 'primary', 'hread', 'vread', 'hsec', 'vsec', 'chr', 'virus', 'verbose', 'original_hread', 'original_vread', 'tol'
 	
-	def __init__(self, host, virus, host_header, virus_header, 
-					host_sec, virus_sec,  tol, map_thresh=20, primary=True, verbose=False):
+	def __init__(self, host, virus, host_sec = AlignmentPool(), virus_sec = AlignmentPool(),  
+					 tol = 3, map_thresh=20, primary=True, verbose=False):
 		""" 
 		Given a host and virus read that are chimeric, calculate the properties of the integration.
 		
@@ -958,27 +1543,23 @@ class ChimericIntegration:
 
 		self.map_thresh = map_thresh
 		self.tol = tol
+		
+		assert self.map_thresh > 0
+		assert self.tol >= 0
 		self.primary = primary
 		self.verbose = verbose
-		
-		assert self.tol >= 0
-		
+
 		self.original_hread = host
-		self.hread = self._combine_short_CIGAR_elements(host, host_header)
-		self.hread = self._simplify_CIGAR(self.hread, host_header)
+		self.hread = self._simplify_CIGAR(host)
 
 		self.original_vread = virus
-		self.vread = self._combine_short_CIGAR_elements(virus, virus_header)
-		self.vread = self._simplify_CIGAR(self.vread, virus_header)
+		self.vread = self._simplify_CIGAR(virus)
 
 		# simple chimeric read has two CIGAR elements
 		assert self._is_chimeric()
 		
-		self.hsec = self._process_non_primary_alignments(self.hread, host_sec, host_header)
-		self.hhead = host_header
-		
-		self.vsec = self._process_non_primary_alignments(self.vread, virus_sec, virus_header)
-		self.vhead = virus_header
+		self.hsec = host_sec	
+		self.vsec = virus_sec
 		
 		self.chr = host.reference_name
 		self.virus = virus.reference_name
@@ -1014,14 +1595,15 @@ class ChimericIntegration:
 	def get_host_coords(self):
 		""" Get coordinates of ambiguous bases in host """
 		
-		coords = self._get_ambig_coords_ref(self.hread, self.hhead)
+		coords = self._get_ambig_coords_ref(self.hread)
 		
 		# check that we're not beyond the coordinates of the chromosome
 		if coords[0] < 0:
 			coords = (0, coords[1])
 		
-		if coords[1] > self.hhead.get_reference_length(self.chr):
-			coords = (coords[0], self.hhead.get_reference_length(self.chr))
+		
+		if coords[1] > self.hread.header.get_reference_length(self.chr):
+			coords = (coords[0], self.hread.header.get_reference_length(self.chr))
 		
 		return coords
 
@@ -1173,14 +1755,14 @@ class ChimericIntegration:
 	def get_viral_coords(self):
 		""" Get coordinates of ambiguous bases in virus """
 		
-		coords = self._get_ambig_coords_ref(self.vread, self.vhead)	
+		coords = self._get_ambig_coords_ref(self.vread)	
 		
 		# check that we're not beyond the coordinates of the chromosome
 		if coords[0] < 0:
 			coords = (0, coords[1])
 		
-		if coords[1] > self.vhead.get_reference_length(self.virus):
-			coords = (coords[0], self.vhead.get_reference_length(self.virus))
+		if coords[1] > self.vread.header.get_reference_length(self.virus):
+			coords = (coords[0], self.vread.header.get_reference_length(self.virus))
 		
 		return coords
 		
@@ -1281,7 +1863,7 @@ class ChimericIntegration:
 		chimera
 		"""
 
-		return self._is_possible_rearrangement(self.hread, self.hsec, self.hhead)
+		return self._is_possible_rearrangement(self.hread, self.hsec)
 	
 	def is_possible_virus_rearrangement(self):
 		""" 
@@ -1290,7 +1872,7 @@ class ChimericIntegration:
 		chimera
 		"""
 
-		return self._is_possible_rearrangement(self.vread, self.vsec, self.vhead)
+		return self._is_possible_rearrangement(self.vread, self.vsec)
 		
 	def is_viral_ambig_loc(self):
 		"""
@@ -1298,6 +1880,17 @@ class ChimericIntegration:
 		read has multiple equivalent alignments to different parts of viral genome)
 		"""	
 		return self._is_ambiguous_location(self.vread, self.vsec)
+		
+	def set_sec_alns(self, hsec, vsec):
+		"""
+		if initialised without secondary or supplementary alignments, add them
+		"""
+		
+		hsec.process_non_primary_alignments(self.tol, self.hread)
+		vsec.process_non_primary_alignments(self.tol, self.vread)
+		
+		self.hsec = hsec
+		self.vsec = vsec
 		
 	def short_str(self):
 		"""
@@ -1326,381 +1919,15 @@ class ChimericIntegration:
 		
 		return ",".join(props)
 		
-	def _check_md_character(self, chr):
-		"""
-		Characters in MD tag can be integers, letters or '^'
-		Return 'int' if inter, 'let' if letter, or 'del' if '^'
-		"""
-		if chr == '^':
-			return 'del'
-		
-		try:
-			int(chr)
-			return 'int'
-		except ValueError:
-			return 'let'
-			
-	def _combine_MD_with_CIGAR(self, cigartuples, md):
-		"""
-		Split a CIGAR and MD tag to get the CIGAR operations and their corresponding
-		elements in the MD tag.  Combine into a list of tuples with length 3.
-		In each tuple, first element is CIGAR op type, second element is CIGAR op length,
-		and third element is list of MD elements
-		For example CIGAR 1S249M and MD tag 10T2G7T5G221 should become
-		[(4,1,[]), (0, 249, [10, 'T', 2, 'G', 7, 'T', 5, 'G', 221])]
-		"""		
-		
-		md_lst = self._split_md_tag(md)
-		md_ind = 0
-		md_cigartuples = []
-		
-		# loop over cigar operations and get corresponding 
-		for op in cigartuples:
-			
-			cigar_op_MD = []
-			# only ops that appear in MD tag are M and D
-			
-			# for a deletion, should be only one MD element for the CIGAR element
-			if op[0] == 2:
-				# deletion element looks like '^AGTG', where AGTG are deleted bases
-				# number of deleted bases should match length of CIGAR op
-				assert len(md_lst[md_ind]) - 1 == op[1]
-				cigar_op_MD.append(md_lst[md_ind])
-				md_ind += 1
-			
-			# for a mapped region, we need to collect the MD elements (matches (ints) and
-			# single letter mismatches)
-			elif op[0] == 0:
-				md_len = 0
-				while md_len < op[1]:
-					md_op = md_lst[md_ind]
-					
-					try:
-						# integer with a run of matched bases
-						md_len += md_op
-					except TypeError:
-						# single letter mismatch
-						assert len(md_op) == 1
-						md_len += 1
-										
-					cigar_op_MD.append(md_op)
-					md_ind += 1
-				
-				#it's possible to have md_len be longer than the operation, 
-				# for example if two mapped regions are separated by an insertion
-				if md_len > op[1]:
-					cigar_op_MD[-1] -= md_len - op[1]
-					md_ind -= 1
-					md_lst[md_ind] -= cigar_op_MD[-1]
-
-			
-			md_cigartuples.append((op[0], op[1], cigar_op_MD))
-		
-		return md_cigartuples
-
-	def _combine_short_CIGAR_elements(self, read, header):
-		"""
-		Sometimes, short insertions, deletions and soft-clipped regions can cause a read
-		to be missed because it doesn't meet our rather strict criteria for a chimeric read
-		
-		For example, viral CIGAR 1S100M49S and host CIGAR 101S49M would be missed as a
-		potential integration because the viral cigar is clipped on both ends,
-		even though it really looks like an integration.  
-		
-		To address this issue, combine any non-mapped short CIGAR elements ()
-		that are shorter in length than a tolerance value (self.tol)
-		
-		Similar in spirit to '_simplify_CIGAR', but takes a slightly different approach (
-		for example, deals differently with reads that are soft-clipped on both ends)
-		
-		We might later on want to split this alignment into smaller ones, for example in
-		the case of a FullAlignment. When we do this, we will want an edit distance for
-		each mapped region of the alignment. Therefore, when editing we should update the
-		MD tag so that we can later compare query and reference for that mapped region.
-		
- 		We don't have all the information to do this properly (since the MD tag stores 
- 		information about the reference, but we don't have the reference).  
- 		We could solve this by asking the user for the reference as well and extracting 
- 		the appropriate bases, but since we only care about the edit distance in this case, 
- 		this is probably overkill.  
-		
-		So instead, just add 'X's to the MD tag when combining soft-clip elements with
-		a mapped region.
-		
-		For deletion elements (D, 2), these are already included in MD tag but will be removed
-		when we remove the element. Use the 'CO' (free-text comment tag) to keep track of
-		how long these elements are and into which mapped region they were combined
-		so that we can later add them into the edit distance if we split the read.
-		For insertion elements (I, 1), these will not be included in the MD tag but we also
-		need to keep track of which mapped element they were combined into so that we
-		can later add them into the edit distance if we split the read.
-		
-		For insertions and deletions, use the CO tag to keep track of how many inserted
-		and deleted bases were combined into a mapped region.  Do this in the format
-		CO: '0:2,2:3,5:0' - a comma separated list of mapped regions in the new CIGAR, with
-		the index of the mapped region in the cigartuples and the number of inserted or
-		deleted bases merged separated by a colon.  For example, '0:2,2:3, 5:0' means
-		that 2 inserted or deleted bases were combined into the mapped region at index 0,
-		3 were combined into the mapped region at index 2, and 0 were combined into the 
-		mapped region at index 5.  Mapped regions referred to in the CO should be AFTER
-		editing the alignment - i.e. index 0 really should be a mapped region
-		"""
-		
-		if read.cigartuples is None:
-			return read
-			
-		if len(read.cigartuples) == 1:
-			return read
-		
-		# first look for elements to simplify
-		curr_non_mapped = 0
-		curr = []
-		last_mapped = None
-		
-		# key is matched region to combine into, and value
-		# is a list of elements to combine
-		to_delete = []
-		
-		for i in range(len(read.cigartuples)):
-			# if mapped
-			if read.cigartuples[i][0] == 0:
-				# check if curr_non_mapped is more than zero and less than tol
-				if curr_non_mapped > 0 and curr_non_mapped <= self.tol:
-					to_delete.append((i, curr))
-				curr_non_mapped = 0
-				curr = []
-				last_mapped = i
-			# if not mapped
-			else:
-				curr.append(i)
-				curr_non_mapped += read.cigartuples[i][1]
-		
-		# check last element
-		if curr_non_mapped > 0 and curr_non_mapped <= self.tol:
-			to_delete.append((last_mapped, curr))
-		
-		if len(to_delete) == 0:
-			return read
-
-		# next, combine short elements with nearest matched region
-		
-		# get MD tag for manipulating
-
-		try:
-			md = read.get_tag('MD')
-			has_md = True
-		except KeyError:
-			has_md = False
-			
-		if has_md:
-			tmp_cigartuples = self._combine_MD_with_CIGAR(read.cigartuples, md)
-
-		else:
-			tmp_cigartuples = [(i[0], i[1], [i[0]]) if i[0] == 0 else (i[0], i[1], [])  for i in read.cigartuples]
-				
-		nm_offset = 0
-		co = {}
-		
-		for elem in reversed(to_delete):
-
-			i_matched = elem[0]
-			assert read.cigartuples[i_matched][0] == 0
-			assert tmp_cigartuples[i_matched][0] == 0
-			i_del = elem[1]
-			i_md = tmp_cigartuples[i_matched][2]
-			
-			# for CO tag - keep track of number of I or D bases combined
-			i_co = i_matched # keep track of which mapped element CO will refer to AFTER deletion
-			try:
-				num_ins_or_del = co[i_matched]
-				del co[i_matched]
-			except KeyError:
-				num_ins_or_del = 0
-			
-			# if cigar operation consumes query, need to add to matched region			
-			matched = tmp_cigartuples[i_matched][1]
-			for idx in i_del:
-			
-				## update cigar operation 
-			
-				# I (1) and S (4) operations consume query - add to matched length
-				if read.cigartuples[idx][0] in {1, 4}:
-					matched += read.cigartuples[idx][1]
-				
-				## update edit distance offset
-				
-				# if this is a soft-clip, we also need to add it to the edit distance offset
-				if read.cigartuples[idx][0] == 4:
-					nm_offset += read.cigartuples[idx][1]
-					
-				# if this is a deletion from reference (was previously in MD tag but will be 
-				# removed), we will account for this in the CO tag so remove from NM offset
-				if read.cigartuples[idx][0] == 2:
-					nm_offset -= read.cigartuples[idx][1]
-				
-				## update MD tag
-				# if we're combining a soft-clip with a matched region, add to MD tag
-				if read.cigartuples[idx][0] == 4:
-					
-					# need to add bases to MD tag, but don't know what reference was at
-					# this position.  So just add a string of 'X's, which need to be 
-					# separated by 0's as per sam specification
-					md_add = [0, 'X'] * read.cigartuples[idx][1] + [0]
-					
-					# if we're combining something after the mapped region
-					if idx > i_matched:
-					
-						# don't need 0 at end
-						md_add.pop(-1)
-						# if last element of i_md is an int, don't need 0 at start
-						if isinstance(i_md[-1], int):
-							md_add.pop(0)
-					
-						i_md = i_md + md_add
-					
-					# if we're combining something before the mapped region
-					else:
-						# don't need 0 at start
-						md_add.pop(0)
-						# if first element of i_md is an int, don't need 0 at end
-						if isinstance(i_md[0], int):
-							md_add.pop(-1)
-							
-						i_md = md_add + i_md
-					
-				# for an insertion or deletion, keep track of the number of bases added
-				# for adding to the CO tag
-				if read.cigartuples[idx][0] in (1, 2):
-					num_ins_or_del += read.cigartuples[idx][1]
-					
-					# if we're deleting something from before the mapped region, we also
-					# need to offset our mapped region index in the CO tag
-					if idx < i_matched:
-						i_co -= 1
-				
-			# update mapped length and md tag
-			tmp_cigartuples[i_matched] = (0, matched, i_md)
-			
-			# remove elements
-			for idx in i_del:
-				tmp_cigartuples.pop(idx)
-
-			# update our CO tag
-			co[i_co] = num_ins_or_del
-		
-		# check that we don't now have two matched regions next to each other
-		if len(tmp_cigartuples) > 1:
-			for i in reversed(range(len(tmp_cigartuples)-1)):
-				if tmp_cigartuples[i][0] == 0:
-					if tmp_cigartuples[i+1][0] == 0:
-						# add matched regions together
-						matched = tmp_cigartuples[i][1] + tmp_cigartuples[i+1][1]
-				
-						# check that we wont't have two int md elements next to each other
-						if isinstance(tmp_cigartuples[i][2][-1], int):
-							if isinstance(tmp_cigartuples[i+1][2][0], int):
-								tmp_cigartuples[i+1][2][0] += tmp_cigartuples[i][2].pop(-1)
-								
-						# add MD for adjacent regions
-						md =  tmp_cigartuples[i][2] + tmp_cigartuples[i+1][2]
-						
-						# we also need to adjust CO tag to make sure it refers to correct
-						# mapped region
-						if i in co.keys() and i+1 in co.keys():
-							# if we have both, combine them
-							co[i] += co[i+1]
-							del co[i+1]
-						
-						# if we have only i+1 in co
-						elif i+1 in co.keys():
-							co[i] = co[i+1]
-							del co[i+1]
-						
-						# remove one of regions
-						tmp_cigartuples.pop(i+1)
-						# update other with new matched and md
-						tmp_cigartuples[i] = (0, matched, md)	
-		
-		# separate out md tag from cigartuples
-		md = []
-		for i in tmp_cigartuples:
-			md += i[2]
-		# check if we now have two numbers next to each other in the MD string 
-		i = 1
-		while i < len(md):
-			if isinstance(md[i-1], int) and isinstance(md[i], int):
-				md[i] = md[i] + md[i-1]
-				md.pop(i-1)
-				continue
-			i += 1
-		md = ''.join([str(i) for i in md])
-		
-		# if we didn't have an MD tag in the first place, don't add one
-		if not has_md:
-			md = ''
-		
-		tmp_cigartuples = [(i[0], i[1]) for i in tmp_cigartuples]
-		
-		# join CO tag elements
-		co = [f"{key}:{val}" for key, val in co.items()]
-		co = ','.join(co)
-			
-		# if we're removing elements that consume the query and are before the first
-		# mapped region for a forward read or after the last mapped region for a reverse 
-		# read then we need to also adjust the mapping position
-		deleted_inds = [tup[1] for tup in to_delete]
-		#https://stackoverflow.com/questions/952914/how-to-make-a-flat-list-out-of-a-list-of-lists
-		deleted_inds = [item for sublist in deleted_inds for item in sublist]
-		mapped = [ind for ind in range(len(read.cigartuples)) if read.cigartuples[ind][0] == 0]
-
-		if read.is_reverse:
-			# check if there are any regions we deleted from after last mapped region
-			offset_op = range(mapped[-1], len(read.cigartuples))
-			offset_op = [i for i in offset_op if i in deleted_inds]
-			
-			if len(offset_op) > 0:
-			
-				# only need to consider those that consume query
-				pos_offset = [read.cigartuples[ind] for ind in offset_op]
-				pos_offset = [tup[1] for tup in pos_offset if tup[0] in (1, 4)]
-				pos_offset = -sum(pos_offset)
-				
-			else:
-				pos_offset = 0
-		else:
-			# check if there are any regions we deleted from before first mapped region
-			offset_op = range(mapped[0])
-			offset_op = [i for i in offset_op if i in deleted_inds]
-		
-			if len(offset_op) > 0:
-				# only need to consider those that consume query
-				pos_offset = [read.cigartuples[ind] for ind in offset_op]
-				pos_offset = [tup[1] for tup in pos_offset if tup[0] in (1, 4)]
-				pos_offset = -sum(pos_offset)
-				
-			else:
-				pos_offset = 0
-
-		return self._edit_alignment(read, header, tmp_cigartuples, pos_offset, nm_offset, co, md)
-		
-	def _edit_alignment(self, read, header, cigartuples, pos_offset, nm_offset, co, md):
+	def _edit_alignment(self, read, cigartuples, pos_offset, nm_offset, co, md):
 		""" Edit an alignment by modifying the cigartuples of an existing read """
-		a = pysam.AlignedSegment(header=header.to_dict())
-		a.query_name = read.query_name
-		a.query_sequence = read.query_sequence
-		a.flag = read.flag
-		a.reference_id = read.reference_id
+		a = copy.deepcopy(read)
+#		a.query_qualities = copy.copy(read.query_qualities)
+
 		a.reference_start = read.reference_start + pos_offset
-		a.mapping_quality = read.mapping_quality
-		a.cigar = cigartuples
-		a.next_reference_id = read.next_reference_id
-		a.next_reference_start = read.next_reference_start 
-		a.template_length = read.template_length
-		a.query_qualities = copy.copy(read.query_qualities)
+		a.cigartuples = cigartuples
 		
 		# update MD, NM, OA, CO tags
-		tags = read.get_tags()
-		updated_OA = False
 		orig_strand = '-' if read.is_reverse else '+'
 		OA_update = (read.reference_name, str(read.reference_start), orig_strand, 
 						read.cigarstring, str(read.mapping_quality), 
@@ -1755,8 +1982,8 @@ class ChimericIntegration:
 					
 				# if hst and vrs constitute a valid integration, add to list
 				try:
-					alt_int = ChimericIntegration(hst, vrs, self.hhead, self.vhead,
-					AlignmentPool(), AlignmentPool(), self.tol, self.map_thresh, False)
+					alt_int = ChimericIntegration(hst, vrs, tol = self.tol,
+									map_thresh = self.map_thresh, primary=False)
 					alt_ints.append(alt_int)
 					
 				except AssertionError:
@@ -1782,7 +2009,7 @@ class ChimericIntegration:
 				self.hread.query_alignment_start + self.num_ambig_bases()
 				])	
 			
-	def _get_ambig_coords_ref(self, read, header):
+	def _get_ambig_coords_ref(self, read):
 		""" 
 		Return a tuple of (start, stop) of ambiguous bases in host or virus 
 		(i.e. in coords in reference) 
@@ -1794,7 +2021,7 @@ class ChimericIntegration:
 			first = False
 
 		# if read has OA, we should use this for getting coordinates rather than
-		read = self._read_from_OA(read, header)
+		read = self._read_from_OA(read)
 			
 		# get start and end of aligned part of read in host coords
 		aligned_coords = (read.get_blocks()[0][0], read.get_blocks()[-1][-1])
@@ -1880,7 +2107,7 @@ class ChimericIntegration:
 		# if we didn't find any equivalent alignments, location not ambiguous
 		return False
 		
-	def _is_possible_rearrangement(self, primary, sec, header):
+	def _is_possible_rearrangement(self, primary, sec):
 		""" 
 		Given a primary alignment and an AlignmentPool of secondary alignments, compare 
 		edit distances for the case that the read is an integration, and the case that the
@@ -1897,7 +2124,7 @@ class ChimericIntegration:
 		all = AlignmentPool(sec)
 		all.append(primary)
 		
-		rearrange_nm, all = all.get_rearrangement_nm(header)
+		rearrange_nm, all = all.get_rearrangement_nm()
 		
 		# if there's only one alignment in pool after removing nested alignments,
 		# can't be rearrangement
@@ -1955,88 +2182,9 @@ class ChimericIntegration:
 			if cigarops1 != cigarops2:
 				return False	
 
-		return True		
-		
-	def _process_non_primary_alignments(self, primary, not_primary, header):
-		""" 
-		Depending on aligner, secondary and supplementary alignments might be present in
-		tags from the primary alignment, or as separate alignments, or both.  
-		
-		We might also want to simplify these alignments using self._combine_short_CIGAR_elements()
-		and self._simplify_CIGAR()
-		"""
-		
-		not_primary += self._process_SA_and_XA(primary, header)
-		
-		# combine any short elements in secondary alignments
-		for i in range(len(not_primary)):
-			not_primary[i] = self._combine_short_CIGAR_elements(not_primary[i], header)
-		
-		if len(not_primary) <= 1:
-			return not_primary
-			
-		# remove any redundant alignments from pool
-		# redundant alignments have same CIGAR, orientation (+/-) and pos		
-		not_primary.remove_redundant_alignments()
-		
-		return not_primary
-	
-	def _process_SA(self, SA, primary, header):
-		""" 
-		Create pysam.AlignedSegment objects for each XA alignment 
-		
-		SA has format (rname,pos,strand,CIGAR,mapQ,NM;)+
-		"""
-		
-		SA_segs = AlignmentPool()
-		
-		SA = SA.split(";")
-		SA = [i for i in SA if i != '']
-		
-		for aln in SA:
-			SA_segs.add_read_from_SA(aln, primary, header)
-		
-		return SA_segs
-				
-	def _process_SA_and_XA(self, primary, header):
-		""" Create AlignmentPool objects with alignments from XA and SA """
-		
-		non_primary = AlignmentPool()
-		
-		# get supplementary alignments from SA tag
-		try:
-			SA = primary.get_tag('SA')
-			non_primary += self._process_SA(SA, primary, header)
-		except KeyError:
-			pass
-		
-		# get supplementary alignments from XA tag
-		try:
-			XA = primary.get_tag('XA')
-			non_primary += self._process_XA(XA, primary, header)
-		except KeyError:
-			pass
-			
-		return non_primary		
-	
-	def _process_XA(self, XA, primary, header):
-		""" 
-		Create pysam.AlignedSegment objects for each XA alignment 
-		
-		XA is bwa-specific and has format (chr,pos,CIGAR,NM;)*
-		"""
-		
-		XA = XA.split(";")
-		XA = [i for i in XA if i != '']
-		
-		XA_segs = AlignmentPool()
-		for aln in XA:
-			XA_segs.add_read_from_XA(aln, primary, header)			
-		
-		
-		return XA_segs		
+		return True				
 
-	def _read_from_OA(self, read, header):
+	def _read_from_OA(self, read):
 		"""
 		Create back the original pysam.AlignedSegment from an OA tag
 		"""
@@ -2047,76 +2195,22 @@ class ChimericIntegration:
 		
 		oa = oa[:-1].split(';')[-1]
 		oa = oa.split(',')
-			
-		a = pysam.AlignedSegment(header.to_dict())
-		a.query_name = str(read.query_name)
-		a.query_sequence = str(read.query_sequence)
-		a.flag = int(read.flag)
-		a.reference_id = int(read.reference_id)
+		
+		a = copy.deepcopy(read)
+
 		a.reference_start = int(oa[1])
 		a.cigarstring = oa[3]
-		a.next_reference_id = int(read.next_reference_id)
-		a.next_reference_start = int(read.next_reference_start)
-		a.template_length = int(read.template_length)
-		a.query_qualities =  copy.copy(read.query_qualities)
-		for tag in read.get_tags():
-			a.set_tag(tag[0], tag[1])
 		
-		return a	
-		
-	def _split_md_tag(self, md):
-		"""
-		Split MD tag into individual elements for ease of manipulation
-		e.g. '10A5^AC6' should become 
-		[10, 'A', 5, '^AC', 6]
-		"""
-		assert len(md) > 0
-		md_lst = []
-		val = md[0]
-		# keep track of what the previous character was
-		prev_type = self._check_md_character(md[0])
-		
+		if (oa[2] == '-') == (read.is_reverse):
+			a.query_sequence = _reverse_complement(a.query_sequence)
 
 		
-		for i in md[1:]:
-			curr_type = self._check_md_character(i)
-			# if previous type was a number
-			if prev_type == 'int':
-				# if this is also a number, it's part of the same number
-				if curr_type == 'int':
-					val = val + i
-				# if it's not part of a number add the previous number and start the new 
-				# element
-				else:
-					md_lst.append(int(val))
-					val = i
-			# if this is part of a deletion
-			elif prev_type == 'del':
-				# if it's a letter, then add to the deletion
-				if curr_type == 'let':
-					val = val + i
-					curr_type = 'del'
-				# otherwise has to be a number - add the deletion to the list and start
-				# the new number
-				else:
-					md_lst.append(val)
-					val = i
-			# otherwise has to be a single letter mismatch
-			else:
-				md_lst.append(val)
-				val = i
-			
-			prev_type = curr_type
+		a.mapping_quality = int(oa[4])
+		a.set_tag('NM', int(oa[5]))
 		
-		# append last element
-		try:
-			md_lst.append(int(val))
-		except ValueError:
-			md_lst.append(val)
+		return a	
 				
-		return md_lst	
-				
-	def _simplify_CIGAR(self, read, header):
+	def _simplify_CIGAR(self, read):
 		""" 
 		Simplify CIGAR by combining all matched regions into one, leaving any
 		soft-clipped regions at either end intact
@@ -2152,7 +2246,7 @@ class ChimericIntegration:
 		# insert just one matched region
 		tmp_cigartuples.insert(matched[0], (0, n_match))
 				
-		return self._edit_alignment(read, header, tmp_cigartuples, 0, 0, '', '')	
+		return self._edit_alignment(read, tmp_cigartuples, 0, 0, '', '')	
 		
 	def _swap_self_with_primary(self, alt_ints, host_alns, virus_alns):
 		"""
@@ -2210,31 +2304,32 @@ class DiscordantIntegration(ChimericIntegration):
 	need to be implemented differently for a discordant pair
 	"""
 	__slots__ = 'hread1', 'hread2', 'vread1', 'vread2', 'hsec1', 'hsec2', 'vsec1', 'vsec2', 'tlen'
-	def __init__(self, host_r1, host_r2, virus_r1, virus_r2, tol,
-					host_header, virus_header, 
-					host_sec1, host_sec2, virus_sec1, virus_sec2,
-					map_thresh=20, tlen=0, primary=True, verbose=False):
-
+	def __init__(self, host_r1, host_r2, virus_r1, virus_r2,
+					host_sec1 = AlignmentPool(), host_sec2=AlignmentPool(), 
+					virus_sec1=AlignmentPool(), virus_sec2=AlignmentPool(),
+					map_thresh=20, tlen=0, tol=3, primary=True, verbose=False):
+					
+		assert tlen >= 0
+		assert tol >= 0
+		assert map_thresh >= 0
+		
 		self.map_thresh = map_thresh
-		self.tlen = tlen
-		self.tol = tol
-		self.hhead = host_header
-		self.vhead = virus_header
+		self.tlen = int(tlen)
+		self.tol = int(tol)
+		
 		self.primary = primary
 		self.verbose = verbose
 		
-		self.hread1 = self._combine_short_CIGAR_elements(host_r1, host_header)
-		self.hread2 = self._combine_short_CIGAR_elements(host_r2, host_header)
-		self.vread1 = self._combine_short_CIGAR_elements(virus_r1, virus_header)
-		self.vread2 = self._combine_short_CIGAR_elements(virus_r2, virus_header)
+		self.hread1 = host_r1
+		self.hread2 = host_r2
+		self.vread1 = virus_r1
+		self.vread2 = virus_r2
 		
 		self.hsec1 = host_sec1
 		self.hsec2 = host_sec2
 		self.vsec1 = virus_sec1
 		self.vsec2 = virus_sec2	
-					
-		assert tol >= 0
-		assert tlen >= 0
+
 		
 		# note that self._is_discordant() also assigns self.hread and self.vread
 		assert self._is_discordant(host_sec1, host_sec2, virus_sec1, virus_sec2,
@@ -2252,7 +2347,7 @@ class DiscordantIntegration(ChimericIntegration):
 
 		return None
 
-	def get_coords(self, read, header):
+	def get_coords(self, read):
 		"""
 		Get the likely coordinates of integration.  This is the end of the aliged read
 		that faces the other read, plus the mean insert size
@@ -2266,7 +2361,7 @@ class DiscordantIntegration(ChimericIntegration):
 			
 		# if we modified the read by combining small CIGAR elements, we modified
 		# the mapping positions, in which case we want to use the original mapping positions
-		read = self._read_from_OA(read, header)
+		read = self._read_from_OA(read)
 		blocks = (read.get_blocks()[0][0], read.get_blocks()[-1][-1])
 		
 		# we want the coordinate of the host/virus base closest to integration
@@ -2282,7 +2377,7 @@ class DiscordantIntegration(ChimericIntegration):
 			start = 0
 
 		# check that the stop isn't more than the length of the reference
-		reference_length = header.get_reference_length(read.reference_name)
+		reference_length = read.header.get_reference_length(read.reference_name)
 		if stop > reference_length:
 			stop = reference_length
 		
@@ -2291,7 +2386,7 @@ class DiscordantIntegration(ChimericIntegration):
 	def get_host_coords(self):
 		""" Get likely coordinates of integration in host chromosome """
 		
-		return self.get_coords(self.hread, self.hhead)
+		return self.get_coords(self.hread)
 
 	def get_host_chr(self):
 		""" Get reference name for host alignment """
@@ -2424,7 +2519,7 @@ class DiscordantIntegration(ChimericIntegration):
 	def get_viral_coords(self):
 		""" Get likely coordinates of integration in viral reference """		
 
-		return self.get_coords(self.vread, self.vhead)
+		return self.get_coords(self.vread)
 		
 	def get_viral_orientation(self):
 		""" 
@@ -2453,6 +2548,28 @@ class DiscordantIntegration(ChimericIntegration):
 			self.virus = self.vread1.reference_name
 		else:
 			self.virus = self.vread2.reference_name
+			
+	def set_sec_alns(self, hsec1, hsec2, vsec1, vsec2):
+		"""
+		if initialised without secondary or supplementary alignments, add them
+		"""
+		
+		hsec1.process_non_primary_alignments(self.tol, self.hread1)
+		hsec2.process_non_primary_alignments(self.tol, self.hread2)
+		vsec1.process_non_primary_alignments(self.tol, self.vread1)
+		vsec2.process_non_primary_alignments(self.tol, self.vread2)
+		
+		self.hsec1 = hsec1
+		self.hsec2 = hsec2
+		self.vsec1 = vsec1
+		self.vsec2 = vsec2
+		
+		if self._is_mapped(self.hread1):
+			self.hsec = self.hsec1
+			self.vsec = self.vsec2
+		else:
+			self.hsec = self.hsec2
+			self.vsec = self.vsec1
 			
 	def _check_overlap_in_unmapped(self, mapped, unmapped):
 		"""
@@ -2594,10 +2711,10 @@ class DiscordantIntegration(ChimericIntegration):
 		if h2_map != v1_map:
 			return False
 
-		self.hsec1 = self._process_non_primary_alignments(self.hread1, host_sec1, self.hhead)
-		self.hsec2 = self._process_non_primary_alignments(self.hread2, host_sec2, self.hhead)
-		self.vsec1 = self._process_non_primary_alignments(self.vread1, virus_sec1, self.vhead)
-		self.vsec2 = self._process_non_primary_alignments(self.vread2, virus_sec2, self.vhead)	
+		self.hsec1 = host_sec1
+		self.hsec2 = host_sec2
+		self.vsec1 = virus_sec1
+		self.vsec2 = virus_sec2	
 			
 		# assign self.hread and self.vread to help with some methods inherited from ChimericIntegration
 		if h1_map:
@@ -2638,7 +2755,7 @@ class DiscordantIntegration(ChimericIntegration):
 					
 		return True		
 		
-	def _is_possible_rearrangement(self, primary, sec, header):
+	def _is_possible_rearrangement(self, primary, sec):
 		""" 
 		For a DiscordantIntegration, rearrangements are unlikely since they would require 
 		both reads to be mapped to the same reference, but a DiscordantIntegration is one
@@ -2714,17 +2831,16 @@ class DiscordantIntegration(ChimericIntegration):
 					continue
 					
 				if hread1_map:
-					h1 = self._combine_short_CIGAR_elements(haln[h_i], self.hhead)
-					v2 = self._combine_short_CIGAR_elements(valn[v_i], self.vhead)
+					h1 = haln[h_i]
+					v2 = valn[v_i]
 				else:
-					h2 = self._combine_short_CIGAR_elements(haln[h_i], self.hhead)
-					v1 = self._combine_short_CIGAR_elements(valn[v_i], self.vhead)
+					h2 = haln[h_i]
+					v1 = valn[v_i]
 				
 				# if host and virus reads constitute a valid integration, add to list
 				try:
-					alt_int = DiscordantIntegration(h1, h2, v1, v2, self.tol, 
-					self.hhead, self.vhead, AlignmentPool(), AlignmentPool(),  
-					AlignmentPool(), AlignmentPool(), self.tol, self.map_thresh, False)
+					alt_int = DiscordantIntegration(h1, h2, v1, v2, 
+										map_thresh = self.map_thresh, primary = False)
 	
 				except AssertionError:
 					alt_int = None
@@ -2793,26 +2909,23 @@ class FullIntegration(ChimericIntegration):
 	right) of an integration.
 	"""
 	__slots__ = 'left', 'right'
-	def __init__(self, host, virus, host_header, virus_header, 
-					host_sec, virus_sec, tol, map_thresh=20, primary=True, verbose=False):
+	def __init__(self, host, virus, host_sec = AlignmentPool(), virus_sec = AlignmentPool(), 
+					map_thresh=20, tol=3, primary=True, verbose=False):
+				
+		assert map_thresh > 0
+		assert tol >= 0
 					
-		self.map_thresh = map_thresh		
-		self.tol = tol
-		
-		self.hhead = host_header
-		self.vhead = virus_header
+		self.map_thresh = map_thresh
+		self.tol = tol	
 		
 		self.primary = primary	
 		
 		self.verbose = verbose
-				
-		assert tol >= 0
 		
 		self.original_hread = host
+		self.hread = host
 		self.original_vread = virus
-		
-		self.hread = self._combine_short_CIGAR_elements(host, host_header)
-		self.vread = self._combine_short_CIGAR_elements(virus, virus_header)
+		self.vread = virus
 		
 		assert self._is_chimeric()
 		
@@ -2832,32 +2945,24 @@ class FullIntegration(ChimericIntegration):
 		"""
 
 		# split viral read into MS ans SM
-		vread1, vread2 = self._split_read(self.vread, self.vhead)
+		vread1, vread2 = self._split_read(self.vread)
 		# split host read into SM and MS
-		hread1, hread2 = self._split_read(self.hread, self.hhead)
+		hread1, hread2 = self._split_read(self.hread)
 		
 		# if host and virus are aligned in same orientation, first part of host read
 		# goes with first part of virus read
 		if self.hread.is_reverse == self.vread.is_reverse:
-				self.left = ChimericIntegration(hread1, vread1, self.hhead, 
-												self.vhead, AlignmentPool(), 
-												AlignmentPool(), self.tol, self.map_thresh,
-												True)
-				self.right = ChimericIntegration(hread2, vread2, self.hhead, 
-												self.vhead, AlignmentPool(), 
-												AlignmentPool(), self.tol, self.map_thresh, 
-												True)
+				self.left = ChimericIntegration(hread1, vread1, map_thresh =self.map_thresh,
+												tol = self.tol, primary = True)
+				self.right = ChimericIntegration(hread2, vread2, map_thresh = self.map_thresh, 
+												tol = self.tol, primary = True)
 		# otherwise, first part of host read goes with second part of virus read and
 		# vice versa
 		else:
-				self.left = ChimericIntegration(hread1, vread2, self.hhead, 
-												self.vhead, AlignmentPool(), 
-												AlignmentPool(), self.tol, self.map_thresh,
-												True)
-				self.right = ChimericIntegration(hread2, vread1, self.hhead, 
-												self.vhead, AlignmentPool(), 
-												AlignmentPool(), self.tol, self.map_thresh, 
-												True)						
+				self.left = ChimericIntegration(hread1, vread2, map_thresh = self.map_thresh,
+												tol = self.tol, primary = True)
+				self.right = ChimericIntegration(hread2, vread1, map_thresh = self.map_thresh, 
+												tol = self.tol, primary = True)						
 		
 	def get_properties(self):
 		"""
@@ -2885,7 +2990,7 @@ class FullIntegration(ChimericIntegration):
 		
 		return props
 		
-	def _create_segment(self, read, header, start, end):
+	def _create_segment(self, read, start, end):
 		"""
 		Create new pysam.AlignedSegment using existing one, using the cigar operations
 		between start and end (as in all python, 0-based half-open)
@@ -2964,7 +3069,7 @@ class FullIntegration(ChimericIntegration):
 		query_start = sum([i[1] for i in read.cigartuples[:start] if i[0] in (0, 1, 4)])
 		query_end = sum([i[1] for i in read.cigartuples[:end] if i[0] in (0, 1, 4)])
 		new_query = read.query_sequence[query_start:query_end]
-		new_quals = copy.copy(read.query_qualities[query_start:query_end])
+#		new_quals = copy.copy(read.query_qualities[query_start:query_end])
 		
 		# if we're getting a mapped region that isn't the first one, will also need
 		# to adjust the mapping position - new_pos
@@ -3002,20 +3107,13 @@ class FullIntegration(ChimericIntegration):
 			tags.append(('OA', OA_update))
 			
 		#create new pysam.AlignedSegment
-		a = pysam.AlignedSegment(header = header.to_dict())
-		a.query_name = read.query_name
-		a.query_sequence= new_query
-		a.flag = read.flag
-		a.reference_id = read.reference_id
+		a = copy.deepcopy(read)
+		a.query_sequence = new_query
 		a.reference_start = new_pos
-		a.mapping_quality = read.mapping_quality
 		a.cigartuples = new_cigartuples
-		a.next_reference_id = read.next_reference_id
-		a.next_reference_start = read.next_reference_start
-		a.template_length = read.template_length
-		a.query_qualities = new_quals
-		a.tags = tags
-
+#		a.query_qualities = new_quals
+		
+		
 		return a
 	
 	def _get_alt_ints(self):
@@ -3046,8 +3144,8 @@ class FullIntegration(ChimericIntegration):
 			
 				# if hst and vrs constitute a valid integration, add to list
 				try:
-					alt_int = FullIntegration(hst, vrs, self.hhead, self.vhead,
-					AlignmentPool(), AlignmentPool(), self.tol, self.map_thresh, False)
+					alt_int = FullIntegration(hst, vrs, map_thresh= self.map_thresh, 
+												primary = False)
 					alt_ints.append(alt_int)
 					
 				except AssertionError:
@@ -3138,7 +3236,7 @@ class FullIntegration(ChimericIntegration):
 		
 		return True
 		
-	def _split_read(self, read, header):
+	def _split_read(self, read):
 		"""
 		For a read composed of three cigar operations (SMS or MIM), split into
 		two reads with two of the three operations each (SM and MS or MI and IM).
@@ -3150,8 +3248,8 @@ class FullIntegration(ChimericIntegration):
 		assert cigarops == [4,0,4] or cigarops == [0,1,0]
 		
 		# get first part of read
-		first = self._create_segment(read, header, 0, 2)
-		second = self._create_segment(read, header, 1, 3)
+		first = self._create_segment(read, 0, 2)
+		second = self._create_segment(read, 1, 3)
 
 		return first, second
 		
