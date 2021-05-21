@@ -99,14 +99,13 @@ class AlignmentFilePair:
 				print(f"checking {self.curr_host[0].qname}")
 				
 			# collect read 1 alignments
-			host_r1_primary  = self.curr_host.get_primary_r1()
+			host_r1_primary  = self.curr_host.get_primary_r1(self.tol)
 			host_r1_not_primary = self.curr_host.get_not_primary().get_read1()
 			
-			virus_r1_primary =  self.curr_virus.get_primary_r1()
+			virus_r1_primary =  self.curr_virus.get_primary_r1(self.tol)
 			virus_r1_not_primary = self.curr_virus.get_not_primary().get_read1()
 
 			# check if primary read 1 alignments appear to be chimeric	
-			
 			if host_r1_primary is not None and virus_r1_primary is not None:
 				if self._is_chimeric(host_r1_primary, virus_r1_primary,
 									host_r1_not_primary, virus_r1_not_primary):
@@ -119,15 +118,14 @@ class AlignmentFilePair:
 
 																				
 			# collect read2 alignments
-			host_r2_primary = self.curr_host.get_primary_r2()
+			host_r2_primary = self.curr_host.get_primary_r2(self.tol)
 			host_r2_not_primary = self.curr_host.get_not_primary().get_read2()
 			
-			virus_r2_primary = self.curr_virus.get_primary_r2()
+			virus_r2_primary = self.curr_virus.get_primary_r2(self.tol)
 			virus_r2_not_primary = self.curr_virus.get_not_primary().get_read2()			
 
 			
 			# check if primary read 1 alignments appear to be chimeric	
-			
 			if host_r2_primary is not None and virus_r2_primary is not None:
 				if self._is_chimeric(host_r2_primary, virus_r2_primary,
 									host_r2_not_primary, virus_r2_not_primary):
@@ -139,10 +137,10 @@ class AlignmentFilePair:
 
 										
 			# if there are alignments that are neither read 1 nor read 2, check if chimeric		
-			host_not12_primary = self.curr_host.get_primary_not_r1_or_r2()
+			host_not12_primary = self.curr_host.get_primary_not_r1_or_r2(self.tol)
 			host_not12_not_primary = self.curr_host.get_not_primary().get_not_read1_or_read2()
 			
-			virus_not12_primary = self.curr_virus.get_primary_not_r1_or_r2()
+			virus_not12_primary = self.curr_virus.get_primary_not_r1_or_r2(self.tol)
 			virus_not12_not_primary = self.curr_virus.get_not_primary().get_not_read1_or_read2()
 			
 			if host_not12_primary is not None and virus_not12_primary is not None:
@@ -429,11 +427,11 @@ class AlignmentPool(list):
 		cigar = XA[2]
 		nm = int(XA[3])
 		
+		# use this info with primary alignment to create new pysam.AlignedSegment 
 		new_seg = self._create_new_segment_from_primary(primary, ref_name=chr, pos=pos, 
 														ori=ori,cigar=cigar, nm=nm)
 		
 		# we copied all flags from primary, so need to update this												
-
 		new_seg.is_supplementary = True
 		# remove MD tag since it only applies to primary alignment
 	
@@ -494,36 +492,36 @@ class AlignmentPool(list):
 		""" Return an AlignmentPool with only the reads that are neither read1 nor read2 from an AlignmentPool """
 		return AlignmentPool([read for read in self if not read.is_read1 and not read.is_read2])
 		
-	def get_primary_r1(self):
+	def get_primary_r1(self, tol):
 		""" Return the primary read 1 alignment as a pysam.AlignedSegment object, or None if there isn't one """
 		
 		primary_r1 = self.get_primary().get_read1()
 		if len(primary_r1) == 0:
 			return None
 		elif len(primary_r1) == 1:
-			return primary_r1[0]	
+			return self._combine_short_CIGAR_elements(tol, primary_r1[0])
 		else:
 			raise ValueError(f"found more than one primary alignment for {self[0].qname} read 1")	
 		
-	def get_primary_r2(self):
+	def get_primary_r2(self, tol):
 		""" Return the primary read 2 alignment as a pysam.AlignedSegment object, or None if there isn't one """
 		
 		primary_r2 = self.get_primary().get_read2()
 		if len(primary_r2) == 0:
 			return None
 		elif len(primary_r2) == 1:
-			return primary_r2[0]	
+			return self._combine_short_CIGAR_elements(tol, primary_r2[0])	
 		else:
 			raise ValueError(f"found more than one primary alignment for {self[0].qname} read 2")	
 
-	def get_primary_not_r1_or_r2(self):
+	def get_primary_not_r1_or_r2(self, tol):
 		""" Return the primary read 1 alignment as a pysam.AlignedSegment object, or None if there isn't one """
 		
 		primary = self.get_primary().get_not_read1_or_read2()
 		if len(primary) == 0:
 			return None
 		elif len(primary) == 1:
-			return primary[0]	
+			return self._combine_short_CIGAR_elements(tol, primary[0])
 		else:
 			raise ValueError(f"found more than one primary alignment for {self[0].qname} (not read 1 or read 2)")	
 			
@@ -1539,10 +1537,12 @@ class ChimericIntegration:
 		self.verbose = verbose
 
 		self.original_hread = host
-		self.hread = self._simplify_CIGAR(host)
+		#self.hread = self._simplify_CIGAR(host)
+		self.hread = host
 
 		self.original_vread = virus
-		self.vread = self._simplify_CIGAR(virus)
+		#self.vread = self._simplify_CIGAR(virus)
+		self.vread = virus
 
 		# simple chimeric read has two CIGAR elements
 		assert self._is_chimeric()
@@ -2261,7 +2261,10 @@ class ChimericIntegration:
 				
 					# add secondary alignments to alt_int (not added during instatiation)
 					host_alns.append(self.hread)
-					host_alns.remove(alt_ints[i].original_hread)
+					try:
+						host_alns.remove(alt_ints[i].original_hread)
+					except:
+						pdb.set_trace()
 				
 					virus_alns.append(self.vread)
 					virus_alns.remove(alt_ints[i].original_vread)
