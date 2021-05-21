@@ -417,7 +417,7 @@ class AlignmentPool(list):
 	
 	def add_read_from_XA(self, XA, primary):
 		""" Add a read based on an XA string (chr,pos,CIGAR,NM) """
-		print("\t\taddig read from XA")
+
 		
 		# get info from XA string
 		XA = XA.split(",")
@@ -433,10 +433,10 @@ class AlignmentPool(list):
 														ori=ori,cigar=cigar, nm=nm)
 		
 		# we copied all flags from primary, so need to update this												
-		print("\t\t setting to supplementary")	
+
 		new_seg.is_supplementary = True
 		# remove MD tag since it only applies to primary alignment
-		print("\t\t removing MD tag")		
+	
 		new_seg = self._remove_MD_tag(new_seg)
 		
 		self.append(new_seg)
@@ -444,7 +444,6 @@ class AlignmentPool(list):
 	def add_read_from_SA(self, SA, primary):
 		""" Add a read based on an SA string (rname,pos,strand,CIGAR,mapQ,NM) """
 
-		print("\t\taddig read from SA")
 		# get info from SA string
 		SA = SA.split(",")
 		assert len(SA) == 6
@@ -459,9 +458,9 @@ class AlignmentPool(list):
 		new_seg = self._create_new_segment_from_primary(primary, ref_name=chr, pos=pos, 
 														ori=ori, cigar=cigar, nm=nm, 
 														mapq=mapq)
-		print("\t\t setting to secondary")														
+													
 		new_seg.is_secondary = True
-		print("\t\t removing MD tag")
+
 		new_seg = self._remove_MD_tag(new_seg)
 		
 		self.append(new_seg)
@@ -550,10 +549,7 @@ class AlignmentPool(list):
 		
 		# check that we're dealing with the same query, and
 		# check that all are read1, read2, or neither
-		try:
-			assert self._is_same_read()
-		except:
-			pdb.set_trace()
+		assert self._is_same_read()
 		
 		query_length = self[0].query_length
 		
@@ -876,9 +872,6 @@ class AlignmentPool(list):
 			
 		if has_md:
 		
-			if md == '':
-				pdb.set_trace()
-		
 			tmp_cigartuples = self._combine_MD_with_CIGAR(read.cigartuples, md)
 
 		else:
@@ -1132,7 +1125,6 @@ class AlignmentPool(list):
 			
 			# if we're reversing orientation, need to reverse CO tag as well
 			if co is not None:
-				pdb.set_trace()
 				
 				# we need to know the length of cigartuples (updated or otherwise)
 				if cigar is not None:
@@ -1291,10 +1283,7 @@ class AlignmentPool(list):
 		It also reverses any reads that are mapped in the reverse orientation, which will 
 		mess up the mapping positions
 		"""
-		try:
-			assert self._is_same_read()
-		except: 
-			pdb.set_trace()
+		assert self._is_same_read()
 		
 		if len(self) < 2:
 			return
