@@ -2261,10 +2261,7 @@ class ChimericIntegration:
 				
 					# add secondary alignments to alt_int (not added during instatiation)
 					host_alns.append(self.hread)
-					try:
-						host_alns.remove(alt_ints[i].original_hread)
-					except:
-						pdb.set_trace()
+					host_alns.remove(alt_ints[i].original_hread)
 				
 					virus_alns.append(self.vread)
 					virus_alns.remove(alt_ints[i].original_vread)
