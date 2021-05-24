@@ -468,8 +468,8 @@ class AlignmentPool(list):
 		combine short cigar elements in all reads in pool
 		"""
 		
-		for read in self:
-			read = self._combine_short_CIGAR_elements(tol, read)
+		for i in range(len(self)):
+			self[i] = self._combine_short_CIGAR_elements(tol, self[i])
 	
 	def get_primary(self):
 		""" Return an AlignmentPool with only the primary alignment(s) from an AlignmentPool """
@@ -916,8 +916,9 @@ class AlignmentPool(list):
 					nm_offset -= read.cigartuples[idx][1]
 				
 				## update MD tag
-				# if we're combining a soft-clip with a matched region, add to MD tag
-				if read.cigartuples[idx][0] == 4:
+				# if we're combining a soft-clip or insertion with a matched region, 
+				# add to MD tag
+				if read.cigartuples[idx][0] in {4, 1}:
 					
 					# need to add bases to MD tag, but don't know what reference was at
 					# this position.  So just add a string of 'X's, which need to be 
@@ -949,7 +950,7 @@ class AlignmentPool(list):
 					
 				# for an insertion or deletion, keep track of the number of bases added
 				# for adding to the CO tag
-				if read.cigartuples[idx][0] in (1, 2):
+				if read.cigartuples[idx][0] in {1, 2}:
 					num_ins_or_del += read.cigartuples[idx][1]
 					
 					# if we're deleting something from before the mapped region, we also
@@ -1063,7 +1064,8 @@ class AlignmentPool(list):
 				pos_offset = 0
 
 		nm = read.get_tag('NM') + nm_offset
-		return self._create_new_segment_from_primary(read, cigartuples=tmp_cigartuples,
+		pos = read.reference_start + pos_offset
+		return self._create_new_segment_from_primary(read, pos=pos, cigartuples=tmp_cigartuples,
 														nm=nm, co=co, md=md)
 			
 	def _convert_cigarstring_to_cigartuples(self, cigar):
@@ -1152,6 +1154,9 @@ class AlignmentPool(list):
 		if cigar is not None:
 			a.cigartuples = self._convert_cigarstring_to_cigartuples(cigar)
 		
+		if cigartuples is not None:
+			a.cigartuples = cigartuples
+		
 		if nm is not None:
 			a.set_tag('NM', nm)
 			
@@ -1161,6 +1166,18 @@ class AlignmentPool(list):
 		if md is not None:
 			a.set_tag('MD', md)
 
+		# add OA tag
+		orig_strand = '+' if not primary.is_reverse else '-'
+		OA_update = (primary.reference_name, str(primary.reference_start), orig_strand, 
+						primary.cigarstring, str(primary.mapping_quality), 
+						str(primary.get_tag('NM')))
+		OA_update = ",".join(OA_update) + ";"	
+		try:
+			a.set_tag('OA', primary.get_tag('OA') + OA_update)
+		except KeyError:
+			a.set_tag('OA', OA_update)
+		
+		
 		return a	
 		
 	def _is_same_read(self):
