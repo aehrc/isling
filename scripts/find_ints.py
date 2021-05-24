@@ -3068,7 +3068,7 @@ class FullIntegration(ChimericIntegration):
 				continue
 			i_map, bp = elem.split(":")
 			i_map = int(i_map)
-			if i_map >= start and i_map < stop:
+			if i_map >= start and i_map < end:
 				nm += int(bp)
 			
 		# get subset of query sequence for assigning to new read
