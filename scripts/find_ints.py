@@ -84,7 +84,7 @@ class AlignmentFilePair:
 		
 		# iterate over reads that have alignments to both host and virus
 		for alns in self._get_aligns():
-		
+			
 			if self.debug:
 				print(f"{self.__repr__()}: find_integrations {self.curr_host[0].query_name}")
 		
@@ -96,7 +96,7 @@ class AlignmentFilePair:
 				break
 				
 			if self.verbose:
-				print(f"checking {self.curr_host[0].qname}")
+				print(f"checking {self.curr_host[0].query_name}")
 				
 			# collect read 1 alignments
 			host_r1_primary  = self.curr_host.get_primary_r1(self.tol)
@@ -270,22 +270,24 @@ class AlignmentFilePair:
 				return
 		
 			# check if the query names are the same for host and viral alignments
-			if self.curr_host[0].qname == self.curr_virus[0].qname:
+			if self.curr_host[0].query_name == self.curr_virus[0].query_name:
 				
 				yield
 				self.curr_host = self.host.collect_next_read_alignments()
 				self.curr_virus = self.virus.collect_next_read_alignments()
 
-			# host qname less than viral qname
-			elif self.curr_host[0].qname > self.curr_virus[0].qname:
+			# host query_name less than viral query_name
+			elif self._str_gt(self.curr_host[0].query_name, self.curr_virus[0].query_name):
+#			elif self.curr_host[0].query_name > self.curr_virus[0].query_name:
 				if self.verbose:
-					print(f"warning: host bam has no alignment for read {self.curr_virus[0].qname} in virus bam, skipping")
+					print(f"warning: host bam has no alignment for read {self.curr_virus[0].query_name} in virus bam, skipping")
 				self.curr_virus = self.virus.collect_next_read_alignments()
 
-			# viral qname less than host qname
-			elif self.curr_virus[0].qname > self.curr_host[0].qname:
+			# viral query_name less than host query_name
+#			elif self.curr_virus[0].query_name > self.curr_host[0].query_name:
+			else:
 				if self.verbose:
-					print(f"warning: virus bam has no alignments for read {self.curr_host[0].qname} in host bam, skipping")
+					print(f"warning: virus bam has no alignments for read {self.curr_host[0].query_name} in host bam, skipping")
 				self.curr_host = self.host.collect_next_read_alignments()
 
 	def close(self):
@@ -300,6 +302,21 @@ class AlignmentFilePair:
 	
 	def __exit__(self, exception, error, traceback):
 		self.close()
+		
+	def _str_gt(self, str1, str2):
+		"""
+		Compare strings in the same way that samtools sorts: shorter string is less, compare the
+		same length strings lexiographically
+		"""
+		
+		if len(str1) != len(str2):
+			if len(str1) > len(str2):
+				return True
+			else:
+				return False
+				
+		return str1 > str2
+		 
 
 class AlignmentFile:
 	""" Basically just pysam.AlignmentFile, but with a few extra methods """
@@ -334,13 +351,13 @@ class AlignmentFile:
 		
 		alns = AlignmentPool()
 			
-		qname = self.curr.qname
+		query_name = self.curr.query_name
 		
 		if self.end:
 			return None
 		
 		# keep getting elements until we either reach a different read or the end of the list
-		while (self.curr.qname == qname) and (self.curr.qname is not None):
+		while (self.curr.query_name == query_name) and (self.curr.query_name is not None):
 			# includes R1, R2, primary, secondary, supplementary alignments
 			alns.append(self.curr)		
 			self._get_next_align()
@@ -391,7 +408,7 @@ class AlignmentFile:
 				self.curr = next(self.aln)
 			except StopIteration:
 				self.end = True
-				self.curr.qname = None
+				self.curr.query_name = None
 				if self.verbose:
 					print(f"reached end of file {self.filename}")
 					
@@ -410,7 +427,7 @@ class AlignmentPool(list):
 	""" 
 	Basically just a list of pysam.AlignedSegment objects, but with a few extra methods.
 	
-	Should only contain alignments from the same read-pair (i.e. qname should be the same for all reads in pool)
+	Should only contain alignments from the same read-pair (i.e. query_name should be the same for all reads in pool)
 	"""
 	
 	def add_read_from_XA(self, XA, primary):
@@ -501,7 +518,7 @@ class AlignmentPool(list):
 		elif len(primary_r1) == 1:
 			return self._combine_short_CIGAR_elements(tol, primary_r1[0])
 		else:
-			raise ValueError(f"found more than one primary alignment for {self[0].qname} read 1")	
+			raise ValueError(f"found more than one primary alignment for {self[0].query_name} read 1")	
 		
 	def get_primary_r2(self, tol):
 		""" Return the primary read 2 alignment as a pysam.AlignedSegment object, or None if there isn't one """
@@ -512,7 +529,7 @@ class AlignmentPool(list):
 		elif len(primary_r2) == 1:
 			return self._combine_short_CIGAR_elements(tol, primary_r2[0])	
 		else:
-			raise ValueError(f"found more than one primary alignment for {self[0].qname} read 2")	
+			raise ValueError(f"found more than one primary alignment for {self[0].query_name} read 2")	
 
 	def get_primary_not_r1_or_r2(self, tol):
 		""" Return the primary read 1 alignment as a pysam.AlignedSegment object, or None if there isn't one """
@@ -523,7 +540,7 @@ class AlignmentPool(list):
 		elif len(primary) == 1:
 			return self._combine_short_CIGAR_elements(tol, primary[0])
 		else:
-			raise ValueError(f"found more than one primary alignment for {self[0].qname} (not read 1 or read 2)")	
+			raise ValueError(f"found more than one primary alignment for {self[0].query_name} (not read 1 or read 2)")	
 			
 	def get_rearrangement_nm(self):
 		""" 
