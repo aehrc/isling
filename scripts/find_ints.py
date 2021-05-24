@@ -299,9 +299,15 @@ class AlignmentFilePair:
 				self.curr_host = self.host.collect_next_read_alignments()
 				
 			# take note of query name to check sort order
-			prev_host = self.curr_host[0].query_name
-			prev_virus = self.curr_virus[0].query_name
-
+			try:
+				prev_host = self.curr_host[0].query_name
+			except TypeError:
+				prev_host = None
+			try:
+				prev_virus = self.curr_virus[0].query_name
+			except TypeError:
+				prev_host = None
+				
 	def close(self):
 		""" Close both alignments """
 
@@ -348,9 +354,8 @@ class AlignmentFilePair:
 		"""
 		Return True if current queryname is greater than or equal to previous queryname
 		"""
-		if curr_lst is None:
+		if curr_lst is None or prev is None:
 			return True
-		
 		
 		if curr_lst[0].query_name == prev:
 			return True
