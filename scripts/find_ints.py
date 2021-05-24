@@ -272,12 +272,10 @@ class AlignmentFilePair:
 			if self.curr_host is None or self.curr_virus is None:
 				return
 				
-			if not self._str_gt(self.curr_host[0].query_name, prev_host):
-				if not self.curr_host[0].query_name == prev_host:
-					raise ValueError(f"host bam must be sorted with 'samtools sort -n' (found out of order read {self.curr_host[0].query_name})")
-			if not self._str_gt(self.curr_virus[0].query_name, prev_virus):
-				if not self.curr_virus[0].query_name == prev_virus:				
-					raise ValueError("host bam must be sorted with 'samtools sort -n' (found out of order read {self.curr_virus[0].query_name})")
+			if not self._check_sort_order(self.curr_host, prev_host):
+				raise ValueError(f"host bam must be sorted with 'samtools sort -n' (found out of order read {self.curr_host[0].query_name})")
+			if not self._check_sort_order(self.curr_virus, prev_virus):			
+				raise ValueError("host bam must be sorted with 'samtools sort -n' (found out of order read {self.curr_virus[0].query_name})")
 				
 						
 			# check if the query names are the same for host and viral alignments
@@ -345,6 +343,22 @@ class AlignmentFilePair:
 			return True
 		except:
 			return False
+			
+	def _check_sort_order(self, curr_lst, prev):
+		"""
+		Return True if current queryname is greater than or equal to previous queryname
+		"""
+		if curr_lst is None:
+			return True
+		
+		
+		if curr_lst[0].query_name == prev:
+			return True
+		
+		if self._str_gt(curr_lst[0].query_name, prev):
+			return True
+		
+		return False
 
 class AlignmentFile:
 	""" Basically just pysam.AlignmentFile, but with a few extra methods """
