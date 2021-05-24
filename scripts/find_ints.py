@@ -63,7 +63,7 @@ class AlignmentFilePair:
 		self.out.write("\t".join(self.header) + "\n")
 		
 		if self.tlen == 0:
-			print(f"warning: insert size is zero - the position for discordant intergration sites will be at the end of the mapped read")
+			print(f"warning: insert size is zero - the position for discordant integration sites will be at the end of the mapped read")
 		
 		if self.tlen < 0:
 			raise ValueError("Mean template length must be a positive integer")
@@ -83,7 +83,7 @@ class AlignmentFilePair:
 		ints = 0
 		
 		# iterate over reads that have alignments to both host and virus
-		for alns in self._get_aligns():
+		for _ in self._get_aligns():
 			
 			if self.debug:
 				print(f"{self.__repr__()}: find_integrations {self.curr_host[0].query_name}")
@@ -185,6 +185,7 @@ class AlignmentFilePair:
 		"""
 		if self.debug:
 			print("\tchecking for chimeric integration")	
+			
 		try:
 			integration = ChimericIntegration(hread, vread, map_thresh = self.map_thresh,
 												tol = self.tol)	
@@ -262,13 +263,23 @@ class AlignmentFilePair:
 		self.curr_host = self.host.collect_next_read_alignments()
 		self.curr_virus = self.virus.collect_next_read_alignments()
 		
+		prev_host = self.curr_host[0].query_name
+		prev_virus = self.curr_virus[0].query_name
 
 		# continue until we've either found the same read or reached the end of one of the files
 		while True:
 		
 			if self.curr_host is None or self.curr_virus is None:
 				return
-		
+				
+			if not self._str_gt(self.curr_host[0].query_name, prev_host):
+				if not self.curr_host[0].query_name == prev_host:
+					raise ValueError(f"host bam must be sorted with 'samtools sort -n' (found out of order read {self.curr_host[0].query_name})")
+			if not self._str_gt(self.curr_virus[0].query_name, prev_virus):
+				if not self.curr_virus[0].query_name == prev_virus:				
+					raise ValueError("host bam must be sorted with 'samtools sort -n' (found out of order read {self.curr_virus[0].query_name})")
+				
+						
 			# check if the query names are the same for host and viral alignments
 			if self.curr_host[0].query_name == self.curr_virus[0].query_name:
 				
@@ -278,7 +289,6 @@ class AlignmentFilePair:
 
 			# host query_name less than viral query_name
 			elif self._str_gt(self.curr_host[0].query_name, self.curr_virus[0].query_name):
-#			elif self.curr_host[0].query_name > self.curr_virus[0].query_name:
 				if self.verbose:
 					print(f"warning: host bam has no alignment for read {self.curr_virus[0].query_name} in virus bam, skipping")
 				self.curr_virus = self.virus.collect_next_read_alignments()
@@ -289,6 +299,10 @@ class AlignmentFilePair:
 				if self.verbose:
 					print(f"warning: virus bam has no alignments for read {self.curr_host[0].query_name} in host bam, skipping")
 				self.curr_host = self.host.collect_next_read_alignments()
+				
+			# take note of query name to check sort order
+			prev_host = self.curr_host[0].query_name
+			prev_virus = self.curr_virus[0].query_name
 
 	def close(self):
 		""" Close both alignments """
@@ -305,18 +319,32 @@ class AlignmentFilePair:
 		
 	def _str_gt(self, str1, str2):
 		"""
-		Compare strings in the same way that samtools sorts: shorter string is less, compare the
-		same length strings lexiographically
+		Compare strings in the same way that samtools sorts: a 'natural' sort
+		Break strings into chunks consisting of all letters and all numbers and compare these
+		if the chunk contains non-digit characters sort lexiographically, otherwise sort 
+		numerically
 		"""
 		
-		if len(str1) != len(str2):
-			if len(str1) > len(str2):
-				return True
+		#https://blog.codinghorror.com/sorting-for-humans-natural-sort-order/
+		convert = lambda text: int(text) if text.isdigit() else text
+		chunk = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ]
+		
+		for c1, c2 in zip(chunk(str1), chunk(str2)):
+			if c1 == c2:
+				continue
+			if self._is_int(c1) and self._is_int(c2):
+				return c1 > c2
 			else:
-				return False
-				
-		return str1 > str2
+				return str(c1) > str(c2)
 		 
+		return False
+		
+	def _is_int(self, x):
+		try:
+			int(x)
+			return True
+		except:
+			return False
 
 class AlignmentFile:
 	""" Basically just pysam.AlignmentFile, but with a few extra methods """
