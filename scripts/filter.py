@@ -70,22 +70,28 @@ def main(args):
 	print(f"filtering {args.input} using criteria {crit.criteria}")
 	
 	with open(args.input, 'r') as in_handle, open(args.keep, 'w') as keep_handle, open(args.exclude, 'w') as exclude_handle:
-		in_csv = csv.DictReader(in_handle, delimiter = '\t')
+	
+		# get header from infile
+		try:
+			header = next(in_handle)
+		except StopIteration:
+			print(f"input file {args.input} is empty")
+			return
+			
+		# write header to keep and exclude
+		keep_handle.write(header)
+		exclude_handle.write(header)
 		
-		keep = csv.DictWriter(keep_handle, delimiter = '\t', fieldnames = in_csv.fieldnames)
-		keep.writeheader()
-		
-		exclude = csv.DictWriter(exclude_handle, delimiter = '\t', fieldnames = in_csv.fieldnames)
-		exclude.writeheader()
+		header = header.strip().split('\t')
 		
 		kept, excluded = 0, 0
 		
-		for row in in_csv:
-			if crit.filter_row(row):
-				keep.writerow(row)
+		for row in in_handle:
+			if crit.filter_row(row, header):
+				keep_handle.write(row)
 				kept += 1
 			else:
-				exclude.writerow(row)	
+				exclude_handle.write(row)	
 				excluded += 1
 
 	print(f"found {kept+excluded} candidate integrations: kept {kept} and excuded {excluded}")
@@ -118,13 +124,13 @@ class Criteria():
 		# check that criteria are valid
 		self.__check_criteria_valid()
 		
-	def filter_row(self, row_original):
-
-		assert isinstance(row_original, dict)
+	def filter_row(self, row_str, header_lst):
 		
-		row = dict(row_original)
+		# split row into dict using header list
+		row = {colname:val for colname, val in zip(header_lst, row_str.strip().split('\t'))} 
+		assert len(row) == len(header_lst)
 		
-		# when comparing integers, we need to convert strings imported by DictReader into ints
+		# when comparing integers, we need to convert strings into ints
 		for int_col in [i for i in self.column_spec.keys() if self.column_spec[i] == 'integer']:
 			try:
 				row[int_col] = int(row[int_col] )
