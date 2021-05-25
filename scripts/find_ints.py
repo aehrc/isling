@@ -26,13 +26,15 @@ def main():
 	parser.add_argument('--integrations', help='file to output integrations to', default='integrations.tsv')
 	parser.add_argument('--map-thresh', help="threshold for length of mapped region", default=20, type=int)
 	parser.add_argument('--mean-template-length', help="mean template length for library", default=0, type=float)
-	parser.add_argument('--tolerance', help="tolerance for short CIGAR operations (MIS ops with a combined length equal to or shorter than this will be combined into the nearest mapped region)", type=int, default=3)
+	parser.add_argument('--tolerance', help="tolerance for short CIGAR operations (MIS ops with a combined length equal to or shorter than this will be combined into the nearest mapped region)", type=int, default=3)	
 	parser.add_argument('--verbose', '-v', help="print extra messages?", action='store_true')
 	parser.add_argument('--debug', '-d', help="print lots of extra messages?", action='store_true')
+	parser.add_argument('--nm-diff', help="output all alternate integration sites with an edit distance at most this much more than the primary integration", type=int, default=None)
+	parser.add_argument('--nm-pc', help="output all alternate integration sites with an edit distance at most this percentage more than the primary integration", type=float, default=None)
 	args = parser.parse_args()
 
 	with AlignmentFilePair(args.host, args.virus, args.integrations, args.map_thresh, args.mean_template_length,
-							args.tolerance, args.verbose, args.debug) as pair:		
+							args.tolerance, args.nm_diff, args.nm_pc, args.verbose, args.debug) as pair:		
 		
 		pair.find_integrations()
 
@@ -40,7 +42,7 @@ def main():
 class AlignmentFilePair:
 	""" A class to hold host and viral alignments, and look for integrations """
 	
-	def __init__(self, host, virus, outfile, map_thresh, tlen, tol = 3, verbose = False, debug=False):
+	def __init__(self, host, virus, outfile, map_thresh, tlen, tol = 3, nm_diff=None, nm_pc=None, verbose = False, debug=False):
 		""" Open host and viral alignments, and check for query sorting """
 		
 		self.host = AlignmentFile(host, verbose)
@@ -54,7 +56,8 @@ class AlignmentFilePair:
 		self.debug = debug
 		self.tlen = int(tlen) # tlen needs to be int so that output coords are ints
 		self.tol = tol
-		self.ints = []
+		self.nm_diff = nm_diff
+		self.nm_pc = nm_pc
 		
 		# open outfile and write a header
 		self.outfile = outfile
@@ -188,7 +191,8 @@ class AlignmentFilePair:
 			
 		try:
 			integration = ChimericIntegration(hread, vread, map_thresh = self.map_thresh,
-												tol = self.tol)	
+												tol = self.tol, nm_diff=self.nm_diff,
+												nm_pc=self.nm_pc)	
 		except AssertionError:
 			return False
 
@@ -212,7 +216,8 @@ class AlignmentFilePair:
 		try:
 			integration = DiscordantIntegration(hread1, hread2, vread1, vread2, 
 										map_thresh = self.map_thresh, tlen = self.tlen,
-										tol = self.tol)
+										tol = self.tol, nm_diff=self.nm_diff,
+										nm_pc=self.nm_pc)
 
 		except AssertionError:
 			return False
@@ -241,7 +246,8 @@ class AlignmentFilePair:
 			print("\tchecking for full integration")	
 		try:
 			integration = FullIntegration(hread, vread, map_thresh = self.map_thresh,
-											tol = self.tol)
+											tol = self.tol, nm_diff=self.nm_diff,
+												nm_pc=self.nm_pc)
 
 		except AssertionError:
 			return False
@@ -1598,10 +1604,11 @@ class ChimericIntegration:
 	A class to store/calculate the properties of a simple chimeric integration 
 	(ie mapped/clipped and clipped/mapped) 
 	"""
-	__slots__ = 'map_thresh', 'primary', 'hread', 'vread', 'hsec', 'vsec', 'chr', 'virus', 'verbose', 'original_hread', 'original_vread', 'tol'
+	__slots__ = 'map_thresh', 'primary', 'hread', 'vread', 'hsec', 'vsec', 'chr', 'virus', 'verbose', 'original_hread', 'original_vread', 'tol', 'nm_pc', 'nm_diff'
 	
 	def __init__(self, host, virus, host_sec = AlignmentPool(), virus_sec = AlignmentPool(),  
-					 tol = 3, map_thresh=20, primary=True, verbose=False):
+					 tol = 3, map_thresh=20, nm_diff=None,
+					  nm_pc=None, primary=True, verbose=False):
 		""" 
 		Given a host and virus read that are chimeric, calculate the properties of the integration.
 		
@@ -1611,9 +1618,17 @@ class ChimericIntegration:
 
 		self.map_thresh = map_thresh
 		self.tol = tol
+		self.nm_pc = nm_pc
+		self.nm_diff = nm_diff
 		
 		assert self.map_thresh > 0
 		assert self.tol >= 0
+		
+		if self.nm_pc is not None:
+			assert self.nm_pc >= 0 and self.nm_pc <= 1
+		if self.nm_diff is not None:
+			assert self.nm_diff >= 0
+		
 		self.primary = primary
 		self.verbose = verbose
 
@@ -2019,6 +2034,22 @@ class ChimericIntegration:
 		
 		return a
 		
+	def _filter_alt_ints(self, alt_ints):
+		"""
+		Filter alternate integrations using self.alt_diff and self.alt_pc
+		"""
+
+		# only keep alternative integration sites that are close in edit distance
+		# to primary
+
+		if self.nm_pc is not None:
+			alt_ints = [int for int in alt_ints if self.get_total_edit_dist()/int.get_total_edit_dist() >= self.nm_pc]
+		
+		if self.nm_diff is not None:
+			alt_ints = [int for int in alt_ints if int.get_total_edit_dist() - self.get_total_edit_dist() <= self.nm_diff]
+					
+		return alt_ints
+		
 	def _get_alt_ints(self):
 		"""
 		If there is one or more secondary/supplementary alignment(s) that cover(s) the same 
@@ -2060,7 +2091,9 @@ class ChimericIntegration:
 					pass
 
 		alt_ints = self._swap_self_with_primary(alt_ints, host_alns, virus_alns)
-
+		
+		alt_ints = self._filter_alt_ints(alt_ints)
+	
 		return alt_ints
 
 	def _get_ambig_coords_read(self):
@@ -2377,15 +2410,22 @@ class DiscordantIntegration(ChimericIntegration):
 	def __init__(self, host_r1, host_r2, virus_r1, virus_r2,
 					host_sec1 = AlignmentPool(), host_sec2=AlignmentPool(), 
 					virus_sec1=AlignmentPool(), virus_sec2=AlignmentPool(),
-					map_thresh=20, tlen=0, tol=3, primary=True, verbose=False):
+					map_thresh=20, tlen=0, tol=3, nm_diff=None,
+					  nm_pc=None, primary=True, verbose=False):
 					
 		assert tlen >= 0
 		assert tol >= 0
 		assert map_thresh >= 0
+		if nm_pc is not None:
+			assert nm_pc >=0 and nm_pc <= 1
+		if nm_diff is not None:
+			assert nm_diff >= 0
 		
 		self.map_thresh = map_thresh
 		self.tlen = int(tlen)
 		self.tol = int(tol)
+		self.nm_pc = nm_pc
+		self.nm_diff = nm_diff
 		
 		self.primary = primary
 		self.verbose = verbose
@@ -2929,6 +2969,8 @@ class DiscordantIntegration(ChimericIntegration):
 					alt_ints.append(alt_int)				
 
 		alt_ints = self._swap_self_with_primary(alt_ints, haln, valn)
+		
+		alt_ints = self._filter_alt_ints(alt_ints)
 			
 		return alt_ints
 		
@@ -2980,13 +3022,20 @@ class FullIntegration(ChimericIntegration):
 	"""
 	__slots__ = 'left', 'right'
 	def __init__(self, host, virus, host_sec = AlignmentPool(), virus_sec = AlignmentPool(), 
-					map_thresh=20, tol=3, primary=True, verbose=False):
+					map_thresh=20, tol=3, nm_diff=None,
+					  nm_pc=None, primary=True, verbose=False):
 				
 		assert map_thresh > 0
 		assert tol >= 0
+		if nm_pc is not None:
+			assert nm_pc >=0 and nm_pc <= 1
+		if nm_diff is not None:
+			assert nm_diff >= 0
 					
 		self.map_thresh = map_thresh
 		self.tol = tol	
+		self.nm_pc = nm_pc
+		self.nm_diff = nm_diff
 		
 		self.primary = primary	
 		
@@ -3222,6 +3271,8 @@ class FullIntegration(ChimericIntegration):
 					pass	
 
 		alt_ints = self._swap_self_with_primary(alt_ints, host_alns, virus_alns)
+		
+		alt_ints = self._filter_alt_ints(alt_ints)
 
 		return alt_ints
 	
