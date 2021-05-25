@@ -14,6 +14,8 @@ from filter import Criteria
 bwa_mem_default = "-a -Y -A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -U 9 -T 10 -h 1,200"
 merge_dist_default = 100
 tol_default = 3
+nm_diff_default = 2
+nm_pc_default = None
 cutoff_default = 20
 merge_method_default= 'common'
 merge_n_min_default = 1
@@ -104,6 +106,8 @@ def make_df(config):
 		merge_dist = get_value_or_default(config, dataset, 'merge-dist', merge_dist_default)
 		clip_cutoff = get_value_or_default(config, dataset, 'clip-cutoff', cutoff_default)
 		cigar_tol = get_value_or_default(config, dataset, 'cigar-tol', tol_default)
+		nm_diff = get_value_or_default(config, dataset, 'alt-edit-dist-thresh', nm_diff_default)
+		nm_pc = get_value_or_default(config, dataset, 'alt-edit-dist-thresh-pc', nm_pc_default)		
 		bwa_mem_params = get_value_or_default(config, dataset, 'bwa-mem', bwa_mem_default)
 		merge_method = get_value_or_default(config, dataset, 'merge-method', merge_method_default)
 		merge_n_min = get_value_or_default(config, dataset, 'merge-n-min', merge_n_min_default)
@@ -122,7 +126,15 @@ def make_df(config):
 		check_int_gt(merge_n_min, -1, 'merge-n-min', dataset)
 		check_int_gt(split, 0, 'split', dataset)
 		check_int_gt(mapq, -1, 'mapq-threshold', dataset)
-
+		
+		if nm_diff is not None:
+			check_int_gt(nm_diff, -1, 'alt-edit-dist-thresh', dataset)
+		if nm_pc is not None:
+			if nm_pc < 0:
+				raise ValueError(f"edit distance threshold percentage ('alt-edit-dist-thresh-pc') must be greater than 0")
+			if nm_pc > 1:
+				raise ValueError(f"edit distance threshold percentage ('alt-edit-dist-thresh-pc') must be less than 1")
+				
 		if mean_frag_len != 'estimate':
 			if mean_frag_len < 0:
 				raise ValueError('key "mean-frag-len" in dataset {dataset} should be either the string "estimate", or a number greater than 0')
@@ -165,11 +177,11 @@ def make_df(config):
 			virus_prefix = config[dataset]["virus_prefixes"][virus]	
 			
 			# append combinations of each sample, host and virus		
-			rows.append((dataset_name, dataset, sample, host, host_fasta, host_prefix, virus, virus_fasta, virus_prefix, merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, merge_method, merge_n_min, clip_cutoff, cigar_tol, split, mean_frag_len, align_cpus, cat, dedup_subs, filter_str, bed_exclude, bed_include, mapq))
+			rows.append((dataset_name, dataset, sample, host, host_fasta, host_prefix, virus, virus_fasta, virus_prefix, merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, merge_method, merge_n_min, clip_cutoff, cigar_tol, split, mean_frag_len, align_cpus, cat, dedup_subs, filter_str, bed_exclude, bed_include, mapq, nm_diff, nm_pc))
 
 				
 	# make dataframe
-	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'merge_method', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'split', 'mean_frag_len', 'align_cpus', 'cat', 'dedup_subs', 'filter', 'bed_exclude', 'bed_include', 'mapq_thresh'])
+	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'merge_method', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'split', 'mean_frag_len', 'align_cpus', 'cat', 'dedup_subs', 'filter', 'bed_exclude', 'bed_include', 'mapq_thresh', 'nm_diff', 'nm_pc'])
 	
 	# do checks on dataframe
 	check_dataset_sample_unique(toDo)

@@ -29,6 +29,8 @@ global:
   # integration detection options
   clip-cutoff: 20
   cigar-tol: 3
+  alt-edit-dist-thresh: 2
+  alt-edit-dist-thresh-pc: 0.6
 
   # postprocessing options
   filter: 

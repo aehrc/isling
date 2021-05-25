@@ -10,6 +10,8 @@ rule find_ints:
 	params:
 		cutoff = lambda wildcards: f"--map-thresh {int(get_value_from_df(wildcards, 'clip_cutoff'))}",
 		tol = lambda wildcards: f"--tolerance {int(get_value_from_df(wildcards, 'cigar_tol'))}",
+		nm_pc = lambda wildcards: "" if get_value_from_df(wildcards, 'nm_pc') is None else f"--nm-pc {get_value_from_df(wildcards, 'nm_pc')}",
+		nm_diff = lambda wildcards: "" if get_value_from_df(wildcards, 'nm_diff') is None else f"--nm-diff {get_value_from_df(wildcards, 'nm_diff')}"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
