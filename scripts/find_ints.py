@@ -2003,15 +2003,6 @@ class ChimericIntegration:
 		accounted for by alignments to the virus than would be if the read was a host/virus
 		chimera
 		"""
-		
-#		if self.vread.query_name[0:3] == 'OTC':
-#			if not self._is_possible_rearrangement(self.vread, self.vsec):
-#				if len(self.vsec) > 0:
-#					print(self.vread)
-#					[print(i) for i in self.vsec]
-#					print(self.vread.cigarstring, self.vread.is_reverse, self.vread.get_tag('NM'), self.vread.reference_start)
-#					[print(read.cigarstring, read.is_reverse, read.get_tag('NM'), read.reference_start) for read in self.vsec]
-#					pdb.set_trace()
 
 		return self._is_possible_rearrangement(self.vread, self.vsec)
 		
@@ -2541,11 +2532,16 @@ class DiscordantIntegration(ChimericIntegration):
 		# check the start isn't less than zero
 		if start < 0:
 			start = 0
+		if stop < 0:
+			stop = 0
 
 		# check that the stop isn't more than the length of the reference
 		reference_length = read.header.get_reference_length(read.reference_name)
 		if stop > reference_length:
 			stop = reference_length
+			
+		if start > reference_length:
+			start = reference_length
 		
 		return (start, stop)
 
