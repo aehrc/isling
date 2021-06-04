@@ -132,7 +132,7 @@ rule post_final:
 		excluded = lambda wildcards: get_post_final(wildcards, 'excluded'),
 	output:
 		kept = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt",
-		excluded = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.excluded.txt"
+		excluded = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.filter_fail.txt"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
@@ -142,12 +142,52 @@ rule post_final:
 		mv {input.excluded} {output.excluded}
 		"""
 
+rule separate_unique_locations:
+	input:
+		kept = rules.post_final.output.kept
+	output:
+		unique = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.unique.txt",
+		host_ambig = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.host_ambig.txt",
+		virus_ambig = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.virus_ambig.txt",
+		both_ambig = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.both_ambig.txt",
+		tmp_both = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.both_ambig.txt.tmp")
+	params:
+		mapq = lambda wildcards: int(get_value_from_df(wildcards, 'mapq_thresh'))
+	container:
+		"docker://szsctt/simvi:1"
+	conda: "../envs/filter.yml"
+	resources:
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+	shell:
+		"""
+		# get uniquely localised integrations as kept
+		python3 scripts/filter.py \
+		-i {input.kept} \
+		-k {output.unique} \
+		-e {output.both_ambig} \
+		-c 'HostMapQ > {params.mapq} and ViralMapQ > {params.mapq} and AltLocs == None'
+		
+		# get integrations that are only ambiguous in host (but not in virus)
+		python3 scripts/filter.py \
+		-i {output.both_ambig} \
+		-k {output.host_ambig} \
+		-e {output.tmp_both} \
+		-c 'ViralMapQ > {params.mapq} and AltLocs == uniqueVirus'	
+			
+		# get integrations that are only ambiguous in virus (but not in host)
+		python3 scripts/filter.py \
+		-i {output.tmp_both} \
+		-k {output.virus_ambig} \
+		-e {output.both_ambig} \
+		-c 'HostMapQ > {params.mapq} and AltLocs == uniqueHost'		
+		"""
 		
 rule merged_bed:
 	input:
-		txt = rules.post_final.output.kept
+		txt = rules.separate_unique_locations.output.unique
 	output:
-		merged = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.merged.txt"
+		merged = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.unique.merged.txt"
 	params:
 		method = lambda wildcards: get_value_from_df(wildcards, 'merge_method'),
 		n = lambda wildcards: int(get_value_from_df(wildcards, 'merge_n_min')),

@@ -42,7 +42,6 @@ def get_for_align(wildcards, read_type):
 		else:
 			return rules.touch_merged.output.merged
 
-
 #### alignments ####
 rule index:
 	input:
@@ -116,7 +115,7 @@ rule combine_bwa_virus:
 		single = "{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaSingle.sam",
 		paired = "{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.sam",
 	output:
-		combined = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.sam"),
+		combined = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bam"),
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1.2, 500),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
@@ -128,7 +127,9 @@ rule combine_bwa_virus:
 	threads: cpus
 	shell:
 		"""
-		samtools merge {output.combined} {input.single} {input.paired}
+		rm -f {output.combined}*tmp*bam
+		samtools merge - {input.single} {input.paired} |\
+		samtools sort -n -o {output.combined} -
 		"""
 
 def get_sam(wildcards, readType, genome):
@@ -273,7 +274,7 @@ rule combine_host:
 		paired = rules.align_bwa_host_paired.output.sam,
 		single = rules.align_bwa_host_single.output.sam
 	output:
-		combined = temp("{outpath}/{dset}/host_aligned/{samp}.{part}.{host}.readsFrom{virus}.sam")
+		combined = temp("{outpath}/{dset}/host_aligned/{samp}.{part}.{host}.readsFrom{virus}.bam")
 	conda: 
 		"../envs/bwa.yml"
 	container:
@@ -284,7 +285,9 @@ rule combine_host:
 		nodes = 1
 	shell:		
 		"""
-		samtools merge {output.combined} {input.single} {input.paired}
+		rm -f {output.combined}*tmp*bam
+		samtools merge - {input.single} {input.paired} |\
+		samtools sort -n -o {output.combined} -
 		"""
 	
 
@@ -295,7 +298,7 @@ rule merge_virus_sams:
 		lambda wildcards: expand(strip_wildcard_constraints(rules.combine_bwa_virus.output.combined), 
 					part = get_split(wildcards), allow_missing=True)
 	output:
-		temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.sam")
+		bam = temp("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bam")
 	conda:
 		"../envs/bwa.yml"
 	resources:
@@ -316,7 +319,7 @@ rule merge_host_sams:
 		lambda wildcards:  expand(strip_wildcard_constraints(rules.combine_host.output.combined), 
 					part = get_split(wildcards), allow_missing=True)
 	output:
-		temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bwaSingle.sam")
+		bam = temp("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bam")
 	conda:
 		"../envs/bwa.yml"
 	resources:
@@ -331,45 +334,41 @@ rule merge_host_sams:
 		samtools merge {output} {input}
 		"""
 
-rule convert_virus_sam_to_bam:
+rule host_stats:
 	input:
-		sam = rules.merge_virus_sams.output
+		bam = rules.merge_host_sams.output.bam
 	output:
-		bam = "{outpath}/{dset}/virus_aligned/{samp}.{virus}.bam",
-		bai = "{outpath}/{dset}/virus_aligned/{samp}.{virus}.bam.bai"
-	conda: 
-		"../envs/bwa.yml"	
-	container:
-		"docker://szsctt/bwa:1"
+		stats = "{outpath}/{dset}/host_stats/{samp}.{host}.readsFrom{virus}.txt"
+	conda:
+		"../envs/bwa.yml"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 500),
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 0.5),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
+	container:
+		"docker://szsctt/bwa:1"	
+	threads: 1
 	shell:
 		"""
-		rm -f {output.bam}*tmp*bam
-		samtools sort -o {output.bam} {input.sam}
-		samtools index {output.bam}
+		samtools stats {input} > {output}
 		"""
 
-rule convert_host_sam_to_bam:
+rule virus_stats:
 	input:
-		sam = rules.merge_host_sams.output
+		bam = rules.merge_virus_sams.output.bam
 	output:
-		bam = "{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bam",
-		bai = "{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bam.bai"
-	conda: 
-		"../envs/bwa.yml"	
-	container:
-		"docker://szsctt/bwa:1"
+		stats = "{outpath}/{dset}/virus_stats/{samp}.{virus}.txt"
+	conda:
+		"../envs/bwa.yml"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 500),
+		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 0.5),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
+	container:
+		"docker://szsctt/bwa:1"	
+	threads: 1
 	shell:
 		"""
-		rm -f {output.bam}*tmp*bam
-		samtools sort -o {output.bam} {input.sam}
-		samtools index {output.bam}
+		samtools stats {input} > {output}
 		"""
-
+		
