@@ -94,7 +94,7 @@ def main(args):
 				exclude_handle.write(row)	
 				excluded += 1
 
-	print(f"found {kept+excluded} candidate integrations: kept {kept} and excuded {excluded}")
+	print(f"found {kept+excluded} candidate integrations: kept {kept} and excluded {excluded}")
 	print(f"Saved kept output to {args.keep} and excluded output to {args.exclude}")
 
 

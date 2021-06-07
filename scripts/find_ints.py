@@ -2058,9 +2058,8 @@ class ChimericIntegration:
 
 		# only keep alternative integration sites that are close in edit distance
 		# to primary
-
 		if self.nm_pc is not None:
-			alt_ints = [int for int in alt_ints if self.get_total_edit_dist()/int.get_total_edit_dist() >= self.nm_pc]
+			alt_ints = [int for int in alt_ints if int.get_total_edit_dist() == 0 or self.get_total_edit_dist()/int.get_total_edit_dist() >= self.nm_pc]
 		
 		if self.nm_diff is not None:
 			alt_ints = [int for int in alt_ints if int.get_total_edit_dist() - self.get_total_edit_dist() <= self.nm_diff]
