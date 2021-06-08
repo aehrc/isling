@@ -37,7 +37,6 @@
 from sys import argv
 import numpy as np
 import argparse
-import csv
 import pdb
 
 columns = {

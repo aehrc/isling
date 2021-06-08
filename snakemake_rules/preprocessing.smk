@@ -18,6 +18,9 @@ import re
 def resources_list_with_min_and_max(file_name_list, attempt, mult_factor=2, minimum = 100, maximum = 120000):
 	
 	# get sum of size of files in file_name_list
+	# input files are instances of class snakemake.io._IOFile
+	# check documentation https://snakemake.readthedocs.io/en/stable/_modules/snakemake/io.html
+	# for more info
 	try:
 		resource = int(sum([file.size for file in file_name_list]) / 1024 / 1024) * attempt * mult_factor
 	# sometimes this doesn't work - not sure why...

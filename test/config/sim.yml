@@ -1,0 +1,49 @@
+snakedir: "."
+
+test-AAV:
+  out_dir: "out/pipeline-test/"
+  
+  # read information
+  read_folder: "/datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/out/experiment1_OTC_chr1/AAV-OTC/AAV/sim_reads/"
+  R1_suffix: "1.fq"
+  R2_suffix: "2.fq"
+  read1-adapt: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
+  read2-adapt: "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
+  split: 3
+  mean-frag-len: "estimate"
+  
+  # read preprocessing options
+  merge: False
+  trim: True
+  dedup: True
+  dedup-subs: 2
+  
+  # alignment options
+  host_name: "hg38"
+  host_fasta: "/datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/data/references/GRCh38.fa"
+  virus_name: "OTC"
+  virus_fasta: "/datasets/work/hb-viralint/work/simulations/intvi_simulation-experiments/data/references/OTC-vec_rAAV-genome-only.fa"
+  bwa-mem: "-a -Y -A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -T 10 -h 1,200"
+  align-cpus: 5
+  
+  # integration detection options
+  clip-cutoff: 20
+  cigar-tol: 3
+
+  # postprocessing options
+  filter: 
+    - "HostEditDist <= 7"
+    - "ViralEditDist <= 7"
+    - "NoAmbiguousBases < 20 or Type == discordant"
+    - "PossibleVectorRearrangement == False"
+
+  mapq-thresh: 20
+
+  merge-method: 'common'
+  merge-n-min: 1
+
+
+
+  
+
+
