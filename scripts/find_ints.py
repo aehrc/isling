@@ -2058,9 +2058,8 @@ class ChimericIntegration:
 
 		# only keep alternative integration sites that are close in edit distance
 		# to primary
-
 		if self.nm_pc is not None:
-			alt_ints = [int for int in alt_ints if self.get_total_edit_dist()/int.get_total_edit_dist() >= self.nm_pc]
+			alt_ints = [int for int in alt_ints if int.get_total_edit_dist() == 0 or self.get_total_edit_dist()/int.get_total_edit_dist() >= self.nm_pc]
 		
 		if self.nm_diff is not None:
 			alt_ints = [int for int in alt_ints if int.get_total_edit_dist() - self.get_total_edit_dist() <= self.nm_diff]
@@ -2330,7 +2329,12 @@ class ChimericIntegration:
 		if self.nm_diff is not None:
 			return rearrange_nm - int_nm <= self.nm_diff
 		elif self.nm_pc is not None:
-			return int_nm / rearrange_nm >= self.nm_pc
+			if rearrange_nm != 0:
+				return int_nm / rearrange_nm >= self.nm_pc
+			# we get a divide by zero error if rearrange_nm is zero, but if this is the case
+			# then it's probably a rearrangement
+			else:
+				return True
 		else:
 			return rearrange_nm >= int_nm
 					
