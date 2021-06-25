@@ -970,7 +970,7 @@ class AlignmentPool(list):
 							
 			# if cigar operation consumes query, need to add to matched region			
 			matched = tmp_cigartuples[i_matched][1]
-			for idx in i_del:
+			for idx in reversed(i_del):
 			
 				## update cigar operation 
 			
@@ -1039,7 +1039,7 @@ class AlignmentPool(list):
 			tmp_cigartuples[i_matched] = (0, matched, i_md)
 			
 			# remove elements
-			for idx in i_del:
+			for idx in reversed(i_del):
 				tmp_cigartuples.pop(idx)
 
 			# update CO tag
@@ -1126,6 +1126,7 @@ class AlignmentPool(list):
 			pos_offset = 0
 
 		nm = read.get_tag('NM') + nm_offset
+		
 		return self._create_new_segment_from_primary(read, pos_offset=pos_offset, cigartuples=tmp_cigartuples,
 														nm=nm, co=co, md=md)
 			
@@ -2522,9 +2523,11 @@ class DiscordantIntegration(ChimericIntegration):
 		end_pos_offset = self._get_co_D_bases(co) - self._get_co_I_bases(co)
 			
 		# get start and end of aligned part of read in host coords
-		blocks = (read.get_blocks()[0][0] + pos_offset, 
+		try:
+			blocks = (read.get_blocks()[0][0] + pos_offset, 
 							read.get_blocks()[-1][-1] + pos_offset + end_pos_offset)
-		
+		except:
+			print(read.query_name)
 		# we want the coordinate of the host/virus base closest to integration
 		if read.is_reverse:
 			stop = blocks[0]
