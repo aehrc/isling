@@ -189,7 +189,7 @@ rule dedupe:
 	container:
 		"docker://szsctt/bbmap:1"	
 	resources:
-		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 8),
+		mem_mb = 32000, #lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 8),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1 # need this for pearcey so that job doesn't get split over multiple nodes
 	shell:

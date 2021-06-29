@@ -1,0 +1,9 @@
+name: find_ints
+channels:
+  - conda-forge
+  - r
+  - bioconda
+  - defaults
+
+dependencies:
+  - pysam
