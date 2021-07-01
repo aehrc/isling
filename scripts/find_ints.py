@@ -2101,7 +2101,9 @@ class ChimericIntegration:
 				# if hst and vrs constitute a valid integration, add to list
 				try:
 					alt_int = ChimericIntegration(hst, vrs, tol = self.tol,
-									map_thresh = self.map_thresh, primary=False)
+													map_thresh = self.map_thresh,  
+													nm_diff=self.nm_diff,
+					  								nm_pc=self.nm_pc, primary=False)
 					alt_ints.append(alt_int)
 					
 				except AssertionError:
@@ -3001,7 +3003,9 @@ class DiscordantIntegration(ChimericIntegration):
 				# if host and virus reads constitute a valid integration, add to list
 				try:
 					alt_int = DiscordantIntegration(h1, h2, v1, v2, 
-										map_thresh = self.map_thresh, primary = False)
+										map_thresh = self.map_thresh, 
+										tlen=self.tlen, tol=self.tol, nm_diff=self.nm_diff,
+					  					nm_pc=self.nm_pc, primary = False)
 	
 				except AssertionError:
 					alt_int = None
@@ -3102,16 +3106,20 @@ class FullIntegration(ChimericIntegration):
 		# goes with first part of virus read
 		if self.hread.is_reverse == self.vread.is_reverse:
 				self.left = ChimericIntegration(hread1, vread1, map_thresh =self.map_thresh,
-												tol = self.tol, primary = True)
+												tol = self.tol,  nm_diff=self.nm_diff,
+					  							nm_pc=self.nm_pc, primary = True)
 				self.right = ChimericIntegration(hread2, vread2, map_thresh = self.map_thresh, 
-												tol = self.tol, primary = True)
+												tol = self.tol,  nm_diff=self.nm_diff,
+					  							nm_pc=self.nm_pc, primary = True)
 		# otherwise, first part of host read goes with second part of virus read and
 		# vice versa
 		else:
 				self.left = ChimericIntegration(hread1, vread2, map_thresh = self.map_thresh,
-												tol = self.tol, primary = True)
+												tol = self.tol,  nm_diff=self.nm_diff,
+					  							nm_pc=self.nm_pc, primary = True)
 				self.right = ChimericIntegration(hread2, vread1, map_thresh = self.map_thresh, 
-												tol = self.tol, primary = True)						
+												tol = self.tol,  nm_diff=self.nm_diff,
+					  							nm_pc=self.nm_pc, primary = True)						
 		
 	def get_properties(self):
 		"""
@@ -3319,7 +3327,8 @@ class FullIntegration(ChimericIntegration):
 				# if hst and vrs constitute a valid integration, add to list
 				try:
 					alt_int = FullIntegration(hst, vrs, map_thresh= self.map_thresh, 
-												primary = False)
+												nm_diff=self.nm_diff, nm_pc=self.nm_pc,
+												tol = self.tol, primary = False)
 					alt_ints.append(alt_int)
 					
 				except AssertionError:
