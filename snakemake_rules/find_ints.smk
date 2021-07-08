@@ -19,6 +19,8 @@ rule find_ints:
 		nodes = 1
 	container:
 		"docker://szsctt/simvi:2"
+	conda:
+		"../envs/find_ints.yml"
 	shell:
 		"""
 		if [ '{params.frag_len}' = 'estimate' ]; then
