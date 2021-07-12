@@ -1,0 +1,86 @@
+---
+output: html_document
+params:
+  dataset: AGRF_CAGRF20124835_JDW46
+  outdir: "../../out/FRG-nonacus"
+  host: GRCh38
+  virus: pAAV-OTC_flop
+---
+
+```{r, setup, include=FALSE}
+knitr::opts_chunk$set(fig.width=12, fig.height=8,
+                      echo=FALSE, warning=FALSE, message=FALSE)
+library(magrittr)
+
+```
+
+---
+title: `r glue::glue("Integration site summary for dataset '{params$dataset}'")`
+date: `r format(Sys.time(), "%a %d %b %Y")`
+---
+
+## Analysis parameters
+
+TODO: some summary of the parameters used for analysis
+
+## Number of host/virus junctions identified
+
+Isling identifies host/virus jucntions in chimeric reads and discordant pairs.  First, looking at the number of junctions identified:
+
+```{r, wc, include=FALSE}
+ints_dir <- file.path(normalizePath(params$outdir),
+                      params$dataset,
+                      "ints")
+
+
+# count total number of junctions identified
+ints_wc <- tibble::tibble(
+  f = list.files(ints_dir, full.names=TRUE),
+  type = dplyr::case_when(
+    stringr::str_detect(f, "\\.integrations\\.txt$") ~ "total putative junctions",
+    stringr::str_detect(f, "\\.integrations\\.filter_fail.txt") ~ "junctions failing filters",
+    stringr::str_detect(f, "\\integrations\\.post\\.txt") ~ "junctions passing filters",
+    TRUE ~ as.character(NA)
+  ),
+  sample = stringr::str_extract(basename(f), glue::glue("^.+(?=\\.{Hmisc::escapeRegex(params$host)})")) 
+) %>% 
+  dplyr::filter(!is.na(type)) %>% 
+  dplyr::mutate(count = purrr::map_dbl(f, ~as.integer(system2("wc", args = c("-l", .x,  " | awk '{print $1}'"), stdout=TRUE))-1)) %>% 
+  dplyr::select(-f) %>% 
+  tidyr::pivot_wider(names_from = "type", values_from = "count")
+
+
+```
+
+First, count the number of host/virus junctions identified in chimeric reads or discordant read-pairs.  
+```{r, echo=FALSE}
+DT::datatable(ints_wc, 
+              rownames = FALSE)
+```
+
+
+```{r filter_statement, include=FALSE}
+exclude <- ints_wc %>% 
+  dplyr::filter(`junctions passing filters` == 0) %>% 
+  dplyr::pull(sample)
+
+exclude
+
+exclude_statement <- ifelse(length(exclude)==0,
+                            glue::glue("All samples had at least one host/virus junction that passed all filters"),
+                            glue::glue("Samples {paste0(exclude, collapse=', ')} had no host/virus junctions that passed all filters"))
+
+```
+
+`r exclude_statement`.  Futher the junctions that passed all filters.
+
+
+```{r, echo=FALSE, results='asis'}
+# if there were some samples with integrations
+if (length(exclude) != nrow(ints_wc)) {
+res <- knitr::knit_child('junc_types.Rmd', quiet = TRUE)
+cat(res, sep = '\n')  
+}
+
+```
+

@@ -1,0 +1,128 @@
+---
+output: html_document
+---
+
+```{r, setup_junc_types, include=FALSE}
+knitr::opts_chunk$set(fig.width=12, fig.height=8,
+                      echo=FALSE, warning=FALSE, message=FALSE)
+library(magrittr)
+
+max_sample_length <- 10
+
+
+```
+
+## Junction types
+
+Each junction has a number of properties associated with it, examine some of those properties.
+
+### Number
+
+Next, we count the number of junctions that can be uniquely localised in both host and virus genomes, and those with locations that are ambiguous in one or both genomes.
+
+```{r, wc_uniq, include=FALSE}
+ints <- tibble::tibble(
+  f = list.files(ints_dir, full.names=TRUE),
+  type = dplyr::case_when(
+    stringr::str_detect(f, "\\integrations\\.post\\.unique\\.txt") ~ "unique",
+    stringr::str_detect(f, "\\integrations\\.post\\.virus_ambig\\.txt") ~ "ambig. (viral)",
+    stringr::str_detect(f, "\\integrations\\.post\\.host_ambig\\.txt") ~ "ambig. (host)",   
+    stringr::str_detect(f, "\\integrations\\.post\\.both_ambig\\.txt") ~ "ambig. (both)",  
+    TRUE ~ as.character(NA)
+  ),
+  sample = stringr::str_extract(basename(f), glue::glue("^.+(?=\\.{Hmisc::escapeRegex(params$host)})")),
+  sample_short = dplyr::case_when(
+    stringr::str_length(sample) > max_sample_length ~ glue::glue("{stringr::str_sub(sample, end=max_sample_length)}..."),
+    TRUE ~ sample
+    )
+) %>% 
+  dplyr::filter(!is.na(type)) %>% 
+  dplyr::filter(sample %in% exclude)
+
+# count number of host/virus junctions in unique/ambiguous categories
+ints_wc <- ints %>% 
+  dplyr::filter(!is.na(type)) %>% 
+  dplyr::mutate(count = purrr::map_dbl(f, ~as.integer(system2("wc", args = c("-l", .x,  " | awk '{print $1}'"), stdout=TRUE))-1)) %>% 
+  tidyr::pivot_wider(names_from = "type", values_from = "count")
+
+
+```
+
+Counting the number of host/virus junctions identified in chimeric reads or discordant read-pairs:
+```{r, echo=FALSE}
+#DT::datatable(dplyr::select(ints_wc, -f), 
+#              rownames = FALSE)
+```
+
+
+```{r}
+
+
+ints_wc %>% 
+  tidyr::pivot_longer(`ambig. (both)`:`ambig. (viral)`, names_to="type", values_to="count") %>% 
+  dplyr::group_by(sample) %>% 
+  dplyr::mutate(frac = count/sum(count)) %>% 
+  dplyr::ungroup() %>% 
+  ggplot2::ggplot(ggplot2::aes(y=sample_short, x=count, fill=type)) +
+  ggplot2::geom_col(position=ggplot2::position_stack(reverse=TRUE)) +
+  ggplot2::theme_classic() +
+  ggplot2::theme(legend.position="bottom",
+                 axis.line.y = ggplot2::element_blank(),
+                 axis.ticks.y = ggplot2::element_blank(),
+                 axis.title.y = ggplot2::element_blank())
+```
+
+
+### Chimeric reads and discordant pairs
+
+Counting the number of junctions that were observed in chimeric reads and discordant pairs.  For chimeric reads, we further stratify in the junction had a 'gap', 'overlap' or was a 'clean' junction.
+
+```{r}
+col_spec <- readr::cols(
+  .default = readr::col_character(),
+  IntStart = readr::col_double(),
+  IntStop = readr::col_double(),
+  VirusStart = readr::col_double(),
+  VirusStop = readr::col_double(),
+  HostEditDist = readr::col_double(),
+  ViralEditDist = readr::col_double(),
+  TotalEditDist = readr::col_double(),
+  PossibleHostTranslocation = readr::col_logical(),
+  PossibleVectorRearrangement = readr::col_logical(),
+  HostAmbiguousLocation = readr::col_logical(),
+  ViralAmbiguousLocation = readr::col_logical(),
+  HostMapQ = readr::col_double(),
+  ViralMapQ = readr::col_double()
+)
+
+
+ints <- ints %>% 
+  dplyr::mutate(data = purrr::map(f, ~readr::read_tsv(., col_types=col_spec))) %>% 
+  tidyr::unnest(data)
+```
+
+
+
+```{r include=FALSE}
+ints %>% 
+  ggplot2::ggplot(ggplot2::aes(y = sample_short, fill = Type)) +
+  ggplot2::geom_bar(position=ggplot2::position_stack(reverse=TRUE)) +
+  ggplot2::theme_classic() +
+  ggplot2::theme(legend.position="bottom",
+                 axis.line.y = ggplot2::element_blank(),
+                 axis.ticks.y = ggplot2::element_blank(),
+                 axis.title.y = ggplot2::element_blank())
+```
+
+
+
+```{r}
+ints %>% 
+  ggplot2::ggplot(ggplot2::aes(y = sample_short, fill = OverlapType)) +
+  ggplot2::geom_bar(position=ggplot2::position_stack(reverse=TRUE)) +
+  ggplot2::theme_classic() +
+  ggplot2::theme(legend.position="bottom",
+                 axis.line.y = ggplot2::element_blank(),
+                 axis.ticks.y = ggplot2::element_blank(),
+                 axis.title.y = ggplot2::element_blank())
+```

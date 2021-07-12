@@ -15,6 +15,8 @@ dependencies:
   - r-ggrepel=0.8.2
   - r-kableextra=1.1
   - r-catools=1.17.1
+  - r-hmisc
+  - r-dt
   - parallel=20200522
   - bedtools=2.29
   - bzip2=1.0
