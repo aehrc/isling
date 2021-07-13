@@ -9,6 +9,8 @@ library(magrittr)
 
 max_sample_length <- 10
 
+pal <- wesanderson::wes_palette("Royal1")
+samp_pal <- wesanderson::wes_palette("Darjeeling1", length(unique(ints_wc$sample)), "continuous")
 
 ```
 
@@ -37,7 +39,7 @@ ints <- tibble::tibble(
     )
 ) %>% 
   dplyr::filter(!is.na(type)) %>% 
-  dplyr::filter(sample %in% exclude)
+  dplyr::filter(!(sample %in% exclude))
 
 # count number of host/virus junctions in unique/ambiguous categories
 ints_wc <- ints %>% 
@@ -56,8 +58,6 @@ Counting the number of host/virus junctions identified in chimeric reads or disc
 
 
 ```{r}
-
-
 ints_wc %>% 
   tidyr::pivot_longer(`ambig. (both)`:`ambig. (viral)`, names_to="type", values_to="count") %>% 
   dplyr::group_by(sample) %>% 
@@ -69,7 +69,8 @@ ints_wc %>%
   ggplot2::theme(legend.position="bottom",
                  axis.line.y = ggplot2::element_blank(),
                  axis.ticks.y = ggplot2::element_blank(),
-                 axis.title.y = ggplot2::element_blank())
+                 axis.title.y = ggplot2::element_blank()) +
+  ggplot2::scale_fill_manual(values=pal)
 ```
 
 
@@ -84,6 +85,7 @@ col_spec <- readr::cols(
   IntStop = readr::col_double(),
   VirusStart = readr::col_double(),
   VirusStop = readr::col_double(),
+  NoAmbiguousBases = readr::col_double(),
   HostEditDist = readr::col_double(),
   ViralEditDist = readr::col_double(),
   TotalEditDist = readr::col_double(),
@@ -97,7 +99,7 @@ col_spec <- readr::cols(
 
 
 ints <- ints %>% 
-  dplyr::mutate(data = purrr::map(f, ~readr::read_tsv(., col_types=col_spec))) %>% 
+  dplyr::mutate(data = purrr::map(f, ~readr::read_tsv(., col_types=col_spec, na = c("", "NA", "None")))) %>% 
   tidyr::unnest(data)
 ```
 
@@ -115,7 +117,6 @@ ints %>%
 ```
 
 
-
 ```{r}
 ints %>% 
   ggplot2::ggplot(ggplot2::aes(y = sample_short, fill = OverlapType)) +
@@ -124,5 +125,81 @@ ints %>%
   ggplot2::theme(legend.position="bottom",
                  axis.line.y = ggplot2::element_blank(),
                  axis.ticks.y = ggplot2::element_blank(),
-                 axis.title.y = ggplot2::element_blank())
+                 axis.title.y = ggplot2::element_blank()) +
+  ggplot2::scale_fill_manual(values=pal)
+```
+
+If the junction is 'gap' or 'overlap', it has an associated number of ambiguous bases associated with it.
+
+```{r}
+
+ints %>% 
+  dplyr::filter(OverlapType == "gap" | OverlapType == "overlap") %>% 
+  ggplot2::ggplot(ggplot2::aes(x = NoAmbiguousBases, color = sample_short)) +
+  ggplot2::geom_freqpoly(bins=max(ints$NoAmbiguousBases, na.rm=TRUE)) +
+  ggplot2::facet_grid(rows=ggplot2::vars(OverlapType)) +
+  ggplot2::theme_classic() +
+  ggplot2::theme(strip.background = ggplot2::element_blank()) +
+  ggplot2::scale_color_manual(values=samp_pal)
+```
+
+
+### Location in viral reference(s)
+
+We can also plot the location of the integrations in the viral reference (for those junctions with an unambiguous location in the host genome).  First, the number of junctions in each viral reference (this is not too informative if you only have one). 
+
+
+```{r}
+ints %>% 
+  dplyr::filter(type == "unique" | type == "ambig. (host)") %>% 
+  dplyr::mutate(VirusRef = forcats::as_factor(VirusRef)) %>% 
+  dplyr::mutate(VirusRef = forcats::fct_relevel(VirusRef, ~stringr::str_sort(., numeric=TRUE))) %>% 
+  ggplot2::ggplot(ggplot2::aes(fill = VirusRef, y=sample_short)) +
+  ggplot2::geom_bar() +
+  ggplot2::theme_classic() +
+  ggplot2::theme(legend.position="bottom",
+                 axis.line.y = ggplot2::element_blank(),
+                 axis.ticks.y = ggplot2::element_blank(),
+                 axis.title.y = ggplot2::element_blank())  +
+  ggplot2::scale_fill_manual(values=rep_len(pal, length(unique(ints$VirusRef))))
+  
+```
+
+
+We can also plot the location of integration jucntions in each viral reference.  Here we separate based on if the virus was integrated in the forward (+) or reverse (-) orientation.
+
+```{r}
+ints %>% 
+  dplyr::filter(type == "unique" | type == "ambig. (host)") %>% 
+  ggplot2::ggplot(ggplot2::aes(x = VirusStart, color=sample_short)) +
+  ggplot2::geom_density(bw=max(ints$VirusStop)/100) +
+  ggplot2::facet_grid(cols=ggplot2::vars(VirusRef), rows=ggplot2::vars(VirusOrientation))+
+  ggplot2::theme_classic() +
+  ggplot2::theme(strip.background = ggplot2::element_blank())
+```
+
+### Location in host genome
+
+```{r fig.height=7}
+ints %>% 
+  dplyr::filter(type == "unique" | type == "ambig. (virus)") %>% 
+  dplyr::mutate(Chr = forcats::as_factor(Chr)) %>% 
+  dplyr::mutate(Chr = forcats::fct_relevel(Chr, ~stringr::str_sort(., numeric=TRUE))) %>% 
+  ggplot2::ggplot(ggplot2::aes(fill = Chr, y=sample_short)) +
+  ggplot2::geom_bar(position=ggplot2::position_stack(reverse=TRUE)) +
+  ggplot2::theme_classic() +
+  ggplot2::theme(legend.position="bottom",
+                 axis.line.y = ggplot2::element_blank(),
+                 axis.ticks.y = ggplot2::element_blank(),
+                 axis.title.y = ggplot2::element_blank()) +
+  ggplot2::scale_fill_manual(values=rep_len(pal, length(unique(ints$Chr))))
+```
+```{r fig.height=30}
+#ints %>% 
+#  dplyr::filter(type == "unique" | type == "ambig. (virus)") %>% 
+#  ggplot2::ggplot(ggplot2::aes(x = IntStart, color=sample_short)) +
+#  ggplot2::geom_freqpoly(bins = 10000) +
+#  ggplot2::facet_grid(rows=ggplot2::vars(Chr), cols=ggplot2::vars(Orientation))+
+#  ggplot2::theme_classic() +
+#  ggplot2::theme(strip.background = ggplot2::element_blank())
 ```

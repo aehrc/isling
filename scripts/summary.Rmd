@@ -72,7 +72,7 @@ exclude_statement <- ifelse(length(exclude)==0,
 
 ```
 
-`r exclude_statement`.  Futher the junctions that passed all filters.
+`r exclude_statement`.  Futher examining the junctions that passed all filters.
 
 
 ```{r, echo=FALSE, results='asis'}
