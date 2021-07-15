@@ -8,6 +8,7 @@ knitr::opts_chunk$set(fig.width=12, fig.height=8,
 library(magrittr)
 
 max_sample_length <- 10
+max_contigs_plot <- 25
 
 pal <- wesanderson::wes_palette("Royal1")
 samp_pal <- wesanderson::wes_palette("Darjeeling1", length(unique(ints_wc$sample)), "continuous")
@@ -16,11 +17,8 @@ samp_pal <- wesanderson::wes_palette("Darjeeling1", length(unique(ints_wc$sample
 
 ## Junction types
 
-Each junction has a number of properties associated with it, examine some of those properties.
+For this section, we examine all the jucntions retained after filtering.  Each junction has a number of properties associated with it - examine some of those properties.
 
-### Number
-
-Next, we count the number of junctions that can be uniquely localised in both host and virus genomes, and those with locations that are ambiguous in one or both genomes.
 
 ```{r, wc_uniq, include=FALSE}
 ints <- tibble::tibble(
@@ -48,29 +46,6 @@ ints_wc <- ints %>%
   tidyr::pivot_wider(names_from = "type", values_from = "count")
 
 
-```
-
-Counting the number of host/virus junctions identified in chimeric reads or discordant read-pairs:
-```{r, echo=FALSE}
-#DT::datatable(dplyr::select(ints_wc, -f), 
-#              rownames = FALSE)
-```
-
-
-```{r}
-ints_wc %>% 
-  tidyr::pivot_longer(`ambig. (both)`:`ambig. (viral)`, names_to="type", values_to="count") %>% 
-  dplyr::group_by(sample) %>% 
-  dplyr::mutate(frac = count/sum(count)) %>% 
-  dplyr::ungroup() %>% 
-  ggplot2::ggplot(ggplot2::aes(y=sample_short, x=count, fill=type)) +
-  ggplot2::geom_col(position=ggplot2::position_stack(reverse=TRUE)) +
-  ggplot2::theme_classic() +
-  ggplot2::theme(legend.position="bottom",
-                 axis.line.y = ggplot2::element_blank(),
-                 axis.ticks.y = ggplot2::element_blank(),
-                 axis.title.y = ggplot2::element_blank()) +
-  ggplot2::scale_fill_manual(values=pal)
 ```
 
 
@@ -143,10 +118,35 @@ ints %>%
   ggplot2::scale_color_manual(values=samp_pal)
 ```
 
+### Ambiguous/unique locatioins
+
+We can also count the number of junctions that can be uniquely localised in both host and virus genomes, and those with locations that are ambiguous in one or both genomes.
+```{r, echo=FALSE}
+#DT::datatable(dplyr::select(ints_wc, -f), 
+#              rownames = FALSE)
+```
+
+
+```{r}
+ints_wc %>% 
+  tidyr::pivot_longer(`ambig. (both)`:`ambig. (viral)`, names_to="type", values_to="count") %>% 
+  dplyr::group_by(sample) %>% 
+  dplyr::mutate(frac = count/sum(count)) %>% 
+  dplyr::ungroup() %>% 
+  ggplot2::ggplot(ggplot2::aes(y=sample_short, x=count, fill=type)) +
+  ggplot2::geom_col(position=ggplot2::position_stack(reverse=TRUE)) +
+  ggplot2::theme_classic() +
+  ggplot2::theme(legend.position="bottom",
+                 axis.line.y = ggplot2::element_blank(),
+                 axis.ticks.y = ggplot2::element_blank(),
+                 axis.title.y = ggplot2::element_blank()) +
+  ggplot2::scale_fill_manual(values=pal)
+```
+
 
 ### Location in viral reference(s)
 
-We can also plot the location of the integrations in the viral reference (for those junctions with an unambiguous location in the host genome).  First, the number of junctions in each viral reference (this is not too informative if you only have one). 
+We can also plot the location of the integrations in the viral reference (for those junctions with an unambiguous location in the host genome).  For ths analysis, we use the integration jucntions that had unambiguous locations in the virus (and the host locaton may be ambguous or unique). First, plot the number of junctions in each viral reference (this is not too informative if you only have one). 
 
 
 ```{r}
@@ -165,6 +165,31 @@ ints %>%
   
 ```
 
+```{r}
+get_top_contigs <- function(col_name, contig_lengths) {
+  contigs_join <- tibble::tibble(
+    name = names(contig_lengths),
+    length = unlist(unname(contig_lengths))
+  )
+  
+  right_join <- "name"
+  
+  contigs_plot <- ints %>% 
+    dplyr::filter(type == "unique" | type == "ambig. (virus)") %>% 
+    dplyr::group_by(!!dplyr::sym(col_name)) %>% 
+    dplyr::summarise(n = dplyr::n()) %>% 
+    dplyr::arrange(desc(n)) %>% 
+    head(max_contigs_plot) %>% 
+    dplyr::left_join(contigs_join, by=setNames(right_join, col_name)) %>% 
+    dplyr::mutate(start=1) %>% 
+    dplyr::arrange(factor(!!dplyr::sym(col_name), levels=stringr::str_sort(!!dplyr::sym(col_name), numeric=TRUE)))
+  
+  return(contigs_plot)
+}
+
+```
+
+
 
 We can also plot the location of integration jucntions in each viral reference.  Here we separate based on if the virus was integrated in the forward (+) or reverse (-) orientation.
 
@@ -172,10 +197,37 @@ We can also plot the location of integration jucntions in each viral reference. 
 ints %>% 
   dplyr::filter(type == "unique" | type == "ambig. (host)") %>% 
   ggplot2::ggplot(ggplot2::aes(x = VirusStart, color=sample_short)) +
-  ggplot2::geom_density(bw=max(ints$VirusStop)/100) +
+  ggplot2::geom_density(bw=max(ints$VirusStop)/200) +
   ggplot2::facet_grid(cols=ggplot2::vars(VirusRef), rows=ggplot2::vars(VirusOrientation))+
   ggplot2::theme_classic() +
-  ggplot2::theme(strip.background = ggplot2::element_blank())
+  ggplot2::theme(strip.background = ggplot2::element_blank()) +
+  ggplot2::scale_color_manual(values=samp_pal)
+```
+
+```{r}
+virus_contigs_plot <- get_top_contigs("VirusRef", virus_contigs)
+
+virus_ints_plot <- ints %>% 
+  dplyr::filter(type == "unique" | type == "ambig. (host)") %>% 
+  dplyr::select(VirusRef, VirusStart, VirusStop, VirusOrientation) %>% 
+  GenomicRanges::makeGRangesFromDataFrame(
+   seqnames.field = "VirusRef",
+   start.field = "VirusStart",
+   end.field = "VirusStop",
+   strand.field= "VirusOrientation",
+   starts.in.df.are.0based = TRUE
+  )
+
+custom.genome <- regioneR::toGRanges(data.frame(chr=names(virus_contigs), 
+                                      start=rep(1, length(virus_contigs)), 
+                                      end=unname(unlist(virus_contigs))
+                                      )
+                           )
+
+kp <- karyoploteR::plotKaryotype(genome = custom.genome, plot.type=2)
+karyoploteR::kpPlotDensity(kp, virus_ints_plot, window.size=100)
+karyoploteR::kpPlotRegions(kp, virus_ints_plot, data.panel=2)
+
 ```
 
 ### Location in host genome
@@ -203,3 +255,43 @@ ints %>%
 #  ggplot2::theme_classic() +
 #  ggplot2::theme(strip.background = ggplot2::element_blank())
 ```
+
+
+Next, we plot the location of the integrations in the host genome.  Since a lot of contigs can make this plot difficult to view, we only use the top `r max_contigs_plot` contigs (ranked by number of integrations).
+
+
+```{r fig.height=15}
+
+
+host_contigs_plot <- get_top_contigs("Chr", host_contigs) 
+
+host_ints_plot <- ints %>% 
+  dplyr::filter(type == "unique" | type == "ambig. (virus)") %>% 
+  dplyr::select(Chr, IntStart, IntStop, Orientation) %>%
+  dplyr::mutate(Orientation = dplyr::case_when(
+    Orientation == "hv" ~ '+',
+    Orientation == "vh" ~ '-'
+  )) %>% 
+  dplyr::filter(Chr %in% host_contigs_plot$Chr) %>% 
+  GenomicRanges::makeGRangesFromDataFrame(
+   seqnames.field = "Chr",
+   start.field = "IntStart",
+   end.field = "IntStop",
+   strand.field= "Orientation",
+   starts.in.df.are.0based = TRUE
+  )
+
+
+
+custom.genome <- regioneR::toGRanges(data.frame(chr=host_contigs_plot$Chr, 
+                                      start=host_contigs_plot$start, 
+                                      end=host_contigs_plot$length
+                                      )
+                           )
+
+kp <- karyoploteR::plotKaryotype(genome = custom.genome, plot.type=2)
+karyoploteR::kpPlotDensity(kp, host_ints_plot)
+karyoploteR::kpPlotRegions(kp, data=host_ints_plot, data.panel=2)
+
+```
+
