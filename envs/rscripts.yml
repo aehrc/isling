@@ -17,6 +17,7 @@ dependencies:
   - r-catools=1.17.1
   - r-hmisc
   - r-dt
+  - r-karyoploter=1.18
   - parallel=20200522
   - bedtools=2.29
   - bzip2=1.0

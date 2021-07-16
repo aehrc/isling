@@ -325,6 +325,10 @@ karyoploteR::kpPlotRegions(kp, virus_plot_rev_chimeric, col=pal[2], data.panel=2
 
 ### Location in host genome
 
+We can also look at the location of integration junctions in the host genome - for this we use the integration junctions that have a unique location in the host genome (the 'unique' and 'ambiguous (viral)' subsets).
+
+First, count the number of integrations on each contig in the host reference:
+
 ```{r fig.height=7}
 ints %>% 
   dplyr::filter(type == "unique" | type == "ambig. (virus)") %>% 
