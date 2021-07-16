@@ -13,7 +13,10 @@
    version="1.1"
    id="svg2139"
    inkscape:version="1.0.2 (e86c8708, 2021-01-15)"
-   sodipodi:docname="ambig_location.svg">
+   sodipodi:docname="ambig_location.svg"
+   inkscape:export-filename="/Users/sco305/OneDrive - CSIRO/Projects/viInt/experiments/intvi_pipeline/report_illustrations/ambig_location.png"
+   inkscape:export-xdpi="300"
+   inkscape:export-ydpi="300">
   <defs
      id="defs2133">
     <inkscape:path-effect
@@ -248,8 +251,8 @@
      fit-margin-bottom="0"
      inkscape:window-width="1252"
      inkscape:window-height="847"
-     inkscape:window-x="0"
-     inkscape:window-y="25"
+     inkscape:window-x="1609"
+     inkscape:window-y="105"
      inkscape:window-maximized="0" />
   <metadata
      id="metadata2136">
@@ -259,7 +262,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
