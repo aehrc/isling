@@ -13,7 +13,10 @@
    version="1.1"
    id="svg597"
    inkscape:version="1.0.2 (e86c8708, 2021-01-15)"
-   sodipodi:docname="junctions.svg">
+   sodipodi:docname="junctions.svg"
+   inkscape:export-filename="/Users/sco305/OneDrive - CSIRO/Projects/viInt/experiments/intvi_pipeline/report_illustrations/junctions.png"
+   inkscape:export-xdpi="300"
+   inkscape:export-ydpi="300">
   <defs
      id="defs591">
     <inkscape:path-effect
@@ -167,7 +170,7 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="0.83972969"
+     inkscape:zoom="0.89591949"
      inkscape:cx="355.25532"
      inkscape:cy="185.33399"
      inkscape:document-units="mm"
@@ -177,8 +180,8 @@
      inkscape:snap-center="true"
      inkscape:window-width="1375"
      inkscape:window-height="847"
-     inkscape:window-x="0"
-     inkscape:window-y="25"
+     inkscape:window-x="1472"
+     inkscape:window-y="29"
      inkscape:window-maximized="0"
      fit-margin-top="0"
      fit-margin-left="0"
@@ -192,7 +195,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -202,23 +205,23 @@
      id="layer1"
      transform="translate(-10.729993,-0.55283779)">
     <rect
-       style="fill:#808080;fill-opacity:0.151316;fill-rule:evenodd;stroke:none;stroke-width:0.474915;stroke-miterlimit:4;stroke-dasharray:none"
+       style="fill:#808080;fill-opacity:0.151316;fill-rule:evenodd;stroke:none;stroke-width:0.42874;stroke-miterlimit:4;stroke-dasharray:none"
        id="rect4922-7-9-4-0-3-1-8"
        width="190.16342"
-       height="46.167824"
+       height="37.626675"
        x="10.729993"
-       y="0.55283779" />
+       y="9.0939865" />
     <text
        xml:space="preserve"
-       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:4.23333px;line-height:1.25;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.264583"
-       x="61.573814"
-       y="5.4999313"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:6.35px;line-height:1.25;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.264583"
+       x="44.684841"
+       y="6.5582647"
        id="text6992"><tspan
          sodipodi:role="line"
          id="tspan6990"
-         x="61.573814"
-         y="5.4999313"
-         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:4.23333px;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.264583">types of reads supporting integration junctions</tspan></text>
+         x="44.684841"
+         y="6.5582647"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:6.35px;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.264583">types of reads supporting integration junctions</tspan></text>
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:4.23333px;line-height:1.25;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.228131"
@@ -608,21 +611,21 @@
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:4.23333px;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.264583">clean/none</tspan></text>
     <text
        xml:space="preserve"
-       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:4.23333px;line-height:1.25;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.228131"
-       x="78.120613"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:6.35px;line-height:1.25;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.228131"
+       x="69.579468"
        y="57.474571"
        id="text1331-2"><tspan
          sodipodi:role="line"
          id="tspan1329-7"
-         x="78.120613"
+         x="69.579468"
          y="57.474571"
-         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:4.23333px;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.228131">junctions in chimeric reads</tspan></text>
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:6.35px;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.228131">junctions in chimeric reads</tspan></text>
     <rect
-       style="fill:#808080;fill-opacity:0.151316;fill-rule:evenodd;stroke:none;stroke-width:0.460099;stroke-miterlimit:4;stroke-dasharray:none"
+       style="fill:#808080;fill-opacity:0.151316;fill-rule:evenodd;stroke:none;stroke-width:0.412268;stroke-miterlimit:4;stroke-dasharray:none"
        id="rect4922-7-9-4-0-3-1-8-9"
        width="190.16342"
-       height="43.332088"
+       height="34.790939"
        x="10.729993"
-       y="52.092522" />
+       y="60.633671" />
   </g>
 </svg>
