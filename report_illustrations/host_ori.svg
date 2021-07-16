@@ -125,8 +125,8 @@
      fit-margin-bottom="0"
      inkscape:window-width="1252"
      inkscape:window-height="847"
-     inkscape:window-x="180"
-     inkscape:window-y="25"
+     inkscape:window-x="1602"
+     inkscape:window-y="35"
      inkscape:window-maximized="0" />
   <metadata
      id="metadata2956">
@@ -136,7 +136,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -272,12 +272,12 @@
        xml:space="preserve"
        style="font-size:6.35px;line-height:1.25;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';stroke-width:0.264583"
        x="51.429665"
-       y="55.961803"
+       y="59.665974"
        id="text2909"><tspan
          sodipodi:role="line"
          id="tspan2907"
          x="51.429665"
-         y="55.961803"
+         y="59.665974"
          style="stroke-width:0.264583">left junction; host/virus</tspan></text>
     <text
        xml:space="preserve"
@@ -395,12 +395,26 @@
        xml:space="preserve"
        style="font-size:6.35px;line-height:1.25;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';stroke-width:0.264583"
        x="49.146095"
-       y="104.33968"
+       y="106.45636"
        id="text2909-9"><tspan
          sodipodi:role="line"
          id="tspan2907-0"
          x="49.146095"
-         y="104.33968"
+         y="106.45636"
          style="stroke-width:0.264583">right junction; virus/host</tspan></text>
+    <rect
+       style="fill:#808080;fill-opacity:0.151316;fill-rule:evenodd;stroke:none;stroke-width:0.364119;stroke-miterlimit:4;stroke-dasharray:none"
+       id="rect4922-7-9-4-0-3-1-8"
+       width="143.16507"
+       height="36.048153"
+       x="7.67028"
+       y="61.801472" />
+    <rect
+       style="fill:#808080;fill-opacity:0.151316;fill-rule:evenodd;stroke:none;stroke-width:0.303786;stroke-miterlimit:4;stroke-dasharray:none"
+       id="rect4922-7-9-4-0-3-1-8-0"
+       width="143.16507"
+       height="25.091867"
+       x="7.6842227"
+       y="108.89065" />
   </g>
 </svg>

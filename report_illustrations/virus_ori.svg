@@ -116,7 +116,7 @@
      inkscape:cx="330.50771"
      inkscape:cy="104.8368"
      inkscape:document-units="mm"
-     inkscape:current-layer="g2023-3"
+     inkscape:current-layer="layer1"
      inkscape:document-rotation="0"
      showgrid="false"
      fit-margin-top="0"
@@ -125,8 +125,8 @@
      fit-margin-bottom="0"
      inkscape:window-width="1252"
      inkscape:window-height="847"
-     inkscape:window-x="0"
-     inkscape:window-y="25"
+     inkscape:window-x="1650"
+     inkscape:window-y="42"
      inkscape:window-maximized="0" />
   <metadata
      id="metadata2414">
@@ -584,28 +584,42 @@
            x="175.66757"
            y="32.177029"
            style="stroke-width:0.264583">-</tspan></text>
+      <rect
+         style="fill:#808080;fill-opacity:0.151316;fill-rule:evenodd;stroke:none;stroke-width:0.418856;stroke-miterlimit:4;stroke-dasharray:none"
+         id="rect4922-7-9-4-0-3-1-8"
+         width="181.92093"
+         height="37.538765"
+         x="14.288326"
+         y="-43.74736" />
+      <rect
+         style="fill:#808080;fill-opacity:0.151316;fill-rule:evenodd;stroke:none;stroke-width:0.418646;stroke-miterlimit:4;stroke-dasharray:none"
+         id="rect4922-7-9-4-0-3-1-8-3"
+         width="181.73853"
+         height="37.538765"
+         x="14.470736"
+         y="6.1880841" />
     </g>
     <text
        xml:space="preserve"
        style="font-size:6.35px;line-height:1.25;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';stroke-width:0.264583"
        x="55.294605"
-       y="5.5450706"
+       y="7.1325707"
        id="text2909"><tspan
          sodipodi:role="line"
          id="tspan2907"
          x="55.294605"
-         y="5.5450706"
+         y="7.1325707"
          style="stroke-width:0.264583">Virus integrated in forward orientation</tspan></text>
     <text
        xml:space="preserve"
        style="font-size:6.35px;line-height:1.25;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';stroke-width:0.264583"
        x="56.398411"
-       y="56.179844"
+       y="57.238178"
        id="text2909-9"><tspan
          sodipodi:role="line"
          id="tspan2907-1"
          x="56.398411"
-         y="56.179844"
+         y="57.238178"
          style="stroke-width:0.264583">Virus integrated in reverse orientation</tspan></text>
   </g>
 </svg>
