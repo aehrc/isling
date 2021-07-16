@@ -1,5 +1,10 @@
 ---
-output: html_document
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
 params:
   dataset: AGRF_CAGRF20124835_JDW46
   outdir: "../../out/FRG-nonacus"
@@ -19,11 +24,17 @@ title: `r glue::glue("Integration site summary for dataset '{params$dataset}'")`
 date: `r format(Sys.time(), "%a %d %b %Y")`
 ---
 
+## Overview
+
+The goal of integration site analysis with _isling_ is to identify host/virus jucntions in sequence datas.  These host/virus junctions are evidence for viral integration into a host genome. The main steps in integration site analysis with _isling_ are shown below:
+
+
+![Overview of the steps for identifying integrations](../report_illustrations/overview.png){width=80% height=80%}
+
 ## Analysis parameters
 
 
-
-```{r}
+```{r analysisConditions}
 
 conditions_file <- file.path(params$outdir, "summary", glue::glue("{params$dataset}.analysis_conditions.tsv"))
 
@@ -59,6 +70,67 @@ pull_unique <- function(column) {
   
 }
 
+
+# https://stackoverflow.com/questions/61711777/how-to-create-an-adaptative-list-ulli-using-htmltools
+vec_to_html_list <- function(vec) {
+  return(
+    htmltools::tags$ul(
+      purrr::map(vec, ~htmltools::tags$li(htmltools::tags$code(.)))
+    )
+  )
+  
+}
+
+```
+
+
+### Samples
+
+The dataset `r htmltools::tags$code(params$dataset)` consisted of the following samples:
+
+`r vec_to_html_list(samples)`
+
+### Preprocessing
+
+
+```{r preprocStatements}
+read_statement <- function() {
+  if (is.na(pull_unique("bam_file"))) {
+    return(htmltools::tags$code("fasta format"))
+  } else {
+     return(htmltools::tags$code("bam format"))
+  }
+}
+
+preproc_statement <- function() {
+  dedup_tool <- glue::glue("{htmltools::tags$code('Dedeupe')} from the {htmltools::tags$code('BBTools')} suite")
+  trim_merge_tool <- glue::glue("{htmltools::tags$code('SeqPrep')}")
+  
+  if (pull_unique("merge")) {
+    if (pull_unique("dedup")) {
+      return(glue::glue("The reads were de-duplciated using {dedup_tool}, had adapters trimmed and overlapping R1 and R2 merged using {trim_merge_tool} before alignment."))
+    }
+    return(glue::glue("The reads had adapters trimmed and overlapping R1 and R2 merged using {trim_merge_tool} before alignment."))
+  } else if (pull_unique("trim")) {
+    if (pull_unique("dedup")) {
+      return(glue::glue("The reads were de-duplicated using {dedup_tool} and had adapters trimmed using {trim_merge_tool} before alignment."))
+    }
+    return(glue::glue("The reads had adapters trimmed using {trim_merge_tool} before alignment."))
+  } else {
+    if (pull_unique("dedup")) {
+      return(glue::glue("The reads were de-duplicated using {dedup_tool} before alignment."))
+    }
+    return(glue::glue("The reads were in alignment 'as-is'."))
+  }
+}
+```
+
+Reads were provided in `r read_statement()`.  `r preproc_statement()`
+
+### Alignment
+
+
+```{r getContigs}
 get_contig_lengths <- function(bwa_index_prefix) {
   filepath <- paste(bwa_index_prefix, ".ann", sep="")
   con = file(filepath, "r")
@@ -96,7 +168,6 @@ get_contig_lengths <- function(bwa_index_prefix) {
   
 }
 
-
 # get host contigs if fasta provided
 host_contigs <- get_contig_lengths(pull_unique("host_prefix"))
 virus_contigs <- get_contig_lengths(pull_unique("virus_prefix"))
@@ -113,39 +184,10 @@ format_contig_statement <- function(contig_list) {
   return(statement)
 }
 
-# https://stackoverflow.com/questions/61711777/how-to-create-an-adaptative-list-ulli-using-htmltools
-vec_to_html_list <- function(vec) {
-  return(
-    htmltools::tags$ul(
-      purrr::map(vec, ~htmltools::tags$li(htmltools::tags$code(.)))
-    )
-  )
-  
-}
+```
 
 
-
-preproc_statement <- function() {
-  dedup_tool <- glue::glue("{htmltools::tags$code('Dedeupe')} from the {htmltools::tags$code('BBTools')} suite")
-  trim_merge_tool <- glue::glue("{htmltools::tags$code('SeqPrep')}")
-  
-  if (pull_unique("merge")) {
-    if (pull_unique("dedup")) {
-      return(glue::glue("The reads were de-duplciated using {dedup_tool}, had adapters trimmed and overlapping R1 and R2 merged using {trim_merge_tool} before alignment."))
-    }
-    return(glue::glue("The reads had adapters trimmed and overlapping R1 and R2 merged using {trim_merge_tool} before alignment."))
-  } else if (pull_unique("trim")) {
-    if (pull_unique("dedup")) {
-      return(glue::glue("The reads were de-duplicated using {dedup_tool} and had adapters trimmed using {trim_merge_tool} before alignment."))
-    }
-    return(glue::glue("The reads had adapters trimmed using {trim_merge_tool} before alignment."))
-  } else {
-    if (pull_unique("dedup")) {
-      return(glue::glue("The reads were de-duplicated using {dedup_tool} before alignment."))
-    }
-    return(glue::glue("The reads were in alignment 'as-is'."))
-  }
-}
+```{r alignmentStatements}
 
 get_frag_len <- function(filename) {
   return(
@@ -181,8 +223,24 @@ get_frag_lens <- function() {
   )
   
 }
+```
 
+The host was `r htmltools::tags$code(pull_unique("host"))` (provided `r ifelse(is.na(pull_unique("host_fasta")), "as a bwa index", "in fasta format")`), `r format_contig_statement(host_contigs)`.
 
+The virus was `r htmltools::tags$code(pull_unique("virus"))` (provided `r ifelse(is.na(pull_unique("virus_fasta")), "as a bwa index", "in fasta format")`), `r format_contig_statement(virus_contigs)`.
+
+Alignments were conducted with `bwa mem` using parameters `r htmltools::tags$code(pull_unique("bwa_mem_params"))`.  See the [man page](http://bio-bwa.sourceforge.net/bwa.shtml) for a full description of these parameters.
+
+Fragment sizes from the alignments are used to calculate an approximate integration location for discordant pairs, in which the actual junction is not directly observed.  The following mean fragment lengths were calculated using `samtools stat` for each sample:
+
+```{r, diplayFragLens, echo=FALSE}
+DT::datatable(get_frag_lens(), 
+              rownames = FALSE)
+```
+
+### Postprocessing
+
+```{r postprocStatements}
 edit_dist_statement <- function() {
   if (is.na(pull_unique("nm_pc")) & is.na(pull_unique("nm_diff"))) {
     return("secondary/supplementary edit distance the same as the primary one")
@@ -214,35 +272,7 @@ merge_statement <- function() {
 ```
 
 
-### Samples
-
-The dataset `r htmltools::tags$code(params$dataset)` consisted of the following samples:
-
-`r vec_to_html_list(samples)`
-
-### Preprocessing
-
-Reads were provided in `r ifelse(is.na(pull_unique("bam_file")), htmltools::tags$code("bam format"),  htmltools::tags$code("fasta format"))`.  `r preproc_statement()`
-
-### Alignment
-
-The host was `r htmltools::tags$code(pull_unique("host"))` (provided `r ifelse(is.na(pull_unique("host_fasta")), "as a bwa index", "in fasta format")`), `r format_contig_statement(host_contigs)`.
-
-The virus was `r htmltools::tags$code(pull_unique("virus"))` (provided `r ifelse(is.na(pull_unique("virus_fasta")), "as a bwa index", "in fasta format")`), `r format_contig_statement(virus_contigs)`.
-
-Alignments were conducted with `bwa mem` using parameters `r htmltools::tags$code(pull_unique("bwa_mem_params"))`.  See the [man page](http://bio-bwa.sourceforge.net/bwa.shtml) for a full description of these parameters.
-
-The following mean fragment lengths were calculated using `samtools stat` for each sample:
-
-```{r, echo=FALSE}
-DT::datatable(get_frag_lens(), 
-              rownames = FALSE)
-```
-
-### Postprocessing
-
 After identification, integration junctions were `r filter_statement()`
-
 
 Retained junctions were split into groups on the basis of confidence in their locations. Junctions had a unique location if the mapping quality for the alignment to a reference was above `r pull_unique("mapq_thresh")`, and if they didn't have any other possible mapping locations.  Other possible mapping locations come from secondary or supplementary alignments that are similar to the primary alignment in terms of part of the read covered and edit distance (`r edit_dist_statement()`), but are in a different part of the genome to the primary alignment.
 
@@ -264,7 +294,6 @@ ints_wc <- tibble::tibble(
   f = list.files(ints_dir, full.names=TRUE),
   type = dplyr::case_when(
     stringr::str_detect(f, "\\.integrations\\.txt$") ~ "total putative junctions",
-    stringr::str_detect(f, "\\.integrations\\.filter_fail.txt") ~ "junctions failing filters",
     stringr::str_detect(f, "\\integrations\\.post\\.txt") ~ "junctions passing filters",
     TRUE ~ as.character(NA)
   ),
@@ -272,14 +301,17 @@ ints_wc <- tibble::tibble(
 ) %>% 
   dplyr::filter(!is.na(type)) %>% 
   dplyr::mutate(count = purrr::map_dbl(f, ~as.integer(system2("wc", args = c("-l", .x,  " | awk '{print $1}'"), stdout=TRUE))-1)) %>% 
-  dplyr::select(-f) %>% 
-  tidyr::pivot_wider(names_from = "type", values_from = "count")
+  dplyr::select(-f)  %>% 
+  tidyr::pivot_wider(names_from = "type", values_from = "count") %>% 
+  dplyr::rowwise() %>%
+  dplyr::mutate("junctions failing filters" = `total putative junctions` - `junctions passing filters`) %>% 
+  dplyr::ungroup()
 
 
 ```
 
 First, count the number of host/virus junctions identified in chimeric reads or discordant read-pairs.  
-```{r, echo=FALSE}
+```{r, displayWC, echo=FALSE}
 DT::datatable(ints_wc, 
               rownames = FALSE)
 ```
@@ -301,7 +333,7 @@ exclude_statement <- ifelse(length(exclude)==0,
 `r exclude_statement`.
 
 
-```{r, echo=FALSE, results='asis'}
+```{r, intProperties, echo=FALSE, results='asis'}
 # if there were some samples with integrations
 if (length(exclude) != nrow(ints_wc)) {
 res <- knitr::knit_child('junc_types.Rmd', quiet = TRUE)
