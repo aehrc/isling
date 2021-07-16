@@ -170,7 +170,7 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="0.89591949"
+     inkscape:zoom="0.925409"
      inkscape:cx="355.25532"
      inkscape:cy="185.33399"
      inkscape:document-units="mm"
@@ -181,7 +181,7 @@
      inkscape:window-width="1375"
      inkscape:window-height="847"
      inkscape:window-x="1472"
-     inkscape:window-y="29"
+     inkscape:window-y="25"
      inkscape:window-maximized="0"
      fit-margin-top="0"
      fit-margin-left="0"
@@ -205,18 +205,31 @@
      id="layer1"
      transform="translate(-10.729993,-0.55283779)">
     <rect
+       style="fill:#808080;fill-opacity:0.151316;fill-rule:evenodd;stroke:none;stroke-width:0.412268;stroke-miterlimit:4;stroke-dasharray:none"
+       id="rect4922-7-9-4-0-3-1-8-9"
+       width="190.16342"
+       height="34.790939"
+       x="10.729993"
+       y="60.633671"
+       inkscape:export-xdpi="300"
+       inkscape:export-ydpi="300" />
+    <rect
        style="fill:#808080;fill-opacity:0.151316;fill-rule:evenodd;stroke:none;stroke-width:0.42874;stroke-miterlimit:4;stroke-dasharray:none"
        id="rect4922-7-9-4-0-3-1-8"
        width="190.16342"
        height="37.626675"
        x="10.729993"
-       y="9.0939865" />
+       y="9.0939865"
+       inkscape:export-xdpi="300"
+       inkscape:export-ydpi="300" />
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:6.35px;line-height:1.25;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.264583"
        x="44.684841"
        y="6.5582647"
-       id="text6992"><tspan
+       id="text6992"
+       inkscape:export-xdpi="300"
+       inkscape:export-ydpi="300"><tspan
          sodipodi:role="line"
          id="tspan6990"
          x="44.684841"
@@ -227,7 +240,9 @@
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:4.23333px;line-height:1.25;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.228131"
        x="24.120865"
        y="75.003532"
-       id="text1163-9-1"><tspan
+       id="text1163-9-1"
+       inkscape:export-xdpi="300"
+       inkscape:export-ydpi="300"><tspan
          sodipodi:role="line"
          id="tspan1161-8-7"
          x="24.120865"
@@ -238,7 +253,9 @@
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:4.23333px;line-height:1.25;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.228131"
        x="48.66758"
        y="91.618683"
-       id="text1163-9-3-3"><tspan
+       id="text1163-9-3-3"
+       inkscape:export-xdpi="300"
+       inkscape:export-ydpi="300"><tspan
          sodipodi:role="line"
          id="tspan1161-8-0-9"
          x="48.66758"
@@ -249,7 +266,9 @@
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:4.23333px;line-height:1.25;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#808080;stroke-width:0.228131"
        x="24.205521"
        y="81.046288"
-       id="text1163-9-8-3"><tspan
+       id="text1163-9-8-3"
+       inkscape:export-xdpi="300"
+       inkscape:export-ydpi="300"><tspan
          sodipodi:role="line"
          id="tspan1161-8-3-8"
          x="24.205521"
@@ -260,14 +279,18 @@
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:4.23333px;line-height:1.25;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.228131"
        x="156.81271"
        y="91.618683"
-       id="text1163-9-3-3-2"><tspan
+       id="text1163-9-3-3-2"
+       inkscape:export-xdpi="300"
+       inkscape:export-ydpi="300"><tspan
          sodipodi:role="line"
          id="tspan1161-8-0-9-7"
          x="156.81271"
          y="91.618683"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:4.23333px;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.228131">read</tspan></text>
     <g
-       id="g2023">
+       id="g2023"
+       inkscape:export-xdpi="300"
+       inkscape:export-ydpi="300">
       <path
          style="fill:none;stroke:#000000;stroke-width:0.237543;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
          d="m 24.624693,34.376671 c 12.65325,0 25.30626,0 37.95902,0"
@@ -457,7 +480,9 @@
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:4.23333px;line-height:1.25;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.228131"
        x="103.86877"
        y="91.618683"
-       id="text1163-9-3-3-2-7"><tspan
+       id="text1163-9-3-3-2-7"
+       inkscape:export-xdpi="300"
+       inkscape:export-ydpi="300"><tspan
          sodipodi:role="line"
          id="tspan1161-8-0-9-7-2"
          x="103.86877"
@@ -465,7 +490,9 @@
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:4.23333px;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.228131">read</tspan></text>
     <g
        id="g1840"
-       transform="translate(4.7625002,15.345837)">
+       transform="translate(4.7625002,15.345837)"
+       inkscape:export-xdpi="300"
+       inkscape:export-ydpi="300">
       <g
          id="g1828"
          transform="translate(0,0.727026)">
@@ -499,7 +526,9 @@
     </g>
     <g
        id="g1856"
-       transform="translate(4.7625002,15.345837)">
+       transform="translate(4.7625002,15.345837)"
+       inkscape:export-xdpi="300"
+       inkscape:export-ydpi="300">
       <g
          id="g1833"
          transform="translate(0,3.180095)">
@@ -539,7 +568,9 @@
     </g>
     <g
        id="g1848"
-       transform="translate(4.7625002,15.345837)">
+       transform="translate(4.7625002,15.345837)"
+       inkscape:export-xdpi="300"
+       inkscape:export-ydpi="300">
       <g
          id="g1823">
         <path
@@ -581,7 +612,9 @@
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:4.23333px;line-height:1.25;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.264583"
        x="46.896721"
        y="64.037704"
-       id="text843-6"><tspan
+       id="text843-6"
+       inkscape:export-xdpi="300"
+       inkscape:export-ydpi="300"><tspan
          sodipodi:role="line"
          id="tspan841-7"
          x="46.896721"
@@ -592,7 +625,9 @@
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:4.23333px;line-height:1.25;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.264583"
        x="157.66031"
        y="63.561455"
-       id="text843-6-2"><tspan
+       id="text843-6-2"
+       inkscape:export-xdpi="300"
+       inkscape:export-ydpi="300"><tspan
          sodipodi:role="line"
          id="tspan841-7-3"
          x="157.66031"
@@ -603,7 +638,9 @@
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:4.23333px;line-height:1.25;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.264583"
        x="102.2562"
        y="64.383423"
-       id="text843-6-2-5"><tspan
+       id="text843-6-2-5"
+       inkscape:export-xdpi="300"
+       inkscape:export-ydpi="300"><tspan
          sodipodi:role="line"
          id="tspan841-7-3-5"
          x="102.2562"
@@ -614,18 +651,13 @@
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:6.35px;line-height:1.25;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.228131"
        x="69.579468"
        y="57.474571"
-       id="text1331-2"><tspan
+       id="text1331-2"
+       inkscape:export-xdpi="300"
+       inkscape:export-ydpi="300"><tspan
          sodipodi:role="line"
          id="tspan1329-7"
          x="69.579468"
          y="57.474571"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:6.35px;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.228131">junctions in chimeric reads</tspan></text>
-    <rect
-       style="fill:#808080;fill-opacity:0.151316;fill-rule:evenodd;stroke:none;stroke-width:0.412268;stroke-miterlimit:4;stroke-dasharray:none"
-       id="rect4922-7-9-4-0-3-1-8-9"
-       width="190.16342"
-       height="34.790939"
-       x="10.729993"
-       y="60.633671" />
   </g>
 </svg>

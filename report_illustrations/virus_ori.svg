@@ -112,8 +112,8 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="0.71"
-     inkscape:cx="330.50771"
+     inkscape:zoom="0.80427852"
+     inkscape:cx="222.5545"
      inkscape:cy="104.8368"
      inkscape:document-units="mm"
      inkscape:current-layer="layer1"
@@ -123,10 +123,10 @@
      fit-margin-left="0"
      fit-margin-right="0"
      fit-margin-bottom="0"
-     inkscape:window-width="1252"
-     inkscape:window-height="847"
+     inkscape:window-width="1697"
+     inkscape:window-height="1016"
      inkscape:window-x="1650"
-     inkscape:window-y="42"
+     inkscape:window-y="25"
      inkscape:window-maximized="0" />
   <metadata
      id="metadata2414">
@@ -136,7 +136,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -147,7 +147,9 @@
      transform="translate(-13.66463,-1.0238707)">
     <g
        id="g2023"
-       transform="translate(-0.65693688,1.3848572)">
+       transform="translate(-0.65693688,1.3848572)"
+       inkscape:export-xdpi="300"
+       inkscape:export-ydpi="300">
       <path
          style="fill:none;stroke:#000000;stroke-width:0.237543;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
          d="m 24.624693,34.376671 c 12.65325,0 25.30626,0 37.95902,0"
@@ -367,7 +369,9 @@
     </g>
     <g
        id="g2023-3"
-       transform="translate(-0.65693688,53.205489)">
+       transform="translate(-0.65693688,53.205489)"
+       inkscape:export-xdpi="300"
+       inkscape:export-ydpi="300">
       <path
          style="fill:none;stroke:#000000;stroke-width:0.237543;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
          d="m 24.624693,34.376671 c 12.65325,0 25.30626,0 37.95902,0"
@@ -604,7 +608,9 @@
        style="font-size:6.35px;line-height:1.25;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';stroke-width:0.264583"
        x="55.294605"
        y="7.1325707"
-       id="text2909"><tspan
+       id="text2909"
+       inkscape:export-xdpi="300"
+       inkscape:export-ydpi="300"><tspan
          sodipodi:role="line"
          id="tspan2907"
          x="55.294605"
@@ -615,7 +621,9 @@
        style="font-size:6.35px;line-height:1.25;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';stroke-width:0.264583"
        x="56.398411"
        y="57.238178"
-       id="text2909-9"><tspan
+       id="text2909-9"
+       inkscape:export-xdpi="300"
+       inkscape:export-ydpi="300"><tspan
          sodipodi:role="line"
          id="tspan2907-1"
          x="56.398411"
