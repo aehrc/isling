@@ -11,10 +11,7 @@ The pipeline performs several steps in order to identify integration sites.  It 
 # Dependencies
 Isling requires `snakemake` and either `singularity` (recommended) or `conda` to supply dependencies.  Additionaly, `python` version 3.5 or above and `pandas` are required (these should be automatically installed if installing `snakemake` with `conda`.
 
-Currently have conda environment called `snakemake`, which I'm activating in wrapper script `run_ints.sh`.  This runs the pipeline on the cluster (cluster config `cluster.json`), using conda to fufill dependencies (`envs/*.yml` contains specifications of conda environments).
-
 Alternativley, use the Docker version which contains isling and all dependencies.
-
 
 # Running
 
