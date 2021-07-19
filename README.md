@@ -1,26 +1,26 @@
-# AAV integration detection pipeline
+# Isling
 
-Pipeline to detect viral integration in paired-end reads.
+Isling is a tool for detecting viral integration in paired-end reads.
 
-Pipeline requires `snakemake` and either `singularity` (recommended) or `conda` to supply dependencies.  Additionaly, `python` version 3.5 or above and `pandas` are required (these should be automatically installed if installing `snakemake` with `conda`.
+# Pipeline overview
+
+The pipeline performs several steps in order to identify integration sites.  It takes as input datasets consisting of either fastq files or bam files. It does some pre-processing of the reads (merging overlapping reads, optional) and then aligns them to both a host and a viral sequence.  Reads are first aligned to the viral sequence(s), and then aligned reads are extracted and aligned to the host.  These alignments are used to identify viral integrations.
+
+# Dependencies
+Isling requires `snakemake` and either `singularity` (recommended) or `conda` to supply dependencies.  Additionaly, `python` version 3.5 or above and `pandas` are required (these should be automatically installed if installing `snakemake` with `conda`.
 
 Currently have conda environment called `snakemake`, which I'm activating in wrapper script `run_ints.sh`.  This runs the pipeline on the cluster (cluster config `cluster.json`), using conda to fufill dependencies (`envs/*.yml` contains specifications of conda environments).
 
 Alternativley, use the Docker version which contains isling and all dependencies.
 
-# Pipeline overview
-
-The pipeline performs several steps in order to identify integration sites.  It takes as input datasets consisting of either fastq files or bam files. It does some pre-processing of the reads (merging overlapping reads, optional) and then aligns them to both a host and a viral sequence.  Reads are first aligned to the viral sequence(s), and then aligned reads are extracted and aligned to the host.  These alignments are used to identify possible viral integrations.
 
 # Running
 
-To run with the test data locally, run:
+To run with the (included) test data locally, run:
 
 ```
 snakemake --configfile test/config/test.yml --cores <cores>
 ```
-
-
 
 ## Inputs
 
