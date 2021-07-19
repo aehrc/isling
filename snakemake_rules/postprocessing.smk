@@ -182,6 +182,32 @@ rule separate_unique_locations:
 		-e {output.both_ambig} \
 		-c 'HostMapQ > {params.mapq} and AltLocs == uniqueHost'		
 		"""
+
+rule rmd_summary_dataset:
+	input:
+		merged_beds = lambda wildcards: expand(
+							strip_wildcard_constraints(rules.separate_unique_locations.output.unique), 
+							zip,
+							samp = toDo.loc[toDo['dataset'] == wildcards.dset,'sample'],
+							host = toDo.loc[toDo['dataset'] == wildcards.dset,'host'],
+							virus = toDo.loc[toDo['dataset'] == wildcards.dset,'virus'],
+							allow_missing = True
+					)
+	output:
+		rmd = "{outpath}/summary/{dset}.html"
+	params:
+		host = lambda wildcards: toDo.loc[toDo['dataset'] == wildcards.dset,'host'][0],
+		virus = lambda wildcards: toDo.loc[toDo['dataset'] == wildcards.dset,'virus'][0],
+		outdir = lambda wildcards: os.path.realpath(toDo.loc[toDo['dataset'] == wildcards.dset,'virus'][0])
+	conda:
+		"../envs/rscripts.yml"
+	container:
+		"docker://szsctt/rscripts:5"
+	shell:
+		"""
+		Rscript -e 'rmarkdown::render("scripts/summary.Rmd", out_file="{output.rmd}", params=list(outdir="{params.outdir}", host="{params.host}", virus="{params.virus}", dataset="{wildcards.dset}"))'
+		"""
+	
 		
 rule merged_bed:
 	input:
@@ -194,6 +220,8 @@ rule merged_bed:
 		
 	container:
 		"docker://szsctt/bedtools:1"
+	conda:
+		"envs/bedtools.yml"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5, 1000)),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
@@ -202,7 +230,6 @@ rule merged_bed:
 		"""
 		python3 scripts/merge.py -i {input.txt} -o {output.merged} -c {params.method} -n {params.n}
 		"""
-
 
 rule summarise:
 	input: 
@@ -218,7 +245,7 @@ rule summarise:
 	conda:
 		"../envs/rscripts.yml"
 	container:
-		"docker://szsctt/rscripts:4"
+		"docker://szsctt/rscripts:5"
 	params:
 		outdir = lambda wildcards, output: path.dirname(output[0]),
 		host = lambda wildcards: set(toDo.loc[toDo['dataset'] == wildcards.dset,'host']).pop(),
@@ -247,7 +274,7 @@ rule ucsc_bed:
 	conda:
 		"../envs/rscripts.yml"
 	container:
-		"docker://szsctt/rscripts:4"
+		"docker://szsctt/rscripts:5"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
