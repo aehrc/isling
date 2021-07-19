@@ -2,6 +2,8 @@
 
 Isling is a tool for detecting viral integration in paired-end reads.
 
+![](report_illustrations/overview.png)
+
 # Pipeline overview
 
 The pipeline performs several steps in order to identify integration sites.  It takes as input datasets consisting of either fastq files or bam files. It does some pre-processing of the reads (merging overlapping reads, optional) and then aligns them to both a host and a viral sequence.  Reads are first aligned to the viral sequence(s), and then aligned reads are extracted and aligned to the host.  These alignments are used to identify viral integrations.
