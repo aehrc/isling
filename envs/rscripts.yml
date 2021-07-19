@@ -12,5 +12,5 @@ dependencies:
   - r-wesanderson=0.3
   - r-hmisc=4.5_0
   - r-dt=0.18
-  - r-karyoploter=1.18
+  - bioconductor-karyoploter=1.18
   - pandoc=2.14
