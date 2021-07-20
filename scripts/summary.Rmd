@@ -169,8 +169,8 @@ get_contig_lengths <- function(bwa_index_prefix) {
 }
 
 # get host contigs if fasta provided
-host_contigs <- get_contig_lengths(pull_unique("host_prefix"))
-virus_contigs <- get_contig_lengths(pull_unique("virus_prefix"))
+host_contigs <- get_contig_lengths(file.path(params$outdir, 'references', params$host, params$host))
+virus_contigs <- get_contig_lengths(file.path(params$outdir, 'references', params$virus, params$virus))
 
 # if there are fewer than five contigs in reference, list them, otherwise just state the number of contigs
 format_contig_statement <- function(contig_list) {

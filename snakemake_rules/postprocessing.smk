@@ -198,14 +198,14 @@ rule rmd_summary_dataset:
 	params:
 		host = lambda wildcards: toDo.loc[toDo['dataset'] == wildcards.dset,'host'][0],
 		virus = lambda wildcards: toDo.loc[toDo['dataset'] == wildcards.dset,'virus'][0],
-		outdir = lambda wildcards: os.path.realpath(toDo.loc[toDo['dataset'] == wildcards.dset,'virus'][0])
+		outdir = lambda wildcards: os.path.abspath(toDo.loc[toDo['dataset'] == wildcards.dset, 'outdir'][0])
 	conda:
 		"../envs/rscripts.yml"
 	container:
 		"docker://szsctt/rscripts:5"
 	shell:
 		"""
-		Rscript -e 'rmarkdown::render("scripts/summary.Rmd", output_file="{os.path.realpath((output.rmd)}", params=list(outdir="{params.outdir}", host="{params.host}", virus="{params.virus}", dataset="{wildcards.dset}"))'
+		Rscript -e 'rmarkdown::render("scripts/summary.Rmd", output_file="../{output.rmd}", params=list(outdir="{params.outdir}", host="{params.host}", virus="{params.virus}", dataset="{wildcards.dset}"))'
 		"""
 	
 		
