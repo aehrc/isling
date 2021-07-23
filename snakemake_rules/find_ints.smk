@@ -18,7 +18,7 @@ rule find_ints:
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	container:
-		"docker://szsctt/simvi:2"
+		"docker://szsctt/isling:latest"
 	conda:
 		"../envs/find_ints.yml"
 	shell:
@@ -50,7 +50,7 @@ rule combine_ints:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	container:
-		"docker://ubuntu:18.04"
+		"docker://szsctt/isling:latest"
 	shell:
 		"""
 		(head -n1 {input.ints[0]} && awk '(FNR==1){{next}}{{print $0| "sort -k1,1 -k2,2n"}}' {input}) > {output.all}

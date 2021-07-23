@@ -78,7 +78,7 @@ rule align_bwa_virus_single:
 	conda:
 		"../envs/bwa.yml"
 	container:
-		"docker://szsctt/bwa:1"
+		"docker://szsctt/isling:latest"
 	threads: cpus
 	shell:
 		"""
@@ -103,7 +103,7 @@ rule align_bwa_virus_paired:
 	conda:
 		"../envs/bwa.yml"	
 	container:
-		"docker://szsctt/bwa:1"
+		"docker://szsctt/isling:latest"
 	threads: cpus
 	shell:
 		"""
@@ -123,7 +123,7 @@ rule combine_bwa_virus:
 	conda:
 		"../envs/bwa.yml"
 	container:
-		"docker://szsctt/bwa:1"
+		"docker://szsctt/isling:latest"
 	threads: cpus
 	shell:
 		"""
@@ -168,7 +168,7 @@ rule extract_to_fastq_single:
 	conda:
 		"../envs/bwa.yml"
 	container:
-		"docker://szsctt/bwa:1"
+		"docker://szsctt/isling:latest"
 	shell:
 		"""
 		# 0x4 - read unmapped
@@ -214,7 +214,7 @@ rule extract_to_fastq_paired:
 	conda:
 		"../envs/bwa.yml"
 	container:
-		"docker://szsctt/bwa:1"
+		"docker://szsctt/isling:latest"
 	shell:
 		"""
 		samtools collate -O {input.bam} | samtools fastq -1 {output.fastq1} -2 {output.fastq2}
@@ -278,7 +278,7 @@ rule combine_host:
 	conda: 
 		"../envs/bwa.yml"
 	container:
-		"docker://szsctt/bwa:1"
+		"docker://szsctt/isling:latest"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.paired, input.single), attempt, 1.2, 500),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
@@ -306,7 +306,7 @@ rule merge_virus_sams:
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	container:
-		"docker://szsctt/bwa:1"
+		"docker://szsctt/isling:latest"
 	threads: 1
 	shell:
 		"""
@@ -327,7 +327,7 @@ rule merge_host_sams:
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	container:
-		"docker://szsctt/bwa:1"
+		"docker://szsctt/isling:latest"
 	threads: 1
 	shell:
 		"""
@@ -365,7 +365,7 @@ rule virus_stats:
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	container:
-		"docker://szsctt/bwa:1"	
+		"docker://szsctt/isling:latest"
 	threads: 1
 	shell:
 		"""

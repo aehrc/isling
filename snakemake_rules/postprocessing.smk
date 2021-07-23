@@ -10,7 +10,7 @@ rule post_filter:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	container:
-		"docker://szsctt/simvi:1"
+		"docker://szsctt/isling:latest"
 	conda: "../envs/filter.yml"
 	shell:
 		"""
@@ -23,7 +23,7 @@ rule sort_bed:
 	output:
 		sorted = "{name}.sorted.bed"
 	container:
-		"docker://ubuntu:18.04"
+		"docker://szsctt/isling:latest"
 	shell:
 		"sort -k1,1 -k2,2n {input.unsorted} > {output.sorted}"
 
@@ -40,7 +40,7 @@ rule exclude_bed:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	container:
-		"docker://szsctt/bedtools:1"
+		"docker://szsctt/isling:latest"
 	conda:
 		"../envs/bedtools.yml"
 	shell:
@@ -85,7 +85,7 @@ rule include_bed:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	container:
-		"docker://szsctt/bedtools:1"
+		"docker://szsctt/isling:latest"
 	conda:
 		"../envs/bedtools.yml"
 	shell:
@@ -136,6 +136,8 @@ rule post_final:
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+	container:
+		"docker://szsctt/isling:latest"
 	shell:
 		"""
 		mv {input.kept} {output.kept}
@@ -154,7 +156,7 @@ rule separate_unique_locations:
 	params:
 		mapq = lambda wildcards: int(get_value_from_df(wildcards, 'mapq_thresh'))
 	container:
-		"docker://szsctt/simvi:1"
+		"docker://szsctt/isling:latest"
 	conda: "../envs/filter.yml"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
@@ -195,17 +197,20 @@ rule rmd_summary_dataset:
 					)
 	output:
 		rmd = "{outpath}/summary/{dset}.html"
+	resources:
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	params:
-		host = lambda wildcards: toDo.loc[toDo['dataset'] == wildcards.dset,'host'][0],
-		virus = lambda wildcards: toDo.loc[toDo['dataset'] == wildcards.dset,'virus'][0],
-		outdir = lambda wildcards: os.path.abspath(toDo.loc[toDo['dataset'] == wildcards.dset, 'outdir'][0])
+		host = lambda wildcards: toDo.loc[(toDo['dataset'] == wildcards.dset).idxmax(), 'host'],
+		virus = lambda wildcards: toDo.loc[(toDo['dataset'] == wildcards.dset).idxmax(), 'virus'],
+		outdir = lambda wildcards: os.path.abspath(toDo.loc[(toDo['dataset'] == wildcards.dset).idxmax(), 'outdir'])
 	conda:
 		"../envs/rscripts.yml"
 	container:
-		"docker://szsctt/rscripts:5"
+		"docker://szsctt/isling:latest"
 	shell:
 		"""
-		Rscript -e 'params=list("outdir"="{params.outdir}", "host"="{params.host}", "virus"="{params.virus}", "dataset"="{wildcards.dset}"); rmarkdown::render("scripts/summary.Rmd", output_file="../{output.rmd}")'
+		Rscript -e 'params=list("outdir"="{params.outdir}", "host"="{params.host}", "virus"="{params.virus}", "dataset"="{wildcards.dset}"); rmarkdown::render("scripts/summary.Rmd", output_file="{output.rmd}")'
 		"""
 	
 		
@@ -217,9 +222,8 @@ rule merged_bed:
 	params:
 		method = lambda wildcards: get_value_from_df(wildcards, 'merge_method'),
 		n = lambda wildcards: int(get_value_from_df(wildcards, 'merge_n_min')),
-		
 	container:
-		"docker://szsctt/bedtools:1"
+		"docker://szsctt/isling:latest"
 	conda:
 		"envs/bedtools.yml"
 	resources:
@@ -245,7 +249,7 @@ rule summarise:
 	conda:
 		"../envs/rscripts.yml"
 	container:
-		"docker://szsctt/rscripts:5"
+		"docker://szsctt/isling:latest"
 	params:
 		outdir = lambda wildcards, output: path.dirname(output[0]),
 		host = lambda wildcards: set(toDo.loc[toDo['dataset'] == wildcards.dset,'host']).pop(),
@@ -274,7 +278,7 @@ rule ucsc_bed:
 	conda:
 		"../envs/rscripts.yml"
 	container:
-		"docker://szsctt/rscripts:5"
+		"docker://szsctt/isling:latest"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
