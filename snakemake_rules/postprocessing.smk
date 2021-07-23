@@ -205,7 +205,7 @@ rule rmd_summary_dataset:
 		"docker://szsctt/rscripts:5"
 	shell:
 		"""
-		Rscript -e 'rmarkdown::render("scripts/summary.Rmd", output_file="../{output.rmd}", params=list(outdir="{params.outdir}", host="{params.host}", virus="{params.virus}", dataset="{wildcards.dset}"))'
+		Rscript -e 'params=list("outdir"="{params.outdir}", "host"="{params.host}", "virus"="{params.virus}", "dataset"="{wildcards.dset}"); rmarkdown::render("scripts/summary.Rmd", output_file="../{output.rmd}")'
 		"""
 	
 		
