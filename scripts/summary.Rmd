@@ -5,18 +5,19 @@ output:
     toc_float:
       collapsed: true
       smooth_scroll: true
-params:
-  dataset: AGRF_CAGRF20124835_JDW46
-  outdir: "../../out/FRG-nonacus"
-  host: GRCh38
-  virus: pAAV2-OTC_flop
+#params:
+#  dataset: test-merge
+#  outdir: "../out/pipeline-test"
+#  host: "host"
+#  virus: "rep68"
 ---
 
 ```{r, setup, include=FALSE}
+print(params)
+
 knitr::opts_chunk$set(fig.width=8, fig.height=6,
                       echo=FALSE, warning=FALSE, message=FALSE)
 library(magrittr)
-
 ```
 
 ---
