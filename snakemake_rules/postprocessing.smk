@@ -187,20 +187,38 @@ rule separate_unique_locations:
 
 rule rmd_summary_dataset:
 	input:
-		merged_beds = lambda wildcards: expand(
+		unique = lambda wildcards: expand(
 							strip_wildcard_constraints(rules.separate_unique_locations.output.unique), 
 							zip,
 							samp = toDo.loc[toDo['dataset'] == wildcards.dset,'sample'],
 							host = toDo.loc[toDo['dataset'] == wildcards.dset,'host'],
 							virus = toDo.loc[toDo['dataset'] == wildcards.dset,'virus'],
 							allow_missing = True
-					)
+					),
+		host_ambig = lambda wildcards: expand(
+							strip_wildcard_constraints(rules.separate_unique_locations.output.host_ambig), 
+							zip,
+							samp = toDo.loc[toDo['dataset'] == wildcards.dset,'sample'],
+							host = toDo.loc[toDo['dataset'] == wildcards.dset,'host'],
+							virus = toDo.loc[toDo['dataset'] == wildcards.dset,'virus'],
+							allow_missing = True
+					),		
+		virus_ambig = lambda wildcards: expand(
+							strip_wildcard_constraints(rules.separate_unique_locations.output.virus_ambig), 
+							zip,
+							samp = toDo.loc[toDo['dataset'] == wildcards.dset,'sample'],
+							host = toDo.loc[toDo['dataset'] == wildcards.dset,'host'],
+							virus = toDo.loc[toDo['dataset'] == wildcards.dset,'virus'],
+							allow_missing = True
+					),
+						
 	output:
 		rmd = "{outpath}/summary/{dset}.html"
 	resources:
-		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 3, 1000)),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	params:
+		outfile = lambda wildcards, output: os.path.abspath(output.rmd),
 		host = lambda wildcards: toDo.loc[(toDo['dataset'] == wildcards.dset).idxmax(), 'host'],
 		virus = lambda wildcards: toDo.loc[(toDo['dataset'] == wildcards.dset).idxmax(), 'virus'],
 		outdir = lambda wildcards: os.path.abspath(toDo.loc[(toDo['dataset'] == wildcards.dset).idxmax(), 'outdir'])
@@ -210,7 +228,7 @@ rule rmd_summary_dataset:
 		"docker://szsctt/isling:latest"
 	shell:
 		"""
-		Rscript -e 'params=list("outdir"="{params.outdir}", "host"="{params.host}", "virus"="{params.virus}", "dataset"="{wildcards.dset}"); rmarkdown::render("scripts/summary.Rmd", output_file="{output.rmd}")'
+		Rscript -e 'params=list("outdir"="{params.outdir}", "host"="{params.host}", "virus"="{params.virus}", "dataset"="{wildcards.dset}"); rmarkdown::render("scripts/summary.Rmd", output_file="{params.outfile}")'
 		"""
 	
 		
