@@ -13,8 +13,6 @@ output:
 ---
 
 ```{r, setup, include=FALSE}
-print(params)
-
 knitr::opts_chunk$set(fig.width=8, fig.height=6,
                       echo=FALSE, warning=FALSE, message=FALSE)
 library(magrittr)
@@ -27,10 +25,11 @@ date: `r format(Sys.time(), "%a %d %b %Y")`
 
 ## Overview
 
-The goal of integration site analysis with _isling_ is to identify host/virus jucntions in sequence datas.  These host/virus junctions are evidence for viral integration into a host genome. The main steps in integration site analysis with _isling_ are shown below:
+The goal of integration site analysis with _isling_ is to identify host/virus jucntions in sequence datas.  These host/virus junctions are evidence for viral integration into a host genome. T
+
+This report gives an overview of the integration sites detected for the dataset called `r params$dataset`
 
 
-![Overview of the steps for identifying integrations](../report_illustrations/overview.png){width=80% height=80%}
 
 ## Analysis parameters
 
