@@ -1,0 +1,150 @@
+---
+output: html_document
+---
+
+```{r}
+samp_pal <- wesanderson::wes_palette("Darjeeling1", length(unique(ints_wc$dataset)), "continuous")
+```
+
+
+### Location in `r ifelse(locs_type == "host", "host", "viral")` reference(s)
+
+We can also plot the location of the integrations for datasets aligned to the `r ifelse(locs_type == "host", "host", "viral")` genome `r locs_name`.
+```{r}
+datasets <- conds %>% 
+  dplyr::filter(!!dplyr::sym(locs_type) == locs_name) %>% 
+  dplyr::pull(dataset)
+```
+
+These are the datasets: 
+
+`r vec_to_html_list(datasets)`
+
+```{r}
+ambig_statement <- ifelse(locs_type == "host", "ambiguous location (virus)", "ambiguous location (host)")
+
+ambig <- ifelse(locs_type == "host", "ambig. (virus)", "ambig. (host)")
+```
+
+
+Here we're onlyl interested in jucntions with an unambiguous location in the `r locs_type` genome, i.e. the 'unique' group and the '`r ambig_statement`' group.
+
+We first plot the number of integration junctions identified in each contig in the `r locs_type` reference.
+
+
+```{r}
+plot_var <- ifelse(locs_type == "host", "Chr", "VirusRef")
+
+ints %>% 
+  dplyr::filter(dataset %in% datasets) %>% 
+  dplyr::filter(type == "unique" | type == ambig) %>% 
+  dplyr::mutate(plot_col = forcats::as_factor(!!dplyr::sym(plot_var))) %>% 
+  dplyr::mutate(plot_col = forcats::fct_relevel(plot_col, ~stringr::str_sort(., numeric=TRUE))) %>% 
+  ggplot2::ggplot(ggplot2::aes(fill = plot_col, y=dataset)) +
+  ggplot2::geom_bar(position=ggplot2::position_stack(reverse=TRUE)) +
+  ggplot2::theme_classic() +
+  ggplot2::theme(legend.position="bottom",
+                 axis.line.y = ggplot2::element_blank(),
+                 axis.ticks.y = ggplot2::element_blank(),
+                 axis.title.y = ggplot2::element_blank())  +
+  ggplot2::scale_fill_manual(values=rep_len(pal, length(unique(ints[[plot_var]]))))
+  
+```
+
+Next, we look at the 25 contigs with the most integrations, and plot the locatioin of the integrations within those contigs.
+
+```{r}
+
+contigs <- get_contig_lengths(locs_bwa_prefx)
+
+
+contigs_plot <- get_top_contigs(ints, plot_var, contigs)
+
+
+
+start_col <- ifelse(locs_type == "host", "IntStart", "VirusStart")
+stop_col <- ifelse(locs_type == "host", "IntStop", "VirusStop")
+ori_col <- ifelse(locs_type == "host", "Orientation", "VirusOrientation")
+
+
+ints_plot <- ints %>% 
+  dplyr::filter(dataset %in% datasets) %>% 
+  dplyr::filter(type == "unique" | type == ambig) %>%
+  dplyr::mutate(Orientation = dplyr::case_when(
+    Orientation == "hv" ~ '+',
+    Orientation == "vh" ~ '-'
+  )) 
+
+
+
+plot_fwd_discord <- ints_plot %>% 
+  dplyr::filter(!!dplyr::sym(ori_col) == '+') %>% 
+  dplyr::filter(Type=="discordant") %>% 
+  GenomicRanges::makeGRangesFromDataFrame(
+   seqnames.field = plot_var,
+   start.field = start_col,
+   end.field = stop_col,
+   strand.field= ori_col,
+   starts.in.df.are.0based = TRUE,
+   keep.extra.columns = TRUE
+  )
+
+plot_fwd_chimeric <- ints_plot %>% 
+  dplyr::filter(!!dplyr::sym(ori_col) == '+') %>% 
+  dplyr::filter(Type!="discordant") %>% 
+  GenomicRanges::makeGRangesFromDataFrame(
+   seqnames.field = plot_var,
+   start.field = start_col,
+   end.field = stop_col,
+   strand.field= ori_col,
+   starts.in.df.are.0based = TRUE,
+   keep.extra.columns = TRUE
+  )
+
+plot_rev_discord <- ints_plot %>% 
+  dplyr::filter(!!dplyr::sym(ori_col) == '-') %>% 
+  dplyr::filter(Type=="discordant") %>% 
+  GenomicRanges::makeGRangesFromDataFrame(
+   seqnames.field = plot_var,
+   start.field = start_col,
+   end.field = stop_col,
+   strand.field= ori_col,
+   starts.in.df.are.0based = TRUE,
+   keep.extra.columns = TRUE
+  )
+
+plot_rev_chimeric <- ints_plot %>% 
+  dplyr::filter(!!dplyr::sym(ori_col) == '-') %>% 
+  dplyr::filter(Type!="discordant") %>% 
+  GenomicRanges::makeGRangesFromDataFrame(
+   seqnames.field = plot_var,
+   start.field = start_col,
+   end.field = stop_col,
+   strand.field= ori_col,
+   starts.in.df.are.0based = TRUE,
+   keep.extra.columns = TRUE
+  )
+
+
+
+custom.genome <- regioneR::toGRanges(data.frame(chr=contigs_plot$contig_name, 
+                                      start=contigs_plot$start, 
+                                      end=contigs_plot$length
+                                      )
+                           )
+
+kp <- karyoploteR::plotKaryotype(genome = custom.genome, plot.type=2)
+#karyoploteR::kpPlotDensity(kp, virus_ints_plot, window.size=100)
+
+
+
+karyoploteR::kpPlotRegions(kp, plot_fwd_discord, col=pal[1], data.panel=1, border="slategray", r0=0, r1=0.45)
+karyoploteR::kpPlotRegions(kp, plot_fwd_chimeric, col=pal[2], data.panel=1, r0=0.55, r1=1)
+karyoploteR::kpPlotRegions(kp, plot_rev_discord, col=pal[1], data.panel=2, border="slategray", r0=0, r1=0.45)
+karyoploteR::kpPlotRegions(kp, plot_rev_chimeric, col=pal[2], data.panel=2, r0=0.55, r1=1)
+
+
+```
+
+
+

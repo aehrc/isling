@@ -6,8 +6,8 @@ output:
       collapsed: true
       smooth_scroll: true
 #params:
-#  dataset: test-merge
-#  outdir: "../out/pipeline-test"
+#  dataset: "test-merge"
+#  outdir: "/scratch1/sco305/intvi_cmri/intvi_pipeline/out/pipeline-test"
 #  host: "host"
 #  virus: "rep68"
 ---
@@ -16,6 +16,8 @@ output:
 knitr::opts_chunk$set(fig.width=8, fig.height=6,
                       echo=FALSE, warning=FALSE, message=FALSE)
 library(magrittr)
+source("summary_funcs.R")
+
 ```
 
 ---
@@ -61,26 +63,12 @@ format_vec_for_printing <- function(vec) {
 }
 
 pull_unique <- function(column) {
-  
   return(
     conditions %>% 
       dplyr::pull(!!dplyr::sym(column)) %>% 
       unique()
   )
-  
 }
-
-
-# https://stackoverflow.com/questions/61711777/how-to-create-an-adaptative-list-ulli-using-htmltools
-vec_to_html_list <- function(vec) {
-  return(
-    htmltools::tags$ul(
-      purrr::map(vec, ~htmltools::tags$li(htmltools::tags$code(.)))
-    )
-  )
-  
-}
-
 ```
 
 
@@ -131,42 +119,7 @@ Reads were provided in `r read_statement()`.  `r preproc_statement()`
 
 
 ```{r getContigs}
-get_contig_lengths <- function(bwa_index_prefix) {
-  filepath <- paste(bwa_index_prefix, ".ann", sep="")
-  con = file(filepath, "r")
-  i <- 1
-  contigs <- list()
-  # first line contains summary for whole genome
-  readLines(con, n = 1)
-  while ( TRUE ) {
 
-    # get next line
-    line <- readLines(con, n = 1)
-    
-    # break if we've reached the end of the file
-    if ( length(line) == 0 ) {
-      break
-    }   
-    
-    # split line into fields
-    line <- stringr::str_split(line, "\\s", simplify=TRUE)[1,]
-    
-    if (i %% 2 == 1) {
-      # get name of contig
-      contig <- line[2]
-    } else {
-      # get length of contig from next line
-      contigs[[contig]] = as.double(line[2])
-    }
-
-    i <- i + 1
-
-  }
-
-  close(con)
-  return(contigs)
-  
-}
 
 # get host contigs if fasta provided
 host_contigs <- get_contig_lengths(file.path(params$outdir, 'references', params$host, params$host))
@@ -281,7 +234,7 @@ Unique integration junctions with `r merge_statement()` in host and virus genome
 
 ## Number of host/virus junctions identified
 
-Isling identifies host/virus junctions in chimeric reads and discordant pairs.  First, looking at the number of junctions identified:
+Isling identifies host/virus junctions in chimeric reads and discordant pairs.  First, looking at the number of junctions identified - note that this is the total number of jucntions, before combining any integration junctions with the same coordinates, and is essentially a count of the nubmer of read (pairs) in which junctions were identfied (except in the case where there was more than one jucntion per read).  This number can differ from the true number of integration events in the dataset if there are  PCR duplicates (for example in amplicon datasets), or clonal expansion in the dataset.
 
 ```{r, wc, include=FALSE}
 ints_dir <- file.path(normalizePath(params$outdir),
@@ -315,6 +268,8 @@ First, count the number of host/virus junctions identified in chimeric reads or 
 DT::datatable(ints_wc, 
               rownames = FALSE)
 ```
+
+There were a total of `r sum(ints_wc['junctions passing filters'])` junctions identified for this dataset.
 
 
 ```{r filter_statement, include=FALSE}

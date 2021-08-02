@@ -1,0 +1,102 @@
+---
+output: html_document
+---
+
+
+```{r, setup_junc_types, include=FALSE}
+knitr::opts_chunk$set(fig.width=12, fig.height=8,
+                      echo=FALSE, warning=FALSE, message=FALSE)
+library(magrittr)
+samp_pal <- wesanderson::wes_palette("Darjeeling1", length(unique(ints_wc$dataset)), "continuous")
+source("summary_funcs.R")
+```
+
+## Junction types
+
+For this section, we examine all the integration junctions retained after filtering.  Each junction has a number of properties associated with it.  In this section we examine some of those properties.
+
+
+### Chimeric reads and discordant pairs
+
+Counting the number of junctions that were observed in chimeric reads and discordant pairs.  For chimeric reads, we further stratify in the junction had a 'gap', 'overlap' or was a 'clean' junction.  
+
+![Types of reads supporting integration junctions and junction types](../report_illustrations/junctions.png){width=75% height=75%}
+
+We call any bases involved in a gap or overlap 'ambiguous bases', and since it is not possible to identify a precise location within those ambiguous bases, _isling_ reports the coordinates of the bases as the location of the integration.
+
+
+```{r}
+ints %>% 
+  ggplot2::ggplot(ggplot2::aes(y = dataset, fill = OverlapType)) +
+  ggplot2::geom_bar(position=ggplot2::position_stack(reverse=TRUE)) +
+  ggplot2::theme_classic() +
+  ggplot2::theme(legend.position="bottom",
+                 axis.line.y = ggplot2::element_blank(),
+                 axis.ticks.y = ggplot2::element_blank(),
+                 axis.title.y = ggplot2::element_blank()) +
+  ggplot2::scale_fill_manual(values=pal)
+```
+
+If the junction is 'gap' or 'overlap', it has an associated number of ambiguous bases associated with it.  The distribution of the number of ambiguous bases looks like this (note that this frequency polynomial is normalised so the area under each curve is the same for all datasets)
+
+```{r include=FALSE}
+ints %>% 
+  dplyr::filter(OverlapType == "gap" | OverlapType == "overlap") %>% 
+  ggplot2::ggplot(ggplot2::aes(x = NoAmbiguousBases, color = dataset, group=dataset)) +
+  ggplot2::facet_grid(rows=ggplot2::vars(OverlapType)) +
+  ggplot2::geom_freqpoly(bins=max(ints$NoAmbiguousBases, na.rm=TRUE)) +
+  ggplot2::theme_classic() +
+  ggplot2::theme(strip.background = ggplot2::element_blank()) +
+  ggplot2::scale_color_manual(values=samp_pal) +
+  ggplot2::xlab("number of ambiguous bases") +
+  ggplot2::ylab("normalised fraction")
+```
+
+```{r}
+
+ints %>% 
+  dplyr::filter(OverlapType == "gap" | OverlapType == "overlap") %>% 
+  ggplot2::ggplot(ggplot2::aes(x = NoAmbiguousBases, color = dataset, group=dataset)) +
+  ggplot2::facet_grid(rows=ggplot2::vars(OverlapType)) +
+  ggplot2::geom_freqpoly(ggplot2::aes(y=..density..), bins=max(ints$NoAmbiguousBases, na.rm=TRUE)) +
+  ggplot2::theme_classic() +
+  ggplot2::theme(strip.background = ggplot2::element_blank()) +
+  ggplot2::scale_color_manual(values=samp_pal) +
+  ggplot2::xlab("number of ambiguous bases") +
+  ggplot2::ylab("normalised fraction")
+```
+
+
+### Ambiguous/unique locations
+
+We can also count the number of junctions that can be uniquely localised in both host and virus genomes, and those with locations that are ambiguous in one or both genomes. 
+
+![Post-processing steps](../report_illustrations/ambig_location.png){width=75% height=75%}
+
+Note the distinction between 'ambiguous bases', which refer to the bases that are part of a gap or overlap at an individual integration junction, and 'ambiguous location', which refers to host or viral alignments which cannot be uniquely localised in the respective genome.  These ambiguous locations occur because the mapping quality of the alignment is low, or because there are multiple best alignments for the read.
+
+We divide integrations into four groups, depending on their locations in host and viral references:
+
+
+| Group             | Host location | Virus location |
+|-------------------|---------------|----------------|
+| Unique            | Unambiguous   | Unambiguous    |
+| Ambiguous (host)  | Ambiguous     | Unambiguous    |
+| Ambiguous (virus) | Unambiguous   | Ambiguous      |
+| Ambiguous (both)  | Ambiguous     | Ambiguous      |
+
+Counting the number of junctions in each of these four groups:
+
+
+```{r}
+ints %>% 
+  ggplot2::ggplot(ggplot2::aes(y = dataset, fill = type)) +
+  ggplot2::geom_bar(position=ggplot2::position_stack(reverse=TRUE)) +
+  ggplot2::theme_classic() +
+  ggplot2::theme(legend.position="bottom",
+                 axis.line.y = ggplot2::element_blank(),
+                 axis.ticks.y = ggplot2::element_blank(),
+                 axis.title.y = ggplot2::element_blank()) +
+  ggplot2::scale_fill_manual(values=pal)
+```
+

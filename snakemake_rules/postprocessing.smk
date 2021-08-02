@@ -132,7 +132,7 @@ rule post_final:
 		excluded = lambda wildcards: get_post_final(wildcards, 'excluded'),
 	output:
 		kept = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.txt",
-		excluded = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.filter_fail.txt"
+		excluded = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.filter_fail.txt")
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
@@ -211,6 +211,7 @@ rule rmd_summary_dataset:
 							virus = toDo.loc[toDo['dataset'] == wildcards.dset,'virus'],
 							allow_missing = True
 					),
+		conds = rules.write_analysis_summary.output.tsv
 						
 	output:
 		rmd = "{outpath}/summary/{dset}.html"
@@ -231,6 +232,68 @@ rule rmd_summary_dataset:
 		Rscript -e 'params=list("outdir"="{params.outdir}", "host"="{params.host}", "virus"="{params.virus}", "dataset"="{wildcards.dset}"); rmarkdown::render("scripts/summary.Rmd", output_file="{params.outfile}")'
 		"""
 	
+rule rmd_summary:
+	input:
+		unique = lambda wildcards: expand(
+							strip_wildcard_constraints(rules.separate_unique_locations.output.unique), 
+							zip,
+							samp = toDo.loc[:, 'sample'],
+							host = toDo.loc[:, 'host'],
+							virus = toDo.loc[:, 'virus'],
+							dset = toDo.loc[:, 'dataset'],
+							allow_missing = True
+					),
+		host_ambig = lambda wildcards: expand(
+							strip_wildcard_constraints(rules.separate_unique_locations.output.host_ambig), 
+							zip,
+							samp = toDo.loc[:, 'sample'],
+							host = toDo.loc[:, 'host'],
+							virus = toDo.loc[:, 'virus'],
+							dset = toDo.loc[:, 'dataset'],
+							allow_missing = True
+					),		
+		virus_ambig = lambda wildcards: expand(
+							strip_wildcard_constraints(rules.separate_unique_locations.output.virus_ambig), 
+							zip,
+							samp = toDo.loc[:, 'sample'],
+							host = toDo.loc[:, 'host'],
+							virus = toDo.loc[:, 'virus'],
+							dset = toDo.loc[:, 'dataset'],
+							allow_missing = True
+					),
+		both_ambig = lambda wildcards: expand(
+							strip_wildcard_constraints(rules.separate_unique_locations.output.both_ambig), 
+							zip,
+							samp = toDo.loc[:, 'sample'],
+							host = toDo.loc[:, 'host'],
+							virus = toDo.loc[:, 'virus'],
+							dset = toDo.loc[:, 'dataset'],
+							allow_missing = True
+					),
+		conds = lambda wildcards: set(expand(
+							strip_wildcard_constraints(rules.write_analysis_summary.output.tsv),
+							dset = toDo.loc[:, 'dataset'],
+							allow_missing = True
+						))					
+	output:
+		rmd = "{outpath}/integration_summary.html"
+	resources:
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 3, 1000)),
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+	params:
+		summary_dir = lambda wildcards, output: os.path.join(os.path.abspath(os.path.dirname(output.rmd)), "summary"),
+		datasets = lambda wildcards: ", ".join([f'"{i}"' for i in set(toDo['dataset'])]),
+		output_file = lambda wildcards, output: os.path.abspath(output.rmd),
+		script = lambda wildcards: os.path.abspath("scripts/summary_all.Rmd")
+	conda:
+		"../envs/rscripts.yml"
+	container:
+		"docker://szsctt/isling:latest"
+	shell:
+		"""
+		Rscript -e 'params=list("summary_dir"="{params.summary_dir}", "datasets"=c({params.datasets})); rmarkdown::render("{params.script}", output_file="{params.output_file}")'
+		"""
+		
 		
 rule merged_bed:
 	input:

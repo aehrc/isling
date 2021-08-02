@@ -38,14 +38,6 @@ ints <- tibble::tibble(
 ) %>% 
   dplyr::filter(!is.na(type)) %>% 
   dplyr::filter(!(sample %in% exclude))
-
-# count number of host/virus junctions in unique/ambiguous categories
-ints_wc <- ints %>% 
-  dplyr::filter(!is.na(type)) %>% 
-  dplyr::mutate(count = purrr::map_dbl(f, ~as.integer(system2("wc", args = c("-l", .x,  " | awk '{print $1}'"), stdout=TRUE))-1)) %>% 
-  tidyr::pivot_wider(names_from = "type", values_from = "count")
-
-
 ```
 
 
@@ -58,25 +50,6 @@ Counting the number of junctions that were observed in chimeric reads and discor
 We call any bases involved in a gap or overlap 'ambiguous bases', and since it is not possible to identify a precise location within those ambiguous bases, _isling_ reports the coordinates of the bases as the location of the integration.
 
 ```{r}
-col_spec <- readr::cols(
-  .default = readr::col_character(),
-  IntStart = readr::col_double(),
-  IntStop = readr::col_double(),
-  VirusStart = readr::col_double(),
-  VirusStop = readr::col_double(),
-  NoAmbiguousBases = readr::col_double(),
-  HostEditDist = readr::col_double(),
-  ViralEditDist = readr::col_double(),
-  TotalEditDist = readr::col_double(),
-  PossibleHostTranslocation = readr::col_logical(),
-  PossibleVectorRearrangement = readr::col_logical(),
-  HostAmbiguousLocation = readr::col_logical(),
-  ViralAmbiguousLocation = readr::col_logical(),
-  HostMapQ = readr::col_double(),
-  ViralMapQ = readr::col_double()
-)
-
-
 ints <- ints %>% 
   dplyr::mutate(data = purrr::map(f, ~readr::read_tsv(., col_types=col_spec, na = c("", "NA", "None")))) %>% 
   tidyr::unnest(data)
@@ -108,14 +81,14 @@ ints %>%
   ggplot2::scale_fill_manual(values=pal)
 ```
 
-If the junction is 'gap' or 'overlap', it has an associated number of ambiguous bases associated with it.  The distribution of the number of ambiguous bases looks like this:
+If the junction is 'gap' or 'overlap', it has an associated number of ambiguous bases associated with it.  The distribution of the number of ambiguous bases looks like this (note that this frequency polynomial is normalised so the area under each curve is the same for all samples).
 
 ```{r}
 
 ints %>% 
   dplyr::filter(OverlapType == "gap" | OverlapType == "overlap") %>% 
   ggplot2::ggplot(ggplot2::aes(x = NoAmbiguousBases, color = sample_short)) +
-  ggplot2::geom_freqpoly(bins=max(ints$NoAmbiguousBases, na.rm=TRUE)) +
+  ggplot2::geom_freqpoly(ggplot2::aes(y=..density..), bins=max(ints$NoAmbiguousBases, na.rm=TRUE)) +
   ggplot2::facet_grid(rows=ggplot2::vars(OverlapType)) +
   ggplot2::theme_classic() +
   ggplot2::theme(strip.background = ggplot2::element_blank()) +
@@ -143,20 +116,11 @@ We divide integrations into four groups, depending on their locations in host an
 
 Counting the number of junctions in each of these four groups:
 
-```{r, echo=FALSE}
-#DT::datatable(dplyr::select(ints_wc, -f), 
-#              rownames = FALSE)
-```
-
 
 ```{r}
-ints_wc %>% 
-  tidyr::pivot_longer(`ambig. (both)`:`ambig. (viral)`, names_to="type", values_to="count") %>% 
-  dplyr::group_by(sample) %>% 
-  dplyr::mutate(frac = count/sum(count)) %>% 
-  dplyr::ungroup() %>% 
-  ggplot2::ggplot(ggplot2::aes(y=sample_short, x=count, fill=type)) +
-  ggplot2::geom_col(position=ggplot2::position_stack(reverse=TRUE)) +
+ints %>% 
+  ggplot2::ggplot(ggplot2::aes(y = sample_short, fill = type)) +
+  ggplot2::geom_bar(position=ggplot2::position_stack(reverse=TRUE)) +
   ggplot2::theme_classic() +
   ggplot2::theme(legend.position="bottom",
                  axis.line.y = ggplot2::element_blank(),
@@ -189,31 +153,6 @@ ints %>%
   
 ```
 
-```{r}
-get_top_contigs <- function(col_name, contig_lengths) {
-  contigs_join <- tibble::tibble(
-    name = names(contig_lengths),
-    length = unlist(unname(contig_lengths))
-  )
-  
-  right_join <- "name"
-  
-  contigs_plot <- ints %>% 
-    dplyr::filter(type == "unique" | type == "ambig. (virus)") %>% 
-    dplyr::group_by(!!dplyr::sym(col_name)) %>% 
-    dplyr::summarise(n = dplyr::n()) %>% 
-    dplyr::arrange(desc(n)) %>% 
-    head(max_contigs_plot) %>% 
-    dplyr::left_join(contigs_join, by=setNames(right_join, col_name)) %>% 
-    dplyr::mutate(start=1) %>% 
-    dplyr::arrange(factor(!!dplyr::sym(col_name), levels=stringr::str_sort(!!dplyr::sym(col_name), numeric=TRUE)))
-  
-  return(contigs_plot)
-}
-
-```
-
-
 
 We can also plot the location of integration junctions in each viral reference.  Since it's hard to visualise very many viral references, this plot is limited to the 25 viral references that harbor the most integration junctions.
 
@@ -235,7 +174,7 @@ ints %>%
 ```
 
 ```{r}
-virus_contigs_plot <- get_top_contigs("VirusRef", virus_contigs)
+virus_contigs_plot <- get_top_contigs(ints, "VirusRef", virus_contigs)
 
 virus_ints_plot <- ints %>% 
   dplyr::filter(type == "unique" | type == "ambig. (host)") %>% 
@@ -303,10 +242,9 @@ virus_plot_rev_chimeric <- virus_ints_plot %>%
   )
 
 
-
-custom.genome <- regioneR::toGRanges(data.frame(chr=names(virus_contigs), 
-                                      start=rep(1, length(virus_contigs)), 
-                                      end=unname(unlist(virus_contigs))
+custom.genome <- regioneR::toGRanges(data.frame(chr=virus_contigs_plot$contig_name, 
+                                      start=virus_contigs_plot$start, 
+                                      end=virus_contigs_plot$length
                                       )
                            )
 
@@ -366,7 +304,7 @@ Similar to above, we plot the integration coordinates for left, or host/virus ju
 ```{r}
 
 
-host_contigs_plot <- get_top_contigs("Chr", host_contigs) 
+host_contigs_plot <- get_top_contigs(ints, "Chr", host_contigs) 
 
 host_plot_fwd_discord <- ints %>% 
   dplyr::filter(type == "unique" | type == "ambig. (virus)") %>% 
@@ -444,7 +382,7 @@ host_plot_rev_chimeric <- ints %>%
    keep.extra.columns = TRUE
   )
 
-custom.genome <- regioneR::toGRanges(data.frame(chr=host_contigs_plot$Chr, 
+custom.genome <- regioneR::toGRanges(data.frame(chr=host_contigs_plot$contig_name, 
                                       start=host_contigs_plot$start, 
                                       end=host_contigs_plot$length
                                       )
