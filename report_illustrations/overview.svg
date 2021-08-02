@@ -2328,11 +2328,11 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="0.95198824"
-     inkscape:cx="352.61505"
-     inkscape:cy="401.41933"
+     inkscape:zoom="1.2519093"
+     inkscape:cx="262.20224"
+     inkscape:cy="168.69208"
      inkscape:document-units="mm"
-     inkscape:current-layer="layer1"
+     inkscape:current-layer="g5247"
      inkscape:document-rotation="0"
      showgrid="false"
      inkscape:snap-others="true"
@@ -2341,7 +2341,7 @@
      inkscape:snap-global="true"
      inkscape:window-width="1550"
      inkscape:window-height="1027"
-     inkscape:window-x="1654"
+     inkscape:window-x="1979"
      inkscape:window-y="25"
      inkscape:window-maximized="0"
      fit-margin-top="0"
@@ -2356,7 +2356,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -3500,21 +3500,27 @@
          width="72.261894"
          height="28.212036"
          x="1.5320932"
-         y="10.066459" />
+         y="10.066459"
+         inkscape:export-xdpi="300"
+         inkscape:export-ydpi="300" />
       <text
          xml:space="preserve"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:4.23333px;line-height:1.25;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.264583"
          x="8.2913837"
          y="14.780166"
-         id="text845"><tspan
+         id="text845"
+         inkscape:export-xdpi="300"
+         inkscape:export-ydpi="300"><tspan
            sodipodi:role="line"
            id="tspan843"
            x="8.2913837"
            y="14.780166"
-           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:4.23333px;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.264583">De-deuplication (BBTools Clumpify)</tspan></text>
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:4.23333px;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.264583">De-duplication (BBTools Clumpify)</tspan></text>
       <g
          id="g3630"
-         transform="translate(-84.513309,17.614732)">
+         transform="translate(-84.513309,17.614732)"
+         inkscape:export-xdpi="300"
+         inkscape:export-ydpi="300">
         <path
            style="fill:#cc0000;stroke:#cc0000;stroke-width:0.21094px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
            d="m 88.966551,5.9679557 c 6.99805,0 13.995869,0 20.993459,0"
@@ -3599,7 +3605,9 @@
          style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:5.64444px;line-height:1.25;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.264583"
          x="3.7153759"
          y="15.350254"
-         id="text837-5"><tspan
+         id="text837-5"
+         inkscape:export-xdpi="300"
+         inkscape:export-ydpi="300"><tspan
            sodipodi:role="line"
            id="tspan835-9"
            x="3.7153759"
@@ -3610,7 +3618,9 @@
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:4.23333px;line-height:1.25;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.264583"
          x="8.7547207"
          y="19.662971"
-         id="text845-7"><tspan
+         id="text845-7"
+         inkscape:export-xdpi="300"
+         inkscape:export-ydpi="300"><tspan
            sodipodi:role="line"
            id="tspan843-3"
            x="8.7547207"
@@ -3621,7 +3631,9 @@
          style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:5.64444px;line-height:1.25;font-family:'Minion Pro';-inkscape-font-specification:'Minion Pro, Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.264583"
          x="-15.778259"
          y="89.51844"
-         id="text837-5-3"><tspan
+         id="text837-5-3"
+         inkscape:export-xdpi="300"
+         inkscape:export-ydpi="300"><tspan
            sodipodi:role="line"
            id="tspan835-9-4"
            x="-15.778259"
