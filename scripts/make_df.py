@@ -462,9 +462,11 @@ def get_samples(config, dataset):
 			# check for corresponding R2 files
 			dropped_samples = []
 			R2_suffix = config[dataset]["R2_suffix"]
-			for R2_file in [f"{folder}/{sample}{R2_suffix}" for sample in samples]:
+			
+			for sample in samples:
+				R2_file = f"{folder}/{sample}{R2_suffix}"
 				if not path.exists(R2_file):
-					print(f"Found R1 file for sample {sample} in dataset {dataset}, bud didn't find matching R2 file.  Ignoring R1 file")
+					print(f"Found R1 file for sample {sample} in dataset {dataset}, but didn't find matching R2 file.  Ignoring R1 file")
 					dropped_samples.append(sample)
 			# drop samples that we couldn't find matching R1 and R2 files for
 			samples = [samp for samp in samples if samp not in dropped_samples]
