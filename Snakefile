@@ -78,8 +78,10 @@ conditions = set()
 summary_files = set()
 ucsc_files = set()
 merged_bed = set()
+
 for i, row in toDo.iterrows():
-	summary_files.add(f"{row['outdir']}/summary/{row['dataset']}.xlsx")
+	summary_files.add(f"{row['outdir']}/summary/{row['dataset']}.html")
+	summary_files.add(f"{row['outdir']}/integration_summary.html")
 	ucsc_files.add(f"{row['outdir']}/summary/ucsc_bed/{row['dataset']}.post.bed")
 	conditions.add(f"{row['outdir']}/summary/{row['dataset']}.analysis_conditions.tsv")
 	merged_bed.add(f"{row['outdir']}/{row['dataset']}/ints/{row['sample']}.{row['host']}.{row['virus']}.integrations.post.unique.merged.txt")
@@ -88,7 +90,7 @@ for i, row in toDo.iterrows():
 rule all:
 	input:
 		conditions,
-#		summary_files,
+		summary_files,
 #		ucsc_files,
 		merged_bed,
 #		expand("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bam",

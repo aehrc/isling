@@ -6,16 +6,11 @@ channels:
   - defaults
 
 dependencies:
-  - r-base=3.6
-  - r-circlize=0.4.10
-  - r-rmarkdown=2.3
+  - r-base=4.1
+  - r-rmarkdown=2.9
   - r-tidyverse=1.3
   - r-wesanderson=0.3
-  - r-writexl=1.3
-  - r-ggrepel=0.8.2
-  - r-kableextra=1.1
-  - r-catools=1.17.1
-  - parallel=20200522
-  - bedtools=2.29
-  - bzip2=1.0
-  - pandoc=2.9
+  - r-hmisc=4.5_0
+  - r-dt=0.18
+  - bioconductor-karyoploter=1.18
+  - pandoc=2.14

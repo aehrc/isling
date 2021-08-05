@@ -970,7 +970,7 @@ class AlignmentPool(list):
 							
 			# if cigar operation consumes query, need to add to matched region			
 			matched = tmp_cigartuples[i_matched][1]
-			for idx in i_del:
+			for idx in reversed(i_del):
 			
 				## update cigar operation 
 			
@@ -1039,7 +1039,7 @@ class AlignmentPool(list):
 			tmp_cigartuples[i_matched] = (0, matched, i_md)
 			
 			# remove elements
-			for idx in i_del:
+			for idx in reversed(i_del):
 				tmp_cigartuples.pop(idx)
 
 			# update CO tag
@@ -1126,6 +1126,7 @@ class AlignmentPool(list):
 			pos_offset = 0
 
 		nm = read.get_tag('NM') + nm_offset
+		
 		return self._create_new_segment_from_primary(read, pos_offset=pos_offset, cigartuples=tmp_cigartuples,
 														nm=nm, co=co, md=md)
 			
@@ -2058,9 +2059,8 @@ class ChimericIntegration:
 
 		# only keep alternative integration sites that are close in edit distance
 		# to primary
-
 		if self.nm_pc is not None:
-			alt_ints = [int for int in alt_ints if self.get_total_edit_dist()/int.get_total_edit_dist() >= self.nm_pc]
+			alt_ints = [int for int in alt_ints if int.get_total_edit_dist() == 0 or self.get_total_edit_dist()/int.get_total_edit_dist() >= self.nm_pc]
 		
 		if self.nm_diff is not None:
 			alt_ints = [int for int in alt_ints if int.get_total_edit_dist() - self.get_total_edit_dist() <= self.nm_diff]
@@ -2101,7 +2101,9 @@ class ChimericIntegration:
 				# if hst and vrs constitute a valid integration, add to list
 				try:
 					alt_int = ChimericIntegration(hst, vrs, tol = self.tol,
-									map_thresh = self.map_thresh, primary=False)
+													map_thresh = self.map_thresh,  
+													nm_diff=self.nm_diff,
+					  								nm_pc=self.nm_pc, primary=False)
 					alt_ints.append(alt_int)
 					
 				except AssertionError:
@@ -2330,7 +2332,12 @@ class ChimericIntegration:
 		if self.nm_diff is not None:
 			return rearrange_nm - int_nm <= self.nm_diff
 		elif self.nm_pc is not None:
-			return int_nm / rearrange_nm >= self.nm_pc
+			if rearrange_nm != 0:
+				return int_nm / rearrange_nm >= self.nm_pc
+			# we get a divide by zero error if rearrange_nm is zero, but if this is the case
+			# then it's probably a rearrangement
+			else:
+				return True
 		else:
 			return rearrange_nm >= int_nm
 					
@@ -2518,9 +2525,11 @@ class DiscordantIntegration(ChimericIntegration):
 		end_pos_offset = self._get_co_D_bases(co) - self._get_co_I_bases(co)
 			
 		# get start and end of aligned part of read in host coords
-		blocks = (read.get_blocks()[0][0] + pos_offset, 
+		try:
+			blocks = (read.get_blocks()[0][0] + pos_offset, 
 							read.get_blocks()[-1][-1] + pos_offset + end_pos_offset)
-		
+		except:
+			print(read.query_name)
 		# we want the coordinate of the host/virus base closest to integration
 		if read.is_reverse:
 			stop = blocks[0]
@@ -2994,7 +3003,9 @@ class DiscordantIntegration(ChimericIntegration):
 				# if host and virus reads constitute a valid integration, add to list
 				try:
 					alt_int = DiscordantIntegration(h1, h2, v1, v2, 
-										map_thresh = self.map_thresh, primary = False)
+										map_thresh = self.map_thresh, 
+										tlen=self.tlen, tol=self.tol, nm_diff=self.nm_diff,
+					  					nm_pc=self.nm_pc, primary = False)
 	
 				except AssertionError:
 					alt_int = None
@@ -3095,16 +3106,20 @@ class FullIntegration(ChimericIntegration):
 		# goes with first part of virus read
 		if self.hread.is_reverse == self.vread.is_reverse:
 				self.left = ChimericIntegration(hread1, vread1, map_thresh =self.map_thresh,
-												tol = self.tol, primary = True)
+												tol = self.tol,  nm_diff=self.nm_diff,
+					  							nm_pc=self.nm_pc, primary = True)
 				self.right = ChimericIntegration(hread2, vread2, map_thresh = self.map_thresh, 
-												tol = self.tol, primary = True)
+												tol = self.tol,  nm_diff=self.nm_diff,
+					  							nm_pc=self.nm_pc, primary = True)
 		# otherwise, first part of host read goes with second part of virus read and
 		# vice versa
 		else:
 				self.left = ChimericIntegration(hread1, vread2, map_thresh = self.map_thresh,
-												tol = self.tol, primary = True)
+												tol = self.tol,  nm_diff=self.nm_diff,
+					  							nm_pc=self.nm_pc, primary = True)
 				self.right = ChimericIntegration(hread2, vread1, map_thresh = self.map_thresh, 
-												tol = self.tol, primary = True)						
+												tol = self.tol,  nm_diff=self.nm_diff,
+					  							nm_pc=self.nm_pc, primary = True)						
 		
 	def get_properties(self):
 		"""
@@ -3312,7 +3327,8 @@ class FullIntegration(ChimericIntegration):
 				# if hst and vrs constitute a valid integration, add to list
 				try:
 					alt_int = FullIntegration(hst, vrs, map_thresh= self.map_thresh, 
-												primary = False)
+												nm_diff=self.nm_diff, nm_pc=self.nm_pc,
+												tol = self.tol, primary = False)
 					alt_ints.append(alt_int)
 					
 				except AssertionError:

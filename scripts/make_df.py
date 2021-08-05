@@ -66,7 +66,7 @@ def make_df(config):
 		
 		# get output directory
 		outdir = get_value_or_default(config, dataset, 'out_dir', getcwd())
-		outdir = path.normpath(outdir)
+		outdir = path.abspath(path.normpath(outdir))
 		config[dataset]['out_dir'] = outdir
 		
 		# get read directory

@@ -121,6 +121,7 @@ rule write_analysis_summary:
 	run:
 		toDo[toDo['dataset'] == wildcards.dset].to_csv(output.tsv, sep = "\t") 
 
+
 rule check_bam_input_is_paired:
 	input: 
 		bam = lambda wildcards: get_value_from_df(wildcards, 'bam_file')
@@ -133,7 +134,7 @@ rule check_bam_input_is_paired:
 	conda:
 		"../envs/bwa.yml"
 	container:
-		"docker://szsctt/bwa:1"
+		"docker://szsctt/isling:latest"
 	shell:
 		"""
 		FWD=$(samtools view -c -f 0x40 {input})
@@ -163,7 +164,7 @@ rule bam_to_fastq:
 	conda:
 		"../envs/bwa.yml"
 	container:
-		"docker://szsctt/bwa:1"
+		"docker://szsctt/isling:latest"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
 	shell:
@@ -187,7 +188,7 @@ rule dedupe:
 	conda:	
 		"../envs/bbmap.yml"
 	container:
-		"docker://szsctt/bbmap:1"	
+		"docker://szsctt/isling:latest"
 	resources:
 		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 8),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
@@ -205,6 +206,8 @@ rule count_fastq:
 	params:
 		n_total =  lambda wildcards: get_value_from_df(wildcards, "split"),
 		cat = lambda wildcards: get_cat(wildcards),
+	container:
+		"docker://szsctt/isling:latest"
 	resources:
 		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 0.5, 500, 5000),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
@@ -239,6 +242,8 @@ rule split_fastq:
 		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 0.5, 500, 5000),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
+	container:
+		"docker://szsctt/isling:latest"
 	wildcard_constraints:
 		read_num = "1|2",
 		part = "\d+"
@@ -267,7 +272,7 @@ rule seqPrep:
 	conda:	
 		"../envs/seqprep.yml"
 	container:
-		"docker://szsctt/seqprep:1"
+		"docker://szsctt/isling:latest"
 	resources:
 		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 0.5, 500, 5000),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
@@ -290,7 +295,7 @@ rule seqPrep_unmerged:
 	conda:	
 		"../envs/seqprep.yml"
 	container:
-		"docker://szsctt/seqprep:1"
+		"docker://szsctt/isling:latest"
 	resources:
 		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 0.5, 500, 5000),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
@@ -308,7 +313,7 @@ rule touch_merged:
 	output:
 		merged = temp("{outpath}/{dset}/combined_reads/{samp}.{part}.mockMerged.fastq.gz")
 	container:
-		"docker://ubuntu:18.04"	
+		"docker://szsctt/isling:latest"
 	shell:
 		"""
 		touch {output.merged}

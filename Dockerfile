@@ -42,6 +42,7 @@ RUN /opt/conda/bin/conda install -n base -c anaconda pip pyyaml=5.3 -y &&\
 ADD scripts /opt/isling/scripts/
 ADD snakemake_rules /opt/isling/snakemake_rules
 ADD Snakefile /opt/isling/Snakefile
+ADD report_illustrations /opt/isling/report_illustrations
 
 # add test files
 ADD test /opt/isling/test

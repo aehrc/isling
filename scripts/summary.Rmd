@@ -1,0 +1,307 @@
+---
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+#params:
+#  dataset: "test-merge"
+#  outdir: "/scratch1/sco305/intvi_cmri/intvi_pipeline/out/pipeline-test"
+#  host: "host"
+#  virus: "rep68"
+---
+
+```{r, setup, include=FALSE}
+knitr::opts_chunk$set(fig.width=8, fig.height=6,
+                      echo=FALSE, warning=FALSE, message=FALSE)
+library(magrittr)
+source("summary_funcs.R")
+
+```
+
+---
+title: `r glue::glue("Integration site summary for dataset '{params$dataset}'")`
+date: `r format(Sys.time(), "%a %d %b %Y")`
+---
+
+## Overview
+
+The goal of integration site analysis with _isling_ is to identify host/virus jucntions in sequence datas.  These host/virus junctions are evidence for viral integration into a host genome. T
+
+This report gives an overview of the integration sites detected for the dataset called `r params$dataset`
+
+
+
+## Analysis parameters
+
+
+```{r analysisConditions}
+
+conditions_file <- file.path(params$outdir, "summary", glue::glue("{params$dataset}.analysis_conditions.tsv"))
+
+conditions <- readr::read_tsv(conditions_file) %>% 
+  dplyr::select(-X1) %>% 
+  dplyr::select(-config_dataset)
+
+# this report is always for one dataset
+conditions <- conditions %>% 
+  dplyr::filter(dataset == params$dataset)
+
+# get sample names for this dataset
+samples <- conditions %>% 
+  dplyr::pull(sample) %>% 
+  unique()
+
+# cosmetics for display
+format_vec_for_printing <- function(vec) {
+  if (length(vec) > 1) {
+    vec[length(vec)] <- glue::glue("and {vec[length(samples)]}")
+  }
+  vec <- paste0(vec, collapse=", ")
+  return(vec)
+}
+
+pull_unique <- function(column) {
+  return(
+    conditions %>% 
+      dplyr::pull(!!dplyr::sym(column)) %>% 
+      unique()
+  )
+}
+```
+
+
+### Samples
+
+The dataset `r htmltools::tags$code(params$dataset)` consisted of the following samples:
+
+`r vec_to_html_list(samples)`
+
+### Preprocessing
+
+
+```{r preprocStatements}
+read_statement <- function() {
+  if (is.na(pull_unique("bam_file"))) {
+    return(htmltools::tags$code("fasta format"))
+  } else {
+     return(htmltools::tags$code("bam format"))
+  }
+}
+
+preproc_statement <- function() {
+  dedup_tool <- glue::glue("{htmltools::tags$code('Dedeupe')} from the {htmltools::tags$code('BBTools')} suite")
+  trim_merge_tool <- glue::glue("{htmltools::tags$code('SeqPrep')}")
+  
+  if (pull_unique("merge")) {
+    if (pull_unique("dedup")) {
+      return(glue::glue("The reads were de-duplciated using {dedup_tool}, had adapters trimmed and overlapping R1 and R2 merged using {trim_merge_tool} before alignment."))
+    }
+    return(glue::glue("The reads had adapters trimmed and overlapping R1 and R2 merged using {trim_merge_tool} before alignment."))
+  } else if (pull_unique("trim")) {
+    if (pull_unique("dedup")) {
+      return(glue::glue("The reads were de-duplicated using {dedup_tool} and had adapters trimmed using {trim_merge_tool} before alignment."))
+    }
+    return(glue::glue("The reads had adapters trimmed using {trim_merge_tool} before alignment."))
+  } else {
+    if (pull_unique("dedup")) {
+      return(glue::glue("The reads were de-duplicated using {dedup_tool} before alignment."))
+    }
+    return(glue::glue("The reads were in alignment 'as-is'."))
+  }
+}
+```
+
+Reads were provided in `r read_statement()`.  `r preproc_statement()`
+
+### Alignment
+
+
+```{r getContigs}
+
+
+# get host contigs if fasta provided
+host_contigs <- get_contig_lengths(file.path(params$outdir, 'references', params$host, params$host))
+virus_contigs <- get_contig_lengths(file.path(params$outdir, 'references', params$virus, params$virus))
+
+# if there are fewer than five contigs in reference, list them, otherwise just state the number of contigs
+format_contig_statement <- function(contig_list) {
+  if (length(contig_list) > 5) {
+    statement <- glue::glue("which had {length(contig_list)} contigs")
+  } else if (length(contig_list) == 1) {
+    statement <- glue::glue("with one contig: {format_vec_for_printing(names(contig_list))}")
+  } else {
+    statement <- glue::glue("with contigs {format_vec_for_printing(names(contig_list))}")
+  }
+  return(statement)
+}
+
+```
+
+
+```{r alignmentStatements}
+
+get_frag_len <- function(filename) {
+  return(
+    as.double(
+      system2("perl", 
+              args= c('-ne', '\'/insert size average:\t([0-9]+)/ && print $1\'', filename), 
+              stdout=TRUE)
+    )
+  )
+  
+}
+
+get_frag_lens <- function() {
+  return(
+    tibble::tibble(
+      sample = samples,
+      host_stats_file = file.path(params$outdir, 
+                                  params$dataset, 
+                                  "host_stats", 
+                                  glue::glue("{samples}.{params$host}.readsFrom{params$virus}.txt")
+                                  ),
+      host = purrr::map_dbl(host_stats_file, get_frag_len),
+      virus_stats_file = file.path(params$outdir, 
+                                  params$dataset, 
+                                  "virus_stats", 
+                                  glue::glue("{samples}.{params$virus}.txt")
+                                  ),
+      virus = purrr::map_dbl(virus_stats_file, get_frag_len)
+    ) %>% 
+      dplyr::select(-dplyr::contains("stats_file")) %>% 
+      dplyr::rowwise() %>% 
+      dplyr::mutate(mean = (host + virus) / 2)
+  )
+  
+}
+```
+
+The host was `r htmltools::tags$code(pull_unique("host"))` (provided `r ifelse(is.na(pull_unique("host_fasta")), "as a bwa index", "in fasta format")`), `r format_contig_statement(host_contigs)`.
+
+The virus was `r htmltools::tags$code(pull_unique("virus"))` (provided `r ifelse(is.na(pull_unique("virus_fasta")), "as a bwa index", "in fasta format")`), `r format_contig_statement(virus_contigs)`.
+
+Alignments were conducted with `bwa mem` using parameters `r htmltools::tags$code(pull_unique("bwa_mem_params"))`.  See the [man page](http://bio-bwa.sourceforge.net/bwa.shtml) for a full description of these parameters.
+
+Fragment sizes from the alignments are used to calculate an approximate integration location for discordant pairs, in which the actual junction is not directly observed.  The following mean fragment lengths were calculated using `samtools stat` for each sample:
+
+```{r, diplayFragLens, echo=FALSE}
+DT::datatable(get_frag_lens(), 
+              rownames = FALSE)
+```
+
+### Postprocessing
+
+```{r postprocStatements}
+edit_dist_statement <- function() {
+  if (is.na(pull_unique("nm_pc")) & is.na(pull_unique("nm_diff"))) {
+    return("secondary/supplementary edit distance the same as the primary one")
+  } else if (!is.na(pull_unique("nm_pc"))) {
+    return(glue::glue("primary edit distance at most {pull_unique('nm_pc')*100}% of the secondary/supplementary one"))
+  } else if (!is.na(pull_unique("nm_diff"))) {
+    return(glue::glue("secondary/supplementary edit distance is at most {htmltools::tags$code(pull_unique('nm_diff'))} more than the primary edit/distance"))
+  }
+}
+
+filter_statement <- function() {
+  filter <- stringr::str_sub(pull_unique("filter"), 2, stringr::str_length(pull_unique("filter"))-1)
+  if (pull_unique("filter") == "True") {
+    return("all junctions were retained.")
+  } else {
+    filter <- stringr::str_split(filter, "\\) and \\(", simplify=TRUE)[1,]
+    return(glue::glue("junctions that met all of the following criteria were retained:\n\n {vec_to_html_list(filter)}"))
+  }
+}
+
+merge_statement <- function() {
+  if (pull_unique("merge_method") == "exact") {
+    return("coordinates exactly matching")
+  } else {
+    return("overlapping coordinates")
+  }
+}
+
+```
+
+
+After identification, integration junctions were `r filter_statement()`
+
+Retained junctions were split into groups on the basis of confidence in their locations. Junctions had a unique location if the mapping quality for the alignment to a reference was above `r pull_unique("mapq_thresh")`, and if they didn't have any other possible mapping locations.  Other possible mapping locations come from secondary or supplementary alignments that are similar to the primary alignment in terms of part of the read covered and edit distance (`r edit_dist_statement()`), but are in a different part of the genome to the primary alignment.
+
+Unique integration junctions with `r merge_statement()` in host and virus genomes were then merged, and merged junctions with at least `r pull_unique("merge_n_min")` supporting reads were retained.
+
+
+## Number of host/virus junctions identified
+
+Isling identifies host/virus junctions in chimeric reads and discordant pairs.  First, looking at the number of junctions identified - note that this is the total number of jucntions, before combining any integration junctions with the same coordinates, and is essentially a count of the nubmer of read (pairs) in which junctions were identfied (except in the case where there was more than one jucntion per read).  This number can differ from the true number of integration events in the dataset if there are  PCR duplicates (for example in amplicon datasets), or clonal expansion in the dataset.
+
+```{r, wc, include=FALSE}
+ints_dir <- file.path(normalizePath(params$outdir),
+                      params$dataset,
+                      "ints")
+
+
+# count total number of junctions identified
+ints_wc <- tibble::tibble(
+  f = list.files(ints_dir, full.names=TRUE),
+  type = dplyr::case_when(
+    stringr::str_detect(f, "\\.integrations\\.txt$") ~ "total putative junctions",
+    stringr::str_detect(f, "\\integrations\\.post\\.txt") ~ "junctions passing filters",
+    TRUE ~ as.character(NA)
+  ),
+  sample = stringr::str_extract(basename(f), glue::glue("^.+(?=\\.{Hmisc::escapeRegex(params$host)})")) 
+) %>% 
+  dplyr::filter(!is.na(type)) %>% 
+  dplyr::mutate(count = purrr::map_dbl(f, ~as.integer(system2("wc", args = c("-l", .x,  " | awk '{print $1}'"), stdout=TRUE))-1)) %>% 
+  dplyr::select(-f)  %>% 
+  tidyr::pivot_wider(names_from = "type", values_from = "count") %>% 
+  dplyr::rowwise() %>%
+  dplyr::mutate("junctions failing filters" = `total putative junctions` - `junctions passing filters`) %>% 
+  dplyr::ungroup()
+
+
+```
+
+First, count the number of host/virus junctions identified in chimeric reads or discordant read-pairs.  
+```{r, displayWC, echo=FALSE}
+DT::datatable(ints_wc, 
+              rownames = FALSE)
+```
+
+There were a total of `r sum(ints_wc['junctions passing filters'])` junctions identified for this dataset.
+
+
+```{r filter_statement, include=FALSE}
+exclude <- ints_wc %>% 
+  dplyr::filter(`junctions passing filters` == 0) %>% 
+  dplyr::pull(sample)
+
+exclude
+
+exclude_statement <- ifelse(length(exclude)==0,
+                            glue::glue("All samples had at least one host/virus junction that passed all filters"),
+                            glue::glue("Samples {paste0(exclude, collapse=', ')} had no host/virus junctions that passed all filters"))
+
+```
+
+`r exclude_statement`.
+
+
+```{r, intProperties, echo=FALSE, results='asis'}
+# if there were some samples with integrations
+if (length(exclude) != nrow(ints_wc)) {
+res <- knitr::knit_child('junc_types.Rmd', quiet = TRUE)
+cat(res, sep = '\n')  
+}
+
+```
+
+
+## Session info
+
+The following is information about the R session and packages used:
+```{r}
+sessionInfo()
+```
+
