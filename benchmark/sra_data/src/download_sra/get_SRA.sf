@@ -1,0 +1,143 @@
+# useful resource: https://reneshbedre.github.io/blog/fqutil.html
+
+#### python modules ####
+
+from os import path
+import re
+from tempfile import TemporaryDirectory
+import pdb
+import yaml
+
+#### get SRA accession of data to get ####
+
+#cache_path = config['sra_cache_path'] 
+#sra_tools_path = config['sra_tools_path']
+
+proj = config['proj']
+accListFile = config['accListFile']
+PROJ = []
+
+# read general config file and apply to config
+if 'sra_config' in config:
+with open(config['sra_config'], 'r') as handle:
+	extra_config = yaml.safe_load(handle)
+	
+for key in extra_config.keys():
+	config[key] = extra_config[key]
+
+# get all the accessions for this dataset
+ACCS = [line.rstrip('\n') for line in open(accListFile)]
+PROJ = [proj for acc in ACCS]
+
+#### local rules ####
+
+localrules: all, download, check_validation
+
+#### target files ####
+
+rule all:
+	input: 
+		expand("data/reads/{proj}/{acc}_1.fastq.gz", zip, proj = PROJ, acc = ACCS)
+
+#### download from SRA ####
+rule download:
+	input:
+		acc_list = accListFile
+	output:	
+		sra = temp("data/reads/{proj}/cache/{acc}/{acc}.sra")
+#		sra = temp(expand("{cache_path}{acc}.sra", cache_path = cache_path, allow_missing = True))
+	params:
+		prefetch_path = lambda wildcards, output: path.dirname(output.sra),
+		hostname = lambda wildcards: config['hostname'] if 'hostname' in config.keys() else ""
+	conda:
+		"../../conda/sra.yml"
+	threads: 1
+	shell:
+		"""
+		ARG="{sra_tools_path}prefetch -O {params.prefetch_path} {wildcards.acc}"
+		
+		if ! [[ -n "{params.hostname}" ]]; then
+			ssh $(whoami)@{params.hostname}  $ARG
+		else
+			$ARG
+		fi
+		"""
+
+rule validate:
+	input:
+		sra = rules.download.output.sra
+	output:
+		check = temp("data/reads/{proj}/{acc}_validate.txt")
+	threads: 1
+	resources:
+		time = lambda wildcards, attempt: [15, 60, 120, 240][attempt - 1],
+		nodes = 1,
+		mem = "2Gb"
+	conda:
+		"../../conda/sra.yml"
+	shell:
+		"""
+		vdb-validate {wildcards.acc} &> {output}
+		"""
+		
+rule check_validation:
+	input:
+		check = rules.validate.output[0]
+	output:
+		ok = temp("data/reads/{proj}/{acc}_ok.txt")
+	run:
+		ok = True
+		with open(input.check) as file:
+			for line in file:
+				if re.search("err", line):
+					ok = False
+		if ok is True:
+			shell("touch {output}")
+
+
+
+rule gzip:
+	input:
+		fq1 = "data/reads/{proj}/{acc}_1.fastq",
+		fq2 = "data/reads/{proj}/{acc}_2.fastq"
+	output:
+		fq1 = "data/reads/{proj}/{acc}_1.fastq.gz",
+		fq2 = "data/reads/{proj}/{acc}_2.fastq.gz"	
+	threads: 4
+	resources:
+		time = lambda wildcards, attempt: [30, 120, 720, 1440][attempt - 1],
+		nodes = 1,
+		mem_mb = lambda wildcards, attempt, input: min(max(int(input.size_mb) * attempt, 50000), 1000)
+	conda:
+		"../../conda/sra.yml"
+	shell:
+		"""
+		pigz -p {threads} {input}
+		"""
+
+rule dump:
+	input:
+		sra = rules.download.output[0],
+		ok = rules.check_validation.output[0]
+	output:	
+		fq1 = "data/reads/{proj}/{acc}_1.fastq",
+		fq2 = "data/reads/{proj}/{acc}_2.fastq"
+	params:
+		path = lambda wildcards, output: path.dirname(output.fq1),
+	threads: 5
+	resources:
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		nodes = 1,
+		mem_mb = lambda wildcards, attempt, input:  min(max(int(input.size_mb) * attempt, 50000), 1000)
+	conda:
+		"../../conda/sra.yml"
+	log:
+		"logs/SRA/dump_{proj}_{acc}.log"
+	shell:
+		"""
+		fasterq-dump -e {threads} -O {params.path} {input.sra}
+		"""
+	#run:
+	#	shell("{sra_tools_path}fastq-dump --split-e -L 5 -O {params.path} {input.sra}")
+
+		

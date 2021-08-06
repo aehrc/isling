@@ -1,0 +1,8 @@
+name: snakemake_sra
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - sra-tools=2.11
+  - pigz=2.6
+  - snakemake=6.6
