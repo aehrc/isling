@@ -1,6 +1,15 @@
 #!/bin/bash
 
+# dependencies:
+## conda
+## singularity
+## parallel
+
+
+
 set -euo pipefail
+
+module load parallel
 
 # download large references
 echo "downloading references"
@@ -12,3 +21,11 @@ conda list -n snakemake_sra || conda env create -f conda/sra.yml
 # download for PRJNA485509 (Nelson)
 echo "downloading reads for PRJNA485509"
 bash src/download_sra/run_get_SRA.sh config/download/PRJNA485509.yml
+
+# download for SRP023539" (Lau)
+echo "downloading reads for SRP023539"
+bash src/download_sra/download_SRP023539.sh
+
+# download for PRJEB2869 (Sung)
+echo "downloading reads for PRJEB2869"
+bash src/download_sra/run_get_SRA.sh config/download/PRJEB2869.yml
