@@ -1,0 +1,49 @@
+snakedir: "."
+
+global:
+  read_folder: "benchmark/sra_data/data/reads/SRP023539"
+  out_dir: "benchmark/sra_data/out/Lau_2014_SRP023539_hg19/isling"
+  R1_suffix: "_1.fastq"
+  R2_suffix: "_2.fastq"
+  read1-adapt: ""
+  read2-adapt: ""
+  
+  dedup: False
+  dedup-subs: 2  
+  
+  split: 3
+  
+  merge: False
+  trim: False
+  
+  host_name: "GRCh37"
+  host_fasta: "benchmark/sra_data/data/references/human_g1k_v37.fasta"
+  virus_name: "HBVs"
+  virus_fasta: "benchmark/sra_data/data/references/SRP023539_HBV.fa"
+  align-cpus: 5
+
+  clip-cutoff: 20
+  mean-frag-len: "estimate"
+  cigar-tol: 3
+  alt-edit-dist-thresh: 3
+  
+  merge-method: 'common'
+  min-n-merge: 1
+  
+  mapq-thresh: 20
+
+all:
+      
+filter1:
+  filter:
+    - "HostEditDist <= 7 and ViralEditDist <= 7"
+    - "NoAmbiguousBases < 20 or Type == discordant"
+
+filter3:
+  filter:
+    - "HostEditDist <= 7 and ViralEditDist <= 7"
+    - "NoAmbiguousBases < 20 or Type == discordant"
+    - "PossibleVectorRearrangement == False" 
+    - "PossibleHostTranslocation == False"
+
+
