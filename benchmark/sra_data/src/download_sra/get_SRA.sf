@@ -47,7 +47,6 @@ rule download:
 		acc_list = accListFile
 	output:	
 		sra = temp("data/reads/{proj}/cache/{acc}/{acc}.sra")
-#		sra = temp(expand("{cache_path}{acc}.sra", cache_path = cache_path, allow_missing = True))
 	params:
 		prefetch_path = lambda wildcards, output: path.abspath(path.dirname(output.sra)),
 		hostname = lambda wildcards: config['hostname'] if 'hostname' in config.keys() else ""
@@ -97,25 +96,6 @@ rule check_validation:
 
 
 
-rule gzip:
-	input:
-		fq1 = "data/reads/{proj}/{acc}_1.fastq",
-		fq2 = "data/reads/{proj}/{acc}_2.fastq"
-	output:
-		fq1 = "data/reads/{proj}/{acc}_1.fastq.gz",
-		fq2 = "data/reads/{proj}/{acc}_2.fastq.gz"	
-	threads: 4
-	resources:
-		time = lambda wildcards, attempt: [30, 120, 720, 1440][attempt - 1],
-		nodes = 1,
-		mem_mb = lambda wildcards, attempt, input: min(max(int(input.size_mb) * attempt, 50000), 1000)
-	conda:
-		"../../conda/sra.yml"
-	shell:
-		"""
-		pigz -p {threads} {input}
-		"""
-
 rule dump:
 	input:
 		sra = rules.download.output[0],
@@ -138,7 +118,23 @@ rule dump:
 		"""
 		fasterq-dump -e {threads} -O {params.path} {input.sra}
 		"""
-	#run:
-	#	shell("{sra_tools_path}fastq-dump --split-e -L 5 -O {params.path} {input.sra}")
 
+rule gzip:
+	input:
+		fq1 = rules.dump.output.fq1,
+		fq2 = rules.dump.output.fq2
+	output:
+		fq1 = "data/reads/{proj}/{acc}_1.fastq.gz",
+		fq2 = "data/reads/{proj}/{acc}_2.fastq.gz"	
+	threads: 4
+	resources:
+		time = lambda wildcards, attempt: [30, 120, 720, 1440][attempt - 1],
+		nodes = 1,
+		mem_mb = lambda wildcards, attempt, input: min(max(int(input.size_mb) * attempt, 50000), 1000)
+	conda:
+		"../../conda/sra.yml"
+	shell:
+		"""
+		pigz -p {threads} {input}
+		"""
 		
