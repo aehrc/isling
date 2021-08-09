@@ -33,6 +33,8 @@ global:
   mapq-thresh: 20
 
 all:
+  filter:
+    - "True"
       
 filter1:
   filter:
