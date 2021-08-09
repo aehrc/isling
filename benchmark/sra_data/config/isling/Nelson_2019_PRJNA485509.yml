@@ -1,0 +1,54 @@
+snakedir: "."
+
+global:
+  read_folder: "benchmark/sra_data/data/reads/PRJNA485509/"
+  out_dir: "benchmark/sra_data/out/Nelson_2019_PRJNA485509/isling"
+  R1_suffix: "_1.fastq.gz"
+  R2_suffix: "_2.fastq.gz"
+  read1-adapt: ""
+  read2-adapt: ""
+
+  dedup: False  
+  dedup-subs: 2
+  
+  split: 1
+  
+  merge: False
+  trim: False
+  
+  host_name: "GRCm38"
+  host_fasta: "benchmark/sra_data/data/references/mm10_no_alt_analysis_set_ENCODE.fasta"
+  virus_name: "nelson_aavs"
+  virus_fasta: "benchmark/sra_data/data/references/Nelson_AAVs.fa"
+  align-cpus: 1
+
+  mean-frag-len: "estimate"
+  clip-cutoff: 20
+  cigar-tol: 3
+  alt-edit-dist-thresh: 3
+    
+  merge-method: 'common'
+  min-n-merge: 1
+
+  mapq-thresh: 20
+
+all:
+  filter:
+    - "True"
+      
+filter1:
+  filter:
+    - "HostEditDist <= 7 and ViralEditDist <= 7"
+    - "NoAmbiguousBases < 20 or Type == discordant"
+    
+filter2:
+  filter:
+    - "NoAmbiguousBases < 20 or Type == discordant"
+    - "PossibleVectorRearrangement == False"
+
+filter3:
+  filter:
+    - "HostEditDist <= 7 and ViralEditDist <= 7"
+    - "NoAmbiguousBases < 20 or Type == discordant"
+    - "PossibleVectorRearrangement == False" 
+    - "PossibleHostTranslocation == False"
