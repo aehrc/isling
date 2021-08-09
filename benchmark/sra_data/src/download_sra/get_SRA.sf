@@ -19,11 +19,13 @@ PROJ = []
 
 # read general config file and apply to config
 if 'sra_config' in config:
-with open(config['sra_config'], 'r') as handle:
-	extra_config = yaml.safe_load(handle)
+	print(os.getcwd())
+
+	with open(config['sra_config'], 'r') as handle:
+		extra_config = yaml.safe_load(handle)
 	
-for key in extra_config.keys():
-	config[key] = extra_config[key]
+	for key in extra_config.keys():
+		config[key] = extra_config[key]
 
 # get all the accessions for this dataset
 ACCS = [line.rstrip('\n') for line in open(accListFile)]
@@ -47,17 +49,16 @@ rule download:
 		sra = temp("data/reads/{proj}/cache/{acc}/{acc}.sra")
 #		sra = temp(expand("{cache_path}{acc}.sra", cache_path = cache_path, allow_missing = True))
 	params:
-		prefetch_path = lambda wildcards, output: path.dirname(output.sra),
+		prefetch_path = lambda wildcards, output: path.abspath(path.dirname(output.sra)),
 		hostname = lambda wildcards: config['hostname'] if 'hostname' in config.keys() else ""
 	conda:
 		"../../conda/sra.yml"
 	threads: 1
 	shell:
 		"""
-		ARG="{sra_tools_path}prefetch -O {params.prefetch_path} {wildcards.acc}"
-		
-		if ! [[ -n "{params.hostname}" ]]; then
-			ssh $(whoami)@{params.hostname}  $ARG
+		ARG="$(which prefetch) {wildcards.acc} --output-directory {params.prefetch_path}"		
+		if [[ "{params.hostname}" ]] ; then
+			ssh $(whoami)@{params.hostname} $ARG
 		else
 			$ARG
 		fi
@@ -77,7 +78,7 @@ rule validate:
 		"../../conda/sra.yml"
 	shell:
 		"""
-		vdb-validate {wildcards.acc} &> {output}
+		vdb-validate {input.sra} &> {output}
 		"""
 		
 rule check_validation:
