@@ -48,6 +48,14 @@ bash src/run_isling/run_isling.sh benchmark/sra_data/config/isling/Lau_2014_SRP0
 
 # run PRJEB2869 (Sung)
 echo "running isling on PRJEB2869"
-bash src/run_isling/run_isling.sh benchmark/sra_data/config/isling/Sung_2012_PRJEB2869.yml.yml 
+bash src/run_isling/run_isling.sh benchmark/sra_data/config/isling/Sung_2012_PRJEB2869.yml
 
+#### other tools ####
+
+echo "running isling on PRJNA485509"
+bash src/run_isling/run_isling.sh benchmark/sra_data/config/other_tools/Nelson_2019_PRJNA485509.yml
+
+# run SRP023539 (Lau)
+echo "running isling on SRP023539"
+bash src/run_other_tools/run_other_tools.sh benchmark/sra_data/config/other_tools/Lau_2014_SRP023539_hg19.yml 
 
