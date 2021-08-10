@@ -6,3 +6,4 @@ dependencies:
   - sra-tools=2.11
   - pigz=2.6
   - snakemake=6.6
+  - samtools=1.13
