@@ -10,6 +10,10 @@ if [ ! -e human_g1k_v37.fasta ] ; then
 	gunzip human_g1k_v37.fasta.gz
 fi
 
+if [ ! -e human_g1k_v37.fasta.fai ] ; then
+	samtools faidx human_g1k_v37.fasta
+fi
+
 #mm10
 if [ ! -e mm10_no_alt_analysis_set_ENCODE.fasta ] ; then
 	echo "downloading mm10 reference"
@@ -17,4 +21,6 @@ if [ ! -e mm10_no_alt_analysis_set_ENCODE.fasta ] ; then
 	gunzip mm10_no_alt_analysis_set_ENCODE.fasta.gz
 fi
 
-
+if [ ! -e mm10_no_alt_analysis_set_ENCODE.fasta.fai ] ; then
+	samtools faidx mm10_no_alt_analysis_set_ENCODE.fasta
+fi

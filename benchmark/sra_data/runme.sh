@@ -7,8 +7,16 @@
 
 set -euo pipefail
 
+#### dependencies ####
+
 module load parallel
 module load singularity
+
+# create conda environment for downloads, if it doesn't already exist
+conda list -n snakemake_sra || conda env create -f conda/sra.yml
+
+eval "$(conda shell.bash hook)"
+conda activate snakemake_sra
 
 #### references ####
 
@@ -17,12 +25,6 @@ echo "downloading references"
 bash src/download_references/download_refs.sh
 
 #### reads ####
-
-# create conda environment for downloads, if it doesn't already exist
-conda list -n snakemake_sra || conda env create -f conda/sra.yml
-
-eval "$(conda shell.bash hook)"
-conda activate snakemake_sra
 
 # download for PRJNA485509 (Nelson)
 echo "downloading reads for PRJNA485509"
@@ -52,10 +54,19 @@ bash src/run_isling/run_isling.sh benchmark/sra_data/config/isling/Sung_2012_PRJ
 
 #### other tools ####
 
-echo "running isling on PRJNA485509"
-bash src/run_isling/run_isling.sh benchmark/sra_data/config/other_tools/Nelson_2019_PRJNA485509.yml
+echo "running other viral integration tools on PRJNA485509"
+bash src/run_other_tools/run_other_tools.sh config/other_tools/Nelson_2019_PRJNA485509.yml
 
 # run SRP023539 (Lau)
-echo "running isling on SRP023539"
-bash src/run_other_tools/run_other_tools.sh benchmark/sra_data/config/other_tools/Lau_2014_SRP023539_hg19.yml 
+echo "running other viral integration tools on SRP023539"
+bash src/run_other_tools/run_other_tools.sh config/other_tools/Lau_2014_SRP023539_hg19.yml 
+
+# run SRP023539 (Lau)
+echo "running other viral integration tools on PRJEB2869"
+bash src/run_other_tools/run_other_tools.sh config/other_tools/Sung_2012_PRJEB2869.yml
+
+#### generate figures ####
+
+echo "generating figures and tables"
+bash src/analysis/run_Rscript.sh
 

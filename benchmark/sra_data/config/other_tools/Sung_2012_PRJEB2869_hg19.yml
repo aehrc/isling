@@ -1,5 +1,5 @@
 global:
-   read_directory: "../../data/reads/PRJEB2869_cat/"
+   read_directory: "../../data/reads/PRJEB2869/"
    out_directory: "../../out/"
    R1_suffix: "_1.fastq.gz"
    R2_suffix: "_2.fastq.gz"
@@ -78,7 +78,7 @@ global:
    
 
      
-Sung_2012_PREJB2869_hg19:
+Sung_2012_PRJEB2869_hg19:
    analysis_virus:
        "HBVs" :  "../../data/references/SRP023539_HBV.fa"
 
