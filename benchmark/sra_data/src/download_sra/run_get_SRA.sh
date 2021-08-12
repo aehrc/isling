@@ -11,5 +11,5 @@ CONDA="snakemake_sra"
 eval "$(conda shell.bash hook)"
 conda activate $CONDA
 
-snakemake --snakefile src/download_sra/get_SRA.sf --cores $CORES --configfile $CONFIG
+snakemake --snakefile src/download_sra/get_SRA.sf --cores $CORES --configfile $CONFIG -T 3
 
