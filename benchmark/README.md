@@ -6,6 +6,8 @@ The main requirements are `conda` and `singularity`.
 
 You will also need to download the references required to run ViFi from [this google drive link](https://drive.google.com/drive/folders/0ByYcg0axX7udeGFNVWtaUmxrOFk).  These should be placed in this directory (`isling/benchmarking`) - make sure to click 'download all', and then unzip and untar all. This should result in a folder called `Release`, with three folders called `GRCh37`, `GRCh38` and `hg19`.  If your filenames or paths are different, you may need to adjsut the config files accordingly.
 
+The main results from these scripts are the figures and tables included in the isling paper.  After successfully running simulations and anlaysis, these will appear in their respective folders `sra_data`, `simulated_data`, in folders called `figures` and `tables`.
+
 ### Simulated data
 
 Use the runscript `runme.sh` in the `simulated_data` folder. This script must be run from inside this folder.
