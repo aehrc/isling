@@ -48,7 +48,7 @@ rule download:
 	output:	
 		sra = temp("data/reads/{proj}/cache/{acc}/{acc}.sra")
 	params:
-		prefetch_path = lambda wildcards, output: path.abspath(path.dirname(output.sra)),
+		prefetch_path = lambda wildcards, output: path.abspath(path.dirname(path.dirname(output.sra))),
 		hostname = lambda wildcards: config['hostname'] if 'hostname' in config.keys() else ""
 	conda:
 		"../../conda/sra.yml"
