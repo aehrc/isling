@@ -1,0 +1,17 @@
+ftp://ftp.ddbj.nig.ac.jp/ddbj_database/dra/fastq/SRA082/SRA082688/SRX290657/SRR873426_1.fastq.bz2
+ftp://ftp.ddbj.nig.ac.jp/ddbj_database/dra/fastq/SRA082/SRA082688/SRX290657/SRR873426_2.fastq.bz2
+ftp://ftp.ddbj.nig.ac.jp/ddbj_database/dra/fastq/SRA082/SRA082688/SRX290658/SRR873427_1.fastq.bz2
+ftp://ftp.ddbj.nig.ac.jp/ddbj_database/dra/fastq/SRA082/SRA082688/SRX290658/SRR873427_2.fastq.bz2
+ftp://ftp.ddbj.nig.ac.jp/ddbj_database/dra/fastq/SRA082/SRA082688/SRX290658/SRR873427.fastq.bz2
+ftp://ftp.ddbj.nig.ac.jp/ddbj_database/dra/fastq/SRA082/SRA082688/SRX290659/SRR873428_1.fastq.bz2
+ftp://ftp.ddbj.nig.ac.jp/ddbj_database/dra/fastq/SRA082/SRA082688/SRX290659/SRR873428_2.fastq.bz2
+ftp://ftp.ddbj.nig.ac.jp/ddbj_database/dra/fastq/SRA082/SRA082688/SRX290659/SRR873428.fastq.bz2
+ftp://ftp.ddbj.nig.ac.jp/ddbj_database/dra/fastq/SRA082/SRA082688/SRX290660/SRR873429_1.fastq.bz2
+ftp://ftp.ddbj.nig.ac.jp/ddbj_database/dra/fastq/SRA082/SRA082688/SRX290660/SRR873429_2.fastq.bz2
+ftp://ftp.ddbj.nig.ac.jp/ddbj_database/dra/fastq/SRA082/SRA082688/SRX290660/SRR873429.fastq.bz2
+ftp://ftp.ddbj.nig.ac.jp/ddbj_database/dra/fastq/SRA082/SRA082688/SRX290661/SRR873430_1.fastq.bz2
+ftp://ftp.ddbj.nig.ac.jp/ddbj_database/dra/fastq/SRA082/SRA082688/SRX290661/SRR873430_2.fastq.bz2
+ftp://ftp.ddbj.nig.ac.jp/ddbj_database/dra/fastq/SRA082/SRA082688/SRX290661/SRR873430.fastq.bz2
+ftp://ftp.ddbj.nig.ac.jp/ddbj_database/dra/fastq/SRA082/SRA082688/SRX290888/SRR873836_1.fastq.bz2
+ftp://ftp.ddbj.nig.ac.jp/ddbj_database/dra/fastq/SRA082/SRA082688/SRX290888/SRR873836_2.fastq.bz2
+ftp://ftp.ddbj.nig.ac.jp/ddbj_database/dra/fastq/SRA082/SRA082688/SRX290888/SRR873836.fastq.bz2
