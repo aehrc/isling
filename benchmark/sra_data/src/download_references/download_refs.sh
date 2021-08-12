@@ -6,8 +6,9 @@ cd data/references/
 #hg37
 if [ ! -e human_g1k_v37.fasta ] ; then
 	echo "downloading human reference (GRCh37/hg19)"
-	wget ftp://ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/reference/
-	gunzip human_g1k_v37.fasta.gz
+	curl http://ftp.1000genomes.ebi.ac.uk/vol1/ftp/technical/reference/human_g1k_v37.fasta.gz -O human_g1k_v37.fasta.gz
+	#wget ftp://ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/reference/human_g1k_v37.fasta.gz
+	gunzip -q human_g1k_v37.fasta.gz
 fi
 
 if [ ! -e human_g1k_v37.fasta.fai ] ; then
