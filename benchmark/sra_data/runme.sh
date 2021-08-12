@@ -9,8 +9,8 @@ set -euo pipefail
 
 #### dependencies ####
 
-module load parallel
-module load singularity
+#module load parallel
+#module load singularity
 
 # create conda environment for downloads, if it doesn't already exist
 conda list -n snakemake_sra || conda env create -f conda/sra.yml
