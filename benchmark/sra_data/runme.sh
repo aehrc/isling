@@ -15,7 +15,7 @@ CORES="20"
 #module load singularity
 
 # create conda environment for downloads, if it doesn't already exist
-conda list -n snakemake_sra || conda env create -f conda/sra.yml
+conda list -n snakemake_sra || mamba env create -f conda/sra.yml
 
 eval "$(conda shell.bash hook)"
 conda activate snakemake_sra
