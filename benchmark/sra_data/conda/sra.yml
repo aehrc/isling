@@ -7,3 +7,4 @@ dependencies:
   - pigz=2.6
   - snakemake=6.6
   - samtools=1.13
+  - parallel
