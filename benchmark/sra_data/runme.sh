@@ -7,7 +7,7 @@
 
 set -euo pipefail
 
-CORES="20"
+CORES="15"
 
 #### dependencies ####
 

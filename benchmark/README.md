@@ -34,6 +34,8 @@ Use the runscript `runme.sh` in the `sra_data` folder.  This script must be run 
 
 Download of SRA data requires the [SRA toolkit](https://github.com/ncbi/sra-tools) and `snakemake`.  The runscript automatically creates a `conda` environment called `snakemake_sra` that contains `sra-tools` and `snakemake`.  Note that the workflow is configured not to use the SRA cache (which you can find the location of using `vdb-config -i`, but rather downloads `.sra` files to a temporary cache in the `data/reads/<dataset>/cache` directory, and then deletes them after creation of `fastq` files.  It is also possible to perform the download step on a different machine with access to a shared filesystem (for example, a cluster where internet access is restricted on some nodes).  To do this, specify the hostname for this machine in the file `config/download/sra.yml`.  Other `snakemake` arguments can be adjusted in the script `src/download_sra/run_get_SRA.sh`.
 
+The snakemake workflow that downloads the SRA data also has an optional step that uses `vdb-validate` to validated the downloaded `.sra` file before it is converted into `fastq` format.  If you're feeling lucky, you can skip this step by setting the `validate_sra` in `config/download/sra.yml` to `False`.
+
 Make sure that you have also (manually) downloaded the necessary references for ViFi from the link above.
 
 #### Running isling
