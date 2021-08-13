@@ -6,8 +6,10 @@ mkdir -p data/reads/SRP023539
 
 cd data/reads/SRP023539
 
-ACCS="../../metadata/SRP023539/accs.txt"
+ACCS="../../data/metadata/SRP023539/accs.txt"
 
 cat $ACCS | parallel -j $CORES wget {}
 
-bunzip2 *.bz2
+if [ ! -e SRR873836_2.fastq ] ; then
+	bunzip2 *.bz2
+fi

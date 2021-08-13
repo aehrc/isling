@@ -48,7 +48,7 @@ rule download:
 	output:	
 		sra = temp("data/reads/{proj}/cache/{acc}/{acc}.sra")
 	params:
-		prefetch_path = lambda wildcards, output: path.abspath(path.dirname(output.sra)),
+		prefetch_path = lambda wildcards, output: path.abspath(path.dirname(path.dirname(output.sra))),
 		hostname = lambda wildcards: config['hostname'] if 'hostname' in config.keys() else ""
 	conda:
 		"../../conda/sra.yml"
@@ -99,7 +99,7 @@ rule check_validation:
 rule dump:
 	input:
 		sra = rules.download.output[0],
-		ok = rules.check_validation.output[0]
+		ok = lambda wildcards: rules.check_validation.output[0] if config['validate_sra'] else rules.download.output[0]
 	output:	
 		fq1 = "data/reads/{proj}/{acc}_1.fastq",
 		fq2 = "data/reads/{proj}/{acc}_2.fastq"
