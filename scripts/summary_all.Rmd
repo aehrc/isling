@@ -6,10 +6,10 @@ output:
     toc_float:
       collapsed: true
       smooth_scroll: true
-#params:
-#  summary_dir: "/scratch1/sco305/intvi_cmri/intvi_pipeline/out/pipeline-test/summary"
-#  datasets:
-#    - "test-merge"
+params:
+  summary_dir: "/scratch1/sco305/intvi_cmri/intvi_pipeline/out/pipeline-test/summary"
+  datasets:
+    - "test-merge"
 ---
 
 
@@ -190,28 +190,39 @@ get_bwa_prefix <- function(type, name) {
   )
 }
 
-
  # if there were some samples with integrations
  if (length(exclude) != nrow(ints_wc)) {
 
    locs_type  <- "host"
+   plot_var <- "Chr"
    for (host in unique(conds$host)) {
 
      locs_name <- host
-     locs_bwa_prefx <- get_bwa_prefix(locs_type, locs_name)
+     locs_bwa_prefix <- get_bwa_prefix(locs_type, locs_name)
 
-     res <- knitr::knit_child('summary_all_locs.Rmd', quiet = TRUE)
-     cat(res, sep = '\n')
+
+    contigs <- get_contig_lengths(locs_bwa_prefix)     
+     contigs_plot <- get_top_contigs(ints, plot_var, contigs)
+     if (nrow(contigs_plot) > 0) {
+
+      res <- knitr::knit_child('summary_all_locs.Rmd', quiet = TRUE)
+      cat(res, sep = '\n')
+     }
    }
    
   locs_type  <- "virus"
+  plot_var <- "VirusRef"
    for (virus in unique(conds$virus)) {
 
      locs_name <- virus
-     locs_bwa_prefx <- get_bwa_prefix(locs_type, locs_name)
+     locs_bwa_prefix <- get_bwa_prefix(locs_type, locs_name)
+      contigs <- get_contig_lengths(locs_bwa_prefix)     
+     contigs_plot <- get_top_contigs(ints, plot_var, contigs)
 
+    if (nrow(contigs_plot) > 0) {
      res <- knitr::knit_child('summary_all_locs.Rmd', quiet = TRUE)
      cat(res, sep = '\n')
+    }
    }
   
  }

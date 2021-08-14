@@ -33,7 +33,7 @@ We first plot the number of integration junctions identified in each contig in t
 
 
 ```{r}
-plot_var <- ifelse(locs_type == "host", "Chr", "VirusRef")
+
 
 ints %>% 
   dplyr::filter(dataset %in% datasets) %>% 
@@ -55,10 +55,6 @@ Next, we look at the 25 contigs with the most integrations, and plot the locatio
 
 ```{r}
 
-contigs <- get_contig_lengths(locs_bwa_prefx)
-
-
-contigs_plot <- get_top_contigs(ints, plot_var, contigs)
 
 
 
@@ -134,15 +130,26 @@ custom.genome <- regioneR::toGRanges(data.frame(chr=contigs_plot$contig_name,
                            )
 
 kp <- karyoploteR::plotKaryotype(genome = custom.genome, plot.type=2)
-#karyoploteR::kpPlotDensity(kp, virus_ints_plot, window.size=100)
+
+bandwidth <- contigs_plot %>% 
+  dplyr::pull(length) %>% 
+  min()
+
+bandwidth <- bandwith / 10000
+
+bandwidth <- max(1, bandwidth)
 
 
+karyoploteR::kpPlotDensity(kp, plot_fwd_discord, col=pal[1], data.panel=1, border="slategray", r0=0, r1=0.45, window.size=bandwidth)
+karyoploteR::kpPlotDensity(kp, plot_fwd_chimeric, col=pal[2], data.panel=1, r0=0.55, r1=1, window.size=bandwidth)
+karyoploteR::kpPlotDensity(kp, plot_rev_discord, col=pal[1], data.panel=2, border="slategray", r0=0, r1=0.45, window.size=bandwidth)
+karyoploteR::kpPlotDensity(kp, plot_rev_chimeric, col=pal[2], data.panel=2, r0=0.55, r1=1, window.size=bandwidth)
 
-karyoploteR::kpPlotRegions(kp, plot_fwd_discord, col=pal[1], data.panel=1, border="slategray", r0=0, r1=0.45)
-karyoploteR::kpPlotRegions(kp, plot_fwd_chimeric, col=pal[2], data.panel=1, r0=0.55, r1=1)
-karyoploteR::kpPlotRegions(kp, plot_rev_discord, col=pal[1], data.panel=2, border="slategray", r0=0, r1=0.45)
-karyoploteR::kpPlotRegions(kp, plot_rev_chimeric, col=pal[2], data.panel=2, r0=0.55, r1=1)
 
+#karyoploteR::kpPlotRegions(kp, plot_fwd_discord, col=pal[1], data.panel=1, border="slategray", r0=0, r1=0.45)
+#karyoploteR::kpPlotRegions(kp, plot_fwd_chimeric, col=pal[2], data.panel=1, r0=0.55, r1=1)
+#karyoploteR::kpPlotRegions(kp, plot_rev_discord, col=pal[1], data.panel=2, border="slategray", r0=0, r1=0.45)
+#karyoploteR::kpPlotRegions(kp, plot_rev_chimeric, col=pal[2], data.panel=2, r0=0.55, r1=1)
 
 ```
 
