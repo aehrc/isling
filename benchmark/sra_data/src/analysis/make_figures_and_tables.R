@@ -606,4 +606,154 @@ real_data <- cowplot::plot_grid(
 
 print(real_data)
 
-cowplot::save_plot("figure4.pdf", real_data)
+cowplot::save_plot("../../figures/figure4.pdf", real_data)
+
+
+#### combined table of number of integrations found ####
+
+
+thresh <- 5
+lau_found_5 <- lau_results %>% 
+  pivot_longer(all:seeksv, names_to = "condition", values_to = "distance") %>% 
+  mutate(found = case_when(
+    distance > thresh ~ FALSE,
+    distance < 0 ~ FALSE,
+    TRUE ~ TRUE
+  )) %>% 
+  group_by(condition) %>% 
+  summarise(Accession = "PRJNA298941",
+            Host = "Human (hg19)",
+            Virus = "Hepatitis B",
+            `Library type` = "RNA-seq",
+            `Distance threshold` = thresh, 
+            `Total sites` = n(),
+            n_found = sum(found)
+            ) %>% 
+  pivot_wider(names_from = condition, values_from = n_found) %>% 
+  rename(isling = filter1) %>% 
+  rename(`isling (including ambiguous locations)` = `filter1_unique-plus-ambig`) %>% 
+  rename(Polyidus = polyidus) %>% 
+  rename(ViFi = vifi) %>% 
+  select(Accession, Host, Virus, `Library type`, `Distance threshold`, 
+         `Total sites`, isling, `isling (including ambiguous locations)`,
+         Polyidus, seeksv, ViFi)
+  
+lau_found_5
+
+thresh <- 8
+lau_found_8 <- lau_results %>% 
+  pivot_longer(all:seeksv, names_to = "condition", values_to = "distance") %>% 
+  mutate(found = case_when(
+    distance > thresh ~ FALSE,
+    distance < 0 ~ FALSE,
+    TRUE ~ TRUE
+  )) %>% 
+  group_by(condition) %>% 
+  summarise(Accession = "PRJNA298941",
+            Host = "Human (hg19)",
+            Virus = "Hepatitis B",
+            `Library type` = "RNA-seq",
+            `Distance threshold` = thresh, 
+            `Total sites` = n(),
+            n_found = sum(found)
+  ) %>% 
+  pivot_wider(names_from = condition, values_from = n_found) %>% 
+  rename(isling = filter1) %>% 
+  rename(`isling (including ambiguous locations)` = `filter1_unique-plus-ambig`) %>% 
+  rename(Polyidus = polyidus) %>% 
+  rename(ViFi = vifi) %>% 
+  select(Accession, Host, Virus, `Library type`, `Distance threshold`, 
+         `Total sites`, isling, `isling (including ambiguous locations)`,
+         Polyidus, seeksv, ViFi)
+
+lau_found_8
+
+thresh <- 5
+sung_found_5 <- sung_results %>% 
+  pivot_longer(all:seeksv, names_to = "condition", values_to = "distance") %>% 
+  mutate(found = case_when(
+    distance > thresh ~ FALSE,
+    distance < 0 ~ FALSE,
+    TRUE ~ TRUE
+  )) %>% 
+  group_by(condition) %>% 
+  summarise(Accession = "PRJEB2869",
+            Host = "Human (hg19)",
+            Virus = "Hepatitis B",
+            `Library type` = "WGS",
+            `Distance threshold` = thresh, 
+            `Total sites` = n(),
+            n_found = sum(found)
+  ) %>% 
+  pivot_wider(names_from = condition, values_from = n_found)  %>% 
+  rename(isling = all) %>% 
+  rename(`isling (including ambiguous locations)` = `all_unique-plus-ambig`) %>% 
+  rename(Polyidus = polyidus) %>% 
+  rename(ViFi = vifi) %>% 
+  select(Accession, Host, Virus, `Library type`, `Distance threshold`, 
+         `Total sites`, isling, `isling (including ambiguous locations)`,
+         Polyidus, seeksv, ViFi)
+  
+sung_found_5
+
+thresh <- 5
+nelson_found_5 <- nelson_results  %>% 
+  pivot_longer(all:seeksv, names_to = "condition", values_to = "distance") %>% 
+  mutate(found = case_when(
+    distance > thresh ~ FALSE,
+    distance < 0 ~ FALSE,
+    TRUE ~ TRUE
+  )) %>% 
+  group_by(condition) %>% 
+  summarise(Accession = "PRJNA485509",
+            Host = "Mouse (mm10)",
+            Virus = "Dual AAV/CRISPR therapy",
+            `Library type` = "Amplicon / Nextera",
+            `Distance threshold` = thresh, 
+            `Total sites` = n(),
+            n_found = sum(found)
+  ) %>% 
+  pivot_wider(names_from = condition, values_from = n_found) %>% 
+  rename(isling = filter1) %>% 
+  rename(Polyidus = polyidus) %>% 
+  rename(`VSeq-Toolkit`=VSeq_no_vec_vec_fusion) %>% 
+  select(Accession, Host, Virus, `Library type`, `Distance threshold`, 
+         `Total sites`, isling,
+         Polyidus, seeksv)
+
+
+thresh <- 100
+nelson_found_100 <- nelson_results  %>% 
+  pivot_longer(all:seeksv, names_to = "condition", values_to = "distance") %>% 
+  mutate(found = case_when(
+    distance > thresh ~ FALSE,
+    distance < 0 ~ FALSE,
+    TRUE ~ TRUE
+  )) %>% 
+  group_by(condition) %>% 
+  summarise(Accession = "PRJNA485509",
+            Host = "Mouse (mm10)",
+            Virus = "Dual AAV/CRISPR therapy",
+            `Library type` = "Amplicon / Nextera",
+            `Distance threshold` = thresh, 
+            `Total sites` = n(),
+            n_found = sum(found)
+  ) %>% 
+  pivot_wider(names_from = condition, values_from = n_found) %>% 
+  rename(isling = filter1) %>% 
+  rename(Polyidus = polyidus) %>% 
+  rename(`VSeq-Toolkit`=VSeq_no_vec_vec_fusion) %>% 
+  select(Accession, Host, Virus, `Library type`, `Distance threshold`, 
+         `Total sites`, isling,
+         Polyidus, seeksv)
+
+summary <- bind_rows(
+  sung_found_5,
+  lau_found_5,
+  lau_found_8,
+  nelson_found_5,
+  nelson_found_100
+)
+
+summary %>% 
+  write_tsv("../../tables/supp-table-4.tsv")
