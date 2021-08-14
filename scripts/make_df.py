@@ -28,6 +28,7 @@ filter_default = ["NoAmbiguousBases < 20 or Type == discordant",
 bed_exclude_default = []
 bed_include_default = []
 mapq_thresh_default = 20
+report_default = True
 
 
 #### check file extensions ####
@@ -80,6 +81,7 @@ def make_df(config):
 			trim = 1
 		else:
 			trim = check_bools(config, dataset, 'trim')
+	
 		
 		# get host and virus 
 		# host and virus can either be spcified as 'host_name' (mandatory) and 
@@ -118,7 +120,10 @@ def make_df(config):
 		bed_exclude = tuple(get_value_or_default(config, dataset, 'bed-exclude', bed_exclude_default))
 		bed_include = tuple(get_value_or_default(config, dataset, 'bed-include', bed_include_default))
 		mapq = get_value_or_default(config, dataset, 'mapq-threshold', mapq_thresh_default)
-		
+		report = get_value_or_default(config, dataset, 'generate-report', report_default)
+
+		report = check_bools(config, dataset, 'generate-report')
+			
 		# check values are integers greater than a minimum value
 		check_int_gt(merge_dist, -1, 'merge-dist', dataset)
 		check_int_gt(clip_cutoff, 1, 'clip-cutoff', dataset)
@@ -177,11 +182,11 @@ def make_df(config):
 			virus_prefix = config[dataset]["virus_prefixes"][virus]	
 			
 			# append combinations of each sample, host and virus		
-			rows.append((dataset_name, dataset, sample, host, host_fasta, host_prefix, virus, virus_fasta, virus_prefix, merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, merge_method, merge_n_min, clip_cutoff, cigar_tol, split, mean_frag_len, align_cpus, cat, dedup_subs, filter_str, bed_exclude, bed_include, mapq, nm_diff, nm_pc))
+			rows.append((dataset_name, dataset, sample, host, host_fasta, host_prefix, virus, virus_fasta, virus_prefix, merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, merge_method, merge_n_min, clip_cutoff, cigar_tol, split, mean_frag_len, align_cpus, cat, dedup_subs, filter_str, bed_exclude, bed_include, mapq, nm_diff, nm_pc, report))
 
 				
 	# make dataframe
-	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'merge_method', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'split', 'mean_frag_len', 'align_cpus', 'cat', 'dedup_subs', 'filter', 'bed_exclude', 'bed_include', 'mapq_thresh', 'nm_diff', 'nm_pc'])
+	toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'merge_method', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'split', 'mean_frag_len', 'align_cpus', 'cat', 'dedup_subs', 'filter', 'bed_exclude', 'bed_include', 'mapq_thresh', 'nm_diff', 'nm_pc', 'generate_report'])
 	
 	# do checks on dataframe
 	check_dataset_sample_unique(toDo)
@@ -363,6 +368,7 @@ def get_value_or_default(config, dataset, key, default):
 	
 	if key not in config[dataset]:
 		print(f"Paramter '{key}' not specified for dataset {dataset}: using default {default}")
+		config[dataset][key] = default
 		return default
 	
 	return config[dataset][key]	

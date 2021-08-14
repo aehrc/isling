@@ -352,7 +352,7 @@ sung_results %>%
   rename(`isling (including ambiguous location)` = `all_unique-plus-ambig`) %>% 
   rename(Polyidus = polyidus) %>% 
   rename(ViFi = vifi) %>% 
-  select(Sample, Chr, Pos, Gene, isling, `isling (including ambiguous location)`, Polyidus, ViFi) %>% 
+  select(Sample, Chr, Pos, Gene, isling, `isling (including ambiguous location)`, Polyidus, ViFi, seeksv) %>% 
   write_tsv("../../tables/supp-table-5.tsv")
 
 sung_results_filt <- sung_results %>% 
@@ -618,7 +618,8 @@ lau_found_5 <- lau_results %>%
   mutate(found = case_when(
     distance > thresh ~ FALSE,
     distance < 0 ~ FALSE,
-    TRUE ~ TRUE
+    is.na(distance) ~ FALSE,
+    TRUE ~ TRUE,
   )) %>% 
   group_by(condition) %>% 
   summarise(Accession = "PRJNA298941",
@@ -646,6 +647,7 @@ lau_found_8 <- lau_results %>%
   mutate(found = case_when(
     distance > thresh ~ FALSE,
     distance < 0 ~ FALSE,
+    is.na(distance) ~ FALSE,
     TRUE ~ TRUE
   )) %>% 
   group_by(condition) %>% 
@@ -674,6 +676,7 @@ sung_found_5 <- sung_results %>%
   mutate(found = case_when(
     distance > thresh ~ FALSE,
     distance < 0 ~ FALSE,
+    is.na(distance) ~ FALSE,
     TRUE ~ TRUE
   )) %>% 
   group_by(condition) %>% 
@@ -702,6 +705,7 @@ nelson_found_5 <- nelson_results  %>%
   mutate(found = case_when(
     distance > thresh ~ FALSE,
     distance < 0 ~ FALSE,
+    is.na(distance) ~ FALSE,
     TRUE ~ TRUE
   )) %>% 
   group_by(condition) %>% 
@@ -719,7 +723,7 @@ nelson_found_5 <- nelson_results  %>%
   rename(`VSeq-Toolkit`=VSeq_no_vec_vec_fusion) %>% 
   select(Accession, Host, Virus, `Library type`, `Distance threshold`, 
          `Total sites`, isling,
-         Polyidus, seeksv)
+         Polyidus, seeksv, `VSeq-Toolkit`)
 
 
 thresh <- 100
@@ -728,6 +732,7 @@ nelson_found_100 <- nelson_results  %>%
   mutate(found = case_when(
     distance > thresh ~ FALSE,
     distance < 0 ~ FALSE,
+    is.na(distance) ~ FALSE,
     TRUE ~ TRUE
   )) %>% 
   group_by(condition) %>% 
@@ -742,10 +747,10 @@ nelson_found_100 <- nelson_results  %>%
   pivot_wider(names_from = condition, values_from = n_found) %>% 
   rename(isling = filter1) %>% 
   rename(Polyidus = polyidus) %>% 
-  rename(`VSeq-Toolkit`=VSeq_no_vec_vec_fusion) %>% 
+  rename(`VSeq-Toolkit`= VSeq_no_vec_vec_fusion) %>% 
   select(Accession, Host, Virus, `Library type`, `Distance threshold`, 
          `Total sites`, isling,
-         Polyidus, seeksv)
+         Polyidus, seeksv, `VSeq-Toolkit`)
 
 summary <- bind_rows(
   sung_found_5,
@@ -753,7 +758,8 @@ summary <- bind_rows(
   lau_found_8,
   nelson_found_5,
   nelson_found_100
-)
+) 
+
 
 summary %>% 
   write_tsv("../../tables/supp-table-4.tsv")

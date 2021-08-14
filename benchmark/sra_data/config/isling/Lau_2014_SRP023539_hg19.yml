@@ -31,6 +31,8 @@ global:
   min-n-merge: 1
   
   mapq-thresh: 20
+  
+  generate-report: False
 
 all:
   filter:
