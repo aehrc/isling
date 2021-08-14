@@ -31,3 +31,8 @@ benchmark/sra_data/data/references/human_g1k_v37.fasta
 benchmark/sra_data/data/references/mm10_no_alt_analysis_set_ENCODE.fasta
 benchmark/sra_data/logs/
 benchmark/sra_data/out/
+benchmark/sra_data/data/references/human_g1k_v37.fasta.fai
+enchmark/sra_data/data/references/mm10_no_alt_analysis_set_ENCODE.fasta.fai
+out
+benchmark/sra_data/data/references/mm10_no_alt_analysis_set_ENCODE.fasta.fai
+.cache
