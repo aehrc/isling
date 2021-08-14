@@ -8,4 +8,4 @@ CORES="$2"
 
 cd ../..
 
-snakemake --keep-going --rerun-incomplete --use-singularity --cores $CORES --configfile $CONFIG --singularity-args '-B $(realpath ../../../..)'
+snakemake --rerun-incomplete --use-singularity --cores $CORES --configfile $CONFIG
