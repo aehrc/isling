@@ -6,10 +6,10 @@ output:
     toc_float:
       collapsed: true
       smooth_scroll: true
-params:
-  summary_dir: "/scratch1/sco305/intvi_cmri/intvi_pipeline/out/pipeline-test/summary"
-  datasets:
-    - "test-merge"
+#params:
+#  summary_dir: "/scratch1/sco305/intvi_cmri/intvi_pipeline/out/pipeline-test/summary"
+#  datasets:
+#    - "test-merge"
 ---
 
 
