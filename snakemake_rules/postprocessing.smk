@@ -211,8 +211,13 @@ rule rmd_summary_dataset:
 							virus = toDo.loc[toDo['dataset'] == wildcards.dset,'virus'],
 							allow_missing = True
 					),
-		conds = rules.write_analysis_summary.output.tsv
-						
+		conds = rules.write_analysis_summary.output.tsv,
+		host_ann = lambda wildcards: expand("{outpath}/references/{host}/{host}.ann", 
+												host = set(toDo.loc[toDo['dataset'] == wildcards.dset,'host']),
+												allow_missing = True), 
+		virus_ann = lambda wildcards: expand("{outpath}/references/{virus}/{virus}.ann", 
+												virus = set(toDo.loc[toDo['dataset'] == wildcards.dset,'virus']),
+												allow_missing = True), 
 	output:
 		rmd = "{outpath}/summary/{dset}.html"
 	resources:
