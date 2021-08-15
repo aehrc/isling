@@ -8,5 +8,5 @@ CORES="$2"
 
 cd src/run_other_tools/
 
-snakemake --keep-going --rerun-incomplete --use-singularity --singularity-args "-B $(realpath ..)" --cores $CORES --configfile ../../$CONFIG
+snakemake --keep-going --rerun-incomplete --use-singularity --singularity-args "-B $(realpath ../..)" --cores $CORES --configfile ../../$CONFIG
 
