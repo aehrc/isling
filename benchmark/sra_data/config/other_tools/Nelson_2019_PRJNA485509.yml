@@ -10,7 +10,7 @@ Nelson_2019_PRJNA485509:
    analysis_host: # if running vifi, there must be a matching key in analysis_hosts under vifi_params
        "GRCm38" : "../../data/references/mm10_no_alt_analysis_set_ENCODE.fasta"
    analysis_virus:
-       "nelson_aavs" :  "../../data/references/Nelson_2016_AAVs.fa"
+       "nelson_aavs" :  "../../data/references/Nelson_AAVs.fa"
    
    #run polyidus?
    # https://github.com/hoffmangroup/polyidus
@@ -69,7 +69,7 @@ Nelson_2019_PRJNA485509:
      idenVecGen: 95
      clusterRange: 3
      host_table:
-       GRCm38_p6: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt"
+       GRCm38: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt"
        
 Nelson_2019_PRJNA485509_vseq_novecvecfusion:
    read_directory: "../../data/reads/PRJNA485509/"
@@ -81,9 +81,9 @@ Nelson_2019_PRJNA485509_vseq_novecvecfusion:
 
    # analysis
    analysis_host: # if running vifi, there must be a matching key in analysis_hosts under vifi_params
-       "GRCm38_p6" : "../../data/references/GRCm38_p6.fa"
+       "GRCm38" : "../../data/references/mm10_no_alt_analysis_set_ENCODE.fasta"
    analysis_virus:
-       "nelson_aavs" :  "../../data/references/Nelson_2016_AAVs.fa"
+       "nelson_aavs" :  "../../data/references/Nelson_AAVs.fa"
 
 
    vseq_toolkit_params:
@@ -105,4 +105,4 @@ Nelson_2019_PRJNA485509_vseq_novecvecfusion:
      idenVecGen: 95
      clusterRange: 3
      host_table:
-       GRCm38_p6: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt"
+       GRCm38: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt"

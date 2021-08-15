@@ -32,6 +32,8 @@ global:
 
   mapq-thresh: 20
 
+  generate-report: False
+
 all:
   filter:
     - "True"
