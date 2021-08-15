@@ -221,6 +221,7 @@ def make_vseq_rows(config, dataset):
 
 	# for each host, get the 'annoTable'
 	
+	
 	assert len(config[dataset]['analysis_host'].keys()) == 1
 	host = list(config[dataset]['analysis_host'].keys())[0]
 	assert 'host_table' in config[dataset]['vseq_toolkit_params']
