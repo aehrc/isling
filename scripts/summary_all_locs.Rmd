@@ -135,7 +135,7 @@ bandwidth <- contigs_plot %>%
   dplyr::pull(length) %>% 
   min()
 
-bandwidth <- bandwith / 10000
+bandwidth <- bandwidth / 10000
 
 bandwidth <- max(1, bandwidth)
 
