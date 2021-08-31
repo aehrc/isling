@@ -87,7 +87,6 @@ for i, row in toDo.iterrows():
 	conditions.add(f"{row['outdir']}/summary/{row['dataset']}.analysis_conditions.tsv")
 	merged_bed.add(f"{row['outdir']}/{row['dataset']}/ints/{row['sample']}.{row['host']}.{row['virus']}.integrations.post.unique.merged.txt")
 
-
 rule all:
 	input:
 		conditions,
@@ -122,3 +121,5 @@ include: "snakemake_rules/find_ints.smk"
 
 #### postprocessing ####
 include: "snakemake_rules/postprocessing.smk"
+
+

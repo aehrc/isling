@@ -109,8 +109,8 @@ def strip_wildcard_constraints(string_with_constraints):
 	# if we want to use these these as input to other rules, we need to strip out the commas
 	
 	string = string_with_constraints
-	
-	if re.search("\{\w+,\w+\}", string):
+
+	if re.search(",.+?\}", string):
 		string = re.sub(",.+?\}", "}", string)
 	
 	return string
