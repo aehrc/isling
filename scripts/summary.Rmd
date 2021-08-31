@@ -13,6 +13,8 @@ output:
 ---
 
 ```{r, setup, include=FALSE}
+knitr::opts_knit$set(root.dir=params$workdir)
+
 knitr::opts_chunk$set(fig.width=8, fig.height=6,
                       echo=FALSE, warning=FALSE, message=FALSE)
 library(magrittr)
@@ -38,7 +40,8 @@ This report gives an overview of the integration sites detected for the dataset 
 
 ```{r analysisConditions}
 
-conditions_file <- file.path(params$outdir, "summary", glue::glue("{params$dataset}.analysis_conditions.tsv"))
+#conditions_file <- file.path(params$outdir, "summary", glue::glue("{params$dataset}.analysis_conditions.tsv"))
+conditions_file <- params$conds
 
 conditions <- readr::read_tsv(conditions_file) %>% 
   dplyr::select(-X1) %>% 
@@ -122,8 +125,8 @@ Reads were provided in `r read_statement()`.  `r preproc_statement()`
 
 
 # get host contigs if fasta provided
-host_contigs <- get_contig_lengths(file.path(params$outdir, 'references', params$host, params$host))
-virus_contigs <- get_contig_lengths(file.path(params$outdir, 'references', params$virus, params$virus))
+host_contigs <- get_contig_lengths(params$host_prefix)
+virus_contigs <- get_contig_lengths(params$virus_prefix)
 
 # if there are fewer than five contigs in reference, list them, otherwise just state the number of contigs
 format_contig_statement <- function(contig_list) {

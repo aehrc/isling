@@ -13,6 +13,11 @@
 import functools
 import re
 
+def multiple_dirname(path, n):
+	parent_path = os.path.dirname(path)
+	if n == 0:
+		return parent_path
+	return multiple_dirname(parent_path, n-1)
 
 # fuction to get mem_mb based on size of input files
 def resources_list_with_min_and_max(file_name_list, attempt, mult_factor=2, minimum = 100, maximum = 120000):
