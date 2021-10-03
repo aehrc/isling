@@ -295,7 +295,7 @@ rule rmd_summary:
 							strip_wildcard_constraints(rules.write_analysis_summary.output.tsv),
 							dset = toDo.loc[:, 'dataset'],
 							allow_missing = True
-						)),
+					)),
 		host_ann = lambda wildcards: expand("{prefix}.ann", prefix = set(toDo.loc[:, 'host_prefix'])),
 		virus_ann = lambda wildcards: expand("{prefix}.ann", prefix = set(toDo.loc[:, 'virus_prefix'])),
 	output:
@@ -308,9 +308,8 @@ rule rmd_summary:
 		datasets = lambda wildcards: ", ".join([f'"{i}"' for i in set(toDo['dataset'])]),
 		output_file = lambda wildcards, output: os.path.abspath(output.rmd),
 		script = lambda wildcards: os.path.abspath("scripts/summary_all.Rmd"),
-		host_prefixes = lambda wildcards, input: "c('" + "', '".join([os.path.splitext(i)[0] for i in input.host_ann) + "')",
-		virus_prefixes = lambda wildcards, input: "c('" + "', '".join([os.path.splitext(i)[0] for i in input.virus_ann) + "')",
-		 
+		host_prefixes = lambda wildcards, input:  "c('" + "', '".join(os.path.splitext(i)[0] for i in input.host_ann) + "')",
+		virus_prefixes = lambda wildcards, input: "c('" + "', '".join(os.path.splitext(i)[0] for i in input.virus_ann) + "')",
 	conda:
 		"../envs/rscripts.yml"
 	container:
