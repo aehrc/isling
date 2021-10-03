@@ -13,6 +13,11 @@
 import functools
 import re
 
+def multiple_dirname(path, n):
+	parent_path = os.path.dirname(path)
+	if n == 0:
+		return parent_path
+	return multiple_dirname(parent_path, n-1)
 
 # fuction to get mem_mb based on size of input files
 def resources_list_with_min_and_max(file_name_list, attempt, mult_factor=2, minimum = 100, maximum = 128000):
@@ -110,7 +115,7 @@ def strip_wildcard_constraints(string_with_constraints):
 	
 	string = string_with_constraints
 	
-	if re.search("\{\w+,\w+\}", string):
+	if re.search(",.+?\}", string):
 		string = re.sub(",.+?\}", "}", string)
 	
 	return string
@@ -181,7 +186,7 @@ rule dedupe:
 		r2_dedup = temp("{outpath}/{dset}/dedup_reads/{samp}_2.fq")
 	params:
 		n_subs = lambda wildcards: get_value_from_df(wildcards, "dedup_subs"),
-		mem_mb = lambda wildcards, resources: max(int(resources.mem_mb * 2), 1000)
+		mem_mb = lambda wildcards, resources: max(int(resources.mem_mb * 1), 1000)
 	threads: cpus
 	conda:	
 		"../envs/bbmap.yml"
