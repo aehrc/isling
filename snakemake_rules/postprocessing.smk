@@ -310,13 +310,15 @@ rule rmd_summary:
 		script = lambda wildcards: os.path.abspath("scripts/summary_all.Rmd"),
 		host_prefixes = lambda wildcards, input:  "c('" + "', '".join(os.path.splitext(i)[0] for i in input.host_ann) + "')",
 		virus_prefixes = lambda wildcards, input: "c('" + "', '".join(os.path.splitext(i)[0] for i in input.virus_ann) + "')",
+		bucket = workflow.default_remote_prefix,
+		workdir = lambda wildcards: os.getcwd()
 	conda:
 		"../envs/rscripts.yml"
 	container:
 		"docker://szsctt/isling:latest"
 	shell:
 		"""
-		Rscript -e 'params=list("summary_dir"="{params.summary_dir}", "host_prefixes"="{params.host_prefixes}", "virus_prefixes"="{params.virus_prefixes}", "datasets"=c({params.datasets})); rmarkdown::render("{params.script}", output_file="{params.output_file}")'
+		Rscript -e 'params=list("workdir"="{params.workdir}","bucket"="{params.bucket}","summary_dir"="{params.summary_dir}", "host_prefixes"="{params.host_prefixes}", "virus_prefixes"="{params.virus_prefixes}", "datasets"=c({params.datasets})); rmarkdown::render("{params.script}", output_file="{params.output_file}")'
 		"""
 		
 		

@@ -43,9 +43,9 @@ This report gives an overview of the integration sites detected for the dataset 
 #conditions_file <- file.path(params$outdir, "summary", glue::glue("{params$dataset}.analysis_conditions.tsv"))
 conditions_file <- params$conds
 
-conditions <- readr::read_tsv(conditions_file) %>% 
-  dplyr::select(-X1) %>% 
-  dplyr::select(-config_dataset)
+conditions <- readr::read_tsv(conditions_file) #%>% 
+  #dplyr::select(-X1) %>% 
+  #dplyr::select(-config_dataset)
 
 # this report is always for one dataset
 conditions <- conditions %>% 
