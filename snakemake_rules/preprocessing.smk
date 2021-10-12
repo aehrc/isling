@@ -20,14 +20,14 @@ def multiple_dirname(path, n):
 	return multiple_dirname(parent_path, n-1)
 
 # fuction to get mem_mb based on size of input files
-def resources_list_with_min_and_max(file_name_list, attempt, mult_factor=2, minimum = 100, maximum = 120000):
+def resources_list_with_min_and_max(file_name_list, attempt, mult_factor=2, minimum = 100, maximum = 128000):
 	
-	# get sum of size of files in file_name_list
+	# get sum of size of files in file_name_list in megabytes (MB)
 	# input files are instances of class snakemake.io._IOFile
 	# check documentation https://snakemake.readthedocs.io/en/stable/_modules/snakemake/io.html
 	# for more info
 	try:
-		resource = int(sum([file.size for file in file_name_list]) / 1024 / 1024) * attempt * mult_factor
+		resource = int(sum([file.size for file in file_name_list]) / 1024) * attempt * mult_factor
 	# sometimes this doesn't work - not sure why...
 	except WorkflowError:
 		
@@ -114,7 +114,6 @@ def strip_wildcard_constraints(string_with_constraints):
 	# if we want to use these these as input to other rules, we need to strip out the commas
 	
 	string = string_with_constraints
-
 	if re.search(",.+?\}", string):
 		string = re.sub(",.+?\}", "}", string)
 	
@@ -170,8 +169,6 @@ rule bam_to_fastq:
 		"../envs/bwa.yml"
 	container:
 		"docker://szsctt/isling:latest"
-	resources:
-		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt)
 	shell:
 		"""
 		samtools view -b -F '0x900' {input.bam} |\
@@ -188,14 +185,14 @@ rule dedupe:
 		r2_dedup = temp("{outpath}/{dset}/dedup_reads/{samp}_2.fq")
 	params:
 		n_subs = lambda wildcards: get_value_from_df(wildcards, "dedup_subs"),
-		mem_mb = lambda wildcards, resources: max(int(resources.mem_mb * 0.8), 1000)
+		mem_mb = lambda wildcards, resources: max(int(resources.mem_mb * 1), 1000)
 	threads: cpus
 	conda:	
 		"../envs/bbmap.yml"
 	container:
 		"docker://szsctt/isling:latest"
 	resources:
-		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 8),
+		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1 # need this for pearcey so that job doesn't get split over multiple nodes
 	shell:
