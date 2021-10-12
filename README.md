@@ -22,6 +22,14 @@ To run with the (included) test data locally, run:
 snakemake --configfile test/config/test.yml --cores <cores>
 ```
 
+Alternatively, if you have docker installed, on MacOS you can run:
+
+```
+docker run --rm -it -v"$(pwd)"/out:/opt/isling/out szsctt/isling:latest snakemake --configfile test/config/test.yml --cores 1
+```
+
+This will use the config file and data inside the container, and the results will appear in a folder called `out` in your current working directory.  On Linux, you will need to run this command as root, and on Windows you will need to adjust the [bind-mount syntax](https://docs.docker.com/storage/bind-mounts/) (`-v` argument).
+
 ## Inputs
 
 A config file, as well as the host and viral references, and reads are required inputs.  Specify all inputs in a config file.
@@ -147,6 +155,7 @@ After detection, junction reads/read pairs may be filtered using post-processing
 
 
 TODO:
+
 5. `nearest-bed`: Specify a list of `bed` files in order to annotate each integration with the nearest feature in each `bed` file, and the distance between the integration and that feature
 6. `nearest-gtf`: Similar to `nearest-bed`, but with a `gtf` file rather than an `bed` file
 
@@ -198,4 +207,16 @@ dataset-2:
 ```
 
 two datasets (`dataset-1` and `dataset-2`) will be analysed.  `dataset-1` will consist of samples `sample1` and `sample2`, and `dataset-2` will consist of all the `bam` files in the directory `/path/to/read/folder/2`.
+
+## Outputs
+
+Results will be organised in the output folders specified in the config file.  For each dataset, a folder sharing the same name as the dataset will be created in this output folder, with a `summary` folder.
+
+### Summary
+
+Within the `summary` folder there are several outputs.
+
+The first is a tab-separated file for each dataset, called `<dataset name>.analysis_conditions.tsv`
+
+Within the dataset folder, the `ints` folder contains the integrations identified by `isling`.  
 
