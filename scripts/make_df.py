@@ -28,7 +28,7 @@ filter_default = ["NoAmbiguousBases < 20 or Type == discordant",
 bed_exclude_default = []
 bed_include_default = []
 mapq_thresh_default = 20
-report_default = True
+report_default = False
 
 
 #### check file extensions ####
