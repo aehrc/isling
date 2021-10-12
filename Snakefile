@@ -46,6 +46,8 @@ workdir: config['snakedir']
 snakedir = config['snakedir']
 config.pop('snakedir')
 
+# Check if cloud computing is used
+config['bucket'] = workflow.default_remote_prefix
 
 sys.path.append(os.path.join(snakedir, "scripts/"))
 from scripts.make_df import make_df, make_reference_dict

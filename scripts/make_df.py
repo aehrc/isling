@@ -44,16 +44,17 @@ merge_methods = {'exact', 'common'}
 
 #### get information for wildcards ####
 
-# get the name of each sample in each dataset, and save information about 
+# get the name of each sample in each dataset, and save information about
 # how to process it in a dataframe
 
 def make_df(config):
 
 	# global options are specified with as a 'dataset' with the name 'global'
 	# values in this dataset are applied to keys which are unset in the remaining datasets
-	if 'global' in config:		
+	if 'global' in config:
 		# get default (global) options
 		default = config.pop('global')
+		bucket = config.pop('bucket')
 		for dataset in config:
 			for key in default:
 				if key not in config[dataset]:
@@ -62,14 +63,15 @@ def make_df(config):
 	rows = []
 
 	for dataset in config:
-	
+
 		cat = check_read_suffixes(config, dataset)
-		
+
 		# get output directory
 		outdir = get_value_or_default(config, dataset, 'out_dir', getcwd())
-#		outdir = path.abspath(path.normpath(outdir))
+		if bucket == "": # Check if local execution "" or cloud computing "<bucket_name>"
+			outdir = path.abspath(path.normpath(outdir))
 		config[dataset]['out_dir'] = outdir
-		
+
 		# get read directory
 		readdir = check_required(config, dataset, 'read_folder')
 		readdir = path.normpath(readdir)
@@ -81,13 +83,12 @@ def make_df(config):
 			trim = 1
 		else:
 			trim = check_bools(config, dataset, 'trim')
-	
-		
-		# get host and virus 
-		# host and virus can either be spcified as 'host_name' (mandatory) and 
+
+		# get host and virus
+		# host and virus can either be spcified as 'host_name' (mandatory) and
 		# either 'host_prefix' or 'host_fasta' 
 		# ('virus_name', 'virus_fasta', 'virus_prefix' in the case of viral reference), 
-		
+
 		# or in 'host'/'virus', where the key is the name of the host/virus and the 
 		# value is the path the the fasta (for fasta input), or 'host_prefixes'/'virus_preifxes'
 		# in the case of pre-indexed references
