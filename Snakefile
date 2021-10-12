@@ -80,12 +80,12 @@ ucsc_files = set()
 merged_bed = set()
 
 for i, row in toDo.iterrows():
-	summary_files.add(f"{row['outdir']}/summary/{row['dataset']}.html")
-	summary_files.add(f"{row['outdir']}/integration_summary.html")
+	if row['generate_report']:
+		summary_files.add(f"{row['outdir']}/summary/{row['dataset']}.html")
+		summary_files.add(f"{row['outdir']}/integration_summary.html")
 	ucsc_files.add(f"{row['outdir']}/summary/ucsc_bed/{row['dataset']}.post.bed")
 	conditions.add(f"{row['outdir']}/summary/{row['dataset']}.analysis_conditions.tsv")
 	merged_bed.add(f"{row['outdir']}/{row['dataset']}/ints/{row['sample']}.{row['host']}.{row['virus']}.integrations.post.unique.merged.txt")
-
 
 rule all:
 	input:
@@ -121,3 +121,5 @@ include: "snakemake_rules/find_ints.smk"
 
 #### postprocessing ####
 include: "snakemake_rules/postprocessing.smk"
+
+

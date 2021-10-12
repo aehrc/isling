@@ -211,8 +211,26 @@ rule rmd_summary_dataset:
 							virus = toDo.loc[toDo['dataset'] == wildcards.dset,'virus'],
 							allow_missing = True
 					),
-		conds = rules.write_analysis_summary.output.tsv
-						
+		conds = rules.write_analysis_summary.output.tsv,
+		host_ann = lambda wildcards: expand("{prefix}.ann",
+						prefix = toDo.loc[toDo['dataset'] == wildcards.dset,'host_prefix']), 
+		virus_ann = lambda wildcards: expand("{prefix}.ann",
+						prefix = toDo.loc[toDo['dataset'] == wildcards.dset,'virus_prefix']), 
+		host_stats = lambda wildcards: expand(strip_wildcard_constraints(rules.host_stats.output.stats),
+							zip,
+							samp = toDo.loc[toDo['dataset'] == wildcards.dset,'sample'],
+							host = toDo.loc[toDo['dataset'] == wildcards.dset,'host'],
+							virus = toDo.loc[toDo['dataset'] == wildcards.dset,'virus'],
+							allow_missing=True
+							),
+                virus_stats = lambda wildcards: expand(strip_wildcard_constraints(rules.virus_stats.output.stats),
+							zip,
+							samp = toDo.loc[toDo['dataset'] == wildcards.dset,'sample'],
+							virus = toDo.loc[toDo['dataset'] == wildcards.dset,'virus'],
+							allow_missing=True
+							),
+
+
 	output:
 		rmd = "{outpath}/summary/{dset}.html"
 	resources:
@@ -222,14 +240,17 @@ rule rmd_summary_dataset:
 		outfile = lambda wildcards, output: os.path.abspath(output.rmd),
 		host = lambda wildcards: toDo.loc[(toDo['dataset'] == wildcards.dset).idxmax(), 'host'],
 		virus = lambda wildcards: toDo.loc[(toDo['dataset'] == wildcards.dset).idxmax(), 'virus'],
-		outdir = lambda wildcards: os.path.abspath(toDo.loc[(toDo['dataset'] == wildcards.dset).idxmax(), 'outdir'])
+		outdir = lambda wildcards, input: multiple_dirname(input.unique[0], 2),
+		host_prefix = lambda wildcards, input: os.path.splitext(input.host_ann[0])[0],
+		virus_prefix = lambda wildcards, input: os.path.splitext(input.virus_ann[0])[0],
+		workdir = lambda wildcards: os.getcwd()
 	conda:
 		"../envs/rscripts.yml"
 	container:
 		"docker://szsctt/isling:latest"
 	shell:
 		"""
-		Rscript -e 'params=list("outdir"="{params.outdir}", "host"="{params.host}", "virus"="{params.virus}", "dataset"="{wildcards.dset}"); rmarkdown::render("scripts/summary.Rmd", output_file="{params.outfile}")'
+		Rscript -e 'params=list("outdir"="{params.outdir}", "host"="{params.host}", "virus"="{params.virus}", "host_prefix"="{params.host_prefix}", "virus_prefix"="{params.virus_prefix}", "conds"="{input.conds}", "dataset"="{wildcards.dset}", "workdir"="{params.workdir}"); rmarkdown::render("scripts/summary.Rmd", output_file="{params.outfile}")'
 		"""
 	
 rule rmd_summary:
@@ -274,7 +295,9 @@ rule rmd_summary:
 							strip_wildcard_constraints(rules.write_analysis_summary.output.tsv),
 							dset = toDo.loc[:, 'dataset'],
 							allow_missing = True
-						))					
+					)),
+		host_ann = lambda wildcards: expand("{prefix}.ann", prefix = set(toDo.loc[:, 'host_prefix'])),
+		virus_ann = lambda wildcards: expand("{prefix}.ann", prefix = set(toDo.loc[:, 'virus_prefix'])),
 	output:
 		rmd = "{outpath}/integration_summary.html"
 	resources:
@@ -284,14 +307,18 @@ rule rmd_summary:
 		summary_dir = lambda wildcards, output: os.path.join(os.path.abspath(os.path.dirname(output.rmd)), "summary"),
 		datasets = lambda wildcards: ", ".join([f'"{i}"' for i in set(toDo['dataset'])]),
 		output_file = lambda wildcards, output: os.path.abspath(output.rmd),
-		script = lambda wildcards: os.path.abspath("scripts/summary_all.Rmd")
+		script = lambda wildcards: os.path.abspath("scripts/summary_all.Rmd"),
+		host_prefixes = lambda wildcards, input:  "c('" + "', '".join(os.path.splitext(i)[0] for i in input.host_ann) + "')",
+		virus_prefixes = lambda wildcards, input: "c('" + "', '".join(os.path.splitext(i)[0] for i in input.virus_ann) + "')",
+		bucket = workflow.default_remote_prefix,
+		workdir = lambda wildcards: os.getcwd()
 	conda:
 		"../envs/rscripts.yml"
 	container:
 		"docker://szsctt/isling:latest"
 	shell:
 		"""
-		Rscript -e 'params=list("summary_dir"="{params.summary_dir}", "datasets"=c({params.datasets})); rmarkdown::render("{params.script}", output_file="{params.output_file}")'
+		Rscript -e 'params=list("workdir"="{params.workdir}","bucket"="{params.bucket}","summary_dir"="{params.summary_dir}", "host_prefixes"="{params.host_prefixes}", "virus_prefixes"="{params.virus_prefixes}", "datasets"=c({params.datasets})); rmarkdown::render("{params.script}", output_file="{params.output_file}")'
 		"""
 		
 		
@@ -306,7 +333,7 @@ rule merged_bed:
 	container:
 		"docker://szsctt/isling:latest"
 	conda:
-		"envs/bedtools.yml"
+		"../envs/bedtools.yml"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5, 1000)),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],

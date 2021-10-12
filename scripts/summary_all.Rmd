@@ -190,31 +190,52 @@ get_bwa_prefix <- function(type, name) {
   )
 }
 
+# if there were some samples with integrations
+if (length(exclude) != nrow(ints_wc)) {
 
- # if there were some samples with integrations
- if (length(exclude) != nrow(ints_wc)) {
+  locs_type  <- "host"
+  plot_var <- "Chr"
+  for (host in unique(conds$host)) {
 
-   locs_type  <- "host"
-   for (host in unique(conds$host)) {
+    locs_name <- host
 
-     locs_name <- host
-     locs_bwa_prefx <- get_bwa_prefix(locs_type, locs_name)
+    if (params$bucket == ""){
+      locs_bwa_prefix <- paste(params$workdir,get_bwa_prefix(locs_type, locs_name), sep = "/")
+    }else{
+      tmpPath <- getwd()
+      setwd(dirname(tmpPath))
+      locs_bwa_prefix <- paste(params$bucket,get_bwa_prefix(locs_type, locs_name), sep = "/")
+    } 
 
-     res <- knitr::knit_child('summary_all_locs.Rmd', quiet = TRUE)
-     cat(res, sep = '\n')
-   }
-   
+    contigs <- get_contig_lengths(locs_bwa_prefix)     
+    contigs_plot <- get_top_contigs(ints, plot_var, contigs)
+    if (nrow(contigs_plot) > 0) {
+      res <- knitr::knit_child('summary_all_locs.Rmd', quiet = TRUE)
+      cat(res, sep = '\n')
+    }
+}
+
   locs_type  <- "virus"
-   for (virus in unique(conds$virus)) {
+  plot_var <- "VirusRef"
+  for (virus in unique(conds$virus)) {
 
-     locs_name <- virus
-     locs_bwa_prefx <- get_bwa_prefix(locs_type, locs_name)
+    locs_name <- virus
+    if (params$bucket == ""){
+      locs_bwa_prefix <- paste(params$workdir,get_bwa_prefix(locs_type, locs_name), sep = "/")
+    }else{
+      tmpPath <- getwd()
+      setwd(dirname(tmpPath))
+      locs_bwa_prefix <- paste(params$bucket,get_bwa_prefix(locs_type, locs_name), sep = "/")
+    }
+    contigs <- get_contig_lengths(locs_bwa_prefix)     
+    contigs_plot <- get_top_contigs(ints, plot_var, contigs)
 
-     res <- knitr::knit_child('summary_all_locs.Rmd', quiet = TRUE)
-     cat(res, sep = '\n')
-   }
-  
- }
+    if (nrow(contigs_plot) > 0) {
+      res <- knitr::knit_child('summary_all_locs.Rmd', quiet = TRUE)
+      cat(res, sep = '\n')
+    }
+  }
+}
 
 
 ```

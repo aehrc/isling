@@ -83,11 +83,23 @@ get_top_contigs <- function(ints, col_name, contig_lengths) {
   include_group <- ifelse(col_name == "Chr", "ambig. (virus)", "ambig. (host)")
   
   contigs_plot <- ints %>% 
-    dplyr::filter(type == "unique" | type == include_group) %>% 
+    dplyr::filter(type == "unique" | type == include_group) 
+  
+  if (nrow(contigs_plot) == 0) {
+    return(contigs_plot)
+  }
+  
+ contigs_plot <- contigs_plot %>% 
     dplyr::group_by(!!dplyr::sym(col_name)) %>% 
     dplyr::summarise(n = dplyr::n()) %>% 
     dplyr::arrange(desc(n)) %>% 
-    head(max_contigs_plot) %>% 
+    head(max_contigs_plot) 
+ 
+ if (nrow(contigs_plot) == 0) {
+   return(contigs_plot)
+ }
+ 
+ contigs_plot <- contigs_plot %>% 
     dplyr::left_join(contigs_join, by=setNames(right_join, col_name)) %>% 
     dplyr::rename(contig_name = !!dplyr::sym(col_name)) %>% 
     dplyr::mutate(start=1) %>% 

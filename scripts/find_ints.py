@@ -269,6 +269,9 @@ class AlignmentFilePair:
 		self.curr_host = self.host.collect_next_read_alignments()
 		self.curr_virus = self.virus.collect_next_read_alignments()
 		
+		if self.curr_host is None or self.curr_virus is None:
+			return
+		
 		prev_host = self.curr_host[0].query_name
 		prev_virus = self.curr_virus[0].query_name
 
@@ -402,11 +405,12 @@ class AlignmentFile:
 		""" Collect the alignments (primary, secondary, supplementary) for the next read (pair) in the file """	
 		
 		alns = AlignmentPool()
-			
-		query_name = self.curr.query_name
-		
+
 		if self.end:
 			return None
+
+			
+		query_name = self.curr.query_name
 		
 		# keep getting elements until we either reach a different read or the end of the list
 		while (self.curr.query_name == query_name) and (self.curr.query_name is not None):
