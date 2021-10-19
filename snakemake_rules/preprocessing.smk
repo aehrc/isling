@@ -27,13 +27,13 @@ def resources_list_with_min_and_max(file_name_list, attempt, mult_factor=2, mini
 	# check documentation https://snakemake.readthedocs.io/en/stable/_modules/snakemake/io.html
 	# for more info
 	try:
-		resource = int(sum([file.size for file in file_name_list]) / 1024) * attempt * mult_factor
+		resource = int(sum([file.size for file in file_name_list]) / 1024 / 1024 ) * attempt * mult_factor
 	# sometimes this doesn't work - not sure why...
 	except WorkflowError:
 		
 		print(f"warning: couldn't get size of input files: using minimum {minimum}")
-		resource = minimum * attempt
-
+		resource = minimum * attempt	
+	
 	resource = min(maximum, resource)
 	
 	return int(max(minimum, resource))
@@ -185,7 +185,7 @@ rule dedupe:
 		r2_dedup = temp("{outpath}/{dset}/dedup_reads/{samp}_2.fq")
 	params:
 		n_subs = lambda wildcards: get_value_from_df(wildcards, "dedup_subs"),
-		mem_mb = lambda wildcards, resources: max(int(resources.mem_mb * 1), 1000)
+		mem_mb = lambda wildcards, resources: max(int(resources.mem_mb * 1), 1000),
 	threads: cpus
 	conda:	
 		"../envs/bbmap.yml"
@@ -194,7 +194,7 @@ rule dedupe:
 	resources:
 		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
-		nodes = 1 # need this for pearcey so that job doesn't get split over multiple nodes
+		nodes = 1, # need this for pearcey so that job doesn't get split over multiple nodes,
 	shell:
 		"""
 		clumpify.sh -Xmx{params.mem_mb}m in1={input.r1} in2={input.r2} out1={output.r1_dedup} out2={output.r2_dedup} dedupe=t ac=f subs={params.n_subs} threads={threads}
@@ -211,7 +211,7 @@ rule count_fastq:
 	container:
 		"docker://szsctt/isling:latest"
 	resources:
-		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 0.5, 500, 5000),
+		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 8, 500),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	shell:
