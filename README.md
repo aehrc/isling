@@ -35,7 +35,7 @@ This will use the config file and data inside the container, and the results wil
 
 A config file, as well as the host and viral/vector references, and reads are required inputs.  Specify all inputs in a config file.
 
-See the file `config.md` for a description of the format of this config file.
+See the file `configfile.md` for a description of the format of this config file.
 
 ## Outputs
 
