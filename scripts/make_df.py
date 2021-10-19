@@ -414,12 +414,12 @@ def check_read_suffixes(config, dataset):
 		
 			# check that input looks like a fastq files
 			if R1_second_extension not in fastq_extensions or R2_second_extension not in fastq_extensions:
-				raise InputError("input files do not look like fastq files (extension is not '.fq' or '.fastq'")
+				raise ValueError("input files do not look like fastq files (extension is not '.fq' or '.fastq'")
 
 			
 		# if uncompressed, check file looks like fastq file
 		elif R1_first_extension not in fastq_extensions or R2_first_extension not in fastq_extensions:
-			raise InputError("for fastq files, input file extensions must be '.fastq' or '.fq'")
+			raise ValueError("for fastq files, input file extensions must be '.fastq' or '.fq'")
 
 	# if input is bam
 	elif "bam_suffix" in config[dataset]:
@@ -427,11 +427,11 @@ def check_read_suffixes(config, dataset):
 		if extension != ".bam" and extension != ".sam":
 			extension = path.splitext(config[dataset]["bam_suffix"])[1]
 			if extension != ".bam" and extension != ".sam":
-				raise InputError("For aligned input, only '.bam' and '.sam' files are currently supported")
+				raise ValueError("For aligned input, only '.bam' and '.sam' files are currently supported")
 	
 	# if nether R1/R2 suffix or bam suffix specified
 	else:
-		raise InputError("Please specify either 'R1_suffix' and 'R2_suffix' or 'bam_suffix' in the config file")
+		raise ValueError("Please specify either 'R1_suffix' and 'R2_suffix' or 'bam_suffix' in the config file")
 
 
 	return cat
@@ -492,7 +492,7 @@ def get_samples(config, dataset):
 			if len(samples) == 0:
 				print(f"warning: no files found for dataset {dataset}")
 		else:
-			raise InputError(f"please specify either 'bam_suffix' or 'R1_suffix' and 'R2_suffix' for dataset {dataset}")
+			raise ValueError(f"please specify either 'bam_suffix' or 'R1_suffix' and 'R2_suffix' for dataset {dataset}")
 			
 		return samples, is_bam
 
