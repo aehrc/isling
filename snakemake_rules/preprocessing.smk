@@ -197,7 +197,7 @@ rule dedupe:
 		nodes = 1 # need this for pearcey so that job doesn't get split over multiple nodes
 	shell:
 		"""
-		clumpify.sh -Xmx{params.mem_mb}m in1={input.r1} in2={input.r2} out1={output.r1_dedup} out2={output.r2_dedup} dedupe=t ac=f subs={params.n_subs}{threads}
+		clumpify.sh -Xmx{params.mem_mb}m in1={input.r1} in2={input.r2} out1={output.r1_dedup} out2={output.r2_dedup} dedupe=t ac=f subs={params.n_subs} threads={threads}
 		"""
 
 rule count_fastq:
