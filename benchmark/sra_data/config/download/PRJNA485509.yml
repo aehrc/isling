@@ -1,3 +1,0 @@
-proj: "PRJNA485509"
-accListFile: "data/metadata/PRJNA485509/SRR_Acc_List.txt"
-sra_config: "config/download/sra.yml"
