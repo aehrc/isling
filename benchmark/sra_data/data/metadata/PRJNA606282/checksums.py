@@ -8,6 +8,8 @@ import os
 ena=sys.argv[1]
 
 with open(ena, 'r') as enafile:
+	enafile.readline()
+
 	for line in enafile:
 		parts = line.strip().split('\t')
 		sums = parts[6].split(";")
