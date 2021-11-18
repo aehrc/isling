@@ -1,5 +1,15 @@
 # scripts for common tasks for analysing external data
 
+lc <- function(f) {
+  return(
+  system2(c("wc", "-l", f), stdout=TRUE) %>% 
+    stringr::str_split("\\s") %>% 
+    purrr::pluck(1) %>% 
+    purrr::pluck(1) %>% 
+    as.integer()
+  )
+}
+
 # import isling results
 importIslingMergedSRA <- function(isling_dir, meta) {
   
@@ -18,15 +28,18 @@ importIslingMergedSRA <- function(isling_dir, meta) {
     ReadIDs = col_character()
   )
   
+  
   isling_df <- tibble(
-    f = list.files(isling_dir, isling_suffix, recursive=TRUE),
-    data = map(f, ~read_tsv(file.path(isling_dir,.), col_types = coltypes))
-  )  %>% 
-    mutate(Run = str_split(basename(f), "\\.", simplify=TRUE)[,1]) %>% 
-    mutate(host = str_split(basename(f), "\\.", simplify=TRUE)[,2]) %>%   
-    mutate(virus = str_split(basename(f), "\\.", simplify=TRUE)[,3])  %>% 
-    mutate(params = basename(dirname(dirname(f)))) %>% 
-    left_join( meta, by="Run") %>% 
+    f = list.files(isling_dir, isling_suffix, recursive=TRUE, full.names=TRUE),
+  )  %>%
+    mutate(lc = map_int(f, lc)) %>% 
+    filter(lc > 1)  %>% 
+    mutate(data = map(f, ~read_tsv(., col_types = coltypes)))  %>%
+    mutate(Run = str_split(basename(f), "\\.", simplify=TRUE)[,1]) %>%
+    mutate(host = str_split(basename(f), "\\.", simplify=TRUE)[,2]) %>%
+    mutate(virus = str_split(basename(f), "\\.", simplify=TRUE)[,3])  %>%
+    mutate(params = basename(dirname(dirname(f)))) %>%
+    left_join( meta, by="Run") %>%
     unnest(data)
   
   return(isling_df)
@@ -55,14 +68,18 @@ importIslingVirusAmbig <- function(isling_dir, meta) {
     ViralMapQ = col_double()
   )
   
+  
   isling_df <- tibble(
-    f = list.files(isling_dir, isling_suffix, recursive=TRUE),
-    data = map(f, ~read_tsv(file.path(isling_dir,.), col_types = coltypes, na = c("", "NA", "None"))))  %>% 
-    mutate(Run = str_split(basename(f), "\\.", simplify=TRUE)[,1]) %>% 
-    mutate(host = str_split(basename(f), "\\.", simplify=TRUE)[,2]) %>%   
-    mutate(virus = str_split(basename(f), "\\.", simplify=TRUE)[,3])  %>% 
-    mutate(params = basename(dirname(dirname(f)))) %>% 
-    left_join( meta, by="Run") %>% 
+    f = list.files(isling_dir, isling_suffix, recursive=TRUE, full.names=TRUE),
+  )  %>%
+    mutate(lc = map_int(f, lc)) %>% 
+    filter(lc > 1)  %>% 
+    mutate(data = map(f, ~read_tsv(., col_types = coltypes)))  %>%
+    mutate(Run = str_split(basename(f), "\\.", simplify=TRUE)[,1]) %>%
+    mutate(host = str_split(basename(f), "\\.", simplify=TRUE)[,2]) %>%
+    mutate(virus = str_split(basename(f), "\\.", simplify=TRUE)[,3])  %>%
+    mutate(params = basename(dirname(dirname(f)))) %>%
+    left_join( meta, by="Run") %>%
     unnest(data)
   
   
@@ -92,14 +109,18 @@ importIslingHostAmbig <- function(isling_dir, meta) {
     ViralMapQ = col_double()
   )
   
+
   isling_df <- tibble(
-    f = list.files(isling_dir, isling_suffix, recursive=TRUE),
-    data = map(f, ~read_tsv(file.path(isling_dir,.), col_types = coltypes, na = c("", "NA", "None"))))  %>% 
-    mutate(Run = str_split(basename(f), "\\.", simplify=TRUE)[,1]) %>% 
-    mutate(host = str_split(basename(f), "\\.", simplify=TRUE)[,2]) %>%   
-    mutate(virus = str_split(basename(f), "\\.", simplify=TRUE)[,3])  %>% 
-    mutate(params = basename(dirname(dirname(f)))) %>% 
-    left_join( meta, by="Run") %>% 
+    f = list.files(isling_dir, isling_suffix, recursive=TRUE, full.names=TRUE),
+  )  %>%
+    mutate(lc = map_int(f, lc)) %>% 
+    filter(lc > 1)  %>% 
+    mutate(data = map(f, ~read_tsv(., col_types = coltypes)))  %>%
+    mutate(Run = str_split(basename(f), "\\.", simplify=TRUE)[,1]) %>%
+    mutate(host = str_split(basename(f), "\\.", simplify=TRUE)[,2]) %>%
+    mutate(virus = str_split(basename(f), "\\.", simplify=TRUE)[,3])  %>%
+    mutate(params = basename(dirname(dirname(f)))) %>%
+    left_join( meta, by="Run") %>%
     unnest(data)
   
   
@@ -290,11 +311,19 @@ importVifiSRA <- function(vifi_dir, meta) {
   return(left_join(vifi, meta, by="Run"))
 }
 
+test_func <- function(g) {
+  print(g)
+}
+
 importSeeksv <- function(seeksv_dir, host_fai, remove_chr=FALSE) {
   
   seeksv_pattern <- ".integrations.txt"
   
-  files <- list.files(seeksv_dir, pattern = seeksv_pattern)
+  files <- list.files(seeksv_dir, pattern = seeksv_pattern, full.names=TRUE, recursive=TRUE)
+ 
+  if (length(files) == 0) {
+    stop("no files found")
+  }
   
   print(glue::glue("importing {length(files)} files"))
   
@@ -332,13 +361,17 @@ importSeeksv <- function(seeksv_dir, host_fai, remove_chr=FALSE) {
   
   # import seeksv data and filter for integrations
   seeksv <- tibble::tibble(
-    f = file.path(seeksv_dir, files),
-    Run = str_split(basename(f), "\\.", simplify=TRUE)[,1],
-    params = "seeksv",
-    data = map(f, ~read_tsv(., col_types = coltypes))
-  ) %>% 
+    f = files,
+    params = "seeksv"
+    )
+  
+  seeksv <- seeksv %>% 
+    mutate(Run = str_split(basename(f), "\\.", simplify=TRUE)[,1]) %>% 
+    mutate(lc = map_int(f, lc)) %>% 
+    filter(lc > 1) %>% 
+    mutate(data = map(f, ~read_tsv(., col_types = coltypes))) %>% 
     tidyr::unnest(data)  
-
+    
   if (remove_chr) {
     seeksv <- seeksv %>% 
       mutate(`@left_chr` = str_replace(`@left_chr`, "chr", "")) %>% 
@@ -517,6 +550,7 @@ writeBedFiles <- function(ints, dir, tool) {
       if (nrow(to_write) == 0) {
         system(glue::glue("touch {filename}"))
       } else {
+        print(glue::glue("writing {nrow(to_write)} integrations to {filename}"))
         write_tsv(to_write, filename, col_names = FALSE)
         tmp <- glue::glue("{filename}.tmp")
         system(glue::glue("sort -k1,1 -k2,2n {filename} > {tmp}"))
@@ -657,11 +691,18 @@ compareBedFiles <- function(experimental_dir, params, validated_dir, bedtools) {
       
       # construct output filename
       out_file <- file.path(params_dir, glue::glue("{run}.closest.bed"))
-
-      # do closeset
-      system(glue::glue('printf "chr_ref\tstart_ref\tstop_ref\tori_ref\tint_site_ref\tChr\tIntStart\tIntStop\tid\td\n" > {out_file}'))
-      cmd <- glue::glue("{bedtools} closest -d -t first -a {a_file} -b {b_file} >> {out_file}")
-      system(cmd)
+      
+      if (length(a_file) == 0) {
+        print(glue::glue("skipping {b_file} because the corresponding validated data is not available"))
+      } else {
+        
+        # do closeset
+        cmd <- glue::glue('printf "chr_ref\tstart_ref\tstop_ref\tori_ref\tint_site_ref\tChr\tIntStart\tIntStop\tid\td\n" > {out_file}')
+        system(cmd)
+        
+        cmd <- glue::glue("{bedtools} closest -d -t first -a {a_file} -b {b_file} >> {out_file}")
+        system(cmd)
+      }
       
     }
   }
@@ -687,12 +728,12 @@ importComparison <- function(experimental_dir, params) {
     params = params, 
     path = file.path(experimental_dir, params),
     files = map(path, ~list.files(., pattern = ".closest.bed"))
-  ) %>% 
-    unnest(files) %>% 
-    mutate(run = str_split(basename(files), "\\.", simplify=TRUE)[,1]) %>% 
-    mutate(data = map2(files, path, ~read_tsv(file.path(.y, .x), 
-                                              col_types=colnames, 
-                                              na = c("", "NA", '.')))) %>% 
+  ) %>%
+    unnest(files) %>%
+    mutate(run = str_split(basename(files), "\\.", simplify=TRUE)[,1]) %>%
+    mutate(data = map2(files, path, ~read_tsv(file.path(.y, .x),
+                                              col_types=colnames,
+                                              na = c("", "NA", '.')))) %>%
     unnest(data)
   return(intersect)
   
