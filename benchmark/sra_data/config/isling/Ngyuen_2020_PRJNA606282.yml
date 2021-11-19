@@ -19,9 +19,10 @@ global:
   host_name: "canFam3"
   host_fasta: "benchmark/sra_data/data/references/Canis_lupus_familiaris.CanFam3.1.dna.toplevel.fa"
   align-cpus: 5
+  bwa-mem: " -k 13-a -Y -A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -U 9 -T 10 -h 1,200"
 
   mean-frag-len: "estimate"
-  clip-cutoff: 20
+  clip-cutoff: 14
   cigar-tol: 3
   alt-edit-dist-thresh: 3
     
@@ -33,7 +34,11 @@ global:
   generate-report: False
   
   filter:
-    - "True"
+    - "HostEditDist <= 5 and ViralEditDist <= 5"
+    - "NoAmbiguousBases < 20 or Type == discordant"
+    - "PossibleHostTranslocation == False"
+    - "PossibleVectorRearrangement == False"
+
 
 # negative control
 all_vectors:
