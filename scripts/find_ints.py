@@ -1605,7 +1605,7 @@ class AlignmentPool(list):
 			
 		try:
 			md = read.get_tag('MD')
-		except KeyEror:
+		except KeyError:
 			md = None
 
 		pos_offset = 0
