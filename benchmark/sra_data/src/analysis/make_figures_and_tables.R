@@ -7,7 +7,7 @@ source("support_funcs.R")
 
 #### paths and setup ####
 
-bedtools <- "/apps/bedtools/2.29.2/bin/bedtools"   
+bedtools <- "/apps/bedtools/2.30.0/bin/bedtools"   
 
 nelson_metadata_dir <- "../../data/metadata/PRJNA485509/"
 nelson_sra_run_table <- file.path(nelson_metadata_dir, "SraRunTable.txt")
@@ -119,8 +119,7 @@ nelson_poly_intersects <- importComparison(tmpdir, params)
 print("starting analysis of Nelson results for seeksv")
 
 # import seeksv
-nelson_seeksv <- importSeeksvSRA(nelson_seeksv_dir, nelson_meta, nelson_host_fai) %>% 
-  filter(str_detect(left_chr, "paragRNA1") | str_detect(right_chr, "paragRNA1"))
+nelson_seeksv <- importSeeksvSRA(nelson_seeksv_dir, nelson_meta, nelson_host_fai)
 
 # compare against published sites
 nelson_seeksv_write <- nelson_seeksv %>% 
@@ -146,8 +145,10 @@ nelson_vseq_dir <- nelson_vseq_dirs[2]
 nelson_vseq2 <- importVseqToolkitSRA(nelson_vseq_dir, nelson_meta) %>% 
   mutate(params = "VSeq_no_vec_vec_fusion")
 
-nelson_vseq <- bind_rows(nelson_vseq, nelson_vseq2) %>% 
-  filter(str_detect(VectorName, "paragRNA1"))
+nelson_vseq <- bind_rows(nelson_vseq, nelson_vseq2) 
+
+#%>% 
+#  filter(str_detect(VectorName, "paragRNA1"))
 
 # compoare with published
 nelson_vseq_write <- nelson_vseq %>% 
