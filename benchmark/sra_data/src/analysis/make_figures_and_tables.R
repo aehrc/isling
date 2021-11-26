@@ -1123,6 +1123,77 @@ ngyuen_found_5 <- ngyuen_validated_results  %>%
          `Total sites`, isling,
          Polyidus, seeksv)
 
+thresh <- 100
+ngyuen_found_100 <- ngyuen_validated_results  %>% 
+  pivot_longer(isling:seeksv, names_to = "condition", values_to = "distance") %>% 
+  mutate(found = case_when(
+    distance > thresh ~ FALSE,
+    distance < 0 ~ FALSE,
+    is.na(distance) ~ FALSE,
+    TRUE ~ TRUE
+  )) %>% 
+  group_by(condition) %>% 
+  summarise(Accession = "PRJNA606282",
+            Host = "Dog (camFam3)",
+            Virus = "AAV-cFVIII therapy",
+            `Library type` = "Nested PCR / Amplicon",
+            `Distance threshold` = thresh, 
+            `Total sites` = n(),
+            n_found = sum(found)
+  ) %>% 
+  pivot_wider(names_from = condition, values_from = n_found) %>% 
+  rename(Polyidus = polyidus) %>% 
+  select(Accession, Host, Virus, `Library type`, `Distance threshold`, 
+         `Total sites`, isling,
+         Polyidus, seeksv)
+
+thresh <- 5
+ngyuen_found_5_notvalidated <- ngyuen_results  %>% 
+  pivot_longer(isling:seeksv, names_to = "condition", values_to = "distance") %>% 
+  mutate(found = case_when(
+    distance > thresh ~ FALSE,
+    distance < 0 ~ FALSE,
+    is.na(distance) ~ FALSE,
+    TRUE ~ TRUE
+  )) %>% 
+  group_by(condition) %>% 
+  summarise(Accession = "PRJNA606282",
+            Host = "Dog (camFam3)",
+            Virus = "AAV-cFVIII therapy",
+            `Library type` = "Nested PCR / Amplicon",
+            `Distance threshold` = thresh, 
+            `Total sites` = n(),
+            n_found = sum(found)
+  ) %>% 
+  pivot_wider(names_from = condition, values_from = n_found) %>% 
+  rename(Polyidus = polyidus) %>% 
+  select(Accession, Host, Virus, `Library type`, `Distance threshold`, 
+         `Total sites`, isling,
+         Polyidus, seeksv)
+
+thresh <- 100
+ngyuen_found_100_notvalidated <- ngyuen_results  %>% 
+  pivot_longer(isling:seeksv, names_to = "condition", values_to = "distance") %>% 
+  mutate(found = case_when(
+    distance > thresh ~ FALSE,
+    distance < 0 ~ FALSE,
+    is.na(distance) ~ FALSE,
+    TRUE ~ TRUE
+  )) %>% 
+  group_by(condition) %>% 
+  summarise(Accession = "PRJNA606282",
+            Host = "Dog (camFam3)",
+            Virus = "AAV-cFVIII therapy",
+            `Library type` = "Nested PCR / Amplicon",
+            `Distance threshold` = thresh, 
+            `Total sites` = n(),
+            n_found = sum(found)
+  ) %>% 
+  pivot_wider(names_from = condition, values_from = n_found) %>% 
+  rename(Polyidus = polyidus) %>% 
+  select(Accession, Host, Virus, `Library type`, `Distance threshold`, 
+         `Total sites`, isling,
+         Polyidus, seeksv)
 
 summary <- bind_rows(
   sung_found_5,
@@ -1130,7 +1201,10 @@ summary <- bind_rows(
   lau_found_8,
   nelson_found_5,
   nelson_found_100,
-  ngyuen_found_5
+  ngyuen_found_5,
+  ngyuen_found_100,
+  ngyuen_found_5_notvalidated,
+  ngyuen_found_100_notvalidated
 ) 
 
 
