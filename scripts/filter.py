@@ -105,6 +105,8 @@ class Criteria():
 	
 	def __init__(self, criteria_list, column_spec=columns):
 	
+		print(criteria_list)
+		
 		assert isinstance(criteria_list, list)
 		assert isinstance(column_spec, dict)
 		for value in column_spec.values():
@@ -451,8 +453,11 @@ class Criteria():
 		
 		# open paren not followed by column name or another open paren is invalid
 		if not (next_term in self.column_spec.keys() or next_term == '(' or next_term == 'not'):
+			pdb.set_trace()
 			raise ValueError("Invalid criteria: "
-			"Open parentheses must be followed by 'not', a column name or another open parenthesis")
+			"Open parentheses must be followed by 'not', a column name or another open parenthesis"
+			f"\n Allowed column names are: {self.column_spec.keys()}"
+			)
 		
 		# open paren not preceeded by 'and', 'or', or 'not' or another open paren is invalid
 		if i > 0:

@@ -25,3 +25,9 @@ fi
 if [ ! -e mm10_no_alt_analysis_set_ENCODE.fasta.fai ] ; then
 	samtools faidx mm10_no_alt_analysis_set_ENCODE.fasta
 fi
+
+#canFam3
+
+  wget http://ftp.ensembl.org/pub/release-104/fasta/canis_lupus_familiaris/dna/Canis_lupus_familiaris.CanFam3.1.dna.toplevel.fa.gz
+  gunzip Canis_lupus_familiaris.CanFam3.1.dna.toplevel.fa.gz
+  

@@ -313,6 +313,11 @@ def get_samples(config):
 	samples = {}
 	## return a dict with datasets as key and sample names as values
 	for dataset in config:
+	
+		if 'samples' in config[dataset]:
+			samples[dataset] = config[dataset]['samples']
+			continue
+	
 		read_dir = path.normpath(config[dataset]['read_directory'])
 		samps = glob(path.join(read_dir, f"*{config[dataset]['R1_suffix']}"))
 		# strip directory and suffix

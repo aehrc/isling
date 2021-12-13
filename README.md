@@ -1,12 +1,14 @@
 # Isling
 
+<img src="report_illustrations/logo.png" width="100%" height="100%">
+
 Isling is a tool for detecting viral or vector integration in paired-end reads.
 
 # Overview
 
 The pipeline performs several steps in order to identify integration sites.  It takes as input datasets consisting of either fastq files or bam files. It does some pre-processing of the reads (merging overlapping reads, optional) and then aligns them to both a host and a viral sequence.  Reads are first aligned to the viral sequence(s), and then aligned reads are extracted and aligned to the host.  These alignments are used to identify viral integrations.
 
-<img src="report_illustrations/overview.png" width="50%" height="50%">
+<img src="report_illustrations/workflow_landscape.png" width="100%">
 
 # Dependencies
 Isling requires `snakemake` and either `singularity` (recommended) or `conda` to supply dependencies.  Additionaly, `python` version 3.5 or above and `pandas` are required (these should be automatically installed if installing `snakemake` with `conda`.
@@ -21,11 +23,19 @@ To run with the (included) test data locally, run:
 snakemake --configfile test/config/test.yml --cores <cores>
 ```
 
+Alternatively, if you have docker installed, on MacOS you can run:
+
+```
+docker run --rm -it -v"$(pwd)"/out:/opt/isling/out szsctt/isling:latest snakemake --configfile test/config/test.yml --cores 1
+```
+
+This will use the config file and data inside the container, and the results will appear in a folder called `out` in your current working directory.  On Linux, you will need to run this command as root, and on Windows you will need to adjust the [bind-mount syntax](https://docs.docker.com/storage/bind-mounts/) (`-v` argument).
+
 ## Inputs
 
 A config file, as well as the host and viral/vector references, and reads are required inputs.  Specify all inputs in a config file.
 
-See the file `config.md` for a description of the format of this config file.
+See the file `configfile.md` for a description of the format of this config file.
 
 ## Outputs
 
@@ -44,7 +54,7 @@ For each sample, there are a number of output files, which may be of interest fo
  - `<sample>.<host>.<virus>.integrations.post.host_ambig.txt`: information about detected junctions that passed all filters and have an unambiguous location vector/virus but ambiguous location in host
  - `<sample>.<host>.<virus>.integrations.post.virus_ambig.txt`: information about detected junctions that passed all filters and have an unambiguous location host but ambiguous location in vector/virus
  - `<sample>.<host>.<virus>.integrations.post.both_ambig.txt`: information about detected junctions that passed all filters and have an ambiguous location in both host and vector/virus
-	
+
 ### Columns
 
 The output files give the location of the identified integrations, and their properties.  Coordinates for integration junctions are specified in terms of their ambiguous bases.  That is, there is often a gap or overlap between the host and viral portions of a read:

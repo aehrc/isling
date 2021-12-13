@@ -1,0 +1,77 @@
+snakedir: "."
+
+global:
+  read_folder: "benchmark/sra_data/data/reads/PRJNA606282/"
+  out_dir: "benchmark/sra_data/out/Ngyuen_2020_PRJNA606282/isling"
+  R1_suffix: "_1.fastq.gz"
+  R2_suffix: "_2.fastq.gz"
+  read1-adapt: ""
+  read2-adapt: ""
+
+  dedup: False  
+  dedup-subs: 2
+  
+  split: 1
+  
+  merge: False
+  trim: False
+  
+  host_name: "canFam3"
+  host_fasta: "benchmark/sra_data/data/references/Canis_lupus_familiaris.CanFam3.1.dna.toplevel.fa"
+  align-cpus: 5
+  bwa-mem: " -k 13-a -Y -A 1 -B 2 -O 6,6 -E 1,1 -L 0,0 -U 9 -T 10 -h 1,200"
+
+  mean-frag-len: "estimate"
+  clip-cutoff: 14
+  cigar-tol: 3
+  alt-edit-dist-thresh: 3
+    
+  merge-method: 'common'
+  min-n-merge: 1
+
+  mapq-thresh: 20
+
+  generate-report: False
+  
+  filter:
+    - "HostEditDist <= 5 and ViralEditDist <= 5"
+    - "NoAmbiguousBases < 20 or Type == discordant"
+    - "PossibleHostTranslocation == False"
+    - "PossibleVectorRearrangement == False"
+
+
+# negative control
+all_vectors:
+  virus_name: "Ngyuen_vectors"
+  virus_fasta: "benchmark/sra_data/data/references/Ngyuen_vectors.fasta"
+  samples:
+    - SRR11074331
+
+two_chain:
+  virus_name: "Ngyuen_two_chain"
+  virus_fasta: "benchmark/sra_data/data/references/Ngyuen_dual_vectors.fasta"
+  samples:
+    - SRR11074332
+    - SRR11074333
+    - SRR11074334
+    - SRR11074344
+    - SRR11074345
+    - SRR11074346
+    - SRR11074347
+    - SRR11074348
+    - SRR11074349
+
+one_chain:
+  virus_name: "Ngyuen_single_chain"
+  virus_fasta: "benchmark/sra_data/data/references/Ngyuen_single_vector.fasta"
+  samples:
+    - SRR11074335
+    - SRR11074336
+    - SRR11074337
+    - SRR11074341
+    - SRR11074342
+    - SRR11074343
+    - SRR11074339
+    - SRR11074350
+    - SRR11074351
+

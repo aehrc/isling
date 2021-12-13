@@ -28,7 +28,7 @@ filter_default = ["NoAmbiguousBases < 20 or Type == discordant",
 bed_exclude_default = []
 bed_include_default = []
 mapq_thresh_default = 20
-report_default = True
+report_default = False
 
 
 #### check file extensions ####
@@ -44,16 +44,17 @@ merge_methods = {'exact', 'common'}
 
 #### get information for wildcards ####
 
-# get the name of each sample in each dataset, and save information about 
+# get the name of each sample in each dataset, and save information about
 # how to process it in a dataframe
 
 def make_df(config):
 
 	# global options are specified with as a 'dataset' with the name 'global'
 	# values in this dataset are applied to keys which are unset in the remaining datasets
-	if 'global' in config:		
+	if 'global' in config:
 		# get default (global) options
 		default = config.pop('global')
+		bucket = config.pop('bucket')
 		for dataset in config:
 			for key in default:
 				if key not in config[dataset]:
@@ -62,14 +63,15 @@ def make_df(config):
 	rows = []
 
 	for dataset in config:
-	
+
 		cat = check_read_suffixes(config, dataset)
-		
+
 		# get output directory
 		outdir = get_value_or_default(config, dataset, 'out_dir', getcwd())
-		outdir = path.abspath(path.normpath(outdir))
+		if bucket == "": # Check if local execution "" or cloud computing "<bucket_name>"
+			outdir = path.abspath(path.normpath(outdir))
 		config[dataset]['out_dir'] = outdir
-		
+
 		# get read directory
 		readdir = check_required(config, dataset, 'read_folder')
 		readdir = path.normpath(readdir)
@@ -81,13 +83,12 @@ def make_df(config):
 			trim = 1
 		else:
 			trim = check_bools(config, dataset, 'trim')
-	
-		
-		# get host and virus 
-		# host and virus can either be spcified as 'host_name' (mandatory) and 
+
+		# get host and virus
+		# host and virus can either be spcified as 'host_name' (mandatory) and
 		# either 'host_prefix' or 'host_fasta' 
 		# ('virus_name', 'virus_fasta', 'virus_prefix' in the case of viral reference), 
-		
+
 		# or in 'host'/'virus', where the key is the name of the host/virus and the 
 		# value is the path the the fasta (for fasta input), or 'host_prefixes'/'virus_preifxes'
 		# in the case of pre-indexed references
@@ -413,12 +414,12 @@ def check_read_suffixes(config, dataset):
 		
 			# check that input looks like a fastq files
 			if R1_second_extension not in fastq_extensions or R2_second_extension not in fastq_extensions:
-				raise InputError("input files do not look like fastq files (extension is not '.fq' or '.fastq'")
+				raise ValueError("input files do not look like fastq files (extension is not '.fq' or '.fastq'")
 
 			
 		# if uncompressed, check file looks like fastq file
 		elif R1_first_extension not in fastq_extensions or R2_first_extension not in fastq_extensions:
-			raise InputError("for fastq files, input file extensions must be '.fastq' or '.fq'")
+			raise ValueError("for fastq files, input file extensions must be '.fastq' or '.fq'")
 
 	# if input is bam
 	elif "bam_suffix" in config[dataset]:
@@ -426,11 +427,11 @@ def check_read_suffixes(config, dataset):
 		if extension != ".bam" and extension != ".sam":
 			extension = path.splitext(config[dataset]["bam_suffix"])[1]
 			if extension != ".bam" and extension != ".sam":
-				raise InputError("For aligned input, only '.bam' and '.sam' files are currently supported")
+				raise ValueError("For aligned input, only '.bam' and '.sam' files are currently supported")
 	
 	# if nether R1/R2 suffix or bam suffix specified
 	else:
-		raise InputError("Please specify either 'R1_suffix' and 'R2_suffix' or 'bam_suffix' in the config file")
+		raise ValueError("Please specify either 'R1_suffix' and 'R2_suffix' or 'bam_suffix' in the config file")
 
 
 	return cat
@@ -491,7 +492,7 @@ def get_samples(config, dataset):
 			if len(samples) == 0:
 				print(f"warning: no files found for dataset {dataset}")
 		else:
-			raise InputError(f"please specify either 'bam_suffix' or 'R1_suffix' and 'R2_suffix' for dataset {dataset}")
+			raise ValueError(f"please specify either 'bam_suffix' or 'R1_suffix' and 'R2_suffix' for dataset {dataset}")
 			
 		return samples, is_bam
 

@@ -69,7 +69,7 @@ Nelson_2019_PRJNA485509:
      idenVecGen: 95
      clusterRange: 3
      host_table:
-       GRCm38: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt"
+       GRCm38: "../../data/references/mouse_genes_vseq_toolkit.txt"
        
 Nelson_2019_PRJNA485509_vseq_novecvecfusion:
    read_directory: "../../data/reads/PRJNA485509/"
@@ -105,4 +105,4 @@ Nelson_2019_PRJNA485509_vseq_novecvecfusion:
      idenVecGen: 95
      clusterRange: 3
      host_table:
-       GRCm38: "$VSeqToolkit/testDir/testReferenceIndex/refSeqUCSCTablehg38.txt"
+       GRCm38: "../../data/references/mouse_genes_vseq_toolkit.txt"
