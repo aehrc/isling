@@ -78,7 +78,7 @@ class IntegrationFile(list):
 			print(f"integration file is empty!")
 			return
 			
-		self.fields = header.strip().split('\t')
+		self.fields = header.strip().split()
 		
 		alt_locs = []
 		
@@ -216,7 +216,6 @@ class Cluster(list):
 		
 		print([str(i) for i in self.coords])
 		
-		pdb.set_trace()
 		
 class Integration(dict):
 	"""
@@ -228,7 +227,7 @@ class Integration(dict):
 		An Integration is initialised from a line from a file containing integrations
 		"""
 	
-		props = line.strip().split("\t")
+		props = line.strip().split()
 		assert len(header) == len(props)
 		
 		for i, field in enumerate(header):
