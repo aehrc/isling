@@ -1991,7 +1991,22 @@ class ChimericIntegration:
 		Check if an integration has ambiguous location in host genome (i.e. host part of
 		read has multiple equivalent alignments to different parts of host genome)
 		"""
-		return self._is_ambiguous_location(self.hread, self.hsec)
+		
+		# if no secondary alignments, is false
+		if len(self.hsec) == 0:
+			return False
+
+		# if no alternate locations, is false
+		alts = 	self._get_alt_ints()
+		if len(alts) == 0:
+			return False
+			
+		# if host read in all alternate locations is the same as primary host read, then not ambiguous
+		if all([self.hread == alt.hread for alt in alts]):
+			return False
+			
+		return True
+
 	
 	def is_possible_translocation(self):
 		""" 
@@ -2016,7 +2031,21 @@ class ChimericIntegration:
 		Check if an integration has ambiguous location in viral genome (i.e. viral part of
 		read has multiple equivalent alignments to different parts of viral genome)
 		"""	
-		return self._is_ambiguous_location(self.vread, self.vsec)
+		# if no secondary alignments, is false
+		if len(self.vsec) == 0:
+			return False
+
+		# if no alternate locations, is false
+		alts = 	self._get_alt_ints()
+		if len(alts) == 0:
+			return False
+			
+		# if host read in all alternate locations is the same as primary host read, then not ambiguous
+		if all([self.vread == alt.vread for alt in alts]):
+			return False
+			
+		return True
+
 		
 	def set_sec_alns(self, hsec, vsec):
 		"""
@@ -2257,52 +2286,7 @@ class ChimericIntegration:
 			return nm
 		
 		return nm + self._get_co_D_bases(co)
-				
-	def _is_ambiguous_location(self, read, sec):
-		"""  
-		An alignment is ambiguous if there's a secondary or supplementary alignment
-		that is equivalent to the primary one.
-		An equivalent alignment is one with the same CIGAR and edit distance
-		"""	
 
-		if len(sec) == 0:
-			return False
-			
-		# get edit distance for primary alignment
-		try:
-			primary_nm = read.get_tag('NM')
-		except KeyError:
-			primary_nm = None
-	
-		for sec_read in sec:
-		
-			# check for the same CIGAR
-			same_cigar = sec_read.cigartuples == read.cigartuples
-
-			# CIGAR must be the same
-			if not same_cigar:
-				continue
-				
-			# check for same edit distance
-			try:
-				sec_nm = sec_read.get_tag('NM')
-			except KeyError:
-				sec_nm = None
-			
-			if primary_nm is not None and sec_nm is not None:
-				if primary_nm != sec_nm:
-					continue 
-				
-			# check for different mapping position or strand
-			same_pos = sec_read.reference_start == read.reference_start
-			same_dir = sec_read.is_reverse == read.is_reverse
-						
-			# if position or strand is different, then location is ambiguous
-			if (not same_pos) or (not same_dir):
-				return True
-
-		# if we didn't find any equivalent alignments, location not ambiguous
-		return False
 		
 	def _is_possible_rearrangement(self, primary, sec):
 		""" 
