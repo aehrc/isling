@@ -1681,7 +1681,7 @@ class ChimericIntegration:
 	A class to store/calculate the properties of a simple chimeric integration 
 	(ie mapped/clipped and clipped/mapped) 
 	"""
-	__slots__ = 'map_thresh', 'primary', 'hread', 'vread', 'hsec', 'vsec', 'chr', 'virus', 'verbose', 'tol', 'nm_pc', 'nm_diff'
+	__slots__ = 'map_thresh', 'primary', 'hread', 'vread', 'hsec', 'vsec', 'chr', 'virus', 'verbose', 'tol', 'nm_pc', 'nm_diff', 'alt_ints'
 	
 	def __init__(self, host, virus, host_sec = AlignmentPool(), virus_sec = AlignmentPool(),  
 					 tol = 3, map_thresh=20, nm_diff=None,
@@ -1901,7 +1901,7 @@ class ChimericIntegration:
 		
 	def get_viral_coords(self):
 		""" Get coordinates of ambiguous bases in virus """
-		
+			
 		coords = self._get_ambig_coords_ref(self.vread)	
 		
 		return coords
@@ -2031,6 +2031,7 @@ class ChimericIntegration:
 		Check if an integration has ambiguous location in viral genome (i.e. viral part of
 		read has multiple equivalent alignments to different parts of viral genome)
 		"""	
+
 		# if no secondary alignments, is false
 		if len(self.vsec) == 0:
 			return False
@@ -2039,11 +2040,13 @@ class ChimericIntegration:
 		alts = 	self._get_alt_ints()
 		if len(alts) == 0:
 			return False
+
+
 			
 		# if host read in all alternate locations is the same as primary host read, then not ambiguous
 		if all([self.vread == alt.vread for alt in alts]):
 			return False
-			
+	
 		return True
 
 		
@@ -2076,7 +2079,7 @@ class ChimericIntegration:
 		props = (
 			f"{chr}:{hstart}-{hstop}",
 			ori,
-			f"{virus}:{vstart}-{vstart}",
+			f"{virus}:{vstart}-{vstop}",
 			vori,
 			str(n_ambig),
 			overlap_type,
@@ -2110,6 +2113,11 @@ class ChimericIntegration:
 		
 		Return a list of ChimericIntegration objects with alternative integrations
 		"""
+		
+		try:
+			return self.alt_ints
+		except AttributeError:
+			pass
 		
 		alt_ints = []
 		
@@ -2146,6 +2154,7 @@ class ChimericIntegration:
 		
 		alt_ints = self._filter_alt_ints(alt_ints)
 	
+		self.alt_ints = alt_ints
 		return alt_ints
 
 	def _get_ambig_coords_read(self):
