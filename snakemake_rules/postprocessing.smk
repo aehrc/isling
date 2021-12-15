@@ -149,10 +149,11 @@ rule separate_unique_locations:
 		kept = rules.post_final.output.kept
 	output:
 		unique = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.unique.txt",
+		at_least_one_ambig = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.atleastone.txt.tmp"),
+		one_ambig = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.one.txt.tmp"),
 		host_ambig = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.host_ambig.txt",
 		virus_ambig = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.virus_ambig.txt",
 		both_ambig = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.both_ambig.txt",
-		tmp_both = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.both_ambig.txt.tmp")
 	params:
 		mapq = lambda wildcards: int(get_value_from_df(wildcards, 'mapq_thresh'))
 	container:
@@ -167,22 +168,23 @@ rule separate_unique_locations:
 		python3 scripts/filter.py \
 		-i {input.kept} \
 		-k {output.unique} \
-		-e {output.both_ambig} \
-		-c 'HostMapQ > {params.mapq} and ViralMapQ > {params.mapq} and AltLocs == None'
+		-e {output.at_least_one_ambig} \
+		-c 'HostMapQ >= {params.mapq} and ViralMapQ >= {params.mapq} and HostAmbiguousLocation == False and ViralAmbiguousLocation == False'
 		
-		# get integrations that are only ambiguous in host (but not in virus)
+		# get both ambiguous itegrations as kept
 		python3 scripts/filter.py \
-		-i {output.both_ambig} \
-		-k {output.host_ambig} \
-		-e {output.tmp_both} \
-		-c 'ViralMapQ > {params.mapq} and AltLocs == uniqueVirus'	
-			
-		# get integrations that are only ambiguous in virus (but not in host)
+		-i {output.at_least_one_ambig} \
+		-k {output.both_ambig} \
+		-e {output.one_ambig} \
+		-c '(HostMapQ < {params.mapq} or HostAmbiguousLocation == True) and (ViralMapQ < {params.mapq} or ViralAmbiguousLocation == True)'
+		
+		# kept > ambiguous in virus, excluded > ambiguous in host
 		python3 scripts/filter.py \
-		-i {output.tmp_both} \
+		-i {output.one_ambig} \
 		-k {output.virus_ambig} \
-		-e {output.both_ambig} \
-		-c 'HostMapQ > {params.mapq} and AltLocs == uniqueHost'		
+		-e {output.host_ambig} \
+		-c '(ViralMapQ >= {params.mapq} and ViralAmbiguousLocation == False)'	
+
 		"""
 
 rule rmd_summary_dataset:
