@@ -183,7 +183,7 @@ rule separate_unique_locations:
 		-i {output.one_ambig} \
 		-k {output.virus_ambig} \
 		-e {output.host_ambig} \
-		-c '(ViralMapQ >= {params.mapq} and ViralAmbiguousLocation == False)'	
+		-c '(ViralMapQ < {params.mapq} or ViralAmbiguousLocation == True)'	
 
 		"""
 
