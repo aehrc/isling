@@ -2,7 +2,7 @@
 
 <img src="report_illustrations/logo.png" width="100%" height="100%">
 
-Isling is a tool for detecting viral or vector integration in paired-end reads.
+Isling is a tool for detecting viral or vector integration in paired-end reads.  Please read [our paper](https://www.sciencedirect.com/science/article/pii/S0022283621006458) for full details.
 
 # Overview
 
