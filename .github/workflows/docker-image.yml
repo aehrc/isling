@@ -31,10 +31,8 @@ jobs:
         name: Build and export to Docker
         uses: docker/build-push-action@v2
         with:
-#          context: .
           load: true
           tags: ${{ env.TEST_TAG }}
-#          file: ${{ github.workspace }}/Dockerfile
       -
         name: Test
         run: |
@@ -46,4 +44,3 @@ jobs:
         with:
           push: true
           tags: szsctt/isling:$(date +%s)
-          file: ${{ github.workspace }}/Dockerfile
