@@ -33,3 +33,5 @@ ADD test /opt/isling/test
 ADD run_tests.sh /opt/isling/
 
 WORKDIR /opt/isling
+
+CMD ./run_tests.sh
