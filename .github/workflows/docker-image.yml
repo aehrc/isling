@@ -31,10 +31,10 @@ jobs:
         name: Build and export to Docker
         uses: docker/build-push-action@v2
         with:
-          context: .
+#          context: .
           load: true
           tags: ${{ env.TEST_TAG }}
-          file: ${{ github.workspace }}/Dockerfile
+#          file: ${{ github.workspace }}/Dockerfile
       -
         name: Test
         run: |
