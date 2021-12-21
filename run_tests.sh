@@ -6,8 +6,8 @@ snakemake \
 	--forceall \
 	--configfile test/config/test.yml
 
-snakemake \
-	-j 1 \
-	--forceall \
-	--configfile test/config/test.yml \
-	--use-conda
+#snakemake \
+#	-j 1 \
+#	--forceall \
+#	--configfile test/config/test.yml \
+#	--use-conda
