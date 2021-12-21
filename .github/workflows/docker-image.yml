@@ -37,14 +37,20 @@ jobs:
         name: Test
         run: |
           docker run --rm ${{ env.TEST_TAG }}
-      - 
-       name: Get short git hash
-       id: short_hash
-       run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+      -
+        name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v3
+        with:
+          images: szsctt/isling
+          tags: |
+            type=raw,latest
+            type=sha
       -
         name: Build and push
         id: docker_build
         uses: docker/build-push-action@v2
         with:
           push: true
-          tags: szsctt/isling:git_${{ steps.short_hash.outputs.sha_short }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
