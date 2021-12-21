@@ -7,8 +7,7 @@ snakemake \
 	--configfile test/config/test.yml
 
 # container has micromamba, not mamba or conda, so we need a workaround
-shopt -s expand_aliases
-alias conda=/opt/conda/bin/conda
+export PATH="/opt/conda/bin/conda:$PATH" 
 
 snakemake \
 	-j 1 \
