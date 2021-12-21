@@ -34,6 +34,7 @@ jobs:
           context: .
           load: true
           tags: ${{ env.TEST_TAG }}
+          file: ./Dockerfile
       -
         name: Test
         run: |
@@ -45,3 +46,4 @@ jobs:
         with:
           push: true
           tags: szsctt/isling:$(date +%s)
+          file: ./Dockerfile
