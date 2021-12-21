@@ -5,6 +5,6 @@ channels:
   - defaults
   - conda-forge
 dependencies:
-  - bedtools=2.29
+  - bedtools=2.30
 
 
