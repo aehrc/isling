@@ -5,4 +5,3 @@ channels:
   - defaults
 dependencies:
   - genmap=1.2
-  - limgomp
