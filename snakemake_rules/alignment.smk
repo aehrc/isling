@@ -51,7 +51,7 @@ rule index:
 	conda: 
 		"../envs/bwa.yml"
 	container:
-		"docker://szsctt/bwa:1"
+		"docker://szsctt/isling:latest"
 	params:
 		prefix = lambda wildcards, output: path.splitext(output[0])[0]
 	resources:
@@ -192,7 +192,7 @@ rule extract_vAligned_paired:
 	conda:
 		"../envs/bwa.yml"
 	container:
-		"docker://szsctt/bwa:1"
+		"docker://szsctt/isling:latest"
 	shell:
 		"""
 		samtools view -hb -F 0x4 -f 0x8 -F 0x800 -o {output.pvBam_readMap_mateUnmap} {input.aligned}
@@ -229,7 +229,7 @@ rule align_bwa_host_single:
 	conda: 
 		"../envs/bwa.yml"
 	container:
-		"docker://szsctt/bwa:1"
+		"docker://szsctt/isling:latest"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 2, 2000),
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
@@ -254,7 +254,7 @@ rule align_bwa_host_paired:
 	conda: 
 		"../envs/bwa.yml"
 	container:
-		"docker://szsctt/bwa:1"
+		"docker://szsctt/isling:latest"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt, 2, 2000),
 		nodes = 1,
