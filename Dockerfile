@@ -15,8 +15,6 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 ENV DEBIAN_FRONTEND noninteractive
 RUN export DEBIAN_FRONTEND
 
-RUN apt-get upate && apt-get install -y libgomp1 && rm -rf /var/lib/apt/lists/*
-
 ADD scripts/consolidate_envs.py /opt/isling/scripts/
 ADD envs /opt/isling/envs/
 RUN micromamba install -n base -c anaconda pip pyyaml=5.3 -y &&\
