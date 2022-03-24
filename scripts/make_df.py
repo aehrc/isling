@@ -28,6 +28,8 @@ filter_default = ["NoAmbiguousBases < 20 or Type == discordant",
 bed_exclude_default = []
 bed_include_default = []
 mapq_thresh_default = 20
+genmap_k_default=20
+genmap_e_default=2
 report_default = False
 
 
@@ -121,6 +123,8 @@ def make_df(config):
 		bed_exclude = tuple(get_value_or_default(config, dataset, 'bed-exclude', bed_exclude_default))
 		bed_include = tuple(get_value_or_default(config, dataset, 'bed-include', bed_include_default))
 		mapq = get_value_or_default(config, dataset, 'mapq-threshold', mapq_thresh_default)
+                genmap_k = get_value_or_default(config, dataset, 'genmap_k', genmap_k_default)
+                genmap_e = get_value_or_default(config, dataset, 'genmap_e', genmap_e_default)
 		report = get_value_or_default(config, dataset, 'generate-report', report_default)
 
 		report = check_bools(config, dataset, 'generate-report')
@@ -132,6 +136,8 @@ def make_df(config):
 		check_int_gt(merge_n_min, -1, 'merge-n-min', dataset)
 		check_int_gt(split, 0, 'split', dataset)
 		check_int_gt(mapq, -1, 'mapq-threshold', dataset)
+                check_int_gt(genmap_k, 5, 'genmap_k', dataset)
+                check_int_gt(genmap_e, -1, 'genmap_e', dataset)
 		
 		if nm_diff is not None:
 			check_int_gt(nm_diff, -1, 'alt-edit-dist-thresh', dataset)
