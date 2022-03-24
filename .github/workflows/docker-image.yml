@@ -2,7 +2,10 @@ name: Docker Image CI
 
 on:
   push:
-    branches: [ master ]
+    branches:
+      - 'master'
+    tags:
+      - 'v*'
   pull_request:
     branches: [ master ]
 
@@ -43,9 +46,6 @@ jobs:
         uses: docker/metadata-action@v3
         with:
           images: szsctt/isling
-          tags: |
-            type=raw,latest
-            type=sha
       -
         name: Build and push
         id: docker_build
