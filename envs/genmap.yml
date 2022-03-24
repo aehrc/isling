@@ -4,4 +4,5 @@ channels:
   - r
   - defaults
 dependencies:
-  - genmap=1.2.
+  - genmap=1.2
+  - limgomp
