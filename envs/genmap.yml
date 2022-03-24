@@ -1,0 +1,7 @@
+name: genmap
+channels:
+  - bioconda
+  - r
+  - defaults
+dependencies:
+  - genmap=1.2.
