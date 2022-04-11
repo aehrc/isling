@@ -346,7 +346,7 @@ rule host_stats:
 		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	container:
-		"docker://szsctt/bwa:1"	
+		"docker://szsctt/isling:latest"
 	threads: 1
 	shell:
 		"""
