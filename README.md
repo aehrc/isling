@@ -28,7 +28,7 @@ docker run --rm -it -v"$(pwd)"/out:/opt/isling/out szsctt/isling:latest snakemak
 
 This will use the config file and data inside the container, and the results will appear in a folder called `out` in your current working directory.  On Linux, you will need to run this command as root, and on Windows you will need to adjust the [bind-mount syntax](https://docs.docker.com/storage/bind-mounts/) (`-v` argument).
 
-For your own data, you'll need to modify the config file - see `configfile.md`.
+The input data (reads and host and viral references) are specified ni a config file - for your own data, you'll need to modify the example config file (`test/config/test.yml`) to point to your own data. See `configfile.md` for more information about the format of the config file.
 
 # Overview
 
