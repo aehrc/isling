@@ -8,10 +8,16 @@ Isling is a tool for detecting viral or vector integration in paired-end reads. 
 
 # Quickstart
 
-To run with the (included) test data locally, run:
+If you have `conda` and `snakemake` installed, to run with the (included) test data locally:
 
 ```
-snakemake --configfile test/config/test.yml --cores <cores>
+snakemake --configfile test/config/test.yml --cores <cores> --use-conda
+```
+
+If you have `snakemake` and `singularity` installed, you can use instead:
+
+```
+snakemake --configfile test/config/test.yml --cores <cores> --use-singularity
 ```
 
 Alternatively, if you have docker installed, on MacOS you can run:
@@ -21,6 +27,8 @@ docker run --rm -it -v"$(pwd)"/out:/opt/isling/out szsctt/isling:latest snakemak
 ```
 
 This will use the config file and data inside the container, and the results will appear in a folder called `out` in your current working directory.  On Linux, you will need to run this command as root, and on Windows you will need to adjust the [bind-mount syntax](https://docs.docker.com/storage/bind-mounts/) (`-v` argument).
+
+For your own data, you'll need to modify the config file - see `configfile.md`.
 
 # Overview
 
@@ -33,27 +41,9 @@ Isling requires `snakemake` and either `singularity` (recommended) or `conda` to
 
 Alternativley, use the Docker version which contains isling and all dependencies.
 
-# Running
-
-To run with the (included) test data locally, run:
-
-```
-snakemake --configfile test/config/test.yml --cores <cores>
-```
-
-For your own data, you'll need to modifiy the config file.  See the file `configfile.md` for information about how to specify inputs.
-
-Alternatively, if you have docker installed, on MacOS or Linux you can run:
-
-```
-docker run --rm -it -v"$(pwd)"/out:/opt/isling/out szsctt/isling:latest snakemake --configfile test/config/test.yml --cores 1
-```
-
-This will use the config file and data inside the container, and the results will appear in a folder called `out` in your current working directory.  On Linux, you will need to run this command as root, and on Windows you will need to adjust the [bind-mount syntax](https://docs.docker.com/storage/bind-mounts/) (`-v` argument).
-
 ## Inputs
 
-A config file, as well as the host and viral/vector references, and reads are required inputs.  Specify all inputs in a config file.
+The required inputs are the config file, which specfies the host and viral/vector references, and reads are required.  Specify all inputs in a config file.  Isling currently only works for paired-end reads.
 
 See the file `configfile.md` for a description of the format of this config file.
 
