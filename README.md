@@ -6,6 +6,22 @@
 
 Isling is a tool for detecting viral or vector integration in paired-end reads.  Please read [our paper](https://www.sciencedirect.com/science/article/pii/S0022283621006458) for full details. 
 
+# Quickstart
+
+To run with the (included) test data locally, run:
+
+```
+snakemake --configfile test/config/test.yml --cores <cores>
+```
+
+Alternatively, if you have docker installed, on MacOS you can run:
+
+```
+docker run --rm -it -v"$(pwd)"/out:/opt/isling/out szsctt/isling:latest snakemake --configfile test/config/test.yml --cores 1
+```
+
+This will use the config file and data inside the container, and the results will appear in a folder called `out` in your current working directory.  On Linux, you will need to run this command as root, and on Windows you will need to adjust the [bind-mount syntax](https://docs.docker.com/storage/bind-mounts/) (`-v` argument).
+
 # Overview
 
 The pipeline performs several steps in order to identify integration sites.  It takes as input datasets consisting of either fastq files or bam files. It does some pre-processing of the reads (merging overlapping reads, optional) and then aligns them to both a host and a viral sequence.  Reads are first aligned to the viral sequence(s), and then aligned reads are extracted and aligned to the host.  These alignments are used to identify viral integrations.
@@ -25,7 +41,9 @@ To run with the (included) test data locally, run:
 snakemake --configfile test/config/test.yml --cores <cores>
 ```
 
-Alternatively, if you have docker installed, on MacOS you can run:
+For your own data, you'll need to modifiy the config file.  See the file `configfile.md` for information about how to specify inputs.
+
+Alternatively, if you have docker installed, on MacOS or Linux you can run:
 
 ```
 docker run --rm -it -v"$(pwd)"/out:/opt/isling/out szsctt/isling:latest snakemake --configfile test/config/test.yml --cores 1
