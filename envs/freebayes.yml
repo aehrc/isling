@@ -1,0 +1,7 @@
+name: freebayes
+channels:
+  - bioconda
+  - r
+  - defaults
+dependencies:
+  - freebayes=1.3
