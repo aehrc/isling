@@ -177,9 +177,33 @@ rule extract_to_fastq_single:
 		samtools view -h -F 0x4 -F 0x800 -F 0x100 -o - {input.aligned} | samtools fastq -0 {output.fastq}  
 		"""
 
-rule extract_to_fastq_paired:
+rule extract_vAligned_paired:
 	input:
 		aligned = lambda wildcards: get_sam(wildcards, "paired", "virus")
+	output:
+		pvBam_readMap_mateUnmap = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.L.bam"),
+		pvBam_readUnmap_mateMap = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.R.bam"),
+		pvBam_bothMapped = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.B.bam"),
+		bam = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.mapped.bam"),
+	resources:
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.2, 500)),
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		nodes = 1	
+	conda:
+		"../envs/bwa.yml"
+	container:
+		"docker://szsctt/isling:latest"
+	shell:
+		"""
+		samtools view -hb -F 0x4 -f 0x8 -F 0x100 -F 0x800 -o {output.pvBam_readMap_mateUnmap} {input.aligned}
+		samtools view -hb -f 0x4 -F 0x8 -F 0x100 -F 0x800 -o {output.pvBam_readUnmap_mateMap} {input.aligned}
+		samtools view -hb -F 0x4 -F 0x8 -F 0x100 -F 0x800 -o {output.pvBam_bothMapped} {input.aligned}
+		samtools merge {output.bam} {output.pvBam_readMap_mateUnmap} {output.pvBam_bothMapped} {output.pvBam_readUnmap_mateMap}
+		"""
+		
+rule extract_to_fastq_paired:
+	input:
+		bam = rules.extract_vAligned_paired.output.bam
 	output:
 		fastq1 = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.bwaPaired.mappedTo{virus}.1.fastq.gz"),
 		fastq2 = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.bwaPaired.mappedTo{virus}.2.fastq.gz")
@@ -193,9 +217,7 @@ rule extract_to_fastq_paired:
 		"docker://szsctt/isling:latest"
 	shell:
 		"""
-		samtools view -h -F 0x4 -F 0x8 -F 0x100 -F 0x800 {input.aligned} | \
-		 samtools collate -O - |\
-		 samtools fastq -1 {output.fastq1} -2 {output.fastq2} -
+		samtools collate -O {input.bam} | samtools fastq -1 {output.fastq1} -2 {output.fastq2}
 		"""
 
 rule align_bwa_host_single:
