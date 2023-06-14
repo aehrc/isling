@@ -133,7 +133,7 @@ rule check_bam_input_is_paired:
 		ok = temp("{outpath}/{dset}/reads/{samp}.tmp"),
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1.2, 300),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	conda:
 		"../envs/bwa.yml"
@@ -163,7 +163,7 @@ rule bam_to_fastq:
 		r2 = temp("{outpath}/{dset}/reads/{samp}_2.fq"),
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1.2, 1000),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	conda:
 		"../envs/bwa.yml"
@@ -193,7 +193,7 @@ rule dedupe:
 		"docker://szsctt/isling:latest"
 	resources:
 		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1, # need this for pearcey so that job doesn't get split over multiple nodes,
 	shell:
 		"""
@@ -212,7 +212,7 @@ rule count_fastq:
 		"docker://szsctt/isling:latest"
 	resources:
 		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 8, 500),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	shell:
 		"""
@@ -242,7 +242,7 @@ rule split_fastq:
 		cat = lambda wildcards: get_cat(wildcards),
 	resources:
 		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 0.5, 500, 5000),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	container:
 		"docker://szsctt/isling:latest"
@@ -277,7 +277,7 @@ rule seqPrep:
 		"docker://szsctt/isling:latest"
 	resources:
 		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 0.5, 500, 5000),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	params:
 		A = lambda wildcards: get_value_from_df(wildcards, "adapter_1"),
@@ -300,7 +300,7 @@ rule seqPrep_unmerged:
 		"docker://szsctt/isling:latest"
 	resources:
 		mem_mb = lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 0.5, 500, 5000),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	params:
 		A = lambda wildcards: get_value_from_df(wildcards, "adapter_1"),

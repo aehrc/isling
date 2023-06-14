@@ -8,7 +8,7 @@ rule post_filter:
 		filterstring = lambda wildcards: get_value_from_df(wildcards, 'filter')
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	container:
 		"docker://szsctt/isling:latest"
 	conda: "../envs/filter.yml"
@@ -38,7 +38,7 @@ rule exclude_bed:
 		excluded = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.removed2.txt"),
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	container:
 		"docker://szsctt/isling:latest"
 	conda:
@@ -83,7 +83,7 @@ rule include_bed:
 		excluded = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.removed3.txt"),
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	container:
 		"docker://szsctt/isling:latest"
 	conda:
@@ -135,7 +135,7 @@ rule post_final:
 		excluded = temp("{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.filter_fail.txt")
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	container:
 		"docker://szsctt/isling:latest"
 	shell:
@@ -161,7 +161,7 @@ rule separate_unique_locations:
 	conda: "../envs/filter.yml"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	shell:
 		"""
 		# get uniquely localised integrations as kept
@@ -237,7 +237,7 @@ rule rmd_summary_dataset:
 		rmd = "{outpath}/summary/{dset}.html"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 3, 1000)),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	params:
 		outfile = lambda wildcards, output: os.path.abspath(output.rmd),
 		host = lambda wildcards: toDo.loc[(toDo['dataset'] == wildcards.dset).idxmax(), 'host'],
@@ -304,7 +304,7 @@ rule rmd_summary:
 		rmd = "{outpath}/integration_summary.html"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 3, 1000)),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	params:
 		summary_dir = lambda wildcards, output: os.path.join(os.path.abspath(os.path.dirname(output.rmd)), "summary"),
 		datasets = lambda wildcards: ", ".join([f'"{i}"' for i in set(toDo['dataset'])]),
@@ -338,7 +338,7 @@ rule merged_bed:
 		"../envs/bedtools.yml"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5, 1000)),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	threads: 1
 	shell:
 		"""
@@ -366,7 +366,7 @@ rule summarise:
 		virus = lambda wildcards: set(toDo.loc[toDo['dataset'] == wildcards.dset,'virus']).pop()
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	threads: 1
 	shell:
 		"Rscript scripts/summarise_ints.R {params.host} {params.virus} {input} {params.outdir}"
@@ -391,7 +391,7 @@ rule ucsc_bed:
 		"docker://szsctt/isling:latest"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 3, 1000),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	threads: 1
 	shell:
 		"""

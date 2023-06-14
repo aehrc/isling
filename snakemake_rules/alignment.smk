@@ -56,7 +56,7 @@ rule index:
 		prefix = lambda wildcards, output: path.splitext(output[0])[0]
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.fa,), attempt, 5, 2000),
-		time = lambda wildcards, attempt: (5, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (5, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	shell:
 		"bwa index -p {params.prefix} {input.fa}"
@@ -73,7 +73,7 @@ rule align_bwa_virus_single:
 		single_RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.virus}_merged\\tSM:{wildcards.samp}\\tPM:merged'",
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt, 2, 2000),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	conda:
 		"../envs/bwa.yml"
@@ -98,7 +98,7 @@ rule align_bwa_virus_paired:
 		paired_RG = lambda wildcards: f"-R '@RG\\tID:{wildcards.samp}_{wildcards.virus}_unmerged\\tSM:{wildcards.samp}\\tPM:unmerged'"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt, 2, 2000),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	conda:
 		"../envs/bwa.yml"	
@@ -118,7 +118,7 @@ rule combine_bwa_virus:
 		combined = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bam"),
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1.2, 500),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	conda:
 		"../envs/bwa.yml"
@@ -163,7 +163,7 @@ rule extract_to_fastq_single:
 		fastq = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.bwaSingle.mappedTo{virus}.fastq.gz"),
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1.2, 500),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	conda:
 		"../envs/bwa.yml"
@@ -187,7 +187,7 @@ rule extract_vAligned_paired:
 		bam = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.{virus}.bwaPaired.mapped.bam"),
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.2, 500)),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1	
 	conda:
 		"../envs/bwa.yml"
@@ -209,7 +209,7 @@ rule extract_to_fastq_paired:
 		fastq2 = temp("{outpath}/{dset}/virus_aligned/{samp}.{part}.bwaPaired.mappedTo{virus}.2.fastq.gz")
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1.2, 500),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	conda:
 		"../envs/bwa.yml"
@@ -232,7 +232,7 @@ rule align_bwa_host_single:
 		"docker://szsctt/isling:latest"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 2, 2000),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	params:
 		index = lambda wildcards, input: os.path.splitext(input.idx[0])[0],
@@ -258,7 +258,7 @@ rule align_bwa_host_paired:
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input.idx, attempt, 2, 2000),
 		nodes = 1,
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	params:
 		index = lambda wildcards, input: os.path.splitext(input.idx[0])[0],
 		mapping = lambda wildcards: get_value_from_df(wildcards, 'bwa_mem_params'),
@@ -281,7 +281,7 @@ rule combine_host:
 		"docker://szsctt/isling:latest"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max((input.paired, input.single), attempt, 1.2, 500),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	shell:		
 		"""
@@ -303,7 +303,7 @@ rule merge_virus_sams:
 		"../envs/bwa.yml"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1.5),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	container:
 		"docker://szsctt/isling:latest"
@@ -324,7 +324,7 @@ rule merge_host_sams:
 		"../envs/bwa.yml"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 1.5),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	container:
 		"docker://szsctt/isling:latest"
@@ -343,7 +343,7 @@ rule host_stats:
 		"../envs/bwa.yml"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 0.5),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	container:
 		"docker://szsctt/isling:latest"
@@ -362,7 +362,7 @@ rule virus_stats:
 		"../envs/bwa.yml"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: resources_list_with_min_and_max(input, attempt, 0.5),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	container:
 		"docker://szsctt/isling:latest"

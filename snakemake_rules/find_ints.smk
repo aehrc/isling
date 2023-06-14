@@ -15,7 +15,7 @@ rule find_ints:
 		frag_len = lambda wildcards: get_value_from_df(wildcards, 'mean_frag_len')
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 		nodes = 1
 	container:
 		"docker://szsctt/isling:latest"
@@ -48,7 +48,7 @@ rule combine_ints:
 		all = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.txt"
 	resources:
 		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5)),
-		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+		runtime = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
 	container:
 		"docker://szsctt/isling:latest"
 	shell:
