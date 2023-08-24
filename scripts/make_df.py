@@ -48,6 +48,10 @@ merge_methods = {'exact', 'common'}
 
 def make_df(config):
 
+    bucket = ''
+    if 'bucket' in config:
+        bucket = config.pop('bucket')
+      
     # global options are specified with as a 'dataset' with the name 'global'
     # values in this dataset are applied to keys which are unset in the remaining datasets
     if 'global' in config:
@@ -57,9 +61,7 @@ def make_df(config):
             for key in default:
                 if key not in config[dataset]:
                     config[dataset][key] = default[key]
-    bucket = ''
-    if 'bucket' in config:
-        bucket = config.pop('bucket')
+
 
     rows = []
     for dataset in config:
