@@ -1,8 +1,5 @@
 name: filter
 channels:
-  - bioconda
-  - r
-  - defaults
   - conda-forge
 dependencies:
   - python
