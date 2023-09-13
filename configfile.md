@@ -5,10 +5,10 @@ A yaml config file is used to specify the data to be processed and parameters fo
 The first entry in the config file should be the key 'snakefile', with the value being the path to the directory containing the snakefile, for example:
 
 ```
-snakedir: "/scratch1/sco305/intvi_pipeline"
+snakedir: "/scratch1/sco305/isling"
 ```
 
-If snakemake is run from the intvi_pipeline directory (which contains the `Snakefile`), this key may be omitted, otherwise it is required.
+This entry is used if `isling` is run from anywhere else other than the `isling` directory. If snakemake is run from the isling directory (which contains the `Snakefile`), this key may be omitted, otherwise it is required.
 
 This should be followed by one block for each dataset to be processed.  All paths should be either absolute or relative to the directory containing the `Snakefile`. An example dataset block from a config file:
 
