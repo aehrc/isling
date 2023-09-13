@@ -7,7 +7,7 @@
 # note that only paired-end reads are supported
 #
 # A yaml file specifies which references are to be used with which datasets
-# the pipline lives in the intvi_pipeline folder which should be cloned
+# the pipline lives in the isling folder which should be cloned
 # from the git repo
 
 # the steps in the pipeline are as follows:
