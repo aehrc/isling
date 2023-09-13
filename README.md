@@ -11,6 +11,7 @@ Isling is a tool for detecting viral or vector integration in paired-end reads. 
 If you have `conda` and `snakemake` installed, to run with the (included) test data locally:
 
 ```
+git clone https://github.com/aehrc/isling.git && cd isling
 snakemake --configfile test/config/test.yml --cores <cores> --use-conda
 ```
 
