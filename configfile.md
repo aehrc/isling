@@ -44,6 +44,8 @@ dataset_name:
     - "path/to/bed"
   bed-exclude:
     - "path/to/bed"
+  annotation-gff:
+    - "path/to/gff"
   min-n-merge: 1
   merge-method: 'common'
 ```
@@ -114,13 +116,14 @@ After detection, junction reads/read pairs may be filtered using post-processing
 	- *HostMapQ* (integer) - mapping quality of the host alignment
 	- *ViralMapQ* (integer) - mapping quality of the virus/vector alignment
 	
-2. `bed-exclude`: Specify a list of `bed` files in order to exclude any integrations that fall within the regions in those `bed` files
-3. `bed-include`: Specify a list of `bed` files in order to only include integrations that fall within the regions in those `bed` files
+2. `bed-exclude`: Specify a list of `bed` files to exclude any integrations that fall within the regions in those `bed` files
+3. `bed-include`: Specify a list of `bed` files to only include integrations that fall within the regions in those `bed` files
+4. `annotation-gff`: Specify a list of `gff` files to annotate each integration with the nearest feature in each `gff` file, and the distance between the integration and that feature
 
 
 TODO:
-5. `nearest-bed`: Specify a list of `bed` files in order to annotate each integration with the nearest feature in each `bed` file, and the distance between the integration and that feature
-6. `nearest-gtf`: Similar to `nearest-bed`, but with a `gtf` file rather than an `bed` file
+5. `nearest-bed`: Specify a list of `bed` files to annotate each integration with the nearest feature in each `bed` file, and the distance between the integration and that feature
+
 
 #### Merging
 

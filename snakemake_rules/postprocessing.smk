@@ -345,6 +345,27 @@ rule merged_bed:
 		python3 scripts/merge.py -i {input.txt} -o {output.merged} -c {params.method} -n {params.n}
 		"""
 
+rule annotate_merged:
+	input:
+		merged = rules.merged_bed.output.merged,
+		annot = lambda wildcards: [os.path.splitext(i)[0] + '.sorted.bed' for i in get_value_from_df(wildcards, 'annot_gff')],
+	output:
+		annotated = "{outpath}/{dset}/ints/{samp}.{host}.{virus}.integrations.post.unique.merged.annotated.txt"
+	container:
+		"docker://szsctt/isling:latest"
+	conda:
+		"../envs/bedtools.yml"
+	resources:
+		mem_mb=lambda wildcards, attempt, input: int(resources_list_with_min_and_max(input, attempt, 1.5, 1000)),
+		time = lambda wildcards, attempt: (30, 120, 1440, 10080)[attempt - 1],
+	threads: 1
+	shell:
+		"""
+		python3 scripts/annotate.py -i {input.txt} -a {input.annot} -o {output.merged} 
+		"""
+
+
+
 rule summarise:
 	input: 
 		merged_beds = lambda wildcards: expand(strip_wildcard_constraints(rules.merged_bed.output.merged), zip,

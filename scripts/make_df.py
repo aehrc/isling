@@ -26,6 +26,7 @@ filter_default = ["NoAmbiguousBases < 20 or Type == discordant",
                    "PossibleVectorRearrangement == False"]
 bed_exclude_default = []
 bed_include_default = []
+annot_default = []
 mapq_thresh_default = 20
 report_default = False
 
@@ -122,6 +123,7 @@ def make_df(config):
         filter_str = get_filter(config, dataset, filter_default)
         bed_exclude = tuple(get_value_or_default(config, dataset, 'bed-exclude', bed_exclude_default))
         bed_include = tuple(get_value_or_default(config, dataset, 'bed-include', bed_include_default))
+        annot_gff = tuple(get_value_or_default(config, dataset, 'annotation-gff', annot_default))
         mapq = get_value_or_default(config, dataset, 'mapq-threshold', mapq_thresh_default)
         report = get_value_or_default(config, dataset, 'generate-report', report_default)
 
@@ -185,11 +187,11 @@ def make_df(config):
             virus_prefix = config[dataset]["virus_prefixes"][virus] 
             
             # append combinations of each sample, host and virus        
-            rows.append((dataset_name, dataset, sample, host, host_fasta, host_prefix, virus, virus_fasta, virus_prefix, merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, merge_method, merge_n_min, clip_cutoff, cigar_tol, split, mean_frag_len, align_cpus, cat, dedup_subs, filter_str, bed_exclude, bed_include, mapq, nm_diff, nm_pc, report))
+            rows.append((dataset_name, dataset, sample, host, host_fasta, host_prefix, virus, virus_fasta, virus_prefix, merge, trim, dedup, unique,  outdir, bwa_mem_params, R1_file, R2_file, bam_file, adapter_1, adapter_2, merge_method, merge_n_min, clip_cutoff, cigar_tol, split, mean_frag_len, align_cpus, cat, dedup_subs, filter_str, bed_exclude, bed_include, annot_gff, mapq, nm_diff, nm_pc, report))
 
                 
     # make dataframe
-    toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'merge_method', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'split', 'mean_frag_len', 'align_cpus', 'cat', 'dedup_subs', 'filter', 'bed_exclude', 'bed_include', 'mapq_thresh', 'nm_diff', 'nm_pc', 'generate_report'])
+    toDo = pd.DataFrame(rows, columns=['dataset', 'config_dataset', 'sample', 'host', 'host_fasta', 'host_prefix', 'virus', 'virus_fasta', 'virus_prefix', 'merge', 'trim', 'dedup', 'unique', 'outdir', 'bwa_mem_params', 'R1_file', 'R2_file', 'bam_file', 'adapter_1', 'adapter_2', 'merge_method', 'merge_n_min', 'clip_cutoff', 'cigar_tol', 'split', 'mean_frag_len', 'align_cpus', 'cat', 'dedup_subs', 'filter', 'bed_exclude', 'bed_include', 'annot_gff', 'mapq_thresh', 'nm_diff', 'nm_pc', 'generate_report'])
     
     # do checks on dataframe
     check_dataset_sample_unique(toDo)
