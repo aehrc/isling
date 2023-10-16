@@ -1,0 +1,30 @@
+name: Run tests
+
+on: [push]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        env: [py37_pysam ]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Install setup-miniconda 
+      uses: conda-incubator/setup-miniconda@v2
+
+    - name: Set up conda environment
+      run: |
+        conda env create -f envs/${{ matrix.env }}.yml
+        
+
+    - name: Run tests
+      run: |
+        conda activate ${{ matrix.env }}
+        python -m pytest 
+
+    - name: Deactivate conda environment
+      run: conda deactivate
