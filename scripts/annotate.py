@@ -29,42 +29,57 @@ def main():
     df.to_csv(args.output, sep="\t", index=False)
 
 
-def parse_args():
+def parse_args(inargs = None):
 
     parser = argparse.ArgumentParser(description="Annotate integration sites with features from one or more gff files")
     parser.add_argument("-i", "--input", help="input file of integration sites", required=True)
     parser.add_argument("-g", "--gff", help="gff file(s) to annotate with", nargs="+")
     parser.add_argument("-v", "--virus", help="Use viral coordinates instead of host coordinates", action="store_true")
     parser.add_argument("-o", "--output", help="output file name", required = True)
-    args = parser.parse_args()
+    
+    # parse args
+    if inargs:
+        args = parser.parse_args(inargs)
+    else:
+        args = parser.parse_args()
 
     return args
 
 def get_closest_feature(ints, gff, df):
 
-    gt = BedTool(gff).sort()
+    # if df is empty, return empty df
+    if df.shape[0] == 0:
+        df[f'{gff.fn}_Feature'] = ['.' for i in range(df.shape[0])]
+        df[f'{gff.fn}_Distance'] = [-1 for i in range(df.shape[0])]
+        return df
 
     # get closest feature
+    gt = BedTool(gff).sort()
     closest = ints.closest(gt, d=True, t="all")
 
-    # combine closest feature and distance if there is more than one match
-    # and add to dataframe
-    closest_df = (pd.read_csv(closest.fn, sep="\t", header=None)
-                    .rename(columns={3: "ID", 12: "Feature", 13: "Distance"})
-                    .groupby("ID")
+    # read dataframe
+    closest_df = pd.read_csv(closest.fn, sep="\t", header=None)
+
+    # if no matches, add columns of "." and -1
+    if closest_df.shape[0] > 0:
+        df[f'{gff.fn}_Feature'] = ['.' for i in range(df.shape[0])]
+        df[f'{gff.fn}_Distance'] = [-1 for i in range(df.shape[0])]
+
+    else:
+        # collapse multiple matches into one row
+        closest_df = ( closest_df
+                    .rename(columns={3: "SiteID", 12: "Feature", 13: "Distance"})
+                    .groupby("SiteID")
                     .agg(Feature = ("Feature", lambda x: ','.join(str(i) for i in x)), 
                          Distance = ("Distance", lambda x: ','.join(str(i) for i in x)))
-                    .rename(columns={"Feature": gff + "_Feature", "Distance": gff + "_Distance"})
+                    .rename(columns={"Feature": gff.fn + "_Feature", "Distance": gff.fn + "_Distance"})
                     .reset_index()
                   )
 
-    # join with original dataframe
-    df = df.merge(closest_df, how="left", left_on="SiteID", right_on="ID")
-    print(df)
+        # join with original dataframe
+        df = df.merge(closest_df, how="left", on="SiteID")
 
     return df
-
-
 
 def integration_bedtool(df, virus=False):
 
