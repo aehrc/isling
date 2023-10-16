@@ -37,3 +37,4 @@ out
 benchmark/sra_data/data/references/mm10_no_alt_analysis_set_ENCODE.fasta.fai
 .cache
 tests/__pycache__/
+__pycache__/
