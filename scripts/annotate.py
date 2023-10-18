@@ -2,6 +2,7 @@
 # add two columns for each gff - the closest feature to each integration site and 
 # the distance to that feature
 
+import os
 import argparse
 import tempfile
 
@@ -49,12 +50,14 @@ def get_closest_feature(ints, gff, df):
 
     # if df is empty, return empty df
     if df.shape[0] == 0:
-        df[f'{gff.fn}_Feature'] = ['.' for i in range(df.shape[0])]
-        df[f'{gff.fn}_Distance'] = [-1 for i in range(df.shape[0])]
+        fn = os.path.basename(gff)
+        df[f'{fn}_Feature'] = ['.' for i in range(df.shape[0])]
+        df[f'{fn}_Distance'] = [-1 for i in range(df.shape[0])]
         return df
 
     # get closest feature
     gt = BedTool(gff).sort()
+    ints = ints.sort()
     closest = ints.closest(gt, d=True, t="all")
 
     # read dataframe
@@ -62,8 +65,9 @@ def get_closest_feature(ints, gff, df):
 
     # if no matches, add columns of "." and -1
     if closest_df.shape[0] > 0:
-        df[f'{gff.fn}_Feature'] = ['.' for i in range(df.shape[0])]
-        df[f'{gff.fn}_Distance'] = [-1 for i in range(df.shape[0])]
+        fn = os.path.basename(gff)
+        df[f'{fn}_Feature'] = ['.' for i in range(df.shape[0])]
+        df[f'{fn}_Distance'] = [-1 for i in range(df.shape[0])]
 
     else:
         # collapse multiple matches into one row

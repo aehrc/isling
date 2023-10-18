@@ -8,3 +8,4 @@ dependencies:
   - pysam=0.16.0.1
   - pybedtools
   - pytest
+  - pandas
