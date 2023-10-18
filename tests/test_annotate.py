@@ -1,3 +1,6 @@
+import os
+import tempfile
+
 from pandas.core.frame import DataFrame
 import pytest
 import pandas as pd
@@ -38,8 +41,9 @@ def df_empty():
 def test_get_closest_feature(df: DataFrame, ints_bedtool: BedTool, gff_bedtool: BedTool):
     # expected output
     expected_output = df.copy()
-    expected_output[f"{gff_bedtool.fn}_Feature"] = ["Gene1", "Gene2", "."]
-    expected_output[f"{gff_bedtool.fn}_Distance"] = [11, 0, -1]
+    fn = os.path.basename(gff_bedtool.fn)
+    expected_output[f"{fn}_Feature"] = ["Gene1", "Gene2", "."]
+    expected_output[f"{fn}_Distance"] = [11, 0, -1]
 
     # test function
     output = get_closest_feature(ints_bedtool, gff_bedtool, df)
@@ -55,8 +59,9 @@ def test_get_closest_feature_empty_gff(df: DataFrame, ints_bedtool: BedTool):
 
     # expected output
     expected_output = df.copy()
-    expected_output[f"{gff.fn}_Feature"] = [".", ".", "."]
-    expected_output[f"{gff.fn}_Distance"] = [-1, -1, -1]
+    fn = os.path.basename(gff.fn)
+    expected_output[f"{fn}_Feature"] = [".", ".", "."]
+    expected_output[f"{fn}_Distance"] = [-1, -1, -1]
 
     # test function
     output = get_closest_feature(ints_bedtool, gff, df)
@@ -72,8 +77,9 @@ def test_get_closest_feature_empty_ints(df_empty: DataFrame, gff_bedtool: BedToo
 
     # expected output
     expected_output = df_empty.copy()
-    expected_output[f"{gff_bedtool.fn}_Feature"] = []
-    expected_output[f"{gff_bedtool.fn}_Distance"] = []
+    fn = os.path.basename(gff_bedtool.fn)
+    expected_output[f"{fn}_Feature"] = []
+    expected_output[f"{fn}_Distance"] = []
 
     # test function
     output = get_closest_feature(ints_bedtool, gff_bedtool, df_empty)

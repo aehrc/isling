@@ -4,7 +4,6 @@
 
 import os
 import argparse
-import tempfile
 
 import pandas as pd
 from pybedtools import BedTool
@@ -24,7 +23,8 @@ def main():
     for gff in args.gff:
 
         # get closest feature
-        df = get_closest_feature(ints, gff, df)
+        gt = BedTool(gff)
+        df = get_closest_feature(ints, gt, df)
 
     # write output
     df.to_csv(args.output, sep="\t", index=False)
@@ -50,13 +50,13 @@ def get_closest_feature(ints, gff, df):
 
     # if df is empty, return empty df
     if df.shape[0] == 0:
-        fn = os.path.basename(gff)
+        fn = os.path.basename(gff.fn)
         df[f'{fn}_Feature'] = ['.' for i in range(df.shape[0])]
         df[f'{fn}_Distance'] = [-1 for i in range(df.shape[0])]
         return df
 
     # get closest feature
-    gt = BedTool(gff).sort()
+    gt = gff.sort()
     ints = ints.sort()
     closest = ints.closest(gt, d=True, t="all")
 
@@ -65,7 +65,7 @@ def get_closest_feature(ints, gff, df):
 
     # if no matches, add columns of "." and -1
     if closest_df.shape[0] > 0:
-        fn = os.path.basename(gff)
+        fn = os.path.basename(gff.fn)
         df[f'{fn}_Feature'] = ['.' for i in range(df.shape[0])]
         df[f'{fn}_Distance'] = [-1 for i in range(df.shape[0])]
 
