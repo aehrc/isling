@@ -22,7 +22,7 @@ def gff_bedtool():
 
 @pytest.fixture
 def ints_bedtool(ints: list):
-    return BedTool(ints)
+    return BedTool([i[:3] + i[6:7] for i in ints])
 
 @pytest.fixture
 def df(ints: list):

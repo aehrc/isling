@@ -49,8 +49,8 @@ def parse_args(inargs = None):
 def get_closest_feature(ints, gff, df):
 
     # if df is empty, return empty df
-    if df.shape[0] == 0:
-        fn = os.path.basename(gff.fn)
+    fn = os.path.basename(gff.fn)
+    if df.shape[0] == 0 or len(gff) == 0:
         df[f'{fn}_Feature'] = ['.' for i in range(df.shape[0])]
         df[f'{fn}_Distance'] = [-1 for i in range(df.shape[0])]
         return df
@@ -63,25 +63,18 @@ def get_closest_feature(ints, gff, df):
     # read dataframe
     closest_df = pd.read_csv(closest.fn, sep="\t", header=None)
 
-    # if no matches, add columns of "." and -1
-    if closest_df.shape[0] > 0:
-        fn = os.path.basename(gff.fn)
-        df[f'{fn}_Feature'] = ['.' for i in range(df.shape[0])]
-        df[f'{fn}_Distance'] = [-1 for i in range(df.shape[0])]
-
-    else:
-        # collapse multiple matches into one row
-        closest_df = ( closest_df
+    # collapse multiple matches into one row
+    closest_df = ( closest_df
                     .rename(columns={3: "SiteID", 12: "Feature", 13: "Distance"})
                     .groupby("SiteID")
                     .agg(Feature = ("Feature", lambda x: ','.join(str(i) for i in x)), 
-                         Distance = ("Distance", lambda x: ','.join(str(i) for i in x)))
-                    .rename(columns={"Feature": gff.fn + "_Feature", "Distance": gff.fn + "_Distance"})
+                            Distance = ("Distance", lambda x: ','.join(str(i) for i in x)))
+                    .rename(columns={"Feature": fn + "_Feature", "Distance": fn + "_Distance"})
                     .reset_index()
                   )
 
-        # join with original dataframe
-        df = df.merge(closest_df, how="left", on="SiteID")
+    # join with original dataframe
+    df = df.merge(closest_df, how="left", on="SiteID")
 
     return df
 
