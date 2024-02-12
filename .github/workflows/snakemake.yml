@@ -32,6 +32,6 @@ jobs:
         with:
           directory: '.'
           snakefile: 'Snakefile'
-          args: '--cores 1 --use-conda --conda-cleanup-pkgs cache --config samples=tests/data/config/samples.csv'
+          args: '--cores 1 --use-conda --conda-cleanup-pkgs cache --configfile test/config/test.yml'
           show-disk-usage-on-error: true
           
