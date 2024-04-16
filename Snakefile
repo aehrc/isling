@@ -40,14 +40,11 @@ import re
 
 # set working directory - directory in which snakefile is located
 if 'snakedir' not in config:
-	config['snakedir'] = getcwd()
-	print(f"warning: 'snakedir' not specified in config file: using current working directory ({config['snakedir']})")
+    config['snakedir'] = getcwd()
+    print(f"warning: 'snakedir' not specified in config file: using current working directory ({config['snakedir']})")
 workdir: config['snakedir']
 snakedir = config['snakedir']
 config.pop('snakedir')
-
-# Check if cloud computing is used
-config['bucket'] = workflow.default_remote_prefix
 
 sys.path.append(os.path.join(snakedir, "scripts/"))
 from scripts.make_df import make_df, make_reference_dict
@@ -64,13 +61,13 @@ ref_names = make_reference_dict(toDo)
 #### global wildcard constraints ####
 
 wildcard_constraints:
-	virus = "|".join([re.escape(i) for i in set(toDo.loc[:,'virus'])]),
-	samp = "|".join([re.escape(i) for i in set(toDo.loc[:,'sample'])]),
-	dset = "|".join([re.escape(i) for i in set(toDo.loc[:,'dataset'])]),
-	host = "|".join([re.escape(i) for i in set(toDo.loc[:,'host'])]),
-	align_type = "bwaPaired|bwaSingle",
-	outpath = "|".join([re.escape(i) for i in set(toDo.loc[:,'outdir'])]),
-	part = "\d+"
+    virus = "|".join([re.escape(i) for i in set(toDo.loc[:,'virus'])]),
+    samp = "|".join([re.escape(i) for i in set(toDo.loc[:,'sample'])]),
+    dset = "|".join([re.escape(i) for i in set(toDo.loc[:,'dataset'])]),
+    host = "|".join([re.escape(i) for i in set(toDo.loc[:,'host'])]),
+    align_type = "bwaPaired|bwaSingle",
+    outpath = "|".join([re.escape(i) for i in set(toDo.loc[:,'outdir'])]),
+    part = "\d+"
 
 #### local rules ####
 localrules: all, touch_merged, check_bam_input_is_paired
@@ -82,35 +79,36 @@ ucsc_files = set()
 merged_bed = set()
 
 for i, row in toDo.iterrows():
-	if row['generate_report']:
-		summary_files.add(f"{row['outdir']}/summary/{row['dataset']}.html")
-		summary_files.add(f"{row['outdir']}/integration_summary.html")
-	ucsc_files.add(f"{row['outdir']}/summary/ucsc_bed/{row['dataset']}.post.bed")
-	conditions.add(f"{row['outdir']}/summary/{row['dataset']}.analysis_conditions.tsv")
-	merged_bed.add(f"{row['outdir']}/{row['dataset']}/ints/{row['sample']}.{row['host']}.{row['virus']}.integrations.post.unique.merged.txt")
+    
+    if row['generate_report']:
+        summary_files.add(f"{row['outdir']}/summary/{row['dataset']}.html")
+        summary_files.add(f"{row['outdir']}/integration_summary.html")
+    ucsc_files.add(f"{row['outdir']}/summary/ucsc_bed/{row['dataset']}.post.bed")
+    conditions.add(f"{row['outdir']}/summary/{row['dataset']}.analysis_conditions.tsv")
+    merged_bed.add(f"{row['outdir']}/{row['dataset']}/ints/{row['sample']}.{row['host']}.{row['virus']}.integrations.post.unique.merged.txt")
 
 rule all:
-	input:
-		conditions,
-		summary_files,
-#		ucsc_files,
-		merged_bed,
-#		expand("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bam",
-#			zip,
-#			outpath = toDo.loc[:,'outdir'],
-#			dset = toDo.loc[:,'dataset'],
-#			samp = toDo.loc[:,'sample'],
-#			virus = toDo.loc[:,'virus'],
-#			host = toDo.loc[:,'host'],
-#			),
-#		expand("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bam",
-#			zip,
-#			outpath = toDo.loc[:,'outdir'],
-#			dset = toDo.loc[:,'dataset'],
-#			samp = toDo.loc[:,'sample'],
-#			virus = toDo.loc[:,'virus'],
-#			host = toDo.loc[:,'host'],
-#			)
+    input:
+        conditions,
+        summary_files,
+#       ucsc_files,
+        merged_bed,
+#       expand("{outpath}/{dset}/virus_aligned/{samp}.{virus}.bam",
+#            zip,
+#            outpath = toDo.loc[:,'outdir'],
+#            dset = toDo.loc[:,'dataset'],
+#            samp = toDo.loc[:,'sample'],
+#            virus = toDo.loc[:,'virus'],
+#            host = toDo.loc[:,'host'],
+#            ),
+#       expand("{outpath}/{dset}/host_aligned/{samp}.{host}.readsFrom{virus}.bam",
+#            zip,
+#            outpath = toDo.loc[:,'outdir'],
+#            dset = toDo.loc[:,'dataset'],
+#            samp = toDo.loc[:,'sample'],
+#            virus = toDo.loc[:,'virus'],
+#            host = toDo.loc[:,'host'],
+#            )
 
 #### read preprocessing ####
 include: "snakemake_rules/preprocessing.smk"
