@@ -27,7 +27,11 @@ def resources_list_with_min_and_max(file_name_list, attempt, mult_factor=2, mini
 	# check documentation https://snakemake.readthedocs.io/en/stable/_modules/snakemake/io.html
 	# for more info
 	try:
-		resource = int(sum([file.size for file in file_name_list]) / 1024 / 1024 ) * attempt * mult_factor
+		if hasattr(file_name_list, "size"):
+			total_bytes = file_name_list.size
+		else:
+			total_bytes = sum(os.path.getsize(str(f)) for f in file_name_list)
+		resource = int(total_bytes / 1024 / 1024) * attempt * mult_factor
 	# sometimes this doesn't work - not sure why...
 	except WorkflowError:
 		
