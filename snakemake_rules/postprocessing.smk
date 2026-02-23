@@ -225,7 +225,7 @@ rule rmd_summary_dataset:
 							virus = toDo.loc[toDo['dataset'] == wildcards.dset,'virus'],
 							allow_missing=True
 							),
-                virus_stats = lambda wildcards: expand(strip_wildcard_constraints(rules.virus_stats.output.stats),
+		virus_stats = lambda wildcards: expand(strip_wildcard_constraints(rules.virus_stats.output.stats),
 							zip,
 							samp = toDo.loc[toDo['dataset'] == wildcards.dset,'sample'],
 							virus = toDo.loc[toDo['dataset'] == wildcards.dset,'virus'],
@@ -312,7 +312,7 @@ rule rmd_summary:
 		script = lambda wildcards: os.path.abspath("scripts/summary_all.Rmd"),
 		host_prefixes = lambda wildcards, input:  "c('" + "', '".join(os.path.splitext(i)[0] for i in input.host_ann) + "')",
 		virus_prefixes = lambda wildcards, input: "c('" + "', '".join(os.path.splitext(i)[0] for i in input.virus_ann) + "')",
-		bucket = workflow.default_remote_prefix,
+		bucket = lambda wildcards: config['bucket'],
 		workdir = lambda wildcards: os.getcwd()
 	conda:
 		"../envs/rscripts.yml"
